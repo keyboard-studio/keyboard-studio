@@ -41,6 +41,11 @@ import {
 import type { PhaseFSeedContext } from "../lib/phaseFSeeds.ts";
 import { proposeTroubleshooting } from "../lib/troubleshootingProposal.ts";
 import {
+  isBodyParityLive,
+  legacyBodyParityAnswer,
+  type BodyParityInputs,
+} from "../lib/bodyParity.ts";
+import {
   combineTroubleshootingProposals,
   extractBaseHelpTroubleshootingLines,
 } from "../lib/baseHelpTroubleshooting.ts";
@@ -311,6 +316,26 @@ export function buildLiveExtractContext(): ExtractContext {
     facetTroubleshootingProposal,
     baseHelpTroubleshootingLines,
   );
+  // Issue #2530: the body-parity question's liveness and legacy answer,
+  // computed from the working-copy store (G-17 — the pf_* module reads
+  // the computed values off the context). The legacy proposal is offered
+  // only when the question is live, so a stale slice on the copy track
+  // (or matching pages) seeds nothing.
+  const bodyParityDecisionValue =
+    useDecisionStore.getState().decisions["help-body-parity"]?.value;
+  const bodyParityInputs: BodyParityInputs = {
+    instantiationMode: wc.instantiationMode,
+    startWelcomeHtmText: wc.startWelcomeHtmText,
+    startHelpPhpText: wc.startHelpPhpText,
+    docFixProposals: wc.docFixProposals,
+    ...(typeof bodyParityDecisionValue === "string"
+      ? { bodyParityDecision: bodyParityDecisionValue }
+      : {}),
+  };
+  const bodyParityLive = isBodyParityLive(bodyParityInputs);
+  const bodyParityProposal = bodyParityLive
+    ? legacyBodyParityAnswer(wc.docFixProposals)
+    : undefined;
   ctx.phaseF = {
     ...(welcomePrefill !== undefined ? { welcomePrefill } : {}),
     ...(projectUrlProposal !== undefined ? { projectUrlProposal } : {}),
@@ -320,6 +345,8 @@ export function buildLiveExtractContext(): ExtractContext {
     ...(troubleshootingProposal !== undefined
       ? { troubleshootingProposal }
       : {}),
+    ...(bodyParityLive ? { bodyParityLive } : {}),
+    ...(bodyParityProposal !== undefined ? { bodyParityProposal } : {}),
     ...(surveyContext["author_contact"] !== undefined
       ? { authorContact: surveyContext["author_contact"] }
       : {}),

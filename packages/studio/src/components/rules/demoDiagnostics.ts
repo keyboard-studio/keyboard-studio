@@ -5,7 +5,7 @@
 // distinct .kmn lines and one representative diagnostic. The wording for each
 // group comes from lib/plainDiagnosticMessage.ts (rendering stays in DemoPane).
 
-import type { CompilerDiagnostic } from "@keyboard-studio/contracts";
+import type { CompilerDiagnostic, DiagnosticPlatform } from "@keyboard-studio/contracts";
 
 /** HINT_UnreachableRule as the kmc-kmn bridge emits it: a later rule repeats an earlier left-hand side. */
 export const CODE_UNREACHABLE_RULE = "KM_HINT_KMCMP_3154094";
@@ -22,13 +22,22 @@ export interface DemoDiagnosticGroup {
 
 /**
  * Group by code in first-seen order. Info-severity diagnostics are dropped
- * unless `includeInfo` is set: this is the desktop rules demo, and the info
- * notes the compiler emits are web/touch-target ones, which have no dedicated
- * surface yet. Warnings, errors and fatals are never hidden.
+ * unless `includeInfo` is set: the demo's notes list is for actionable
+ * notes, and info detail stays available in the error branch (which keeps
+ * every severity) and on the review screen. Warnings, errors and fatals
+ * are never hidden.
+ *
+ * When `platform` is set, diagnostics tagged for the OTHER platform are
+ * dropped (#2378): the desktop demo shows desktop notes, and the touch
+ * step's surface will show web notes once it ships. Diagnostics with no
+ * platform tag (unowned — synthesized or from another producer) are NEVER
+ * dropped by this filter: an unknown home is not a reason to hide a note.
+ * The review screen's DiagnosticsPanel takes no `platform` and shows
+ * everything, so nothing is dropped from the app as a whole.
  */
 export function groupDemoDiagnostics(
   diagnostics: readonly CompilerDiagnostic[],
-  options: { includeInfo?: boolean } = {},
+  options: { includeInfo?: boolean; platform?: DiagnosticPlatform } = {},
 ): DemoDiagnosticGroup[] {
   const byCode = new Map<string, DemoDiagnosticGroup>();
   const lineSets = new Map<string, Set<number>>();
@@ -37,6 +46,13 @@ export function groupDemoDiagnostics(
   const seen = new Set<string>();
   for (const d of diagnostics) {
     if (d.severity === "info" && options.includeInfo !== true) continue;
+    if (
+      options.platform !== undefined &&
+      d.platform !== undefined &&
+      d.platform !== options.platform
+    ) {
+      continue;
+    }
     const key = `${d.code}|${d.location?.line ?? ""}|${d.message}`;
     if (seen.has(key)) continue;
     seen.add(key);

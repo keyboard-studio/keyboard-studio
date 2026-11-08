@@ -12,6 +12,15 @@
 // gets a comment; otherwise a `bug(<area>): ...` issue is filed. Failures that
 // the sweep already marked as owned by a known gap are summarised, never filed.
 // Only `gh issue list|comment|create` is used; `gh` is injected so tests stub it.
+//
+// The merged report is a SUMMARY, not a concatenation: each shard case carries
+// its full author `run` (decisions, gates, report), so a latin-tier merge is
+// ~1GB of JSON and `JSON.stringify` throws `RangeError: Invalid string length`
+// (V8's ~512MB string cap) before anything is filed -- run 42472864904 died
+// exactly there. The merge therefore drops `run` and keeps only the fields the
+// summary and the filing need; the per-shard artifacts keep the full detail.
+// A shard killed mid-write also leaves a truncated JSON file (run 41299134474);
+// that shard is skipped with a warning instead of killing the whole merge.
 
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, appendFileSync } from "node:fs";
@@ -45,13 +54,13 @@ export function normaliseCase(c) {
 }
 
 /** Merge shard reports of one tier into a single report. */
-export function mergeReports(reports) {
+export function mergeReports(reports, { unparsedShards = [] } = {}) {
   if (reports.length === 0) throw new Error("no shard reports to merge");
   const tier = reports[0].tier;
   const cases = [];
   for (const r of reports) {
     if (r.tier !== tier) throw new Error(`mixed tiers in one merge: ${tier} and ${r.tier}`);
-    cases.push(...r.cases.map(normaliseCase));
+    cases.push(...r.cases.map((c) => slimCase(normaliseCase(c))));
   }
   cases.sort((a, b) => (a.caseId < b.caseId ? -1 : a.caseId > b.caseId ? 1 : 0));
   const summary = { tier, cases: { completed: 0, skipped: 0, failed: 0 }, byGate: {}, byFirstFailingStep: {}, skips: {} };
@@ -67,7 +76,44 @@ export function mergeReports(reports) {
       summary.cases.completed++;
     }
   }
-  return { tier, shards: reports.map((r) => r.shard).sort(), summary, cases };
+  return { tier, shards: reports.map((r) => r.shard).sort(), unparsedShards, summary, cases };
+}
+
+/**
+ * Keep only the fields the summary and the filing need. A shard case's `run`
+ * (the full author run: decisions, gates, report) is ~0.5MB per case, so
+ * carrying it into the merged report blows past V8's string-length cap at
+ * latin scale; the per-shard artifacts remain the source of full detail.
+ */
+export function slimCase(c) {
+  const { caseId, base, profile, backspace, status, gate, decisionPoint, detail, skipReason, owner } = c;
+  const out = { caseId, base, profile, backspace, status };
+  if (gate !== undefined) out.gate = gate;
+  if (decisionPoint !== undefined) out.decisionPoint = decisionPoint;
+  if (detail !== undefined) out.detail = detail;
+  if (skipReason !== undefined) out.skipReason = skipReason;
+  if (owner !== undefined) out.owner = owner;
+  return out;
+}
+
+/**
+ * Read and parse the shard report files. A file a killed shard left truncated
+ * is skipped with a warning (its cases are lost, but the other shards still
+ * merge and file); only when NO shard parses does this throw.
+ */
+export function loadShardReports(files) {
+  const reports = [];
+  const unparsed = [];
+  for (const f of files) {
+    try {
+      reports.push(JSON.parse(readFileSync(f, "utf8")));
+    } catch (err) {
+      unparsed.push({ file: f, error: String(err?.message ?? err).split("\n")[0] });
+      console.warn(`[WARN] skipping unparseable shard report ${f}: ${unparsed.at(-1).error}`);
+    }
+  }
+  if (reports.length === 0) throw new Error("no shard reports to merge");
+  return { reports, unparsed };
 }
 
 /** Markdown for the job summary: by gate, by first failing step, skips by reason. */
@@ -95,6 +141,11 @@ export function summaryMarkdown(merged) {
   table("Skips by reason", s.skips);
   const gaps = merged.cases.filter((c) => c.status === "known-gap");
   lines.push(`Known-gap failures (summarised, not filed): ${gaps.length}`, "");
+  if (merged.unparsedShards?.length > 0) {
+    lines.push(`Unparsed shard reports (excluded from this merge): ${merged.unparsedShards.length}`, "");
+    for (const u of merged.unparsedShards) lines.push(`- ${u.file}: ${u.error}`);
+    lines.push("");
+  }
   return lines.join("\n");
 }
 
@@ -187,12 +238,13 @@ function main(argv) {
     else if (a === "--file-issues") doFile = true;
     else files.push(a);
   }
-  const merged = mergeReports(files.map((f) => JSON.parse(readFileSync(f, "utf8"))));
+  const { reports, unparsed } = loadShardReports(files);
+  const merged = mergeReports(reports, { unparsedShards: unparsed });
   if (mergeOut) writeFileSync(mergeOut, JSON.stringify(merged, null, 2), "utf8");
   const md = summaryMarkdown(merged);
   if (summaryFile) appendFileSync(summaryFile, md + "\n", "utf8");
   else console.log(md);
-  console.log(`[INFO] ${merged.summary.cases.failed} failed, ${merged.summary.cases.skipped} skipped`);
+  console.log(`[INFO] ${merged.summary.cases.failed} failed, ${merged.summary.cases.skipped} skipped${unparsed.length > 0 ? `, ${unparsed.length} shard report(s) unparseable` : ""}`);
   if (doFile) {
     for (const r of fileIssues(merged, { gh: ghRunner, runUrl })) console.log(`[OK] ${r.action} ${r.key}`);
   }

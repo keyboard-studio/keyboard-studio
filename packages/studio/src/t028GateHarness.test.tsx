@@ -235,6 +235,7 @@ function makeLiveDeps(): ReducerDeps {
     getSavedAnswer: (stepId, questionId) => peekStepAnswers(stepId)?.answers[questionId],
     getStartKeyboardId: () => useWorkingCopyStore.getState().startKeyboard?.id,
     getHistoryEntryState: () => useWorkingCopyStore.getState().historyEntryState,
+    getDocFixProposals: () => useWorkingCopyStore.getState().docFixProposals,
     applyWorkingCopyPatch: (patch, writes) => {
       const wc = useWorkingCopyStore.getState();
       if (patch.ir !== undefined && wc.ir !== null) {
@@ -244,6 +245,7 @@ function makeLiveDeps(): ReducerDeps {
       if (patch.attribution !== undefined) wc.setAttribution(patch.attribution);
       if (patch.helpDocs !== undefined) wc.setHelpDocs(patch.helpDocs);
       if (patch.historyEntryState !== undefined) wc.setHistoryEntryState(patch.historyEntryState);
+      if (patch.docFixProposals !== undefined) wc.setDocFixProposals(patch.docFixProposals);
     },
     rebuildFromDecisions: (changed) => {
       rebuildWorkingCopyFromStores(changed);

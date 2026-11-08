@@ -822,6 +822,18 @@ export interface WorkingCopyState {
    */
   customCss: string | null;
   /**
+   * The Documentation step's authored overrides (specs/html-editor), one
+   * nullable string per editable doc member, mirroring `customCss`:
+   * null = untouched (the generated/carried text ships as-is);
+   * "" = the author cleared it. Projected into the VFS by
+   * projectWorkingCopyVfs step 0b and applied again at serialize step 5c
+   * so regeneration cannot overwrite them.
+   */
+  authoredWelcomeHtm: string | null;
+  authoredReadmeHtm: string | null;
+  authoredReadmeMd: string | null;
+  authoredHelpPhp: string | null;
+  /**
    * In-progress Phase E (touch gallery) draft state — persisted across
    * unmount/remount when the user navigates back to Phase C and returns.
    *
@@ -1137,6 +1149,14 @@ export interface WorkingCopyState {
   setTouchLayoutJson: (json: string | null) => void;
   /** Record the CSS step's result (null = untouched, "" = cleared). */
   setCustomCss: (css: string | null) => void;
+  /** Record the Documentation step's authored welcome.htm (null = untouched, "" = cleared). */
+  setAuthoredWelcomeHtm: (text: string | null) => void;
+  /** Record the Documentation step's authored readme.htm (null = untouched, "" = cleared). */
+  setAuthoredReadmeHtm: (text: string | null) => void;
+  /** Record the Documentation step's authored README.md (null = untouched, "" = cleared). */
+  setAuthoredReadmeMd: (text: string | null) => void;
+  /** Record the Documentation step's authored help .php (null = untouched, "" = cleared). */
+  setAuthoredHelpPhp: (text: string | null) => void;
   /**
    * Persist the in-progress Phase E draft so it survives an unmount/remount
    * caused by back-navigation to Phase C. Call from TouchGallery whenever
@@ -1703,6 +1723,10 @@ function freshInstantiationTail() {
     sequenceFlaggedChars: [],
     touchLayoutJson: null,
     customCss: null,
+    authoredWelcomeHtm: null,
+    authoredReadmeHtm: null,
+    authoredReadmeMd: null,
+    authoredHelpPhp: null,
     touchDraft: null,
     galleryIntrosSeen: { mechanism: false, touch: false },
     // Fresh instance, not carried from any preceding working copy — see
@@ -1829,6 +1853,10 @@ export type WorkingCopyData = Omit<
   | "unlockDesktop"
   | "setTouchLayoutJson"
   | "setCustomCss"
+  | "setAuthoredWelcomeHtm"
+  | "setAuthoredReadmeHtm"
+  | "setAuthoredReadmeMd"
+  | "setAuthoredHelpPhp"
   | "setTouchDraft"
   | "markGalleryIntroSeen"
   | "reset"
@@ -1934,6 +1962,10 @@ const INITIAL_STATE: WorkingCopyData = {
   sequenceFlaggedChars: [],
   touchLayoutJson: null,
   customCss: null,
+  authoredWelcomeHtm: null,
+  authoredReadmeHtm: null,
+  authoredReadmeMd: null,
+  authoredHelpPhp: null,
   touchDraft: null,
   galleryIntrosSeen: { mechanism: false, touch: false },
   // key edit overlay + touch editor mode (spec 063) — empty log, character
@@ -2363,6 +2395,14 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setTouchLayoutJson: (json) => set({ touchLayoutJson: json }),
 
   setCustomCss: (css) => set({ customCss: css }),
+
+  setAuthoredWelcomeHtm: (text) => set({ authoredWelcomeHtm: text }),
+
+  setAuthoredReadmeHtm: (text) => set({ authoredReadmeHtm: text }),
+
+  setAuthoredReadmeMd: (text) => set({ authoredReadmeMd: text }),
+
+  setAuthoredHelpPhp: (text) => set({ authoredHelpPhp: text }),
 
   setTouchDraft: (draft) => set({ touchDraft: draft }),
 

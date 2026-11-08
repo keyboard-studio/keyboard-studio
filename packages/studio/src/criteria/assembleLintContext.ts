@@ -66,6 +66,7 @@
 import type {
   CriteriaLintInput,
   CriteriaPlacement,
+  FontCoverage,
   LinguistInventory,
   ReviewContext,
   VirtualFS,
@@ -83,7 +84,9 @@ import type { LintContext } from "@keymanapp/keyboard-lint";
 
 import { findKmnPath } from "../lib/findKmnPath.ts";
 import { readVfsText } from "../lib/vfsText.ts";
+import { fontCoveredRanges } from "./fontCmap.ts";
 import { fontFamilyName } from "./fontFamilyNames.ts";
+import { packagedFontBinaries } from "./packagedFontBinaries.ts";
 
 /**
  * The region subtag of a BCP47 tag (mirrors the rule in
@@ -464,6 +467,18 @@ export function assembleLintContext(
     }
   }
 
+  // Issue #2593 §18.13: cmap coverage of the same population — every
+  // .kps-listed font file present in this VFS. A present file whose
+  // cmap cannot be read contributes no entry (never a false "missing
+  // glyph" finding); the check then judges on what could be read.
+  const kpsFontCoverage: FontCoverage[] = [];
+  for (const font of packagedFontBinaries(vfs, kpsFontRefs)) {
+    const covered = fontCoveredRanges(font.bytes);
+    if (covered !== undefined) {
+      kpsFontCoverage.push({ ref: font.path, covered });
+    }
+  }
+
   // KPJ pair facts (1.10b / 2.7): the root .kpj's raw text, handed to
   // keyboard-lint like the .kps text for 15.3. The file lives at the
   // VFS root as <keyboardId>.kpj (the scaffolder's rename keeps it
@@ -482,6 +497,7 @@ export function assembleLintContext(
     kpsLanguages,
     kpsTargets,
     kpsFontFamilies,
+    kpsFontCoverage,
     kpsFontSelected,
     kpsDetailsReadme,
     kpsDetailsWelcome,

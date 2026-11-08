@@ -63,6 +63,22 @@ export interface PhaseFSeedInputs {
    * 2026-10-17 FR-007 carve-out ruling on issue #2206.
    */
   troubleshootingProposal?: string;
+  /**
+   * Issue #2530: whether the 11.9 body-parity question is live — the
+   * inherited welcome/help pages differ, or a body-parity answer is
+   * already recorded. Computed by the wiring from the working-copy
+   * store (`lib/bodyParity.ts`), same pattern as `welcomePrefill`.
+   * `pf_body_parity`'s `lookupDefault` answers only when this is true,
+   * so the copy track and matching pages seed nothing.
+   */
+  bodyParityLive?: boolean;
+  /**
+   * Issue #2530: a persisted `docFixProposals.bodySync` answer, mapped
+   * onto the new question's vocabulary (`"declined"` →
+   * `"keep-different"`). `pf_body_parity`'s `extract` reads it. Only
+   * present when the question is live.
+   */
+  bodyParityProposal?: string;
   authorContact?: string;
   bcp47Tag?: string;
 }

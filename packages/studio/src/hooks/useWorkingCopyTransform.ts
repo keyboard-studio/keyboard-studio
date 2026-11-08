@@ -232,6 +232,18 @@ export function useWorkingCopyTransform(
   const liveCss = opts?.liveCss;
   const storeCustomCss = useWorkingCopyStore((s) => s.customCss);
   const customCss = liveCss !== undefined ? liveCss : storeCustomCss;
+  // Documentation-step overrides (specs/html-editor): the authored doc files
+  // are store fields like customCss, read through the hook's own selectors
+  // so the memo keys below stay the single trigger for rebuilding this closure.
+  const authoredWelcomeHtm = useWorkingCopyStore((s) => s.authoredWelcomeHtm);
+  const authoredReadmeHtm = useWorkingCopyStore((s) => s.authoredReadmeHtm);
+  const authoredReadmeMd = useWorkingCopyStore((s) => s.authoredReadmeMd);
+  const authoredHelpPhp = useWorkingCopyStore((s) => s.authoredHelpPhp);
+  // Where an authored welcome edit lands (welcomePagePath): the flat path
+  // only on an Open walk over a flat-convention base, as in the download.
+  const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
+  const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  const startWelcomeConvention = useWorkingCopyStore((s) => s.startWelcomeConvention);
 
   // P1 fix (bug F4 footgun): omitting previewedStartId is legitimate for
   // post-commit call sites (MechanismGallery, TouchGallery) but is a silent
@@ -530,6 +542,13 @@ export function useWorkingCopyTransform(
             contextToleranceOverlay: storeContextToleranceOverlay,
             touchLayoutJson: storeTouchLayoutJson,
             customCss,
+            authoredWelcomeHtm,
+            authoredReadmeHtm,
+            authoredReadmeMd,
+            authoredHelpPhp,
+            instantiationMode,
+            startVfs,
+            startWelcomeConvention,
           },
           {
             vfs,
@@ -576,5 +595,12 @@ export function useWorkingCopyTransform(
     marksGuardsKey,
     capsHandlingMode,
     customCss,
+    authoredWelcomeHtm,
+    authoredReadmeHtm,
+    authoredReadmeMd,
+    authoredHelpPhp,
+    instantiationMode,
+    startVfs,
+    startWelcomeConvention,
   ]);
 }

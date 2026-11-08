@@ -60,6 +60,7 @@ export type DecisionId =
   | "syllabic-finals-wanted"
   // Phase F help-doc answers (spec 087 US4)
   | "help-welcome-paragraph"
+  | "help-body-parity"
   | "help-usage-tip-1"
   | "help-usage-tip-2"
   | "help-history-bullets"
@@ -332,6 +333,9 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "syllabic-finals-wanted": [],
   // Phase F help-doc answers: package-descriptor / help output, no IR writes.
   "help-welcome-paragraph": [],
+  // Issue #2530: the body-parity answer writes the doc-fix-proposals
+  // working-copy slice via its apply, not the IR.
+  "help-body-parity": [],
   "help-usage-tip-1": [],
   "help-usage-tip-2": [],
   "help-history-bullets": [],

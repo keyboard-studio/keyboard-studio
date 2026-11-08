@@ -33,7 +33,7 @@
 // per settled value.
 
 import { createContext, useContext } from "react";
-import type { IRPath, KeyboardIR, HistoryEntryState } from "@keyboard-studio/contracts";
+import type { IRPath, KeyboardIR, HistoryEntryState, DocFixProposals } from "@keyboard-studio/contracts";
 import type {
   Decision,
   DecisionProvenance,
@@ -83,6 +83,13 @@ export interface GalleryHostDeps {
   getWorkingIR: () => KeyboardIR | null;
   /** Read the working copy's current HISTORY-entry state (apply context). */
   getHistoryEntryState: () => HistoryEntryState | null;
+  /**
+   * Read the working copy's current documentation-fix proposals (apply
+   * context, issue #2530). Gallery modules never return the channel
+   * (A3 authorizes it for `help-body-parity` only), but the context
+   * shape is shared with the runner, so the dep is composed here too.
+   */
+  getDocFixProposals: () => DocFixProposals | null;
   /**
    * The checked working-copy patch sink (089 contract A4) — the same sink
    * StudioShell injects into the reducer deps: the `ir` channel's checked
@@ -146,6 +153,7 @@ export function runGalleryApply<V>(
     writes,
     decisions: deps.getDecisions(),
     currentHistoryEntryState: deps.getHistoryEntryState(),
+    currentDocFixProposals: deps.getDocFixProposals(),
   };
   const patch = mod.apply(value, ctx);
   if (!assertPatchChannelsAuthorized(mod.definition.id, mod, patch)) return;

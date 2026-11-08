@@ -1,13 +1,13 @@
 {
- "generatedAt": "2026-11-06T09:58:29.157Z",
- "catalogSize": 208,
+ "generatedAt": "2026-11-08T07:50:33.818Z",
+ "catalogSize": 209,
  "byBand": {
-  "layer-c-enforce": 124,
+  "layer-c-enforce": 125,
   "scaffolder-bake": 40,
   "yellow-survey": 34,
   "red-checklist": 10
  },
- "implementedCount": 117,
+ "implementedCount": 118,
  "notImplemented": [
   "9.1-font-license-nonempty",
   "9.2-font-license-open-identifier",
@@ -2461,6 +2461,21 @@
    "hook": {
     "kind": "preSubmitChecklistText"
    }
+  },
+  {
+   "id": "18.13-packaged-fonts-cover-typed-characters",
+   "band": "layer-c-enforce",
+   "section": "18. Design heuristics (DISCUS)",
+   "description": "Every character the keyboard types has a glyph in each packaged font it ships (cmap coverage check)",
+   "hook": {
+    "kind": "lintRuleId",
+    "id": "KM_LINT_FONT_GLYPH_COVERAGE"
+   },
+   "implemented": true,
+   "precertified": false,
+   "checkFiles": [
+    "packages/keyboard-lint/src/checks/criteria/check-font-glyph-coverage.ts"
+   ]
   },
   {
    "id": "19.1-import-attribution-in-pr-body",

@@ -9,6 +9,7 @@
 import { describe, it, expect } from "vitest";
 import type { StartDocumentationProfile } from "@keyboard-studio/contracts";
 import mod, { definition, validate } from "./pf_welcome_paragraph.ts";
+import { resolveNext } from "../../flowWalk.ts";
 import { prefill, requiredWhen, type AdaptiveDescriptionContext } from "../../../lib/adaptiveDescription.ts";
 
 const FULL_PROFILE: StartDocumentationProfile = {
@@ -176,4 +177,19 @@ describe("pf_welcome_paragraph — validate() fixtures (unchanged)", () => {
       }
     });
   }
+});
+
+describe("pf_welcome_paragraph — body-parity routing (issue #2530)", () => {
+  it("routes to pf_body_parity when the 11.9 finding is live", () => {
+    expect(resolveNext(definition, undefined, { body_parity_live: "true" })).toBe(
+      "pf_body_parity",
+    );
+  });
+
+  it("routes straight to pf_font_guidance when the finding is not live", () => {
+    expect(resolveNext(definition, undefined, { body_parity_live: "false" })).toBe(
+      "pf_font_guidance",
+    );
+    expect(resolveNext(definition, undefined, {})).toBe("pf_font_guidance");
+  });
 });

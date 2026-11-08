@@ -77,6 +77,7 @@ import {
 import { makeTestIR, basicKbdus, makeStartKeyboard, irGroup, charRule } from "@keyboard-studio/contracts/fixtures";
 import { selectStrategy, deriveCarveNeededSet, generateKvksFromIR, oskContinueResult } from "@keyboard-studio/engine";
 import { completeOskStep } from "../lib/oskStepCompletion.ts";
+import { completeHtmlStep } from "../lib/htmlStepCompletion.ts";
 import { completeFallbackPolicyStep } from "../lib/fallbackPolicyStepCompletion.ts";
 import { computeConvenienceGate } from "../survey/convenience/convenienceGate.ts";
 import { recommendedRemovalChars } from "../lib/irToCarveNodes.ts";
@@ -857,8 +858,16 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
         }
 
         case "html": {
-          // welcome.htm editor — fixtures carry none; advance with empty source.
-          result = { html: "" };
+          // Documentation editor (specs/html-editor): seed from the
+          // authored text, else the base's start prose, else a stub
+          // paragraph, append one edited paragraph, and record the
+          // completion the way HtmlEditor does on Continue.
+          const htmlState = useWorkingCopyStore.getState();
+          const seed =
+            htmlState.authoredWelcomeHtm ?? htmlState.startWelcomeHtmText ?? "<p>Documentation.</p>";
+          const edited = `${seed}\n<p>Edited in the Documentation step.</p>`;
+          completeHtmlStep({ welcomeHtm: edited });
+          result = { welcomeHtm: edited };
           break;
         }
 

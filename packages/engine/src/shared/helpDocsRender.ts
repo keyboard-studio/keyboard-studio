@@ -541,8 +541,8 @@ function rewriteInheritedPagename(helpPhpText: string, displayName: string): str
 
 const LEADING_PHP_BLOCK_RE = /^(\uFEFF?\s*(?:<\?php[\s\S]*?\?>\s*)+)/;
 
-/** The page's leading `<?php … ?>` header block (the help-site header), or "" when it has none. */
-function leadingPhpBlock(page: string): string {
+/** The page's leading `<?php … ?>` header block (the help-site header), or "" when it has none. Exported for the Documentation step (specs/html-editor): the editor never sees the header; serialization re-prepends it byte-for-byte. */
+export function leadingPhpBlock(page: string): string {
   return LEADING_PHP_BLOCK_RE.exec(page)?.[1] ?? "";
 }
 

@@ -96,6 +96,7 @@ import {
   checkVersionVPrefix,
 } from "./checks/criteria/check-version.js";
 import { checkDeprecatedKpsLinkage } from "./checks/criteria/check-deprecated-kps.js";
+import { checkFontGlyphCoverage } from "./checks/criteria/check-font-glyph-coverage.js";
 import {
   checkKpjFormatOutdated,
   checkKpjVersionBumped,
@@ -299,6 +300,20 @@ export function runCriteriaChecks(
     }),
   );
   collect(checkWoffInPackage(filePaths, input.kpsFileNames, kpsPath));
+
+  // 18.13 — packaged-font glyph coverage (issue #2593): every character
+  // the keyboard types must have a glyph in each packaged font's cmap.
+  // Runs only with a parsed IR; without one the assembly names the
+  // missing IR in contextMissing, never a silent pass.
+  if (keyboardIR !== undefined) {
+    collect(
+      checkFontGlyphCoverage({
+        ir: keyboardIR,
+        coverage: input.kpsFontCoverage,
+        kmnPath: kmnPath(keyboardId),
+      }),
+    );
+  }
 
   // 15.3 — the judged keyboard's own .kps Related packages linkage
   // (gated inside the check on deprecationInPlay).

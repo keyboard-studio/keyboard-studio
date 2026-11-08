@@ -2,8 +2,11 @@
 // `gh` is always a stub here; the real CLI is never called.
 
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
-import { failureKey, failuresByKey, fileIssues, issueTitle, mergeReports, reproduceCommand } from "./file-sweep-issues.mjs";
+import { failureKey, failuresByKey, fileIssues, issueTitle, loadShardReports, mergeReports, reproduceCommand, slimCase, summaryMarkdown } from "./file-sweep-issues.mjs";
 
 const fail = (over = {}) => ({
   caseId: "sweep-kb1-p1-whole",
@@ -124,4 +127,45 @@ test("an in-progress entry left by a killed shard merges as a hung failure and i
 test("an in-progress entry with no recorded step still keys as hung @ unknown", () => {
   const m = mergeReports([report([{ caseId: "x", base: "kb2", profile: 1, backspace: "whole", status: "in-progress" }])]);
   assert.equal(failureKey(m.cases[0]), "[headless-sweep] kb2 p1-whole hung @ unknown");
+});
+
+test("slimCase keeps the filing fields and drops the per-case run payload", () => {
+  const c = slimCase(fail({ run: { decisions: { a: 1 }, report: "x".repeat(1000) }, owner: "US6" }));
+  assert.equal(c.gate, "G2");
+  assert.equal(c.detail, "boom");
+  assert.equal(c.owner, "US6");
+  assert.equal("run" in c, false);
+});
+
+test("merged cases drop run, so a latin-scale merge stays far below the stringify cap", () => {
+  // Run 42472864904 died in JSON.stringify(merged) (RangeError: Invalid string
+  // length): each shard case carries a ~0.5MB run, so the latin merge is ~1GB.
+  const bigRun = { decisions: { a: "x".repeat(1_000_000) } };
+  const m = mergeReports([report([fail({ run: bigRun }), fail({ caseId: "sweep-kb2-p1-whole", base: "kb2", run: bigRun })])]);
+  assert.equal(m.cases.every((c) => !("run" in c)), true);
+  assert.equal(failuresByKey(m).size, 2);
+  assert.ok(JSON.stringify(m).length < 10_000, `merged JSON is ${JSON.stringify(m).length} chars`);
+});
+
+test("loadShardReports skips a truncated shard file and reports it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "sweep-merge-"));
+  const good = join(dir, "headless-report-latin-1of4.json");
+  const bad = join(dir, "headless-report-latin-2of4.json");
+  writeFileSync(good, JSON.stringify(report([fail()], "1of4")));
+  writeFileSync(bad, JSON.stringify(report([fail()], "2of4")).slice(0, 40)); // killed mid-write, run 41299134474
+  const { reports, unparsed } = loadShardReports([good, bad]);
+  assert.equal(reports.length, 1);
+  assert.equal(unparsed.length, 1);
+  assert.equal(unparsed[0].file, bad);
+  const m = mergeReports(reports, { unparsedShards: unparsed });
+  assert.deepEqual(m.summary.cases, { completed: 0, skipped: 0, failed: 1 });
+  assert.equal(m.unparsedShards.length, 1);
+  assert.match(summaryMarkdown(m), /Unparsed shard reports \(excluded from this merge\): 1/);
+});
+
+test("loadShardReports throws when every shard is unparseable", () => {
+  const dir = mkdtempSync(join(tmpdir(), "sweep-merge-"));
+  const bad = join(dir, "headless-report-latin-1of4.json");
+  writeFileSync(bad, '{"tier": "latin", "shard": "1of4", "cases": [');
+  assert.throws(() => loadShardReports([bad]), /no shard reports to merge/);
 });

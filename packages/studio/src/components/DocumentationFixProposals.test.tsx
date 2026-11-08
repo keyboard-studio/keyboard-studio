@@ -3,6 +3,11 @@
 // only on an adaptation with inherited pages and live findings; accepting /
 // declining records the answer in the working copy; undo clears it; the
 // copy track never sees a proposal.
+//
+// Issue #2530: the body-parity choice (11.9) is NOT a row here any more —
+// it is the pf_body_parity flow question. These tests pin that no body-sync
+// row renders even while the 11.9 finding is live, and that a recorded
+// legacy bodySync answer renders no row either.
 
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { screen, fireEvent, cleanup, within } from "@testing-library/react";
@@ -40,7 +45,7 @@ afterEach(() => {
 });
 
 describe("DocumentationFixProposals (issue #1908)", () => {
-  it("offers the pagename and body-sync proposals on an adaptation, naming current and expected values", () => {
+  it("offers the pagename proposal on an adaptation, naming current and expected values", () => {
     instantiateAdaptation();
     render(<DocumentationFixProposals />);
 
@@ -48,9 +53,9 @@ describe("DocumentationFixProposals (issue #1908)", () => {
     expect(pagename.textContent).toContain("Cameroon QWERTY (SIL) Keyboard Help");
     expect(pagename.textContent).toContain("US English (Basic) Keyboard Help");
 
-    const bodySync = screen.getByTestId("doc-fix-body-sync");
-    // The summary diff names the divergence (the copyright line).
-    expect(bodySync.textContent).toContain("Copyright");
+    // Issue #2530: the bodies differ (a live 11.9 finding), but the
+    // body-parity choice is a flow question now — no row renders for it.
+    expect(screen.queryByTestId("doc-fix-body-sync")).toBeNull();
   });
 
   it("records acceptance, and undo clears the record", () => {
@@ -73,13 +78,15 @@ describe("DocumentationFixProposals (issue #1908)", () => {
     expect(useWorkingCopyStore.getState().docFixProposals).toBeNull();
   });
 
-  it("records the author's canonical-side choice for the body sync", () => {
+  it("renders no body-sync row for a recorded legacy bodySync answer", () => {
     instantiateAdaptation();
+    // A persisted draft's answer: the flow question owns it now, and the
+    // row must not come back to re-ask it.
+    useWorkingCopyStore.getState().setDocFixProposals({ bodySync: "help" });
     render(<DocumentationFixProposals />);
-    const bodySync = screen.getByTestId("doc-fix-body-sync");
-    fireEvent.click(within(bodySync).getByText("Use the help page's text"));
-    fireEvent.click(within(bodySync).getByText("Make both pages match"));
-    expect(useWorkingCopyStore.getState().docFixProposals).toEqual({ bodySync: "help" });
+    expect(screen.queryByTestId("doc-fix-body-sync")).toBeNull();
+    // The pagename row is unaffected by the legacy answer.
+    expect(screen.getByTestId("doc-fix-pagename")).not.toBeNull();
   });
 
   it("offers the image-width proposal when kb.css rides only in the startDocCssTexts slice, naming its path", () => {

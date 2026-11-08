@@ -49,7 +49,7 @@
 // | language-region-pick | survey/SurveyRunner.tsx (il_language_region, routed by identityResolution) | asked only for a region-ambiguous language, as a free pick among its regions; a case names no region, so the author leaves it blank |
 // | debug-pin-chip | survey/SurveyRunner.tsx (debugPinsStore) | a debug-only affordance that pins a question's value, not part of an author's decisions |
 // | help-docs-dialog | editors/adapters/PhaseFGate.tsx (ConfirmDialog) | a blocking dialog over the help-docs content; dismissing it records nothing |
-// | documentation-fix-proposals | components/DocumentationFixProposals.tsx | per-finding fix proposals applied by button; no walk policy accepts them |
+// | documentation-fix-proposals | components/DocumentationFixProposals.tsx (pagename + image-width rows) | per-finding fix proposals applied by button; no walk policy accepts them — the body-parity choice left this list for the pf_body_parity flow question (issue #2530) |
 // | more-detail-gate-yes | survey/questions/f (pf_more_detail_gate) | answering Yes opens extra Phase F questions; the author keeps the lookup default (No) |
 
 import type { DecisionPoint } from "../decisionPointBases.ts";

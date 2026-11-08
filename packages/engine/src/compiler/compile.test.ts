@@ -204,6 +204,119 @@ describe("compile() — kmcmplib severity and line decode", () => {
     expect(tables.name(0x5020ff)).toBeUndefined();
   });
 
+  it("tags each diagnostic with its compile-target platform (#2378)", async () => {
+    const tables = await loadKmcMessageTables();
+    // The name lookups pin every numeric code below to its upstream symbol,
+    // so a hand-computed code that drifts names the wrong message — and the
+    // length assertion pins the size of the web set, so an upstream rename
+    // that drops a code out of WEB_ONLY_KMN_MESSAGE_NAMES fails here
+    // instead of silently re-tagging it "desktop".
+    const webOnly: Array<[number, string]> = [
+      // KmwCompiler namespace (0x7000).
+      [0x507004, "ERROR_TouchLayoutFileDoesNotExist"],
+      [0x207006, "INFO_MinimumWebEngineVersion"],
+      // Web-only KmnCompiler codes (WEB_ONLY_KMN_MESSAGE_NAMES).
+      [0x502063, "ERROR_140FeatureOnlyContextAndNotAnyWeb"],
+      [0x502059, "ERROR_InvalidTouchLayoutFile"],
+      [0x502054, "ERROR_NotSupportedInKeymanWebContext"],
+      [0x502055, "ERROR_NotSupportedInKeymanWebOutput"],
+      [0x502056, "ERROR_NotSupportedInKeymanWebStore"],
+      [0x50205a, "ERROR_TouchLayoutInvalidIdentifier"],
+      [0x502057, "ERROR_VirtualCharacterKeysNotSupportedInKeymanWeb"],
+      [0x402098, "WARN_ExtendedShiftFlagsNotSupportedInKeymanWeb"],
+      [0x402092, "WARN_TouchLayoutCustomKeyNotDefined"],
+      [0x40209f, "WARN_TouchLayoutFontShouldBeSameForAllPlatforms"],
+      [0x402091, "WARN_TouchLayoutMissingLayer"],
+      [0x402093, "WARN_TouchLayoutMissingRequiredKeys"],
+      [0x4020a9, "WARN_TouchLayoutSpecialLabelOnNormalKey"],
+      [0x402099, "WARN_TouchLayoutUnidentifiedKey"],
+      [0x402095, "WARN_EmbedJsFileMissing"],
+      [0x50200b, "ERROR_InvalidBegin"],
+      [0x402094, "WARN_HelpFileMissing"],
+      [0x502058, "ERROR_VirtualKeysNotValidForMnemonicLayouts"],
+      [0x4020a3, "WARN_DontMixChiralAndNonChiralModifiers"],
+      [0x30209a, "HINT_UnreachableKeyCode"],
+      [0x50205b, "ERROR_InvalidKeyCode"],
+      [0x4020aa, "WARN_OptionStoreNameInvalid"],
+    ];
+    expect(webOnly).toHaveLength(24);
+    for (const [code, name] of webOnly) {
+      expect(tables.name(code)).toBe(name);
+      expect(tables.platform(code)).toBe("web");
+    }
+
+    // Shared .kmn rules (both passes) stay "desktop" — including the
+    // version-gate codes, which name web-only features but the shared WASM
+    // parser enforces on both passes (ERROR_90FeatureOnlyEmbedCSS and
+    // ERROR_90FeatureOnlyLayoutFile), and codes that fire on both passes
+    // (WARN_VirtualKeyWithMnemonicLayout, WARN_KeyBadLength).
+    const desktop: Array<[number, string]> = [
+      [0x50201d, "ERROR_StoreDoesNotExist"],
+      [0x3020ae, "HINT_UnreachableRule"],
+      [0x502060, "ERROR_90FeatureOnlyEmbedCSS"],
+      [0x50205c, "ERROR_90FeatureOnlyLayoutFile"],
+      [0x40208b, "WARN_VirtualKeyWithMnemonicLayout"],
+      [0x402084, "WARN_KeyBadLength"],
+    ];
+    for (const [code, name] of desktop) {
+      expect(tables.name(code)).toBe(name);
+      expect(tables.platform(code)).toBe("desktop");
+    }
+    // An unknown KmnCompiler-namespace code defaults to desktop (it is a
+    // .kmn code until proven otherwise); any other namespace stays unowned.
+    expect(tables.name(0x5020ff)).toBeUndefined();
+    expect(tables.platform(0x5020ff)).toBe("desktop");
+    expect(tables.platform(0x401000)).toBeUndefined();
+
+    // The tag rides on the mapped diagnostic; a non-numeric code has no
+    // namespace to decode and stays untagged.
+    expect(mapKmnCompilerEvent({ code: 0x507004, message: "t" }, "k", tables).platform).toBe("web");
+    expect(mapKmnCompilerEvent({ code: 0x4020a3, message: "w" }, "k", tables).platform).toBe("web");
+    expect(mapKmnCompilerEvent({ code: 0x50201d, message: "d" }, "k", tables).platform).toBe("desktop");
+    expect(mapKmnCompilerEvent({ code: 0x502060, message: "e" }, "k", tables).platform).toBe("desktop");
+    expect(
+      mapKmnCompilerEvent({ code: "ERROR_Something", message: "x" }, "k", tables),
+    ).not.toHaveProperty("platform");
+  });
+
+  it("platform tagging follows the targets pass: a web-pass-only warning is 'web' under targets=any and absent under targets=windows (#2378)", async () => {
+    // Mixing chiral and non-chiral Ctrl sets is accepted by the desktop
+    // pass; only the web pass reports
+    // WARN_DontMixChiralAndNonChiralModifiers ("Use only one or the other
+    // set for web target"). Compiling the same keyboard with
+    // targets=windows skips the web pass entirely, so it must produce no
+    // web-tagged diagnostic at all. What this control catches is the
+    // opposite mistake: a code wrongly tagged "web" that fires on the
+    // desktop pass, or a web pass running under targets=windows. (A code
+    // missed from the web set is tagged "desktop" and shows in the
+    // desktop pane — visible, not dropped — so this test cannot catch
+    // that direction; only the emission-proven set in kmcMessages.ts
+    // guards it.)
+    const chiralKmn = (targets: string) =>
+      minimalKmn.replace("'any'", `'${targets}'`) +
+      "\n+ [LCTRL K_A] > 'x'\n+ [CTRL K_B] > 'y'\n";
+    const compileTargets = async (targets: string) => {
+      const vfs = createVirtualFS([
+        { path: "source/minimal.kmn", content: chiralKmn(targets), isBinary: false },
+      ]);
+      return compile(vfs, "minimal");
+    };
+
+    const anyResult = await compileTargets("any");
+    expect(anyResult.artifacts.some((a) => a.filename.endsWith(".js"))).toBe(true);
+    const webWarning = anyResult.diagnostics.find(
+      (d) => d.code === `KM_WARN_KMCMP_${0x4020a3}`,
+    );
+    expect(webWarning).toMatchObject({ severity: "warning", platform: "web" });
+
+    const windowsResult = await compileTargets("windows");
+    expect(windowsResult.artifacts.some((a) => a.filename.endsWith(".js"))).toBe(false);
+    expect(windowsResult.diagnostics.filter((d) => d.platform === "web")).toEqual([]);
+    expect(
+      windowsResult.diagnostics.some((d) => d.code === `KM_WARN_KMCMP_${0x4020a3}`),
+    ).toBe(false);
+  }, 30_000);
+
   it("maps the CompilerEvent shape: severity-derived code prefix, `line`, filename fallback", async () => {
     const tables = await loadKmcMessageTables();
     // Non-numeric codes keep the old "warning" fallback.
@@ -215,6 +328,7 @@ describe("compile() — kmcmplib severity and line decode", () => {
       severity: "warning",
       layer: "A",
       message: "w",
+      platform: "web",
       location: { file: "source/k.kmn", line: 3 },
     });
     expect(

@@ -150,6 +150,76 @@ describe("DemoPane compile diagnostics", () => {
     );
     expect(screen.queryByTestId("rules-demo-warnings")).toBeNull();
   });
+
+  it("hides web-tagged diagnostics from the desktop notes list (#2378)", () => {
+    render(
+      <DemoPane
+        artifact={{
+          ...readyArtifact,
+          diagnostics: [
+            {
+              code: "KM_WARN_KMCMP_4000001" as const,
+              severity: "warning" as const,
+              layer: "A" as const,
+              message: "desktop rule",
+              platform: "desktop" as const,
+            },
+            {
+              code: "KM_ERROR_KMCMP_5271556" as const,
+              severity: "error" as const,
+              layer: "A" as const,
+              message: "touch layout missing",
+              platform: "web" as const,
+            },
+            {
+              code: "KM_INFO_KMCMP_2125830" as const,
+              severity: "info" as const,
+              layer: "A" as const,
+              message: "min web engine",
+              platform: "web" as const,
+            },
+          ],
+        }}
+        ir={null}
+        jsBytes={null}
+        simulateImpl={() => ({}) as never}
+      />,
+    );
+    const rows = screen.getAllByTestId("rules-demo-diagnostic-row");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.textContent).toContain("desktop rule");
+    const details = screen.getByTestId("rules-demo-warnings");
+    expect(details.querySelector("summary")?.textContent).toContain("1 note");
+  });
+
+  it("still shows a web-tagged error when the compile itself fails (#2378)", () => {
+    render(
+      <DemoPane
+        artifact={{
+          ...IDLE,
+          status: "error",
+          errorStep: "compile",
+          errorMessage: "compile failed",
+          diagnostics: [
+            {
+              code: "KM_ERROR_KMCMP_5271556" as const,
+              severity: "error" as const,
+              layer: "A" as const,
+              message: "touch layout missing",
+              platform: "web" as const,
+            },
+          ],
+        }}
+        ir={null}
+        jsBytes={null}
+        simulateImpl={() => ({}) as never}
+      />,
+    );
+    expect(screen.queryByTestId("rules-demo-error")).not.toBeNull();
+    const rows = screen.getAllByTestId("rules-demo-diagnostic-row");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.textContent).toContain("touch layout missing");
+  });
 });
 
 describe("DemoPane output preview (#2384)", () => {

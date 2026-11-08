@@ -122,6 +122,10 @@ const GAP_SPECS: readonly GapSpec[] = [
   { id: "12.2-iso-639-5-lang-code", code: "KM_LINT_ISO_639_5_LANG_CODE", criteria: "BCP47 tags do not use ISO 639-5 language codes.", why: "language-tag hygiene; no DecisionId" },
   { id: "12.3-numeric-region-non-contrastive", code: "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE", criteria: "A language tag does not include a numerical region code, unless it is explicitly contrastive.", why: "language-tag hygiene; no DecisionId" },
   { id: "18.7-mandated-currency-char", code: "KM_LINT_MANDATED_CHAR_MISSING", criteria: "The keyboard can produce the mandated characters for currency (if applicable).", why: "character coverage; no DecisionId" },
+  // Criterion 18.13 (issue #2593, PR #2622): same status as the Batch 1–3
+  // entries — the criteria resolver is its consumer, and no DecisionId
+  // captures packaged-font cmap coverage.
+  { id: "18.13-font-glyph-coverage", code: "KM_LINT_FONT_GLYPH_COVERAGE", criteria: "Every character the keyboard types has a glyph in each packaged font it ships (cmap coverage check).", why: "packaged-font glyph coverage; no DecisionId" },
   // Spec 084 KPJ pair (checks in keyboard-lint's checks/criteria/
   // check-kpj): same status as the Batch 1–3 entries — the criteria
   // resolver is their consumer, and no DecisionId captures what they

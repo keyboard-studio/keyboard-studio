@@ -77,7 +77,7 @@ Each story phase ends with the same three gate tasks:
      b. `deadkeyOverlay.ops`: set it from `deadkeys-defined.value.ops`. Replay applies the ops to the IR, but the projection reads the store (`serializeWorkingCopy.ts:511`).
      c. Assignments: `physical-layout.value.assignments` -> `recordAssignments` (`stores/workingCopyStore.ts:994`).
      d. `contextToleranceOverlay`: it cannot be derived from the value. At `tolerance`, await `applyContextToleranceDecision` (`lib/contextToleranceApply.ts:62`, async compile + simulate).
-     e. `fallbackPolicy`: it is in no decision value and not in the record (`survey/carve/carveValue.ts:29-33`). The harness uses DEFAULT; this limitation is recorded in the fixture header.
+     e. `fallbackPolicy`: superseded by issue #2366 (`5a12ff74`): it is now the `fallback-policy` decision, recorded at the step and restored by the fixture through `migrateFallbackPolicy`; a record without it replays with `DEFAULT_FALLBACK_POLICY`.
   6. Call `buildOutputBundle()`.
   7. Return the compiled result, a `simulate` closure and the gates.
 - [x] T012 [US1] Add the script `fixtures:decision-points` to `packages/studio/package.json`. It runs `scripts/genDecisionPoints.ts`, which writes `src/lib/__fixtures__/decision-points/<base>/<profile>/<point>.decisions.json` from the T003 records, and its output must be deterministic. Generate and commit the JSON.

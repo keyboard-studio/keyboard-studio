@@ -51,6 +51,8 @@ const APPLY_CHANNEL_AUTHORIZATION: ReadonlyArray<{
   { channel: "attribution", decisionId: "copyright-holder" },
   { channel: "helpDocs", decisionId: "help-welcome-paragraph" },
   { channel: "historyEntryState", decisionId: "help-welcome-paragraph" },
+  // Issue #2530: the body-parity answer owns the doc-fix-proposals slice.
+  { channel: "docFixProposals", decisionId: "help-body-parity" },
 ];
 
 /**

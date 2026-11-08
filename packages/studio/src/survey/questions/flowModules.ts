@@ -74,6 +74,7 @@ import pfDocLanguageOtherMod from "./f/pf_doc_language_other.ts";
 import pfDocLanguageSecondMod from "./f/pf_doc_language_second.ts";
 import pfDocLanguageSecondOtherMod from "./f/pf_doc_language_second_other.ts";
 import pfWelcomeParagraphMod from "./f/pf_welcome_paragraph.ts";
+import pfBodyParityMod from "./f/pf_body_parity.ts";
 import pfFontGuidanceMod from "./f/pf_font_guidance.ts";
 import pfHistoryEntryMod from "./f/pf_history_entry.ts";
 import pfHistoryEntryBulletsMod from "./f/pf_history_entry_bullets.ts";
@@ -233,6 +234,9 @@ export const flowModules = {
 
     // --- Default path ---
     pfWelcomeParagraphMod,
+    // Issue #2530: the welcome/help body-parity choice, asked only when
+    // the 11.9 finding is live (routed from pf_welcome_paragraph's `next`).
+    pfBodyParityMod,
     pfUsageTip1Mod,
     // HISTORY proposal (spec 079 US5): confirm / edit / dismiss, spliced in
     // via pf_usage_tip_1's `next` (last default-path screen before the gate).
