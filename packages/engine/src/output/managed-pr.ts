@@ -162,6 +162,7 @@ export async function publishManagedPR(
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
+        ...(opts.authToken !== undefined ? { Authorization: `Bearer ${opts.authToken}` } : {}),
       },
       body: JSON.stringify(requestBody),
     });

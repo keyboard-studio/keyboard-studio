@@ -26,7 +26,21 @@ import {
   vercelClientIp,
   type RateLimitDecision,
 } from "../../utilities/oauth-backend/src/managed-pr-rate-limit.js";
-import { jsonResponse } from "../oauth/_shared.js";
+import { jsonResponse, webFetch } from "../oauth/_shared.js";
+import {
+  authenticateSubmitter,
+  sessionSigningKeyFromEnv,
+  type Submitter,
+} from "../../utilities/oauth-backend/src/submitter-auth.js";
+
+/** Resolve the signed-in submitter from the request (test seam below). */
+export type SubmitterAuthenticator = (req: Request) => Promise<Submitter | null>;
+
+const envAuthenticator: SubmitterAuthenticator = (req) =>
+  authenticateSubmitter(req.headers.get("authorization"), {
+    sessionKey: sessionSigningKeyFromEnv(),
+    fetch: webFetch,
+  });
 
 // ---------------------------------------------------------------------------
 // Web-fetch adapter — the global Web `Response` already exposes `.ok`,
@@ -111,6 +125,7 @@ export async function runManagedPRHandler(
   req: Request,
   configOverride?: ManagedPRPipelineConfig | null,
   throttleOverride?: (ip: string | null) => Promise<RateLimitDecision>,
+  authOverride?: SubmitterAuthenticator,
 ): Promise<Response> {
   if (req.method !== "POST") {
     return jsonResponse(405, { error: "method_not_allowed" }, { Allow: "POST" });
@@ -148,6 +163,14 @@ export async function runManagedPRHandler(
     );
   }
 
+  // Submitting requires a sign-in (Google session token or GitHub user
+  // token). Checked after the throttle so a flood of unauthenticated
+  // requests cannot drive one GitHub /user call each without limit.
+  const submitter = await (authOverride ?? envAuthenticator)(req);
+  if (submitter === null) {
+    return jsonResponse(401, { error: "sign_in_required" });
+  }
+
   let raw: unknown;
   try {
     raw = await req.json();
@@ -165,7 +188,7 @@ export async function runManagedPRHandler(
   // Map it to 502 submission_unavailable — same as a network-level failure.
   let result: Awaited<ReturnType<typeof submitManagedPR>>;
   try {
-    result = await submitManagedPR(parsed.data, config);
+    result = await submitManagedPR(parsed.data, config, submitter);
   } catch {
     return jsonResponse(502, { error: "submission_unavailable" });
   }
