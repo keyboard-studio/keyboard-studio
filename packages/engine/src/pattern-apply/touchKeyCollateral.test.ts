@@ -321,6 +321,23 @@ describe("analyzeKeyEditCollateral", () => {
     expect(analyzeKeyEditCollateral(layout, op)).toEqual({ outputs: [], unreachableCharacters: [] });
   });
 
+  it("a move or copy across layers discards nothing", () => {
+    // Both relocate/duplicate the EXISTING node (FR-021) — the source key
+    // stays producible (copy) or stays producible on its new layer (move).
+    const layout = makeTouchKeyRuleJoinLayout();
+    const base = {
+      seq: 1,
+      address: touchKeyAddress("phone", TOUCH_JOIN_LAYERS.default, TOUCH_JOIN_IDS.longpressBase),
+      toLayer: TOUCH_JOIN_LAYERS.symbol,
+    } as const;
+    expect(
+      analyzeKeyEditCollateral(layout, { ...base, kind: "moveToLayer" }),
+    ).toEqual({ outputs: [], unreachableCharacters: [] });
+    expect(
+      analyzeKeyEditCollateral(layout, { ...base, kind: "copyToLayer" }),
+    ).toEqual({ outputs: [], unreachableCharacters: [] });
+  });
+
   it("classification excludes the operation's OWN discarded addresses from the elsewhere search", () => {
     // A key whose main output and its own longpress happen to produce the
     // SAME character must not report the longpress as the main tap's

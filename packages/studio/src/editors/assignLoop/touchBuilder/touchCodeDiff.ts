@@ -11,7 +11,7 @@
 // - Key-level only (Q1). Row/layer/platform structural changes are NOT
 //   decomposed — they are rejections naming the limitation, never silently
 //   dropped.
-// - Only the 8 op kinds; no new kinds, twin appliers untouched.
+// - Only the 10 op kinds; no new kinds, twin appliers untouched.
 // - Addresses are `touchKeyAddress(platform, layerId, keyId)` with NO
 //   occurrence suffix. Sound under the duplicate-id discipline: any op
 //   addressing a duplicated id is rejected ("duplicate-id-edit"), and

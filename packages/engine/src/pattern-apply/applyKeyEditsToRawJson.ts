@@ -134,6 +134,7 @@
 
 import type {
   AddKeyOp,
+  CopyToLayerOp,
   KeyEditOperation,
   MoveKeyOp,
   MoveToLayerOp,
@@ -613,6 +614,86 @@ function applyMoveToLayer(
 }
 
 /**
+ * Case B's `copyToLayer` — the twin of `applyKeyEditsToLayout.ts`'s
+ * `copyToLayer` case, held to the same rules by `applyKeyEdits.twin.test.ts`:
+ * deep-clone the source wire object (never rebuild — Case B fidelity),
+ * refuse on id collision, anchor before/after when it resolves on the
+ * target layer, else append to the last row. The source key is NOT spliced
+ * out. Raw JSON carries no `nodeId`, so the clone needs no fresh one (the
+ * IR twin mints one; the twin test compares modulo `nodeId`).
+ */
+function applyCopyToLayer(
+  view: RawLayoutView,
+  resolved: ResolvedMainKey,
+  op: CopyToLayerOp,
+  warnings: string[],
+): void {
+  if (op.scope === "family") {
+    warnUnresolved(
+      warnings,
+      op,
+      'scope "family" has no shared referent across a layer family for a copyToLayer',
+    );
+    return;
+  }
+  const srcParts = parseTouchKeyAddress(op.address);
+  if (srcParts === undefined) {
+    warnUnresolved(warnings, op, "malformed source address");
+    return;
+  }
+  const platform = view.platforms.find((p) => p.id === srcParts.platform);
+  if (platform === undefined) {
+    warnUnresolved(warnings, op, `platform "${srcParts.platform}" not found`);
+    return;
+  }
+  const targetLayer = platform.layers.find((l) => l.id === op.toLayer);
+  if (targetLayer === undefined) {
+    warnUnresolved(warnings, op, `target layer "${op.toLayer}" not found`);
+    return;
+  }
+  if (resolved.layerRows === targetLayer.rows) {
+    warnUnresolved(warnings, op, `target layer "${op.toLayer}" is the key's own layer — no change`);
+    return;
+  }
+  const collides = targetLayer.rows.some((r) =>
+    r.keys.some((k) => k.id === resolved.key.id),
+  );
+  if (collides) {
+    warnUnresolved(
+      warnings,
+      op,
+      `target layer "${op.toLayer}" already has a key with id "${resolved.key.id}"`,
+    );
+    return;
+  }
+  // Deep-clone the whole wire object — sub-keys, geometry, provenance and
+  // every other field travel, so the clone cannot silently drop a field the
+  // IR twin carries.
+  const copied: RawKey = structuredClone(resolved.key);
+  let inserted = false;
+  if (op.anchorAddress !== undefined) {
+    const anchor = resolveMainRawKey(view, op.anchorAddress);
+    if (anchor !== undefined && anchor.layerRows === targetLayer.rows) {
+      const at = anchor.keyIndex + (op.position === "after" ? 1 : 0);
+      anchor.row.keys.splice(at, 0, copied);
+      inserted = true;
+    } else {
+      warnings.push(
+        `[key-edit-apply-raw] op #${op.seq} (copyToLayer) at "${op.address}": anchor "${op.anchorAddress}" did not resolve on layer "${op.toLayer}" — appended instead`,
+      );
+    }
+  }
+  if (!inserted) {
+    const lastRow = targetLayer.rows[targetLayer.rows.length - 1];
+    if (lastRow === undefined) {
+      targetLayer.rows.push({ keys: [copied] });
+    } else {
+      lastRow.keys.push(copied);
+    }
+  }
+}
+
+/**
  * Case B's create half of `setSubKey`'s upsert (spec 065 T042, FR-026) — the
  * twin of `applyKeyEditsToLayout.ts`'s `appendSubKey`.
  *
@@ -751,6 +832,10 @@ export function applyKeyEditsToRawJson(
       }
       case "moveToLayer": {
         applyMoveToLayer(view, resolved, op, warnings);
+        break;
+      }
+      case "copyToLayer": {
+        applyCopyToLayer(view, resolved, op, warnings);
         break;
       }
       case "setSubKey": {

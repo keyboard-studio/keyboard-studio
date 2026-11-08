@@ -40,7 +40,10 @@ import {
   parseBuilderTemplate,
   predefinedLayerOf,
   resolveBuilderKey,
+  rightEdgeUnits,
+  snapBuilderWidth,
   subKeyEntriesOf,
+  suggestKeyIdFromText,
   synthesizeDropKeyId,
   buildCharmapDropOps,
   FLICK_DIRECTIONS,
@@ -589,5 +592,66 @@ describe("template apply never adds a Ctrl layer", () => {
     const ops = buildTemplateApplyOps(layout(["default"]), layout(["default", "ctrl", "ctrl-alt"]));
     for (const op of ops) expect(op.address).not.toMatch(/:ctrl/);
     expect(ops.every((op) => op.address.startsWith("phone:default:"))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #2596 item 4 — snap to grid + right-edge position
+// ---------------------------------------------------------------------------
+
+describe("snapBuilderWidth", () => {
+  it("snaps to the nearest 10 units", () => {
+    expect(snapBuilderWidth(100)).toBe(100);
+    expect(snapBuilderWidth(104)).toBe(100);
+    expect(snapBuilderWidth(105)).toBe(110);
+    expect(snapBuilderWidth(106)).toBe(110);
+    expect(snapBuilderWidth(153)).toBe(150);
+  });
+  it("clamps to TIKE's 10–500 range", () => {
+    expect(snapBuilderWidth(4)).toBe(10);
+    expect(snapBuilderWidth(0)).toBe(10);
+    expect(snapBuilderWidth(504)).toBe(500);
+    expect(snapBuilderWidth(999)).toBe(500);
+  });
+});
+
+describe("rightEdgeUnits", () => {
+  const row = [
+    { width: 100, pad: 15 },
+    { width: 100, pad: 15 },
+    { width: 50, pad: 0 },
+  ];
+  it("sums width + pad up to and including the key", () => {
+    expect(rightEdgeUnits(row, 0)).toBe(115);
+    expect(rightEdgeUnits(row, 1)).toBe(230);
+    expect(rightEdgeUnits(row, 2)).toBe(280);
+  });
+  it("is empty for an empty row and caps at the last key", () => {
+    expect(rightEdgeUnits([], 0)).toBe(0);
+    expect(rightEdgeUnits(row, 9)).toBe(280);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #2596 item 5 — key id suggested from text (spec 104 FR-005 arm (c))
+// ---------------------------------------------------------------------------
+
+describe("suggestKeyIdFromText", () => {
+  it("suggests U_<HEX> for a single plain character", () => {
+    expect(suggestKeyIdFromText("a")).toBe("U_0061");
+    expect(suggestKeyIdFromText("é")).toBe("U_00E9");
+    expect(suggestKeyIdFromText("ɓ")).toBe("U_0253");
+  });
+  it("suggests nothing for a combining mark (guarded T_ per FR-005(d))", () => {
+    expect(suggestKeyIdFromText("\u0301")).toBeNull();
+    expect(suggestKeyIdFromText("\u0303")).toBeNull();
+  });
+  it("suggests nothing for multi-character strings (version floor unseen)", () => {
+    expect(suggestKeyIdFromText("ae")).toBeNull();
+    expect(suggestKeyIdFromText("ch")).toBeNull();
+  });
+  it("suggests nothing for empty text or whitespace", () => {
+    expect(suggestKeyIdFromText("")).toBeNull();
+    expect(suggestKeyIdFromText(" ")).toBeNull();
   });
 });

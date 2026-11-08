@@ -7,7 +7,7 @@
 //
 // Behavior basis: `developer/src/tike/xml/layoutbuilder/src/*.ts` in
 // keymanapp/keyman (read for BEHAVIOR only, never transliterated). The
-// write channel is exclusively the 8 `KeyEditOperation` kinds, built here
+// write channel is exclusively the 10 `KeyEditOperation` kinds, built here
 // as `PendingKeyEditOperation` (no `seq`) and committed by the pane through
 // `commitKeyEditOp`.
 
@@ -20,7 +20,7 @@ import {
   type TouchLayoutIR,
   type TouchKeyIR,
 } from "@keyboard-studio/contracts";
-import { resolveKeyAddress } from "@keyboard-studio/engine";
+import { isCombiningMark, resolveKeyAddress } from "@keyboard-studio/engine";
 import type { PendingKeyEditOperation } from "../../../stores/workingCopyStore.ts";
 
 /**
@@ -44,6 +44,43 @@ export const BUILDER_DEFAULT_KEY_WIDTH = 100;
 /** TIKE resize clamp, in units (`makeKeyResizable`: 10–500). */
 export const BUILDER_MIN_KEY_WIDTH = 10;
 export const BUILDER_MAX_KEY_WIDTH = 500;
+/**
+ * Alignment grid, in units (#2596 item 4): widths snap to the nearest 10.
+ * A TIKE row is 100 units, so 10 is a tenth of a standard key — fine
+ * enough to line rows up, coarse enough to feel like a grid, and it
+ * preserves every existing multiple-of-10 width unchanged.
+ */
+export const BUILDER_WIDTH_SNAP = 10;
+
+/**
+ * Snap a width to the alignment grid (#2596 item 4), clamped to TIKE's
+ * 10–500 range. Pure; the pane applies it to resize-drag commits and to
+ * the Width field, so a snapped value is what commits in both paths.
+ */
+export function snapBuilderWidth(width: number): number {
+  const snapped = Math.round(width / BUILDER_WIDTH_SNAP) * BUILDER_WIDTH_SNAP;
+  return Math.min(BUILDER_MAX_KEY_WIDTH, Math.max(BUILDER_MIN_KEY_WIDTH, snapped));
+}
+
+/**
+ * Right-edge position of the key at `index` in a row (#2596 item 4): the
+ * running sum of `width + pad` up to and including that key, in units — the
+ * number an author lines rows up against. `pad` is the row's effective pad
+ * (the pane passes its narrow-aware value), so the readout matches the
+ * rendered row. Out-of-range index → the row's full width.
+ */
+export function rightEdgeUnits(
+  keys: readonly { readonly width: number; readonly pad: number }[],
+  index: number,
+): number {
+  let edge = 0;
+  const last = Math.min(index, keys.length - 1);
+  for (let i = 0; i <= last; i++) {
+    const key = keys[i]!;
+    edge += key.width + key.pad;
+  }
+  return edge;
+}
 
 /** A device presentation: the pixel box the keyboard is scaled into. */
 export interface BuilderPresentation {
@@ -426,6 +463,29 @@ export function synthesizeDropKeyId(text: string): string {
     parts.push(cp.toString(16).toUpperCase().padStart(4, "0"));
   }
   return `U_${parts.join("_")}`;
+}
+
+/**
+ * Suggest a key id from the text typed into a fresh key (#2596 item 5,
+ * spec 104 FR-005 arm (c)): a single plain character mints `U_<HEX>`.
+ * Returns null — no suggestion — for everything else, deliberately:
+ * - a combining mark mints guarded `T_` under FR-005(d) (unticked
+ *   start-of-line), so suggesting `U_` would mint an unguarded mark;
+ * - a multi-character string mints `U_` only when `&VERSION` is 15.0+,
+ *   which this pane cannot see, so suggesting blindly could mint an id
+ *   the keyboard cannot use;
+ * - empty text and whitespace name no character at all.
+ * The pane offers this as an explicit button on `T_new_N` keys only — an
+ * author action, never an auto-rename (identity changes are presented,
+ * never silent).
+ */
+export function suggestKeyIdFromText(text: string): string | null {
+  const chars = [...text];
+  if (chars.length !== 1) return null;
+  const ch = chars[0]!;
+  if (/\s/u.test(ch)) return null;
+  if (isCombiningMark(ch)) return null;
+  return synthesizeDropKeyId(text);
 }
 
 /**
