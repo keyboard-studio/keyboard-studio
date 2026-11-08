@@ -1,8 +1,9 @@
 // Spec 113 T007: the `kmn-edits` decision value round-trips through its zod
 // mirror, and malformed entries are refused at the load boundary.
 import { describe, expect, it } from "vitest";
-import type { KmnEditsValue, LayoutOperation } from "./index";
-import { KmnEditsValueSchema, LayoutOperationSchema } from "./schemas";
+import type { IRChange, KmnEdit, KmnEditsValue, LayoutOperation } from "./index";
+import { isLayoutOperation } from "./index";
+import { KmnEditSchema, KmnEditsValueSchema, LayoutOperationSchema } from "./schemas";
 
 const OPS: LayoutOperation[] = [
   { seq: 1, at: 1000, op: "set-key", vkey: "K_Q", layer: [], output: { kind: "text", text: "ŋ" } },
@@ -66,5 +67,66 @@ describe("KmnEditsValueSchema", () => {
 
   it("rejects a repeated seq", () => {
     expect(KmnEditsValueSchema.safeParse({ entries: [OPS[0], { ...OPS[1], seq: 1 }] }).success).toBe(false);
+  });
+});
+
+// Spec 113 T090: Code-tab entries are additive arms of the same union.
+const RULE = {
+  nodeId: "rule#9",
+  context: [{ kind: "vkey" as const, name: "K_A", modifiers: [] }],
+  output: [{ kind: "char" as const, value: "b" }],
+};
+const STORE = { name: "keys", items: [{ kind: "char" as const, value: "a" }], isSystem: false };
+const ANCHOR = { container: { kind: "group" as const, name: "main", usingKeys: true }, text: "+ [K_A] > 'a'" };
+const CHANGES: IRChange[] = [
+  { change: "insert", at: { ...ANCHOR, prev: "x", next: "y" }, node: RULE },
+  { change: "remove", at: ANCHOR, old: RULE },
+  { change: "replace", at: ANCHOR, old: RULE, node: { ...RULE, nodeId: "rule#10" } },
+  { change: "set-store", name: "keys", value: STORE, previous: { ...STORE, items: [] }, after: "other" },
+  { change: "remove-store", name: "keys", previous: STORE },
+  { change: "add-group", group: { nodeId: "group#2", name: "g", usingKeys: false, rules: [], readonly: false }, after: "main" },
+  { change: "remove-group", previous: { nodeId: "group#2", name: "g", usingKeys: false, rules: [], readonly: false } },
+  { change: "set-begin", begin: { encoding: "Unicode", main: "g" }, previous: { encoding: "Unicode", main: "main" } },
+  { change: "set-header", header: { name: "B" }, previous: { name: "A" } },
+];
+
+describe("Code-tab entries", () => {
+  const codeEdit: KmnEdit = {
+    seq: 9,
+    at: 2000,
+    op: "code-apply",
+    changes: CHANGES,
+    overrides: [{ change: 1, owner: "deadkeys" }],
+  };
+  const kept: KmnEdit = { seq: 10, at: 2001, op: "review-kept", target: 9 };
+
+  it("round-trips a CodeEdit holding every IRChange kind", () => {
+    expect(KmnEditSchema.parse(codeEdit)).toEqual(codeEdit);
+    expect(CHANGES.map((c) => c.change)).toHaveLength(9);
+  });
+
+  it("round-trips a ReviewKept", () => {
+    expect(KmnEditSchema.parse(kept)).toEqual(kept);
+  });
+
+  it("round-trips a value mixing Layout and Code entries", () => {
+    const value: KmnEditsValue = { entries: [OPS[0]!, codeEdit, kept] };
+    expect(KmnEditsValueSchema.parse(value)).toEqual(value);
+  });
+
+  it("rejects an unknown change kind, an unknown owner, and a negative target", () => {
+    expect(KmnEditSchema.safeParse({ ...codeEdit, changes: [{ change: "swap" }] }).success).toBe(false);
+    expect(KmnEditSchema.safeParse({ ...codeEdit, overrides: [{ change: 0, owner: "nobody" }] }).success).toBe(false);
+    expect(KmnEditSchema.safeParse({ ...kept, target: -1 }).success).toBe(false);
+  });
+
+  it("keeps the strictly increasing seq rule across arms", () => {
+    expect(KmnEditsValueSchema.safeParse({ entries: [codeEdit, { ...kept, seq: 9 }] }).success).toBe(false);
+  });
+
+  it("isLayoutOperation separates the arms", () => {
+    expect(isLayoutOperation(OPS[0]!)).toBe(true);
+    expect(isLayoutOperation(codeEdit)).toBe(false);
+    expect(isLayoutOperation(kept)).toBe(false);
   });
 });

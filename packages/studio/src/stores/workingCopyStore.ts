@@ -21,7 +21,7 @@
 //   - Worker boundary upheld: WASM is not imported here.
 
 import { create } from "zustand";
-import { DEFAULT_FALLBACK_POLICY, listDeadkeys } from "@keyboard-studio/contracts";
+import { DEFAULT_FALLBACK_POLICY, isLayoutOperation, listDeadkeys } from "@keyboard-studio/contracts";
 import type {
   Attribution,
   AxisFill,
@@ -59,8 +59,11 @@ import {
   applyLayoutOp,
   clearKeyLive,
   invertEffect,
+  applyIRChanges,
+  invertChanges,
 } from "@keyboard-studio/engine";
 import type { KmnEditEffect } from "@keyboard-studio/engine";
+import type { IRChange } from "@keyboard-studio/contracts";
 import type {
   ContextToleranceOverlay,
   KeyEditOperation,
@@ -91,7 +94,7 @@ import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
 import { useDecisionStore } from "./decisionStore.ts";
 import { useRulesDemoArtifactStore } from "./rulesDemoArtifactStore.ts";
 import { applyMutatePatch } from "../steps/mutateApply.ts";
-import { DEADKEY_WRITES, LAYOUT_WRITES } from "../steps/editorMutate.ts";
+import { CODE_WRITES, codeEditPatch, DEADKEY_WRITES, LAYOUT_WRITES } from "../steps/editorMutate.ts";
 import {
   emptyCharacterInventoryValue,
   emptyInventoryDecisionValue,
@@ -248,7 +251,10 @@ export type UndoEntry =
   // the inverse `DeadkeyOperation`s in the order undo applies them, each captured from the IR
   // before its op ran; undo applies them and appends them to the (append-only) deadkey overlay, so
   // the emitted .kmn after undo equals the text before the edit.
-  | { k: "ld"; inverse: DeadkeyOperation[] };
+  | { k: "ld"; inverse: DeadkeyOperation[] }
+  // Spec 113 US8: one Code-tab Apply. Holds the inverse of its changes, content-anchored, so undo
+  // is `applyIRChanges(ir, inverse)` and never a rebuild.
+  | { k: "c"; seq: number; inverse: IRChange[] };
 
 /** A Layout-tab edit as the caller states it; the store assigns `seq` and `at` at commit. */
 export type KmnEditInput = DistributiveOmit<KmnEdit, "seq" | "at">;
@@ -1999,6 +2005,39 @@ function slotIsReadOnly(ir: KeyboardIR, entry: KmnEdit): boolean {
   return cell.plain !== null && !cell.plain.editable;
 }
 
+/**
+ * A Code-tab entry (spec 113 US8). `code-apply` applies its changes to the live IR through
+ * `applyMutatePatch(..., CODE_WRITES)` and pushes undo kind `c`; a change whose anchor is gone
+ * refuses the whole entry, so nothing is half-applied. `review-kept` has no IR effect and no undo
+ * step. Neither needs the Layout tab's compiled artifact: the Apply gate already compiled the text.
+ */
+function commitCodeEntry(
+  s: WorkingCopyState,
+  set: StoreSet,
+  input: Extract<KmnEditInput, { op: "code-apply" | "review-kept" }>,
+): CommitKmnEditResult {
+  const earlier = recordedKmnEdits();
+  const seq = earlier.reduce((max, e) => Math.max(max, e.seq), 0) + 1;
+  const entry = { ...input, seq, at: Date.now() } as KmnEdit;
+  if (entry.op === "review-kept") {
+    recordKmnEdits([...earlier, entry]);
+    return { ok: true, seqs: [seq] };
+  }
+  if (entry.op !== "code-apply" || s.ir === null) return { ok: false, reason: "refused" };
+  let ir: KeyboardIR;
+  try {
+    const result = applyIRChanges(s.ir, entry.changes);
+    if (result.misses.length > 0) return { ok: false, reason: "refused" };
+    ir = applyMutatePatch(s.ir, codeEditPatch(s.ir, result.ir), CODE_WRITES);
+  } catch {
+    return { ok: false, reason: "refused" };
+  }
+  const undoEntry: UndoEntry = { k: "c", seq, inverse: invertChanges(entry.changes) };
+  set((cur) => ({ ir, undoStack: [...cur.undoStack, undoEntry] }));
+  recordKmnEdits([...earlier, entry]);
+  return { ok: true, seqs: [seq] };
+}
+
 function commitKmnEditImpl(
   get: StoreGet,
   set: StoreSet,
@@ -2008,6 +2047,7 @@ function commitKmnEditImpl(
   const s = get();
   if (s.ir === null || s.startIr === null) return { ok: false, reason: "no-working-copy" };
   if (s.desktopLocked) return { ok: false, reason: "locked" };
+  if (op.op === "code-apply" || op.op === "review-kept") return commitCodeEntry(s, set, op);
   if (useRulesDemoArtifactStore.getState().artifact.status !== "ready") {
     return { ok: false, reason: "not-compiled" };
   }
@@ -2023,6 +2063,7 @@ function commitKmnEditImpl(
     const entry = { ...input, seq: ++seq, at } as KmnEdit;
     if (slotIsReadOnly(ir, entry)) return { ok: false, reason: "read-only" };
     try {
+      if (!isLayoutOperation(entry)) return { ok: false, reason: "refused" };
       const result =
         entry.op === "clear-key"
           ? clearKeyLive(ir, entry, s.startIr, [...earlier, ...added])
@@ -2104,7 +2145,17 @@ function commitLayoutDeadkeyOpImpl(
 function undoKmnEditImpl(get: StoreGet, set: StoreSet): boolean {
   const s = get();
   const top = s.undoStack[s.undoStack.length - 1];
-  if (top === undefined || (top.k !== "l" && top.k !== "lb" && top.k !== "ld") || s.ir === null) return false;
+  if (top === undefined || (top.k !== "l" && top.k !== "lb" && top.k !== "ld" && top.k !== "c") || s.ir === null) {
+    return false;
+  }
+  if (top.k === "c") {
+    const result = applyIRChanges(s.ir, top.inverse);
+    if (result.misses.length > 0) return false;
+    const ir = applyMutatePatch(s.ir, codeEditPatch(s.ir, result.ir), CODE_WRITES);
+    set((cur) => ({ ir, undoStack: cur.undoStack.slice(0, -1) }));
+    recordKmnEdits(recordedKmnEdits().filter((e) => e.seq !== top.seq));
+    return true;
+  }
   if (top.k === "ld") {
     let ir: KeyboardIR = s.ir;
     try {
@@ -2196,7 +2247,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     // A Layout-tab edit (spec 113) is undone through its own action: it also records the
     // `kmn-edits` decision without the entry, which this store's set() cannot do.
     const top = get().undoStack[get().undoStack.length - 1];
-    if (top !== undefined && (top.k === "l" || top.k === "lb" || top.k === "ld")) {
+    if (top !== undefined && (top.k === "l" || top.k === "lb" || top.k === "ld" || top.k === "c")) {
       get().undoKmnEdit();
       return;
     }
@@ -2250,7 +2301,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
           keyEditOverlay: { ops: s.keyEditOverlay.ops.slice(0, -n) },
           undoStack: s.undoStack.slice(0, -1),
         };
-      } else if (last.k === "l" || last.k === "lb" || last.k === "ld") {
+      } else if (last.k === "l" || last.k === "lb" || last.k === "ld" || last.k === "c") {
         // Handled by undoKmnEdit above; unreachable through this action.
         return s;
       } else {

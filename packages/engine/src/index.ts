@@ -1252,6 +1252,10 @@ export type {
   ReplayResult,
 } from "./layout-ops/index.js";
 
+// Spec 113 US8: the Code tab's structural IR diff (contracts/code-edits.md).
+export { applyIRChanges, diffIR, findOwners, invertChanges } from "./kmn-diff/index.js";
+export type { ApplyIRChangesResult } from "./kmn-diff/index.js";
+
 // Spec 109 FR-040: the shared enumerator of unhandled key positions (also used by spec 108's fill).
 export { enumerateUnhandledPositions } from "./base-fallback/unhandledPositions.js";
 export type { PositionState, UnhandledPosition } from "./base-fallback/unhandledPositions.js";

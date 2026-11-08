@@ -5,7 +5,7 @@
 
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { parseKmn } from "@keyboard-studio/engine";
+import { diffIR, parseKmn } from "@keyboard-studio/engine";
 import type { KeyboardIR, SimKeyInput, SimulationStep } from "@keyboard-studio/contracts";
 import { render } from "../../test/renderWithI18n.tsx";
 import {
@@ -307,9 +307,28 @@ describe("LayoutPane", () => {
       expect(screen.queryByTestId("key-detail-fallback")).toBeNull();
     });
 
-    // T101 (US8) asserts this once a Code-tab Apply reaches the artifact; today it never does
-    // (research R1), so the scenario cannot pass yet and must not pass silently.
-    it.todo("T101: reflects a Code-tab Apply after the artifact is republished (needs US8)");
+    it("reflects a Code-tab Apply after the artifact is republished, hand-set from the Code tab", async () => {
+      const ir = load(KMN);
+      render(<LayoutPane onViewInCode={vi.fn()} />);
+      publish();
+      await settle();
+      expect(cell("K_C").getAttribute("data-provenance")).toBe("base-fallback");
+
+      // The Code tab's Apply adds a rule to the live IR; the validation cycle recompiles and
+      // republishes, and the compiled keyboard now fires it.
+      const changes = diffIR(ir, parseKmn(`${KMN}+ [K_C] > 'q'
+`, "t").ir);
+      act(() => {
+        expect(useWorkingCopyStore.getState().commitKmnEdit({ op: "code-apply", changes, overrides: [] }).ok).toBe(true);
+      });
+      compiled.typed.set("K_C", "q");
+      compiled.fired.add("K_C");
+      publish();
+      await waitFor(() => expect(cell("K_C").getAttribute("aria-label")).toContain("types q"));
+      expect(cell("K_C").getAttribute("data-provenance")).toBe("hand-set");
+      fireEvent.click(cell("K_C"));
+      expect(screen.getByTestId("key-detail-changed-in-code")).toBeTruthy();
+    });
   });
 });
 

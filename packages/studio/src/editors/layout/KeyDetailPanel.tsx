@@ -155,6 +155,14 @@ export function KeyDetailPanel({ cell, onViewInCode, editSlot }: KeyDetailPanelP
             </dd>
           </>
         )}
+        {cell.authorEdit === "code-tab" && (
+          <>
+            <dt style={dtStyle}>{t({ id: "editor.layout.detail.changedInCodeLabel", message: "Changed in code" })}</dt>
+            <dd style={ddStyle} data-testid="key-detail-changed-in-code">
+              {t({ id: "editor.layout.detail.changedInCode", message: "A Code tab edit set this key; it wins over the other editors." })}
+            </dd>
+          </>
+        )}
         {!cell.frame && (
           <>
             <dt style={dtStyle}>{t({ id: "editor.layout.detail.ruleCountLabel", message: "Rules for this key" })}</dt>

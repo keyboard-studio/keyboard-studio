@@ -33,6 +33,7 @@ import type {
   TouchLayoutIR,
   FacetProvenance,
   FacetValue,
+  IRGroup,
   IRRule,
   KeyboardIR,
 } from "./keyboard-ir";
@@ -69,7 +70,7 @@ import type {
 } from "./decisionRecord";
 import { DECISION_RECORD_FORMAT, DECISION_SUMMARY_LIMIT } from "./decisionRecord";
 import type { HelpDocsAnswers } from "./help-docs";
-import type { KmnEditsValue } from "./kmnEdits";
+import type { CodeEdit, IRChange, IRNode, KmnEdit, KmnEditsValue, ReviewKept, StoreValue } from "./kmnEdits";
 import type { LayoutOperation, LayoutOutput, ModifierToken } from "./layoutOps";
 import type { AssignableTo, Expect } from "./utils/schemaGuards";
 import type {
@@ -1033,8 +1034,109 @@ export const LayoutOperationSchema = z.discriminatedUnion("op", [
   z.object({ ...layoutOpBase, op: z.literal("decline-case-partner"), partner: z.string().min(1) }),
 ]);
 
+// ---------------------------------------------------------------------------
+// Code-tab edits (spec 113 US8, contracts/code-edits.md). IR nodes and stores
+// are persisted whole; their shapes are owned by the codec and written only by
+// this build, so they are checked structurally (an object with the fields every
+// consumer reads) rather than field by field.
+// ---------------------------------------------------------------------------
+
+const IRNodeSchema = z.custom<IRNode>(
+  (v) =>
+    typeof v === "object" &&
+    v !== null &&
+    typeof (v as { nodeId?: unknown }).nodeId === "string" &&
+    ("context" in v || "sourceText" in v || "anchor" in v),
+  "expected an IR rule, comment, or raw fragment",
+);
+
+const StoreValueSchema = z.custom<StoreValue>(
+  (v) =>
+    typeof v === "object" &&
+    v !== null &&
+    typeof (v as { name?: unknown }).name === "string" &&
+    Array.isArray((v as { items?: unknown }).items) &&
+    typeof (v as { isSystem?: unknown }).isSystem === "boolean",
+  "expected a store value",
+);
+
+const IRGroupSchema = z.custom<IRGroup>(
+  (v) =>
+    typeof v === "object" &&
+    v !== null &&
+    typeof (v as { name?: unknown }).name === "string" &&
+    Array.isArray((v as { rules?: unknown }).rules),
+  "expected a group",
+);
+
+const IRBeginSchema = z.object({ encoding: z.enum(["Unicode", "ANSI"]), main: z.string() });
+
+const IRHeaderPatchSchema = z.object({
+  name: z.string().optional(),
+  bcp47: z.array(z.string()).optional(),
+  copyright: z.string().optional(),
+  version: z.string().optional(),
+  targets: z.array(z.string()).optional(),
+  storeDirectives: z.array(z.string()).optional(),
+});
+
+const ContentAnchorSchema = z.object({
+  container: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("group"), name: z.string(), usingKeys: z.boolean() }),
+    z.object({ kind: z.literal("raw") }),
+  ]),
+  text: z.string(),
+  prev: z.string().optional(),
+  next: z.string().optional(),
+});
+
+export const IRChangeSchema = z.discriminatedUnion("change", [
+  z.object({ change: z.literal("insert"), at: ContentAnchorSchema, node: IRNodeSchema }),
+  z.object({ change: z.literal("remove"), at: ContentAnchorSchema, old: IRNodeSchema }),
+  z.object({ change: z.literal("replace"), at: ContentAnchorSchema, old: IRNodeSchema, node: IRNodeSchema }),
+  z.object({
+    change: z.literal("set-store"),
+    name: z.string(),
+    value: StoreValueSchema,
+    previous: StoreValueSchema.optional(),
+    after: z.string().optional(),
+  }),
+  z.object({
+    change: z.literal("remove-store"),
+    name: z.string(),
+    previous: StoreValueSchema,
+    after: z.string().optional(),
+  }),
+  z.object({ change: z.literal("add-group"), group: IRGroupSchema, after: z.string().optional() }),
+  z.object({ change: z.literal("remove-group"), previous: IRGroupSchema, after: z.string().optional() }),
+  z.object({ change: z.literal("set-begin"), begin: IRBeginSchema, previous: IRBeginSchema }),
+  z.object({ change: z.literal("set-header"), header: IRHeaderPatchSchema, previous: IRHeaderPatchSchema }),
+]);
+
+const OwnerRefSchema = z.object({
+  change: z.number().int().nonnegative(),
+  owner: z.enum(["deadkeys", "rules-step", "layout-tab", "code-tab", "identity", "another-step"]),
+});
+
+const entryBase = { seq: z.number().int().nonnegative(), at: z.number() };
+
+export const CodeEditSchema = z.object({
+  ...entryBase,
+  op: z.literal("code-apply"),
+  changes: z.array(IRChangeSchema),
+  overrides: z.array(OwnerRefSchema),
+});
+
+export const ReviewKeptSchema = z.object({
+  ...entryBase,
+  op: z.literal("review-kept"),
+  target: z.number().int().nonnegative(),
+});
+
+export const KmnEditSchema = z.union([LayoutOperationSchema, CodeEditSchema, ReviewKeptSchema]);
+
 export const KmnEditsValueSchema = z
-  .object({ entries: z.array(LayoutOperationSchema) })
+  .object({ entries: z.array(KmnEditSchema) })
   .superRefine((value, ctx) => {
     for (let i = 1; i < value.entries.length; i++) {
       if (value.entries[i]!.seq <= value.entries[i - 1]!.seq) {
@@ -1288,3 +1390,10 @@ type _LayoutOperationOpsGuard = Expect<
   Equal<z.infer<typeof LayoutOperationSchema>["op"], LayoutOperation["op"]>
 >;
 type _KmnEditsValueGuard = Expect<AssignableTo<z.infer<typeof KmnEditsValueSchema>, KmnEditsValue>>;
+// The entry union's key set: a `KmnEdit` arm added to the type but not the schema would be
+// dropped at the draft-load boundary, so a saved Code-tab edit would not survive a reload.
+type _KmnEditOpsGuard = Expect<Equal<z.infer<typeof KmnEditSchema>["op"], KmnEdit["op"]>>;
+type _CodeEditGuard = Expect<AssignableTo<z.infer<typeof CodeEditSchema>, CodeEdit>>;
+type _ReviewKeptGuard = Expect<AssignableTo<z.infer<typeof ReviewKeptSchema>, ReviewKept>>;
+type _IRChangeGuard = Expect<AssignableTo<z.infer<typeof IRChangeSchema>, IRChange>>;
+type _IRChangeKindsGuard = Expect<Equal<z.infer<typeof IRChangeSchema>["change"], IRChange["change"]>>;

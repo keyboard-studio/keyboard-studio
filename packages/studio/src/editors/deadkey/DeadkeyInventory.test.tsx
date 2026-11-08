@@ -118,3 +118,18 @@ describe("DeadkeyInventory", () => {
     expect(onDefine).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("DeadkeyInventory changed in code (spec 113 US8)", () => {
+  it("notes a Code tab edit that overrode the deadkey editor", async () => {
+    const { useDecisionStore } = await import("../../stores/decisionStore.ts");
+    useDecisionStore.getState().reset();
+    useDecisionStore.getState().record({
+      id: "kmn-edits",
+      value: { entries: [{ seq: 1, at: 0, op: "code-apply", changes: [], overrides: [{ change: 0, owner: "deadkeys" }] }] },
+      provenance: "asked",
+    });
+    renderInventory(parseIr(""));
+    expect(screen.getByTestId("changed-in-code-note")).toBeTruthy();
+    useDecisionStore.getState().reset();
+  });
+});

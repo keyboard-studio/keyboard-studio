@@ -184,3 +184,15 @@ describe("KeyDetailPanel", () => {
     expect(screen.getByTestId("key-detail-iso-note").textContent).toContain("beside left Shift");
   });
 });
+
+describe("KeyDetailPanel changed in code (spec 113 US8)", () => {
+  it("says so when a Code tab edit set the key", () => {
+    show(cellOf(attribution("K_A", { plain: row({ provenance: "hand-set", authorEdit: "code-tab" }) })));
+    expect(screen.getByTestId("key-detail-changed-in-code").textContent).toContain("Code tab");
+  });
+
+  it("does not say so for a Layout tab edit or the starting point", () => {
+    show(cellOf(attribution("K_A", { plain: row({ provenance: "hand-set", authorEdit: "layout-tab" }) })));
+    expect(screen.queryByTestId("key-detail-changed-in-code")).toBeNull();
+  });
+});

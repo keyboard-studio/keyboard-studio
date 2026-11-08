@@ -19,7 +19,7 @@ export interface KmnEditEffect {
   removed: Array<{ rule: IRRule; index: number }>;
 }
 
-/** What `replayKmnEdits` could not apply; always empty until entries can miss (US8). */
+/** What `replayKmnEdits` could not apply: a Code-tab change whose content anchor is gone (US8). */
 export interface ReplayMiss {
   seq: number;
   reason: string;

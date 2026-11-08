@@ -391,10 +391,90 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-07T23:39:50.725Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T092",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:03:59.563Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T094",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:03:59.826Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T098",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:04:00.097Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T093",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:06:53.493Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T099",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:06:53.763Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T100",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:08:39.118Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T101",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:09:19.564Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T102",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:10:49.136Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T103",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:12:52.296Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T104",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:13:38.931Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T097",
+  "currentTask": "T104",
   "task_summaries": {
     "T049": {
       "status": "DONE",
@@ -729,6 +809,92 @@
       "did": "engine/contract side verified: tests pass",
       "files": [
         "kmn-diff.corpus.test.ts"
+      ]
+    },
+    "T092": {
+      "status": "DONE",
+      "did": "KmnCodePane Apply tests: gate errors record nothing, formatting-only, owner confirm, one CodeEdit + undo c, no setWorkingIR; compile gate fail-closed pinned",
+      "files": [
+        "packages/studio/src/editors/assignLoop/KmnCodePane.test.tsx",
+        "packages/studio/src/lib/compileCandidateKmn.ts"
+      ]
+    },
+    "T094": {
+      "status": "DONE",
+      "did": "CODE_WRITES, codeEditPatch, kmn-edits irPaths and module writes extended to groups/stores/comments/raw/header",
+      "files": [
+        "packages/studio/src/steps/editorMutate.ts",
+        "packages/studio/src/decisions/decisionTypes.ts",
+        "packages/studio/src/survey/questions/gallery/kmnEdits.ts"
+      ]
+    },
+    "T098": {
+      "status": "DONE",
+      "did": "Apply rewired: parse/lint, Layer A, candidate compile, diffIR, owner confirm, commitKmnEdit code-apply, undo kind c",
+      "files": [
+        "packages/studio/src/editors/assignLoop/KmnCodePane.tsx",
+        "packages/studio/src/stores/workingCopyStore.ts",
+        "packages/studio/src/lib/compileCandidateKmn.ts"
+      ]
+    },
+    "T093": {
+      "status": "DONE",
+      "did": "reviewFlags tests: flags a/b/c, keep clears, revert latest undoes, revert older appends inverse",
+      "files": [
+        "packages/studio/src/editors/assignLoop/reviewFlags.test.ts",
+        "packages/studio/src/editors/assignLoop/reviewFlags.ts"
+      ]
+    },
+    "T099": {
+      "status": "DONE",
+      "did": "reviewFlags.ts, CodeReviewList.tsx, tab count in addPhysicalAdapter, kmn-edits renderer entry words; test for tab name and button names",
+      "files": [
+        "packages/studio/src/editors/assignLoop/reviewFlags.ts",
+        "packages/studio/src/editors/assignLoop/CodeReviewList.tsx",
+        "packages/studio/src/editors/adapters/addPhysicalAdapter.tsx",
+        "packages/studio/src/editors/adapters/addPhysicalAdapter.test.tsx",
+        "packages/studio/src/survey/questions/gallery/KmnEditsRenderer.tsx"
+      ]
+    },
+    "T100": {
+      "status": "DONE",
+      "did": "ChangedInCodeNote (Assign, deadkey inventory) and key-detail changed-in-code line",
+      "files": [
+        "packages/studio/src/editors/assignLoop/ChangedInCodeNote.tsx",
+        "packages/studio/src/editors/assignLoop/ChangedInCodeNote.test.tsx",
+        "packages/studio/src/editors/layout/KeyDetailPanel.tsx",
+        "packages/studio/src/editors/deadkey/DeadkeyInventory.tsx",
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T101": {
+      "status": "DONE",
+      "did": "LayoutPane test: Code-tab Apply then republish shows the change, hand-set from the Code tab",
+      "files": [
+        "packages/studio/src/editors/layout/LayoutPane.test.tsx"
+      ]
+    },
+    "T102": {
+      "status": "DONE",
+      "did": "kmn-edits surface evidence and derivedEquivalence arms C and D with mixed Layout and Code entries",
+      "files": [
+        "packages/studio/src/decisions/derivedSurfaceRegistry.ts",
+        "packages/studio/src/decisions/derivedEquivalence.test.ts"
+      ]
+    },
+    "T103": {
+      "status": "DONE",
+      "did": "Projection codeEdits test: live, projected (vs projection of edited text), and rebuilt agree with zero misses on the SC-010 set",
+      "files": [
+        "packages/studio/src/lib/projectWorkingCopyVfs.codeEdits.test.ts"
+      ]
+    },
+    "T104": {
+      "status": "DONE",
+      "did": "i18n for Phase 6: extracted, French written, catalog lint green",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
       ]
     }
   }

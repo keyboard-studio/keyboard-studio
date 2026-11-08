@@ -135,3 +135,25 @@ describe("AddPhysicalAdapter tab bar", () => {
     expect(code.getAttribute("data-reveal")).toBe("");
   });
 });
+
+describe("AddPhysicalAdapter review flags (spec 113 US8)", () => {
+  it("puts the review-flag count in the Code tab's name and shows the list there; flags do not gate anything", async () => {
+    const { useDecisionStore } = await import("../../stores/decisionStore.ts");
+    useDecisionStore.getState().reset();
+    useDecisionStore.getState().record({
+      id: "kmn-edits",
+      value: {
+        entries: [{ seq: 1, at: 0, op: "code-apply", changes: [], overrides: [{ change: 0, owner: "layout-tab" }] }],
+      },
+      provenance: "asked",
+    });
+    renderAdapter();
+    expect(tab("code").textContent).toBe("Code (1)");
+    fireEvent.click(tab("code"));
+    expect(await screen.findByTestId("kmn-code-review")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Keep" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Revert" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "View in code" })).toBeTruthy();
+    useDecisionStore.getState().reset();
+  });
+});

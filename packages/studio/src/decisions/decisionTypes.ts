@@ -419,6 +419,7 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "help-docs": [],
   "welcome-htm": [],
   // spec 113: the module's apply replays the Layout-tab edit log over the groups array
-  // (LAYOUT_WRITES; an array is one patch leaf, so the declared path is the whole array).
-  "kmn-edits": [["groups"]],
+  // (LAYOUT_WRITES; an array is one patch leaf, so the declared path is the whole array). A
+  // Code-tab entry (US8) also reaches stores, raw fragments, and the header (CODE_WRITES).
+  "kmn-edits": [["groups"], ["stores"], ["comments"], ["raw"], ["header"]],
 };

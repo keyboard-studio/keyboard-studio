@@ -41,6 +41,7 @@ import { usePlacementPriors } from "../../hooks/usePlacementPriors.ts";
 import { completePhysicalLayoutStep } from "../../lib/mechanismStepCompletion.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { MechanismGallery } from "../assignLoop/MechanismGallery.tsx";
+import { CodeReviewList, useCodeReviewFlags } from "../assignLoop/CodeReviewList.tsx";
 import { FallbackPolicySection } from "../fallback/FallbackPolicySection.tsx";
 
 // Lazy-loaded so the Monaco bundle never lands in the main chunk (same
@@ -80,6 +81,9 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
   const [activeTab, setActiveTab] = useState<EditorTab>("assign");
   const [layoutVisited, setLayoutVisited] = useState(false);
   const [revealNodeId, setRevealNodeId] = useState<string | undefined>(undefined);
+  // Review flags on Code-tab edits (spec 113 US8): the count rides on the tab so it is announced
+  // as part of the tab's name. Flags never gate completion or download.
+  const codeReview = useCodeReviewFlags();
   const tabIdBase = useId();
   const tabRefs = useRef<Map<EditorTab, HTMLButtonElement>>(new Map());
   const tabId = (tab: EditorTab) => `${tabIdBase}-tab-${tab}`;
@@ -91,7 +95,7 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
     if (tab === "layout") setLayoutVisited(true);
   }
 
-  function handleViewInCode(nodeId: string) {
+  function handleViewInCode(nodeId: string | undefined) {
     setRevealNodeId(nodeId);
     setActiveTab("code");
   }
@@ -122,9 +126,13 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
     tabRefs.current.get(next)?.focus();
   }
 
+  const flagCount = codeReview.flags.length;
   const tabLabels: Readonly<Record<EditorTab, string>> = {
     assign: t({ id: "editor.assignLoop.mechanisms.tabAssign", message: "Assign" }),
-    code: t({ id: "editor.assignLoop.mechanisms.tabCode", message: "Code" }),
+    code:
+      flagCount === 0
+        ? t({ id: "editor.assignLoop.mechanisms.tabCode", message: "Code" })
+        : t({ id: "editor.assignLoop.mechanisms.tabCodeFlagged", message: `Code (${{ count: flagCount }})` }),
     layout: t({ id: "editor.assignLoop.mechanisms.tabLayout", message: "Layout" }),
   };
 
@@ -221,6 +229,11 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
                   </div>
                 }
               >
+                <CodeReviewList
+                  flags={codeReview.flags}
+                  value={codeReview.value}
+                  onViewInCode={handleViewInCode}
+                />
                 <KmnCodePane {...(revealNodeId !== undefined ? { revealNodeId } : {})} />
               </Suspense>
             )}

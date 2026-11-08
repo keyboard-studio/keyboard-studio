@@ -7,9 +7,15 @@
  * its own). The survivors apply in order through `applyLayoutOp`, so later
  * entries on the same slot win and replaying the same log on the same IR is
  * idempotent.
+ *
+ * A Code-tab `code-apply` entry applies its content-anchored changes through
+ * `applyIRChanges`; each change whose anchor is gone is reported as a miss with
+ * the entry's `seq` (never thrown, never dropped silently). `review-kept` has no
+ * IR effect.
  */
 
 import type { KeyboardIR, KmnEdit } from "@keyboard-studio/contracts";
+import { applyIRChanges } from "../kmn-diff/applyIRChanges.js";
 import { applyLayoutOp } from "./applyLayoutOp.js";
 import { sameLayer } from "./ruleMatch.js";
 import type { ReplayMiss } from "./types.js";
@@ -39,8 +45,18 @@ export function normaliseKmnEdits(entries: readonly KmnEdit[]): KmnEdit[] {
 
 export function replayKmnEdits(ir: KeyboardIR, entries: readonly KmnEdit[]): ReplayResult {
   let current = ir;
+  const misses: ReplayMiss[] = [];
   for (const entry of normaliseKmnEdits(entries)) {
+    if (entry.op === "review-kept") continue;
+    if (entry.op === "code-apply") {
+      const result = applyIRChanges(current, entry.changes);
+      current = result.ir;
+      for (const index of result.misses) {
+        misses.push({ seq: entry.seq, reason: `change ${index} (${entry.changes[index]?.change ?? "unknown"}): anchor not found` });
+      }
+      continue;
+    }
     current = applyLayoutOp(current, entry).ir;
   }
-  return { ir: current, misses: [] };
+  return { ir: current, misses };
 }

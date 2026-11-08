@@ -3,14 +3,15 @@
 // Layout tab. Content-team copy (FR-041).
 
 import { useLingui } from "@lingui/react/macro";
-import type { KmnEdit, KmnEditsValue, LayoutOutput } from "@keyboard-studio/contracts";
+import { isLayoutOperation } from "@keyboard-studio/contracts";
+import type { KmnEdit, KmnEditsValue, LayoutOperation, LayoutOutput } from "@keyboard-studio/contracts";
 import type { DecisionRendererProps } from "../../../decisions/decisionTypes.ts";
 
 export function KmnEditsRenderer({ value }: DecisionRendererProps<KmnEditsValue>) {
   const { t } = useLingui();
   const entries = value?.entries ?? [];
 
-  function layerName(entry: KmnEdit): string {
+  function layerName(entry: LayoutOperation): string {
     return entry.layer.length === 0
       ? t({ id: "editor.layout.edits.defaultLayer", message: "Default" })
       : entry.layer.join("+");
@@ -28,6 +29,13 @@ export function KmnEditsRenderer({ value }: DecisionRendererProps<KmnEditsValue>
   }
 
   function entryWords(entry: KmnEdit): string {
+    if (entry.op === "code-apply") {
+      return t({ id: "editor.layout.edits.codeApply", message: "Edited in the Code tab" });
+    }
+    if (entry.op === "review-kept") {
+      return t({ id: "editor.layout.edits.reviewKept", message: "Code tab edit reviewed" });
+    }
+    if (!isLayoutOperation(entry)) return "";
     const key = entry.vkey;
     const layer = layerName(entry);
     switch (entry.op) {

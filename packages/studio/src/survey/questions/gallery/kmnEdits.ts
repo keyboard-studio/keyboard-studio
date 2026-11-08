@@ -16,6 +16,7 @@ import { irPath } from "@keyboard-studio/contracts";
 import type { KmnEditsValue } from "@keyboard-studio/contracts";
 import { replayKmnEdits } from "@keyboard-studio/engine";
 import type { GalleryModule } from "../../types.ts";
+import { codeEditPatch } from "../../../steps/editorMutate.ts";
 import { KmnEditsRenderer } from "./KmnEditsRenderer.tsx";
 
 export type { KmnEditsValue };
@@ -34,12 +35,15 @@ const kmnEdits: GalleryModule<KmnEditsValue> = {
   // requirement does not block replay (research R12).
   requires: ["carved-layout", "deadkeys-defined", "rule-set", "physical-layout"],
   inputs: [],
-  writes: [irPath("groups")],
+  writes: [irPath("groups"), irPath("stores"), irPath("comments"), irPath("raw"), irPath("header")],
   apply: (value, ctx) => {
     const effective = value ?? (ctx.decisions["kmn-edits"]?.value as KmnEditsValue | undefined);
     if (effective === undefined || ctx.ir === null || effective.entries.length === 0) return {};
     const { ir } = replayKmnEdits(ctx.ir, effective.entries);
-    return { ir: { groups: ir.groups } };
+    // Only a Code-tab entry reaches beyond the groups array; a Layout-only log keeps the narrow
+    // (and cheaper) patch.
+    const hasCode = effective.entries.some((e) => e.op === "code-apply");
+    return { ir: hasCode ? codeEditPatch(ctx.ir, ir) : { groups: ir.groups } };
   },
   renderer: KmnEditsRenderer,
   fixtures: {

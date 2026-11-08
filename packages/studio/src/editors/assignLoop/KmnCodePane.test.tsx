@@ -11,14 +11,24 @@ import {
   cleanup,
   fireEvent,
   screen,
+  waitFor,
 } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { emitKmn, parseKmn } from "@keyboard-studio/engine";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { installDialogShim } from "../../test/dialogShim.ts";
+import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { KmnCodePane, lineForNode } from "./KmnCodePane.tsx";
+import type { CandidateCompileResult } from "../../lib/compileCandidateKmn.ts";
+import type { CodeEdit, KmnEditsValue } from "@keyboard-studio/contracts";
 
 vi.mock("./touchBuilder/monacoSetup.ts", () => ({}));
+
+const compileMock = vi.hoisted(() => ({ fn: vi.fn() }));
+vi.mock("../../lib/compileCandidateKmn.ts", () => ({
+  compileCandidateKmn: (changes: unknown) => compileMock.fn(changes),
+}));
 
 const editorMocks = vi.hoisted(() => ({
   setModelMarkers: vi.fn(),
@@ -85,7 +95,12 @@ function applyButton(): HTMLButtonElement {
   return screen.getByTestId("kmn-code-apply") as HTMLButtonElement;
 }
 
+installDialogShim();
+
 beforeEach(() => {
+  compileMock.fn.mockReset();
+  compileMock.fn.mockResolvedValue({ status: "ok" } satisfies CandidateCompileResult);
+  useDecisionStore.getState().reset();
   editorMocks.setModelMarkers.mockClear();
   editorMocks.revealLineInCenter.mockClear();
   editorMocks.setSelection.mockClear();
@@ -124,26 +139,6 @@ describe("KmnCodePane", () => {
     });
     expect(screen.getByTestId("kmn-code-dirty")).toBeTruthy();
     expect(applyButton().disabled).toBe(false);
-  });
-
-  it("Apply parses the KMN and writes via setWorkingIR", () => {
-    const ir = makeIR();
-    useWorkingCopyStore.setState({ ir });
-    render(<KmnCodePane />);
-    const edited = editorText() + "\n";
-    act(() => {
-      fireEvent.change(screen.getByTestId("mock-editor"), {
-        target: { value: edited },
-      });
-    });
-    act(() => {
-      fireEvent.click(applyButton());
-    });
-    // setWorkingIR wrote the re-parsed IR back to the store: the stored
-    // IR is a new object (fresh parse), not the original.
-    const next = useWorkingCopyStore.getState().ir;
-    expect(next).not.toBeNull();
-    expect(next).not.toBe(ir);
   });
 
   it("Apply is blocked while the KMN has syntax errors", () => {
@@ -222,5 +217,192 @@ describe("KmnCodePane", () => {
       rerender(<KmnCodePane revealNodeId={r1.nodeId} />);
       expect(editorMocks.revealLineInCenter).toHaveBeenCalledTimes(2);
     });
+  });
+});
+
+describe("KmnCodePane Apply (spec 113 US8)", () => {
+  const KMN = [
+    "store(&NAME) 'testkbd'",
+    "begin Unicode > use(main)",
+    "group(main) using keys",
+    "+ 'a' > 'b'",
+    "+ 'c' > 'd'",
+    "",
+  ].join("\n");
+
+  const startOf = (): KeyboardIR => parseKmn(KMN, "testkbd").ir;
+
+  function seed(ir: KeyboardIR = startOf(), startIr: KeyboardIR = startOf()): KeyboardIR {
+    useWorkingCopyStore.setState({ ir, startIr, undoStack: [], desktopLocked: false });
+    return ir;
+  }
+
+  const edit = (text: string) =>
+    act(() => {
+      fireEvent.change(screen.getByTestId("mock-editor"), { target: { value: text } });
+    });
+
+  const clickApply = async () => {
+    await act(async () => {
+      fireEvent.click(applyButton());
+    });
+  };
+
+  const recorded = (): KmnEditsValue | undefined =>
+    useDecisionStore.getState().decisions["kmn-edits"]?.value as KmnEditsValue | undefined;
+
+  const changedRule = () => editorText().replace("+ U+0063 > U+0064", "+ U+0063 > U+0065");
+
+  afterEach(() => {
+    useWorkingCopyStore.setState({ startIr: null, undoStack: [] });
+  });
+
+  it("a parse error records nothing and leaves the IR unchanged", async () => {
+    const ir = seed();
+    render(<KmnCodePane />);
+    edit("store(&NAME 'unterminated");
+    await clickApply();
+    expect(useWorkingCopyStore.getState().ir).toBe(ir);
+    expect(recorded()).toBeUndefined();
+    expect(compileMock.fn).not.toHaveBeenCalled();
+  });
+
+  it("a Layer A error records nothing, is shown at its line, and skips the compile", async () => {
+    const ir = seed();
+    render(<KmnCodePane />);
+    edit(`store(&LANGUAGE) 'x'\n${changedRule()}`);
+    await clickApply();
+    expect(useWorkingCopyStore.getState().ir).toBe(ir);
+    expect(recorded()).toBeUndefined();
+    expect(screen.getByTestId("kmn-code-apply-error").textContent).toMatch(/Line 1/);
+    expect(compileMock.fn).not.toHaveBeenCalled();
+  });
+
+  it("a compile error records nothing and is shown at its line", async () => {
+    const ir = seed();
+    compileMock.fn.mockResolvedValue({
+      status: "errors",
+      diagnostics: [
+        { code: "KM_ERROR_X", severity: "error", layer: "A", message: "bad rule", location: { file: "", line: 5, column: 1 } },
+      ],
+    } satisfies CandidateCompileResult);
+    render(<KmnCodePane />);
+    edit(changedRule());
+    await clickApply();
+    expect(compileMock.fn).toHaveBeenCalledTimes(1);
+    expect(useWorkingCopyStore.getState().ir).toBe(ir);
+    expect(recorded()).toBeUndefined();
+    expect(screen.getByTestId("kmn-code-apply-error").textContent).toMatch(/Line 5: bad rule/);
+  });
+
+  it("a change the projection cannot place blocks the Apply: the download would lose it", async () => {
+    const ir = seed();
+    compileMock.fn.mockResolvedValue({ status: "unplaceable" } satisfies CandidateCompileResult);
+    render(<KmnCodePane />);
+    edit(changedRule());
+    await clickApply();
+    expect(useWorkingCopyStore.getState().ir).toBe(ir);
+    expect(recorded()).toBeUndefined();
+    expect(screen.getByTestId("kmn-code-apply-error").textContent).toMatch(/does not fit/);
+  });
+
+  it("a compile service that is wired but fails (no diagnostics) blocks the Apply", async () => {
+    const ir = seed();
+    compileMock.fn.mockResolvedValue({ status: "errors", diagnostics: [] } satisfies CandidateCompileResult);
+    render(<KmnCodePane />);
+    edit(changedRule());
+    await clickApply();
+    expect(useWorkingCopyStore.getState().ir).toBe(ir);
+    expect(recorded()).toBeUndefined();
+    expect(screen.getByTestId("kmn-code-apply-error").textContent).toMatch(/does not compile/);
+  });
+
+  it("an unavailable compile service (mock engine) does not block: Layer A already ran", async () => {
+    seed();
+    compileMock.fn.mockResolvedValue({ status: "unavailable" } satisfies CandidateCompileResult);
+    render(<KmnCodePane />);
+    edit(changedRule());
+    await clickApply();
+    expect(recorded()?.entries).toHaveLength(1);
+  });
+
+  it("a formatting-only change records nothing and does not compile", async () => {
+    const ir = seed();
+    render(<KmnCodePane />);
+    edit(editorText().replace("group(main) using keys", "group(main)   using   keys\n\n"));
+    await clickApply();
+    expect(recorded()).toBeUndefined();
+    expect(useWorkingCopyStore.getState().ir).toBe(ir);
+    expect(compileMock.fn).not.toHaveBeenCalled();
+  });
+
+  it("a formatting-only change records nothing when the IR holds a freestanding comment", async () => {
+    const ir = startOf();
+    ir.comments.push({ nodeId: "comment#900", text: "", anchor: "freestanding", sourceLine: 1 });
+    seed(ir, startOf());
+    render(<KmnCodePane />);
+    edit(`${editorText()}
+
+`);
+    await clickApply();
+    expect(recorded()).toBeUndefined();
+    expect(compileMock.fn).not.toHaveBeenCalled();
+  });
+
+  it("an Apply records one CodeEdit, pushes undo kind c, and never calls setWorkingIR with a re-parsed IR", async () => {
+    const ir = seed();
+    const setWorkingIR = vi.fn();
+    useWorkingCopyStore.setState({ setWorkingIR });
+    render(<KmnCodePane />);
+    edit(changedRule());
+    await clickApply();
+    const entries = recorded()?.entries ?? [];
+    expect(entries).toHaveLength(1);
+    const entry = entries[0] as CodeEdit;
+    expect(entry.op).toBe("code-apply");
+    expect(entry.overrides).toEqual([]);
+    const stack = useWorkingCopyStore.getState().undoStack;
+    expect(stack[stack.length - 1]?.k).toBe("c");
+    expect(setWorkingIR).not.toHaveBeenCalled();
+    const next = useWorkingCopyStore.getState().ir!;
+    expect(emitKmn(next)).toContain("+ U+0063 > U+0065");
+    // The untouched rule keeps its identity (no wholesale replacement).
+    expect(next.groups[0]!.rules[0]!.nodeId).toBe(ir.groups[0]!.rules[0]!.nodeId);
+  });
+
+  function seedOverride(): KeyboardIR {
+    const start = parseKmn(KMN.replace("+ 'c' > 'd'\n", ""), "testkbd").ir;
+    const ir = startOf();
+    ir.groups[0]!.rules[1]!.rulesStepAdded = true;
+    return seed(ir, start);
+  }
+
+  it("an override shows the owner confirm; nothing is recorded until it is confirmed", async () => {
+    seedOverride();
+    render(<KmnCodePane />);
+    edit(changedRule());
+    await clickApply();
+    expect(screen.getByTestId("kmn-code-owner-confirm").textContent).toMatch(/rules step/);
+    expect(recorded()).toBeUndefined();
+    await act(async () => {
+      fireEvent.click(screen.getByText("Apply anyway"));
+    });
+    await waitFor(() => expect(recorded()?.entries).toHaveLength(1));
+    const entry = recorded()!.entries[0] as CodeEdit;
+    expect(entry.overrides.map((o) => o.owner)).toEqual(["rules-step"]);
+    const stack = useWorkingCopyStore.getState().undoStack;
+    expect(stack[stack.length - 1]?.k).toBe("c");
+  });
+
+  it("cancelling the owner confirm records nothing", async () => {
+    const ir = seedOverride();
+    render(<KmnCodePane />);
+    edit(changedRule());
+    await clickApply();
+    await act(async () => {
+      fireEvent.click(screen.getByText("Cancel"));
+    });
+    expect(recorded()).toBeUndefined();
+    expect(useWorkingCopyStore.getState().ir).toBe(ir);
   });
 });

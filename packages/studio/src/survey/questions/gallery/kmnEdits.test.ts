@@ -37,10 +37,10 @@ function ctx(base: ApplyContext["ir"], decisions: ApplyContext["decisions"] = {}
 }
 
 describe("kmnEdits module contract", () => {
-  it("provides kmn-edits, orders after the rule writers, writes the groups array", () => {
+  it("provides kmn-edits, orders after the rule writers, writes groups plus the Code-tab surfaces", () => {
     expect(kmnEdits.provides).toEqual(["kmn-edits"]);
     expect(kmnEdits.requires).toEqual(["carved-layout", "deadkeys-defined", "rule-set", "physical-layout"]);
-    expect(kmnEdits.writes.map((p) => p[0])).toEqual(["groups"]);
+    expect(kmnEdits.writes.map((p) => p[0])).toEqual(["groups", "stores", "comments", "raw", "header"]);
     expect(kmnEdits.extract).toBeUndefined();
   });
 

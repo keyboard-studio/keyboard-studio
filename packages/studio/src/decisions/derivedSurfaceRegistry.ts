@@ -145,7 +145,7 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
   },
   {
     id: "kmn-edits",
-    label: "Layout-tab key edits (replayable edit log)",
+    label: "Layout-tab and Code-tab edits (replayable edit log)",
     // Born derived (spec 113): the edit list is the decision itself, never a store slice,
     // so there is no pending gap to close; phase 0 as survey-decision-replay.
     phase: 0,
@@ -159,6 +159,7 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
       "specs/113-layout-studio/research.md R12: each confirmed Layout-tab edit is recorded at edit time as the kmn-edits decision; its apply() replays the entries through replayKmnEdits",
       "Gate arm C (derivedEquivalence.test.ts): a rebuild from decisions reproduces the entry group's rules after Layout edits, and a later completion's rebuild keeps them",
       "Gate arm D (derivedEquivalence.test.ts): the kmn-edits value reloads from the draft envelope",
+      "Spec 113 US8: a Code-tab Apply is a content-anchored `code-apply` entry in the same log; gate arms C and D replay and reload a mix of Layout and Code entries (SC-011)",
     ],
   },
   {

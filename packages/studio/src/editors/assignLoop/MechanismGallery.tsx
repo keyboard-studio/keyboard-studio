@@ -68,6 +68,7 @@ import {
 import type { I18n } from "@lingui/core";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { LayoutEditedKeys } from "./LayoutEditedKeys.tsx";
+import { ChangedInCodeNote } from "./ChangedInCodeNote.tsx";
 import { msg, plural } from "@lingui/core/macro";
 import { resolveMessage } from "../../lib/i18nResolve.ts";
 import { useShallow } from "zustand/react/shallow";
@@ -4378,6 +4379,8 @@ export function MechanismGallery({
 
         {/* Keys the Layout tab set key-first (spec 113): not assignments, so labelled here. */}
         <LayoutEditedKeys />
+        {/* Rules the Code tab changed over a rules-step edit (spec 113 US8). */}
+        <ChangedInCodeNote owner="rules-step" />
 
         {/* Added chip row — characters already configured, removable */}
         {coveredChars.size > 0 && (

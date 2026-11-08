@@ -10,6 +10,9 @@ import { applyLayoutOp } from "./applyLayoutOp.js";
 import { clearKeyLive } from "./clearKeyLive.js";
 import { normaliseKmnEdits, replayKmnEdits } from "./replayKmnEdits.js";
 import { parseKmn, slotLines } from "./testKeyboard.js";
+import { diffIR } from "../kmn-diff/diffIR.js";
+import { applyIRChanges } from "../kmn-diff/applyIRChanges.js";
+import { parse } from "../codec/parse.js";
 
 let seq = 0;
 const at = 0;
@@ -21,7 +24,7 @@ function clearKey(vkey: string, layer: Array<"SHIFT"> = []): KmnEdit {
 }
 
 describe("replayKmnEdits", () => {
-  it("misses are always empty", () => {
+  it("a Layout-only log has no misses", () => {
     expect(replayKmnEdits(parseKmn(), [setKey("K_A", "z")]).misses).toEqual([]);
   });
 
@@ -134,5 +137,47 @@ describe("clearKeyLive", () => {
     const out = clearKeyLive(afterEdits, clear, start, entries).ir;
     expect(emit(out)).not.toContain("U+0071 + [K_B]");
     expect(slotLines(out, "K_A", [])).toEqual(slotLines(start, "K_A", []));
+  });
+});
+
+describe("replayKmnEdits: Code-tab entries (spec 113 T096)", () => {
+  const edited = (ir: ReturnType<typeof parseKmn>, from: string, to: string) =>
+    parse(emit(ir).replace(from, to), "layout-ops-test").ir;
+
+  it("a code-apply entry replays its changes; review-kept has no IR effect", () => {
+    const ir = parseKmn();
+    const changes = diffIR(ir, edited(ir, "+ [K_B] > U+0062", "+ [K_B] > U+0043"));
+    const code: KmnEdit = { seq: 1, at: 0, op: "code-apply", changes, overrides: [] };
+    const kept: KmnEdit = { seq: 2, at: 0, op: "review-kept", target: 1 };
+    const withKept = replayKmnEdits(ir, [code, kept]);
+    const without = replayKmnEdits(ir, [code]);
+    expect(withKept.misses).toEqual([]);
+    expect(emit(withKept.ir)).toBe(emit(without.ir));
+    expect(emit(withKept.ir)).toBe(emit(applyIRChanges(ir, changes).ir));
+    expect(emit(withKept.ir)).toContain("+ [K_B] > U+0043");
+  });
+
+  it("mixes Layout and Code entries in order", () => {
+    const ir = parseKmn();
+    const changes = diffIR(ir, edited(ir, "+ [K_B] > U+0062", "+ [K_B] > U+0043"));
+    const entries: KmnEdit[] = [
+      { seq: 1, at: 0, op: "set-key", vkey: "K_A", layer: [], output: { kind: "text", text: "p" } },
+      { seq: 2, at: 0, op: "code-apply", changes, overrides: [] },
+    ];
+    const out = replayKmnEdits(ir, entries);
+    expect(out.misses).toEqual([]);
+    const text = emit(out.ir);
+    expect(text).toContain("U+0070");
+    expect(text).toContain("+ [K_B] > U+0043");
+  });
+
+  it("a change whose anchor is gone is a miss tagged with the entry's seq", () => {
+    const ir = parseKmn();
+    const changes = diffIR(ir, edited(ir, "+ [K_B] > U+0062", "+ [K_B] > U+0043"));
+    const gone = parse(emit(ir).replace("+ [K_B] > U+0062\n", ""), "layout-ops-test").ir;
+    const out = replayKmnEdits(gone, [{ seq: 7, at: 0, op: "code-apply", changes, overrides: [] }]);
+    expect(out.misses).toHaveLength(1);
+    expect(out.misses[0]?.seq).toBe(7);
+    expect(emit(out.ir)).toBe(emit(gone));
   });
 });
