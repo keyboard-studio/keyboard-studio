@@ -11,12 +11,14 @@ function diag(
   severity: CompilerDiagnostic["severity"],
   line?: number,
   message = "msg",
+  platform?: CompilerDiagnostic["platform"],
 ): CompilerDiagnostic {
   return {
     code,
     severity,
     layer: "A",
     message,
+    ...(platform !== undefined ? { platform } : {}),
     ...(line !== undefined ? { location: { file: "a.kmn", line } } : {}),
   };
 }
@@ -28,9 +30,9 @@ describe("demoDiagnostics", () => {
   it("drops info severity but keeps errors in the 0x7000 namespace", () => {
     const groups = groupDemoDiagnostics([
       diag(INFO, "info"),
-      diag("KM_ERROR_KMCMP_5271044", "error"),
+      diag("KM_ERROR_KMCMP_5271556", "error"),
     ]);
-    expect(groups.map((g) => g.code)).toEqual(["KM_ERROR_KMCMP_5271044"]);
+    expect(groups.map((g) => g.code)).toEqual(["KM_ERROR_KMCMP_5271556"]);
   });
 
   it("includes info when asked", () => {
@@ -63,5 +65,27 @@ describe("demoDiagnostics", () => {
     ]);
     expect(groups[0]).toMatchObject({ count: 2, lines: [] });
     expect(groups[0]?.representative.message).toBe("first");
+  });
+
+  it("drops web-tagged diagnostics from the desktop list but keeps desktop and untagged ones (#2378)", () => {
+    const desktop = diag("KM_WARN_KMCMP_4000001", "warning", 1, "desktop rule", "desktop");
+    const web = diag("KM_ERROR_KMCMP_5271556", "error", 2, "touch layout missing", "web");
+    const untagged = diag("KM_WARN_KMCMP_4000002", "warning", 3, "unowned note");
+    const groups = groupDemoDiagnostics([desktop, web, untagged], { platform: "desktop" });
+    expect(groups.map((g) => g.code)).toEqual(["KM_WARN_KMCMP_4000001", "KM_WARN_KMCMP_4000002"]);
+  });
+
+  it("keeps web-tagged diagnostics when filtering to web (#2378)", () => {
+    const desktop = diag("KM_WARN_KMCMP_4000001", "warning", 1, "desktop rule", "desktop");
+    const web = diag("KM_ERROR_KMCMP_5271556", "error", 2, "touch layout missing", "web");
+    const groups = groupDemoDiagnostics([desktop, web], { platform: "web" });
+    expect(groups.map((g) => g.code)).toEqual(["KM_ERROR_KMCMP_5271556"]);
+  });
+
+  it("keeps everything when no platform filter is given (#2378)", () => {
+    const desktop = diag("KM_WARN_KMCMP_4000001", "warning", 1, "desktop rule", "desktop");
+    const web = diag("KM_ERROR_KMCMP_5271556", "error", 2, "touch layout missing", "web");
+    const groups = groupDemoDiagnostics([desktop, web]);
+    expect(groups.map((g) => g.code)).toEqual(["KM_WARN_KMCMP_4000001", "KM_ERROR_KMCMP_5271556"]);
   });
 });

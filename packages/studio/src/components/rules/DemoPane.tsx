@@ -390,9 +390,14 @@ export function DemoPane(props: DemoPaneProps = {}) {
   const showTrace = artifactStatus === "ready" && rows.length > 0;
 
   // Desktop demo: info diagnostics are filtered in the helper, then identical
-  // codes collapse into one counted row. The error branch keeps every severity.
+  // codes collapse into one counted row. Web/touch-tagged diagnostics are
+  // excluded here (#2378) — they belong to the touch step's surface once it
+  // ships; the review screen's DiagnosticsPanel still shows them. Untagged
+  // (unowned) diagnostics stay visible. The error branch below keeps every
+  // severity AND every platform: when the compile has failed, the author
+  // needs the actual cause, whatever target it came from.
   const diagnosticGroups = useMemo(
-    () => groupDemoDiagnostics(artifact.diagnostics),
+    () => groupDemoDiagnostics(artifact.diagnostics, { platform: "desktop" }),
     [artifact.diagnostics],
   );
   const diagnosticTotal = totalDemoDiagnostics(diagnosticGroups);
