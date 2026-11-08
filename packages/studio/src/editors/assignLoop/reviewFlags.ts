@@ -2,7 +2,8 @@
 //
 // Pure. A flag is raised for: (a) a Code-tab entry that overrode another editor's work and has
 // no `ReviewKept` for it, (b) an entry change that no longer finds its anchor on replay, and
-// (c) a rule a Code-tab entry inserted that another rule in its group now shadows. A `ReviewKept`
+// (c) a rule a Code-tab entry inserted that another rule in its group now shadows, in the working copy
+// or in the projected keyboard (only the projection holds Assign-tab rules). A `ReviewKept`
 // entry targeting a seq clears every flag of that seq. Flags never block completion or download.
 
 import { findShadowedRules } from "@keyboard-studio/engine";
@@ -16,7 +17,7 @@ export interface ReplayMissLike {
 export type ReviewFlag =
   | { kind: "overrode"; seq: number; owners: OwnerRef["owner"][]; changes: number }
   | { kind: "missed"; seq: number; reason: string }
-  | { kind: "shadowed"; seq: number | null; ruleNodeId: string; shadowedBy: string };
+  | { kind: "shadowed"; seq: number | null; ruleNodeId: string; shadowedBy: string; projected?: true };
 
 /** A node's content without its identity or source position, so a stored change can be matched to a live rule. */
 function contentKey(node: unknown): string {
@@ -48,8 +49,10 @@ function entryFor(entries: readonly KmnEdit[], ruleNode: unknown): CodeEdit | nu
 
 /** The node id of a live rule that a flag's entry put there, so "view in code" can reveal it. */
 export function nodeIdForFlag(flag: ReviewFlag, value: KmnEditsValue | undefined, ir: KeyboardIR | null): string | undefined {
-  if (flag.kind === "shadowed") return flag.ruleNodeId;
+  // A projected hit names a node of the built keyboard, not of the working copy: find the entry's live rule instead.
+  if (flag.kind === "shadowed" && flag.projected !== true) return flag.ruleNodeId;
   if (value === undefined || ir === null) return undefined;
+  if (flag.seq === null) return undefined;
   const entry = codeEdits(value.entries).find((e) => e.seq === flag.seq);
   if (entry === undefined) return undefined;
   const keys = new Set(insertedRuleKeys(entry.changes));
@@ -64,6 +67,7 @@ export function reviewFlags(
   value: KmnEditsValue | undefined,
   misses: readonly ReplayMissLike[],
   ir: KeyboardIR | null,
+  projectedIr: KeyboardIR | null = null,
 ): ReviewFlag[] {
   if (value === undefined) return [];
   const kept = new Set<number>();
@@ -83,6 +87,19 @@ export function reviewFlags(
       const entry = entryFor(value.entries, rule);
       if (entry !== null && kept.has(entry.seq)) continue;
       flags.push({ kind: "shadowed", seq: entry?.seq ?? null, ruleNodeId: hit.ruleNodeId, shadowedBy: hit.shadowedBy });
+    }
+  }
+  // The projected (built) keyboard holds Assign-tab rules the working IR does not, so a code rule
+  // can be shadowed only there. Its rules carry no author tag, so a code rule is recognised by content.
+  if (projectedIr !== null) {
+    const rules = projectedIr.groups.flatMap((g) => g.rules);
+    for (const hit of findShadowedRules(projectedIr)) {
+      const rule = rules.find((r) => r.nodeId === hit.ruleNodeId);
+      if (rule === undefined) continue;
+      const entry = entryFor(value.entries, rule);
+      if (entry === null || kept.has(entry.seq)) continue;
+      if (flags.some((f) => f.kind === "shadowed" && f.seq === entry.seq)) continue;
+      flags.push({ kind: "shadowed", seq: entry.seq, ruleNodeId: hit.ruleNodeId, shadowedBy: hit.shadowedBy, projected: true });
     }
   }
   return flags;

@@ -70,6 +70,26 @@ describe("reviewFlags", () => {
     expect(flags[0]).toMatchObject({ kind: "shadowed", seq: 1 });
   });
 
+  it("(c) flags a code-inserted rule that an Assign-tab rule shadows in the projected keyboard only", () => {
+    const withCode = KMN.replace("+ 'c' > 'd'\n", "+ 'c' > 'd'\n+ 'e' > 'f'\n");
+    const e = codeEdit(1, base, withCode);
+    const ir = applyIRChanges(base, e.changes).ir;
+    // The projection holds a rule the Assign tab put in front of the code rule; the working IR does not.
+    const projected = parse(withCode.replace("+ 'a' > 'b'\n", "+ 'e' > 'q'\n+ 'a' > 'b'\n"));
+    expect(reviewFlags(value([e]), [], ir)).toEqual([]);
+    const flags = reviewFlags(value([e]), [], ir, projected);
+    expect(flags).toHaveLength(1);
+    expect(flags[0]).toMatchObject({ kind: "shadowed", seq: 1, projected: true });
+    const kept: KmnEdit = { seq: 2, at: 0, op: "review-kept", target: 1 };
+    expect(reviewFlags(value([e, kept]), [], ir, projected)).toEqual([]);
+  });
+
+  it("(c) does not flag the same shadowed rule twice when the working IR and the projection both show it", () => {
+    const e = codeEdit(1, base, KMN.replace("+ 'a' > 'b'\n", "+ 'a' > 'b'\n+ 'a' > 'z'\n"));
+    const ir = applyIRChanges(base, e.changes).ir;
+    expect(reviewFlags(value([e]), [], ir, ir)).toHaveLength(1);
+  });
+
   it("(c) does not flag a shadowed rule that no code entry inserted", () => {
     const shadowed = parse(KMN.replace("+ 'a' > 'b'\n", "+ 'a' > 'b'\n+ 'a' > 'z'\n"));
     expect(reviewFlags(value([]), [], shadowed)).toEqual([]);

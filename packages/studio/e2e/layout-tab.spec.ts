@@ -368,4 +368,66 @@ test.describe("spec 113 Layout tab - US8", () => {
     await expect(page.getByTestId("editor-view-tab-code")).toHaveText("Code");
     await expectCodeHas(page, "U+014C");
   });
+  // Ruling 9: the Assign tab's assignment wins over a code edit on the same key, in either order.
+  // The edit is not applied in the download, and the author is told why.
+  async function expectDownloadHasAssignmentNotEdit(page: Page): Promise<void> {
+    await navigateToOutput(page);
+    const download = await triggerDownload(page);
+    const zip = unzipSync(new Uint8Array(fs.readFileSync((await download.path())!)));
+    const kmn = Object.entries(zip).find(([name]) => name.endsWith(".kmn"));
+    expect(kmn, "the download carries a .kmn").toBeDefined();
+    const kmnText = new TextDecoder().decode(kmn![1]);
+    expect(kmnText, "the assignment's rule is in the download").toMatch(/\[K_E\] > U\+014B/i);
+    expect(kmnText, "the code edit on the replaced rule is not applied").not.toContain("U+00A4");
+  }
+
+  /** Leave the finished Mechanisms step and reopen it on its editor tabs. */
+  async function reopenMechanisms(page: Page): Promise<void> {
+    await page.getByRole("button", { name: /^Mechanisms —/ }).click({ timeout: 60_000 });
+    await page.getByTestId("editor-view-tabs").waitFor({ state: "visible", timeout: 60_000 });
+  }
+
+  test("ruling 9: a code edit, then the key is assigned in the Assign tab; the edit is not applied and is flagged", async ({ page }) => {
+    await reachMechanicalGallery(page, "basic_kbdus", "en", "ŋ");
+    await page.getByTestId("editor-view-tab-code").click();
+    await expect(page.getByTestId("kmn-code-pane")).toBeVisible({ timeout: 60_000 });
+    await codeReplaceAll(page, "[K_E] > U+0065", "[K_E] > U+00A4");
+    await codeApply(page);
+
+    await page.getByTestId("editor-view-tab-assign").click();
+    await driveMechanismsGallery(page, { placements: { "ŋ": { key: "K_E" } } });
+    await expectDownloadHasAssignmentNotEdit(page);
+
+    // Back in the Code tab the edit is listed with the reason, and counted on the tab.
+    await reopenMechanisms(page);
+    await page.getByTestId("editor-view-tab-code").click();
+    await expect(page.getByTestId("kmn-code-pane")).toBeVisible({ timeout: 60_000 });
+    const flag = page.getByTestId("kmn-code-review-flag");
+    await expect(flag).toHaveCount(1, { timeout: 120_000 });
+    await expect(flag).toContainText("could not be applied to the keyboard as built");
+    await expect(page.getByTestId("editor-view-tab-code")).toHaveText("Code (1)");
+  });
+
+  // Pending a product decision. Ruling 9 says this order is also an FR-063 (b) review flag: the
+  // edit is recorded, not applied in the download, and flagged. Today the Apply gate's projection
+  // check (compileCandidateKmn "unplaceable") refuses the Apply instead: it shows "does not fit the
+  // keyboard as it will be built", records nothing, and leaves the tab at "Code". Either amend
+  // ruling 9 and scenario 4 to accept the refusal, or let the gate record an edit whose only miss is
+  // a rule an assignment claims. Then flip this to `test`, or change its assertions.
+  test.fixme("ruling 9: the key is assigned in the Assign tab, then edited in code; the edit is not applied and is flagged", async ({ page }) => {
+    await reachMechanicalGallery(page, "basic_kbdus", "en", "ŋ");
+    await page.getByTestId("editor-view-tab-assign").click();
+    await driveMechanismsGallery(page, { placements: { "ŋ": { key: "K_E" } } });
+
+    await reopenMechanisms(page);
+    await page.getByTestId("editor-view-tab-code").click();
+    await expect(page.getByTestId("kmn-code-pane")).toBeVisible({ timeout: 60_000 });
+    await codeReplaceAll(page, "[K_E] > U+0065", "[K_E] > U+00A4");
+    await codeApply(page);
+    const flag = page.getByTestId("kmn-code-review-flag");
+    await expect(flag).toHaveCount(1, { timeout: 120_000 });
+    await expect(flag).toContainText("could not be applied to the keyboard as built");
+    await expect(page.getByTestId("editor-view-tab-code")).toHaveText("Code (1)");
+    await expectDownloadHasAssignmentNotEdit(page);
+  });
 });

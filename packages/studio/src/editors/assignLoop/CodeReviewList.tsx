@@ -7,27 +7,34 @@
 
 import { useEffect, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
-import { invertChanges } from "@keyboard-studio/engine";
-import type { CodeEdit, KmnEditsValue, OwnerRef } from "@keyboard-studio/contracts";
+import { invertChanges, parseKmn } from "@keyboard-studio/engine";
+import type { CodeEdit, KeyboardIR, KmnEditsValue, OwnerRef } from "@keyboard-studio/contracts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { projectWorkingCopyForOutput } from "../../lib/serializeWorkingCopy.ts";
+import { readVfsText } from "../../lib/vfsText.ts";
 import { nodeIdForFlag, reviewFlags, type ReplayMissLike, type ReviewFlag } from "./reviewFlags.ts";
 
 const MISS_WARNING = /layout edit (\d+) skipped: (.*)$/;
 
 /**
  * Replay misses for the recorded entries, read from the output projection's warnings (it replays
- * onto the IR it assembles, which is the one that ships). Runs once per change to the entries or
- * the IR, never on a timer, and only when a Code-tab entry exists.
+ * onto the IR it assembles, which is the one that ships), plus that projected keyboard parsed
+ * back to an IR so shadowing by Assign-tab rules can be found. Runs once per change to the
+ * entries or the IR, never on a timer, and only when a Code-tab entry exists.
  */
-function useReplayMisses(value: KmnEditsValue | undefined): readonly ReplayMissLike[] {
+function useProjection(value: KmnEditsValue | undefined): {
+  misses: readonly ReplayMissLike[];
+  projectedIr: KeyboardIR | null;
+} {
   const ir = useWorkingCopyStore((s) => s.ir);
   const [misses, setMisses] = useState<readonly ReplayMissLike[]>([]);
+  const [projectedIr, setProjectedIr] = useState<KeyboardIR | null>(null);
   const hasCode = value?.entries.some((e) => e.op === "code-apply") === true;
   useEffect(() => {
     if (!hasCode) {
       setMisses([]);
+      setProjectedIr(null);
       return;
     }
     let live = true;
@@ -40,20 +47,22 @@ function useReplayMisses(value: KmnEditsValue | undefined): readonly ReplayMissL
           if (m?.[1] !== undefined && m[2] !== undefined) found.push({ seq: Number(m[1]), reason: m[2] });
         }
         setMisses(found);
+        const kmnText = readVfsText(projected.vfs, `source/${projected.keyboardId}.kmn`);
+        setProjectedIr(kmnText === undefined ? null : parseKmn(kmnText, projected.keyboardId).ir);
       })
       .catch(() => undefined);
     return () => {
       live = false;
     };
   }, [hasCode, value, ir]);
-  return misses;
+  return { misses, projectedIr };
 }
 
 export function useCodeReviewFlags(): { flags: ReviewFlag[]; value: KmnEditsValue | undefined } {
   const value = useDecisionStore((s) => s.decisions["kmn-edits"]?.value) as KmnEditsValue | undefined;
   const ir = useWorkingCopyStore((s) => s.ir);
-  const misses = useReplayMisses(value);
-  return { flags: reviewFlags(value, misses, ir), value };
+  const { misses, projectedIr } = useProjection(value);
+  return { flags: reviewFlags(value, misses, ir, projectedIr), value };
 }
 
 /** Keep: record that the author reviewed the entry (clears its flags). */
