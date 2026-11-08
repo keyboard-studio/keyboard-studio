@@ -36,6 +36,7 @@ function fixtureInput(
     kpsLanguages: [],
     kpsTargets: [],
     kpsFontFamilies: [],
+    kpsFontCoverage: [],
     contrastiveRegionAttested: false,
     placement: "release",
     deprecationInPlay: false,
@@ -72,6 +73,73 @@ describe("runCriteriaChecks via lintWithContext", () => {
     expect(codes).toContain("KM_LINT_VERSION_V_PREFIX");
     // The .woff in the VFS inventory is caught by 9.6.
     expect(codes).toContain("KM_LINT_WOFF_FONT_IN_PACKAGE");
+  });
+
+  it("18.13 fires when a packaged font's cmap lacks a typed character", async () => {
+    // The keyboard types 'a' (U+0061); the coverage below starts at 'b'.
+    const ir = makeTestIR({
+      header: { keyboardId: ID, name: "Demo", version: "v1.02" },
+      groups: [
+        {
+          nodeId: "g1",
+          name: "main",
+          usingKeys: true,
+          readonly: false,
+          rules: [
+            {
+              nodeId: "r1",
+              context: [],
+              output: [{ kind: "char", value: "a" }],
+            },
+          ],
+        },
+      ],
+    });
+    const { findings } = await lintWithContext(fixtureVfs(), ID, {
+      keyboardIR: ir,
+      criteriaInput: fixtureInput({
+        kpsFontCoverage: [
+          { ref: "NoA.ttf", covered: [{ start: 0x62, end: 0x7e }] },
+        ],
+      }),
+    });
+    const finding = findings.find((f) => f.code === "KM_LINT_FONT_GLYPH_COVERAGE");
+    expect(finding).toBeDefined();
+    expect(finding?.severity).toBe("warning");
+    expect(finding?.message).toContain("U+0061");
+    expect(finding?.message).toContain("NoA.ttf");
+  });
+
+  it("18.13 stays silent when the packaged font covers the typed characters", async () => {
+    const ir = makeTestIR({
+      header: { keyboardId: ID, name: "Demo", version: "v1.02" },
+      groups: [
+        {
+          nodeId: "g1",
+          name: "main",
+          usingKeys: true,
+          readonly: false,
+          rules: [
+            {
+              nodeId: "r1",
+              context: [],
+              output: [{ kind: "char", value: "a" }],
+            },
+          ],
+        },
+      ],
+    });
+    const { findings } = await lintWithContext(fixtureVfs(), ID, {
+      keyboardIR: ir,
+      criteriaInput: fixtureInput({
+        kpsFontCoverage: [
+          { ref: "Full.ttf", covered: [{ start: 0x0, end: 0x10ffff }] },
+        ],
+      }),
+    });
+    expect(findings.map((f) => f.code)).not.toContain(
+      "KM_LINT_FONT_GLYPH_COVERAGE",
+    );
   });
 
   it("Batch 2: 1.9 fires on duplicate files only with a CriteriaLintInput", async () => {

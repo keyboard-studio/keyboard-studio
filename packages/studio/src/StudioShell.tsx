@@ -96,6 +96,7 @@ import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
 import { useOpenInventorySeed } from "./hooks/useOpenInventorySeed.ts";
 import { useOe2SoleSourceFindings } from "./hooks/useOe2SoleSourceFindings.ts";
 import { useLdmlFindings } from "./hooks/useLdmlFindings.ts";
+import { useFontGlyphCoverageFindings } from "./hooks/useFontGlyphCoverageFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
 import { useContextToleranceApply } from "./hooks/useContextToleranceApply.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
@@ -1243,12 +1244,32 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // The LDML export's A/N warnings and hints ride the same array on the same terms (spec 108):
   // a memoised synchronous hook over the published preview projection. They never gate an output.
   const ldmlFindings = useLdmlFindings();
+  // Issue #2593: the packaged-font glyph-coverage warning (18.13) rides
+  // the same array on the same terms — a memoised synchronous hook over
+  // the working copy's VFS + IR. It has no owning question, so it renders
+  // as an unmapped finding on the Output screen.
+  const fontGlyphCoverageFindings = useFontGlyphCoverageFindings();
   const findings = useMemo(
     () =>
-      documentationFindings.length === 0 && oe2Findings.length === 0 && ldmlFindings.length === 0
+      documentationFindings.length === 0 &&
+      oe2Findings.length === 0 &&
+      ldmlFindings.length === 0 &&
+      fontGlyphCoverageFindings.length === 0
         ? validatorFindingsOnly
-        : [...validatorFindingsOnly, ...documentationFindings, ...oe2Findings, ...ldmlFindings],
-    [validatorFindingsOnly, documentationFindings, oe2Findings, ldmlFindings],
+        : [
+            ...validatorFindingsOnly,
+            ...documentationFindings,
+            ...oe2Findings,
+            ...ldmlFindings,
+            ...fontGlyphCoverageFindings,
+          ],
+    [
+      validatorFindingsOnly,
+      documentationFindings,
+      oe2Findings,
+      ldmlFindings,
+      fontGlyphCoverageFindings,
+    ],
   );
   // spec-014 US5/T034 — publish the SINGLE debounced `useValidator` findings to
   // the store so the sibling `StudioShell` can feed C4 spine-prefix shippability
