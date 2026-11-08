@@ -13,7 +13,7 @@ import type { LayerCombo } from "@keyboard-studio/contracts";
 import type { ReadOnlyReason } from "@keyboard-studio/engine";
 import { formatLayerCombo } from "../assignLoop/keyGrid/LayerSelector.tsx";
 import { codepointLabel } from "../../survey/codepointLabel.ts";
-import type { CellKind, CellProvenance, DesktopCellViewModel } from "./desktopGridViewModel.ts";
+import type { CellKind, CellProvenance, DesktopCellViewModel, FallbackClass } from "./desktopGridViewModel.ts";
 
 export interface LayoutCopy {
   /** "Default" for the unshifted layer, otherwise "Shift+AltGr" style. */
@@ -22,6 +22,10 @@ export interface LayoutCopy {
   kindLabel: (kind: CellKind) => string;
   /** Where the behaviour comes from, in words (FR-012). */
   provenanceLabel: (provenance: CellProvenance) => string;
+  /** The word a screen reader hears for a provisional key (FR-030). */
+  provisionalLabel: () => string;
+  /** A fallback character class in words ("punctuation and symbols"). */
+  fallbackClassLabel: (fallbackClass: FallbackClass) => string;
   /** The one-word form drawn on the cell. */
   provenanceShort: (provenance: CellProvenance) => string;
   /** Why a cell or row is read-only, in plain words (FR-015). */
@@ -78,6 +82,25 @@ export function useLayoutCopy(): LayoutCopy {
         return t({ id: "editor.layout.provenance.baseFallback", message: "Base keyboard fallback" });
       default: {
         const unreachable: never = provenance;
+        return unreachable;
+      }
+    }
+  }
+
+  function provisionalLabel(): string {
+    return t({ id: "editor.layout.cell.provisional", message: "provisional" });
+  }
+
+  function fallbackClassLabel(fallbackClass: FallbackClass): string {
+    switch (fallbackClass) {
+      case "letters":
+        return t({ id: "editor.layout.fallbackClass.letters", message: "letters" });
+      case "digits":
+        return t({ id: "editor.layout.fallbackClass.digits", message: "digits" });
+      case "punctuation":
+        return t({ id: "editor.layout.fallbackClass.punctuation", message: "punctuation and symbols" });
+      default: {
+        const unreachable: never = fallbackClass;
         return unreachable;
       }
     }
@@ -234,6 +257,7 @@ export function useLayoutCopy(): LayoutCopy {
     if (cell.vkey === "K_oE2") parts.push(isoExtraKeyNote());
     parts.push(outputPhrase(cell), kindLabel(cell.kind));
     if (cell.provenance !== null) parts.push(provenanceLabel(cell.provenance));
+    if (cell.provisional) parts.push(provisionalLabel());
     if (!cell.frame) {
       parts.push(
         cell.editable
@@ -251,6 +275,8 @@ export function useLayoutCopy(): LayoutCopy {
     layerName,
     kindLabel,
     provenanceLabel,
+    provisionalLabel,
+    fallbackClassLabel,
     provenanceShort,
     readOnlyReasonText,
     outputPhrase,

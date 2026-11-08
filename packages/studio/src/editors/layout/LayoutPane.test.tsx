@@ -121,7 +121,8 @@ describe("LayoutPane", () => {
     publish();
     await settle();
     const tabs = within(screen.getByTestId("key-layer-selector")).getAllByRole("tab");
-    expect(tabs.map((t) => t.textContent)).toEqual(["Default", "Shift"]);
+    // Each tab also carries its provisional key count.
+    expect(tabs.map((t) => t.textContent?.replace(/\d+$/, ""))).toEqual(["Default", "Shift"]);
     expect(screen.getByRole("grid").getAttribute("aria-label")).toBe("Desktop layout, Default layer");
     fireEvent.click(screen.getByTestId("key-layer-selector-option-SHIFT"));
     expect(screen.getByRole("grid").getAttribute("aria-label")).toBe("Desktop layout, Shift layer");
@@ -350,4 +351,33 @@ describe("LayoutPane undo (spec 113 US2)", () => {
     expect((screen.getByTestId("layout-undo") as HTMLButtonElement).disabled).toBe(true);
     expect(useWorkingCopyStore.getState().undoStack).toEqual([]);
   });
+
+  it("shows each layer's provisional key count, and an assigned key is not provisional (US6 scenario 1)", async () => {
+    load(KMN);
+    render(<LayoutPane onViewInCode={vi.fn()} />);
+    publish();
+    await settle();
+    expect(cell("K_A").getAttribute("data-provisional")).toBe("false");
+    expect(cell("K_D").getAttribute("data-provisional")).toBe("true");
+    const provisionalIn = (cells: HTMLElement[]) => cells.filter((c) => c.getAttribute("data-provisional") === "true").length;
+    const defaultCount = provisionalIn(screen.getAllByRole("gridcell"));
+    expect(defaultCount).toBeGreaterThan(0);
+    expect(screen.getByTestId("key-layer-selector-count-default").textContent).toBe(String(defaultCount));
+    const shiftCount = Number(screen.getByTestId("key-layer-selector-count-SHIFT").textContent);
+    expect(shiftCount).toBeGreaterThan(0);
+    expect(screen.getByTestId("key-layer-selector-option-SHIFT").getAttribute("aria-label")).toContain("provisional keys");
+    fireEvent.click(screen.getByTestId("key-layer-selector-option-SHIFT"));
+    expect(provisionalIn(screen.getAllByRole("gridcell"))).toBe(shiftCount);
+  });
+
+  it("a provisional key's detail reaches the fallback policy surface", async () => {
+    load(KMN);
+    render(<LayoutPane onViewInCode={vi.fn()} />);
+    publish();
+    await settle();
+    fireEvent.click(cell("K_D"));
+    fireEvent.click(screen.getByTestId("key-detail-change-policy"));
+    expect(screen.getByTestId("fallback-policy-section")).toBeTruthy();
+  });
+
 });

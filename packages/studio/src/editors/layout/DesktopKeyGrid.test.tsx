@@ -236,3 +236,18 @@ describe("DesktopKeyGrid cell names (FR-040)", () => {
     expect(cell("K_A").style.opacity).toBe("0.75");
   });
 });
+
+describe("provisional cells (FR-030)", () => {
+  it("are visibly distinct and announced as provisional; an assigned key is neither", () => {
+    render(<Harness />);
+    const provisional = cell("K_D");
+    expect(provisional.getAttribute("data-provisional")).toBe("true");
+    expect(provisional.getAttribute("aria-label")).toContain("provisional");
+    expect(provisional.style.border).toContain("dotted");
+    const assigned = cell("K_A");
+    expect(assigned.getAttribute("data-provisional")).toBe("false");
+    expect(assigned.getAttribute("aria-label")).not.toContain("provisional");
+    expect(assigned.style.border).not.toContain("dotted");
+    expect(cell("K_ENTER").getAttribute("aria-label")).not.toContain("provisional");
+  });
+});

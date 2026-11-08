@@ -22,7 +22,8 @@ import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../lib/galleryThe
 import { LayerSelector } from "../assignLoop/keyGrid/LayerSelector.tsx";
 import type { LayoutPanelProps } from "./layoutPanelProps.ts";
 import { baseFallbackCells } from "./baseFallbackCells.ts";
-import { buildDesktopGridViewModel } from "./desktopGridViewModel.ts";
+import { buildDesktopGridViewModel, countProvisional, fallbackClassOf } from "./desktopGridViewModel.ts";
+import type { FallbackClass } from "./desktopGridViewModel.ts";
 import type { DesktopCellViewModel } from "./desktopGridViewModel.ts";
 import { AddLayerDialog } from "./AddLayerDialog.tsx";
 import { AfterContextView } from "./AfterContextView.tsx";
@@ -39,7 +40,11 @@ import { useLayoutCopy } from "./useLayoutCopy.ts";
 /** The most compile diagnostics listed in the banner. */
 const MAX_BANNER_DIAGNOSTICS = 3;
 
-const NO_FINDING_COUNTS: ReadonlyMap<string, number> = new Map();
+/**
+ * Classes whose fallback policy the author has confirmed (spec 109). Nothing stores that
+ * confirmation yet, and the Layout tab never sets policy, so no class is confirmed here.
+ */
+const NO_CONFIRMED_CLASSES: ReadonlySet<FallbackClass> = new Set();
 
 export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
   const { t, i18n } = useLingui();
@@ -100,12 +105,34 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
       mnemonic: attribution.mnemonic,
       baseFallback: fallback,
       contexts,
+      confirmedClasses: NO_CONFIRMED_CLASSES,
     }).cells;
     // A completed desktop step is read-only here as it is in the Assign tab.
     return desktopLocked ? built.map((c) => (c.editable ? { ...c, editable: false } : c)) : built;
     // `layer` is covered by `layerId`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attribution, fallback, contexts, desktopLocked, layerId]);
+
+  // Provisional keys per layer (FR-030), shown as the layer's count. The open layer is counted from
+  // its verified cells; the others from the working copy's own rules, as no other layer is compiled
+  // and simulated here.
+  const provisionalByLayer = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (ir === null) return counts;
+    for (const l of layers) {
+      const key = layerKey(l);
+      if (key === layerId) continue;
+      const fb = baseFallbackCells(ir, DESKTOP_VKEYS, l, bases);
+      const n = attributeLayer(ir, l, DESKTOP_VKEYS).filter((c) => {
+        if (c.frame || c.plain !== null || !c.unhandled) return false;
+        const cls = fallbackClassOf(fb.get(c.vkey));
+        return cls === null || !NO_CONFIRMED_CLASSES.has(cls);
+      }).length;
+      counts.set(key, n);
+    }
+    counts.set(layerId, countProvisional(cells));
+    return counts;
+  }, [ir, layers, layerId, bases, cells]);
 
   const selected = cells.find((c) => c.vkey === selectedVkey) ?? null;
 
@@ -279,7 +306,8 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
           layerIds={layerIds}
           activeLayerId={layerId}
           onSelectLayer={selectLayer}
-          findingCountsByLayerId={NO_FINDING_COUNTS}
+          findingCountsByLayerId={provisionalByLayer}
+          countKind="provisional"
           layerLabels={layerLabels}
           hideGroupHeadings
           label={t({ id: "editor.layout.pane.layersLabel", message: "Layers" })}

@@ -1,4 +1,4 @@
-// E2E: spec 113 (Layout Studio) T048 — US1 row; US2 (T070), US3 (T087) and US8 (T105) rows below.
+// E2E: spec 113 (Layout Studio) T048 — US1 row; US2 (T070), US3 (T087), US6 (T115) and US8 (T105) rows below.
 //
 // Copy a simple positional keyboard, open Mechanical Gallery -> Layout, and check that:
 //   - the default-layer cells show the copied keyboard's characters, labelled "from the starting
@@ -301,6 +301,33 @@ async function codeApply(page: Page): Promise<void> {
   await page.getByTestId("kmn-code-apply").click();
   await expect(page.getByTestId("kmn-code-dirty")).toHaveCount(0, { timeout: 120_000 });
 }
+
+test.describe("spec 113 Layout tab - US6", () => {
+  test.setTimeout(600_000);
+
+  test("provisional keys are marked and counted per layer; the detail reaches the fallback policy surface", async ({ page }) => {
+    await reachMechanicalGallery(page, "bj_cree_woods", "en", "é");
+    await openLayoutTab(page);
+
+    // Wait for the compile, then find a key the keyboard does not handle.
+    await expect(page.getByTestId("layout-grid")).toBeVisible({ timeout: 60_000 });
+    const provisional = page.locator('[role="gridcell"][data-provisional="true"]').first();
+    await expect(provisional, "a sparse layer has keys the base keyboard types").toBeVisible();
+    await expect(provisional).toHaveAttribute("aria-label", /provisional/);
+    await expect(page.locator('[role="gridcell"][data-provisional="false"]').first()).toBeVisible();
+
+    // The layer shows how many keys are provisional, and the count matches the grid.
+    const shown = await page.locator('[role="gridcell"][data-provisional="true"]').count();
+    await expect(page.getByTestId("key-layer-selector-count-default")).toHaveText(String(shown));
+
+    // "Change the fallback policy" opens spec 109's surface in place; the Layout tab sets nothing.
+    await provisional.click();
+    await page.getByTestId("key-detail-change-policy").click();
+    const surface = page.getByTestId("key-detail-provisional").getByTestId("fallback-policy-section");
+    await expect(surface).toBeVisible();
+    await expect(surface.getByTestId("fallback-policy-current")).toBeVisible();
+  });
+});
 
 test.describe("spec 113 Layout tab - US8", () => {
   test.setTimeout(900_000);

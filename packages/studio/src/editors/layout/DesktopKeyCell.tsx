@@ -60,6 +60,7 @@ export function DesktopKeyCell({
       data-testid={`layout-cell-${cell.vkey}`}
       data-kind={cell.kind}
       data-provenance={cell.provenance ?? "none"}
+      data-provisional={cell.provisional ? "true" : "false"}
       data-editable={cell.editable ? "true" : "false"}
       aria-rowindex={rowIndex}
       aria-colindex={colIndex}
@@ -82,8 +83,16 @@ export function DesktopKeyCell({
         gap: 2,
         padding: "4px 2px",
         height: 52,
-        background: isSelected ? "var(--app-accent-subtle)" : cell.frame ? "transparent" : BG_CARD,
-        border: `1px ${readOnly ? "dashed" : "solid"} ${isSelected ? ACCENT : BORDER}`,
+        background: isSelected
+          ? "var(--app-accent-subtle)"
+          : cell.frame
+            ? "transparent"
+            : cell.provisional
+              ? `repeating-linear-gradient(135deg, ${BG_CARD} 0 5px, var(--app-accent-subtle) 5px 7px)`
+              : BG_CARD,
+        // A provisional key is dotted (not solid, not the read-only dash) and its glyph italic, so
+        // it is told apart without colour.
+        border: `${cell.provisional ? "2px dotted" : `1px ${readOnly ? "dashed" : "solid"}`} ${isSelected || cell.provisional ? ACCENT : BORDER}`,
         borderRadius: 4,
         color: cell.frame || stale ? TEXT_DIM : TEXT_MAIN,
         opacity: stale ? 0.75 : 1,
@@ -102,7 +111,7 @@ export function DesktopKeyCell({
           overflow: "hidden",
           textOverflow: "ellipsis",
           maxWidth: "100%",
-          fontStyle: cell.kind === "deadkey" ? "italic" : undefined,
+          fontStyle: cell.kind === "deadkey" || cell.provisional ? "italic" : undefined,
         }}
       >
         {glyph ?? (cell.frame ? "" : "·")}

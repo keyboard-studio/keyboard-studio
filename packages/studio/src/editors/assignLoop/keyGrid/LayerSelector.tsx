@@ -178,6 +178,8 @@ export interface LayerSelectorProps {
   readonly hideGroupHeadings?: boolean;
   /** Localized accessible name override. */
   readonly label?: string;
+  /** What the counts count. Default findings; the desktop Layout tab counts provisional keys. */
+  readonly countKind?: "findings" | "provisional";
 }
 
 /** One rendered group: a plane's family, or the single shared freeform bucket. */
@@ -253,6 +255,7 @@ export function LayerSelector({
   layerLabels,
   hideGroupHeadings = false,
   label,
+  countKind = "findings",
 }: LayerSelectorProps) {
   const { t } = useLingui();
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -291,10 +294,16 @@ export function LayerSelector({
     });
     if (count <= 0) return { visibleCount: undefined, accessibleName: baseName };
 
-    const countClause = t({
-      id: "editor.assignLoop.keyGrid.layerSelector.optionFindingCount",
-      message: plural(count, { one: "# finding", other: "# findings" }),
-    });
+    const countClause =
+      countKind === "provisional"
+        ? t({
+            id: "editor.assignLoop.keyGrid.layerSelector.optionProvisionalCount",
+            message: plural(count, { one: "# provisional key", other: "# provisional keys" }),
+          })
+        : t({
+            id: "editor.assignLoop.keyGrid.layerSelector.optionFindingCount",
+            message: plural(count, { one: "# finding", other: "# findings" }),
+          });
     return {
       visibleCount: String(count),
       accessibleName: `${baseName} — ${countClause}`,

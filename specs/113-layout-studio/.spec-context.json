@@ -511,10 +511,58 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-08T06:02:11.758Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T110",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:24:41.944Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T111",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:24:42.230Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T112",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:24:42.506Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T113",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:24:42.772Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T114",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:24:43.037Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T115",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:24:43.311Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T109",
+  "currentTask": "T115",
   "task_summaries": {
     "T049": {
       "status": "DONE",
@@ -979,6 +1027,57 @@
     "T109": {
       "status": "DONE",
       "did": "E2E US5 row: read-only key detail and view in code reveals the rule line",
+      "files": [
+        "packages/studio/e2e/layout-tab.spec.ts"
+      ]
+    },
+    "T110": {
+      "status": "DONE",
+      "did": "Tests for provisional cells, announcement, per-layer counts, confirmed class and assigned keys",
+      "files": [
+        "packages/studio/src/editors/layout/desktopGridViewModel.test.ts",
+        "packages/studio/src/editors/layout/DesktopKeyGrid.test.tsx",
+        "packages/studio/src/editors/layout/LayoutPane.test.tsx"
+      ]
+    },
+    "T111": {
+      "status": "DONE",
+      "did": "Provisional flag, styling, aria announcement, per-layer counts into LayerSelector",
+      "files": [
+        "packages/studio/src/editors/layout/desktopGridViewModel.ts",
+        "packages/studio/src/editors/layout/DesktopKeyCell.tsx",
+        "packages/studio/src/editors/layout/useLayoutCopy.ts",
+        "packages/studio/src/editors/layout/LayoutPane.tsx",
+        "packages/studio/src/editors/assignLoop/keyGrid/LayerSelector.tsx"
+      ]
+    },
+    "T112": {
+      "status": "DONE",
+      "did": "Change the fallback policy entry in KeyDetailPanel opening FallbackPolicySection",
+      "files": [
+        "packages/studio/src/editors/layout/KeyDetailPanel.tsx",
+        "packages/studio/src/editors/layout/KeyDetailPanel.test.tsx"
+      ]
+    },
+    "T113": {
+      "status": "DONE",
+      "did": "SC-006 studio provenance test and engine corpus sweep",
+      "files": [
+        "packages/studio/src/editors/layout/provenance.test.ts",
+        "packages/engine/src/layout-attribution/provisional.corpus.test.ts"
+      ]
+    },
+    "T114": {
+      "status": "DONE",
+      "did": "i18n en and fr catalogs for Phase 8",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T115": {
+      "status": "DONE",
+      "did": "E2E US6 row (written, not run)",
       "files": [
         "packages/studio/e2e/layout-tab.spec.ts"
       ]

@@ -307,12 +307,12 @@ policy surface.
 punctuation policy; those keys stop being provisional; assign one letter key; it stops being
 provisional; nothing else changes (SC-006).
 
-- [ ] T110 [P] [US6] Extend `LY/desktopGridViewModel.test.ts` and `LY/DesktopKeyGrid.test.tsx`: provisional cells visually distinct and announced "provisional" to assistive technology; per-layer provisional counts passed to `LayerSelector`'s `findingCountsByLayerId`; a confirmed class policy removes its keys from the count and shows the confirmed result; an author-assigned key is never provisional (SC-006)
-- [ ] T111 [US6] Implement the provisional styling, announcement, and per-layer counts in `LY/DesktopKeyCell.tsx`, `LY/desktopGridViewModel.ts`, and `LY/LayoutPane.tsx`; passes T110
-- [ ] T112 [US6] Add "change the fallback policy" to a provisional key's detail in `LY/KeyDetailPanel.tsx`, reaching `ST/editors/fallback/FallbackPolicySection.tsx` for that key's character class (the Layout tab never sets policy, FR-031); test in `LY/KeyDetailPanel.test.tsx`
-- [ ] T113 [US6] SC-006 over the corpus set in `LY/provenance.test.ts` (or the engine corpus suite if it needs no studio state): every unhandled key provisional, no `authorEdit` key provisional
-- [ ] T114 [US6] i18n for Phase 8 (as T045)
-- [ ] T115 [US6] E2E US6 row in `E2E` (uses `packages/studio/e2e/fallback-policy.spec.ts`'s helpers where they fit)
+- [x] T110 [P] [US6] Extend `LY/desktopGridViewModel.test.ts` and `LY/DesktopKeyGrid.test.tsx`: provisional cells visually distinct and announced "provisional" to assistive technology; per-layer provisional counts passed to `LayerSelector`'s `findingCountsByLayerId`; a confirmed class policy removes its keys from the count and shows the confirmed result; an author-assigned key is never provisional (SC-006)
+- [x] T111 [US6] Implement the provisional styling, announcement, and per-layer counts in `LY/DesktopKeyCell.tsx`, `LY/desktopGridViewModel.ts`, and `LY/LayoutPane.tsx`; passes T110
+- [x] T112 [US6] Add "change the fallback policy" to a provisional key's detail in `LY/KeyDetailPanel.tsx`, reaching `ST/editors/fallback/FallbackPolicySection.tsx` for that key's character class (the Layout tab never sets policy, FR-031); test in `LY/KeyDetailPanel.test.tsx`
+- [x] T113 [US6] SC-006 over the corpus set in `LY/provenance.test.ts` (or the engine corpus suite if it needs no studio state): every unhandled key provisional, no `authorEdit` key provisional
+- [x] T114 [US6] i18n for Phase 8 (as T045)
+- [x] T115 [US6] E2E US6 row in `E2E` (uses `packages/studio/e2e/fallback-policy.spec.ts`'s helpers where they fit)
 
 **Checkpoint**: Commit `spec 113 T110-T115`.
 

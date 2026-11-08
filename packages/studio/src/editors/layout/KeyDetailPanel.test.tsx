@@ -8,6 +8,7 @@ import { render } from "../../test/renderWithI18n.tsx";
 import type { WindowsLayout } from "../../lib/windowsLayouts.ts";
 import { baseFallbackFor } from "./baseFallbackCells.ts";
 import { buildDesktopGridViewModel, type DesktopCellViewModel } from "./desktopGridViewModel.ts";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { KeyDetailPanel } from "./KeyDetailPanel.tsx";
 
 afterEach(cleanup);
@@ -237,5 +238,36 @@ describe("KeyDetailPanel rules and replaced value (spec 113 US5, FR-016)", () =>
     cleanup();
     render(<KeyDetailPanel cell={cellOf(attribution("K_A"))} onViewInCode={vi.fn()} replaced={{ kind: "text", text: "a" }} />);
     expect(screen.queryByTestId("key-detail-replaced")).toBeNull();
+  });
+});
+
+describe("KeyDetailPanel: provisional key (FR-031)", () => {
+  const provisionalCell = () =>
+    cellOf(attribution("K_COMMA", { plain: null, unhandled: true }), {
+      baseFallback: new Map([["K_COMMA", baseFallbackFor("K_COMMA", LAYER, [US])]]),
+    });
+
+  it("offers to change the fallback policy for the key's class, and opens the fallback surface", () => {
+    show(provisionalCell());
+    expect(screen.getByTestId("key-detail-provisional").textContent).toContain("provisional");
+    const button = screen.getByTestId("key-detail-change-policy");
+    expect(button.textContent).toBe("Change the fallback policy for punctuation and symbols");
+    expect(screen.queryByTestId("fallback-policy-section")).toBeNull();
+    fireEvent.click(button);
+    expect(screen.getByTestId("fallback-policy-section")).toBeTruthy();
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("does not set the policy itself", () => {
+    const before = useWorkingCopyStore.getState().fallbackPolicy;
+    show(provisionalCell());
+    fireEvent.click(screen.getByTestId("key-detail-change-policy"));
+    expect(useWorkingCopyStore.getState().fallbackPolicy).toBe(before);
+  });
+
+  it("is absent for a key that is not provisional", () => {
+    show(cellOf(attribution("K_A")));
+    expect(screen.queryByTestId("key-detail-provisional")).toBeNull();
+    expect(screen.queryByTestId("key-detail-change-policy")).toBeNull();
   });
 });

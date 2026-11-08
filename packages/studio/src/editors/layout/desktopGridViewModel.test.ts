@@ -7,6 +7,8 @@ import type { WindowsLayout } from "../../lib/windowsLayouts.ts";
 import { baseFallbackFor } from "./baseFallbackCells.ts";
 import {
   buildDesktopGridViewModel,
+  countProvisional,
+  fallbackClassOf,
   type DesktopCellViewModel,
   type DesktopGridViewModelInput,
 } from "./desktopGridViewModel.ts";
@@ -277,5 +279,70 @@ describe("geometry", () => {
     expect(g.cells[0]).toMatchObject({ row: 1, width: 1 });
     expect(g.cells[1]?.row).toBe(2);
     expect(g.rowCount).toBe(5);
+  });
+});
+
+describe("provisional keys (FR-030..FR-032, SC-006)", () => {
+  const unhandled = (vkey: string, layer: LayerCombo = LAYER) =>
+    cell(vkey, { plain: null, unhandled: true, layer });
+  const fb = (vkey: string) => baseFallbackFor(vkey, LAYER, [US]);
+
+  it("an unhandled key is provisional, with its character class", () => {
+    const c = one(unhandled("K_B"), { baseFallback: new Map([["K_B", fb("K_B")]]) });
+    expect(c).toMatchObject({ provenance: "base-fallback", provisional: true, fallbackClass: "letters" });
+  });
+
+  it("a key the keyboard handles, and a frame key, are never provisional", () => {
+    expect(one(cell("K_A")).provisional).toBe(false);
+    expect(one(cell("K_ENTER", { plain: null, frame: true })).provisional).toBe(false);
+  });
+
+  it("an author-assigned key is never provisional", () => {
+    const c = one(cell("K_A", { plain: row({ provenance: "hand-set", authorEdit: "layout-tab" }) }));
+    expect(c.provisional).toBe(false);
+    const code = one(cell("K_A", { plain: row({ provenance: "hand-set", authorEdit: "code-tab" }) }));
+    expect(code.provisional).toBe(false);
+  });
+
+  it("a key the compiled keyboard has a rule for (an assignment) is not provisional", () => {
+    const steps: CellStep[] = [
+      {
+        vkey: "K_B",
+        layer: LAYER,
+        step: { input: { vkey: "K_B", modifiers: [] }, outputAfter: "z", pendingDeadkeys: [], beep: false, firedRule: { group: "main", ruleIndex: 1 } },
+      },
+    ];
+    expect(one(unhandled("K_B"), { steps, baseFallback: new Map([["K_B", fb("K_B")]]) }).provisional).toBe(false);
+  });
+
+  it("classifies the base character by Unicode category", () => {
+    expect(fallbackClassOf(fb("K_B"))).toBe("letters");
+    expect(fallbackClassOf(fb("K_1"))).toBe("digits");
+    expect(fallbackClassOf(fb("K_COMMA"))).toBe("punctuation");
+    expect(fallbackClassOf(baseFallbackFor("K_B", LAYER, []))).toBeNull();
+  });
+
+  it("a confirmed class policy removes its keys from the provisional count and keeps the result", () => {
+    const map = new Map([
+      ["K_B", fb("K_B")],
+      ["K_1", fb("K_1")],
+      ["K_COMMA", fb("K_COMMA")],
+    ]);
+    const cells = [unhandled("K_B"), unhandled("K_1"), unhandled("K_COMMA")];
+    const before = vm(cells, { baseFallback: map });
+    expect(countProvisional(before)).toBe(3);
+    const after = vm(cells, { baseFallback: map, confirmedClasses: new Set(["punctuation"]) });
+    expect(countProvisional(after)).toBe(2);
+    const comma = after.find((c) => c.vkey === "K_COMMA")!;
+    expect(comma).toMatchObject({ provisional: false, provenance: "base-fallback", display: "," });
+    expect(after.find((c) => c.vkey === "K_B")!.provisional).toBe(true);
+  });
+
+  it("a key with no classifiable character stays provisional whatever is confirmed", () => {
+    const c = one(unhandled("K_B"), {
+      baseFallback: new Map([["K_B", baseFallbackFor("K_B", LAYER, [])]]),
+      confirmedClasses: new Set(["letters", "digits", "punctuation"]),
+    });
+    expect(c.provisional).toBe(true);
   });
 });

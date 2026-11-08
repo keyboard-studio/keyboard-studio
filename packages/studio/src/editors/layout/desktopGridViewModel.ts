@@ -36,6 +36,22 @@ export type CellKind =
   | "unknown"
   | "system-shortcut";
 
+/**
+ * The character class a base keyboard's fallback character falls in (spec 109 FR-020: Unicode
+ * General Category; letters L* and marks M*, digits Nd, punctuation and symbols P* and S*).
+ */
+export type FallbackClass = "letters" | "digits" | "punctuation";
+
+/** The class of a fallback outcome; null when the base keyboard types no classifiable character. */
+export function fallbackClassOf(detail: BaseFallbackDetail | undefined): FallbackClass | null {
+  if (detail?.outcome.kind !== "character") return null;
+  const text = detail.outcome.text;
+  if (/^[\p{L}\p{M}]/u.test(text)) return "letters";
+  if (/^\p{Nd}/u.test(text)) return "digits";
+  if (/^[\p{P}\p{S}]/u.test(text)) return "punctuation";
+  return null;
+}
+
 export interface DesktopCellViewModel {
   /** The Keyman virtual key, e.g. `K_A`; `K_oE2` for the ISO extra key. */
   vkey: string;
@@ -78,6 +94,14 @@ export interface DesktopCellViewModel {
   readOnlyReason?: ReadOnlyReason;
   /** The key also takes part in deadkey combinations or contextual replacements ("after ..." rows). Informational only. */
   hasContextualRows: boolean;
+  /**
+   * The key is typed by the base keyboard's fallback and nobody has confirmed it (FR-030): true
+   * for a non-frame `base-fallback` cell whose character class has no confirmed fallback policy.
+   * An assigned or starting-point key is never provisional (SC-006).
+   */
+  provisional: boolean;
+  /** The class of the base keyboard's character on a base-fallback cell, when it has one. */
+  fallbackClass?: FallbackClass;
   /** Number of rules attribution found for the key in this layer (plain plus rows). */
   ruleCount: number;
   /** `ready`, `stale` (last good result while recompiling or after a failed compile), or `not-compiled` (no `.js` yet; never a guess). */
@@ -110,6 +134,11 @@ export interface DesktopGridViewModelInput {
   baseFallback?: ReadonlyMap<string, BaseFallbackDetail>;
   /** From `listContexts(ir)`: the number of keys per context, for a deadkey's combination count. */
   contexts?: ReadonlyArray<{ context: LayoutContext; keyCount: number }>;
+  /**
+   * Character classes whose fallback policy the author has confirmed (spec 109). Keys of these
+   * classes are not provisional. Empty until the confirmation is stored; the Layout tab never sets it.
+   */
+  confirmedClasses?: ReadonlySet<FallbackClass>;
   geometry?: readonly DesktopIsoGeometryKey[];
 }
 
@@ -192,6 +221,7 @@ function buildCell(g: DesktopIsoGeometryKey, input: DesktopGridViewModelInput, a
     keyLabel: keyLabelOf(g.id),
     frame: a.frame,
     state: input.state,
+    provisional: false,
     hasContextualRows: a.rows.some((r) => r.context.length > 0),
     ruleCount: (a.plain === null ? 0 : 1) + a.rows.length,
     attribution: a,
@@ -233,8 +263,12 @@ function buildCell(g: DesktopIsoGeometryKey, input: DesktopGridViewModelInput, a
     const detail = a.unhandled ? input.baseFallback?.get(g.id) : undefined;
     const kind = notCompiled ? "unknown" : fallbackKind(detail);
     const editable = !notCompiled && !mnemonic;
+    const fallbackClass = fallbackClassOf(detail);
+    const confirmed = fallbackClass !== null && input.confirmedClasses?.has(fallbackClass) === true;
     return {
       ...base,
+      provisional: !confirmed,
+      ...(fallbackClass !== null ? { fallbackClass } : {}),
       provenance: "base-fallback",
       kind,
       display: notCompiled ? null : (detail?.display ?? null),
@@ -280,6 +314,11 @@ function buildCell(g: DesktopIsoGeometryKey, input: DesktopGridViewModelInput, a
     editable,
     ...(reason !== undefined ? { readOnlyReason: reason } : {}),
   };
+}
+
+/** How many cells of a layer are provisional (FR-030). */
+export function countProvisional(cells: readonly DesktopCellViewModel[]): number {
+  return cells.reduce((n, c) => (c.provisional ? n + 1 : n), 0);
 }
 
 /** One view model per key of the ISO desktop grid, for one layer. */

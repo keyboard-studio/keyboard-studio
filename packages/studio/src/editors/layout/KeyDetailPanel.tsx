@@ -10,6 +10,7 @@
 // The value a hand-set key replaced comes from the caller (`replaced`): the starting point's own
 // attribution for the same key and layer, since the working copy's rules do not keep it.
 
+import { useState } from "react";
 import type { ReactNode } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
@@ -20,6 +21,7 @@ import type { DesktopCellViewModel } from "./desktopGridViewModel.ts";
 import { codepointLabel } from "../../survey/codepointLabel.ts";
 import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../lib/galleryTheme.ts";
 import { FONT_MONO } from "../../ui/theme.ts";
+import { FallbackPolicySection } from "../fallback/FallbackPolicySection.tsx";
 import { useLayoutCopy } from "./useLayoutCopy.ts";
 
 export interface KeyDetailPanelProps {
@@ -31,6 +33,45 @@ export interface KeyDetailPanelProps {
   replaced?: LayoutOutput | LayoutBecomes | null;
   /** Where the next phase's edit controls go. */
   editSlot?: ReactNode;
+}
+
+/**
+ * "Change the fallback policy" for a provisional key (FR-031). The policy itself is set only in
+ * spec 109's surface, which this opens in place; the Layout tab never sets it.
+ */
+function FallbackPolicyEntry({ cell }: { cell: DesktopCellViewModel }) {
+  const { t } = useLingui();
+  const copy = useLayoutCopy();
+  const [open, setOpen] = useState(false);
+  const label =
+    cell.fallbackClass !== undefined
+      ? t({
+          id: "editor.layout.detail.changePolicyForClass",
+          message: `Change the fallback policy for ${{ fallbackClass: copy.fallbackClassLabel(cell.fallbackClass) }}`,
+        })
+      : t({ id: "editor.layout.detail.changePolicy", message: "Change the fallback policy" });
+  return (
+    <div data-testid="key-detail-provisional">
+      <p style={noteStyle}>
+        {t({
+          id: "editor.layout.detail.provisionalExplain",
+          message:
+            "This key is provisional: the base keyboard's character is only a proposal until you assign the key or confirm the fallback policy for its kind of character.",
+        })}
+      </p>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        data-testid="key-detail-change-policy"
+        className="ks-focus-ring"
+        style={linkButtonStyle}
+      >
+        {label}
+      </button>
+      {open && <FallbackPolicySection defaultOpen />}
+    </div>
+  );
 }
 
 export function KeyDetailPanel({ cell, onViewInCode, editSlot, replaced }: KeyDetailPanelProps) {
@@ -232,6 +273,8 @@ export function KeyDetailPanel({ cell, onViewInCode, editSlot, replaced }: KeyDe
           )}
         </div>
       )}
+
+      {cell.provisional && <FallbackPolicyEntry key={`${cell.vkey}|${layer}`} cell={cell} />}
 
       {editSlot}
 
