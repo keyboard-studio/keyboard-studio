@@ -11,36 +11,24 @@
 // component renders nothing unless the working copy is an adaptation with
 // inherited welcome/help text. A row appears while its finding is live, and
 // stays visible after it is answered so the author can revisit the choice.
+//
+// Issue #2530: the body-parity choice (criterion 11.9,
+// KM_LINT_PHP_HTM_BODY_MISMATCH) is NOT a row here any more — it is a
+// question in the Phase F flow (pf_body_parity), answered through the
+// normal decision machinery. Only the yes/no fixes (11.7 pagename, 11.8
+// image width) remain as rows; their answers still live in
+// `docFixProposals` beside the question's `bodySync`.
 
-import { useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { expectedPagename, normalizeDocBody, parsePagename } from "@keymanapp/keyboard-lint";
+import { expectedPagename, parsePagename } from "@keymanapp/keyboard-lint";
 import type { DocFixProposals } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useDocumentationFindings } from "../hooks/useDocumentationFindings.ts";
 
 const PAGENAME_CODE = "KM_LINT_PHP_PAGENAME_FORMAT";
-const BODY_PARITY_CODE = "KM_LINT_PHP_HTM_BODY_MISMATCH";
 const OSK_IMAGE_CODE = "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED";
 
 const KB_CSS_PATH_RE = /^source\/(?:help|welcome)\/kb\.css$/i;
-
-interface BodyDifference {
-  welcome: string;
-  help: string;
-}
-
-/** A short window around the first place two normalized bodies diverge — the summary-form diff the author decides from. */
-function firstBodyDifference(welcomeBody: string, helpBody: string): BodyDifference {
-  let i = 0;
-  const limit = Math.min(welcomeBody.length, helpBody.length);
-  while (i < limit && welcomeBody[i] === helpBody[i]) i += 1;
-  const from = Math.max(0, i - 40);
-  return {
-    welcome: welcomeBody.slice(from, i + 80),
-    help: helpBody.slice(from, i + 80),
-  };
-}
 
 const rowStyle: React.CSSProperties = {
   border: "1px solid var(--app-border)",
@@ -66,7 +54,6 @@ export function DocumentationFixProposals(): React.ReactElement | null {
     (s) => s.identity?.displayName ?? s.startKeyboard?.displayName ?? "",
   );
   const findings = useDocumentationFindings();
-  const [canonical, setCanonical] = useState<"welcome" | "help">("welcome");
 
   if (!isAdaptation) return null;
   if (startWelcomeHtmText === null && startHelpPhpText === null) return null;
@@ -83,13 +70,12 @@ export function DocumentationFixProposals(): React.ReactElement | null {
     ]),
   ];
   const showPagename = codes.has(PAGENAME_CODE) || proposals?.pagename !== undefined;
-  const showBodySync = codes.has(BODY_PARITY_CODE) || proposals?.bodySync !== undefined;
   // The kb.css proposal activates only when a kb.css is actually in the
   // working copy; an already-recorded answer keeps its row so it stays
   // reversible.
   const showImageWidth =
     (codes.has(OSK_IMAGE_CODE) && kbCssPaths.length > 0) || proposals?.imageWidth !== undefined;
-  if (!showPagename && !showBodySync && !showImageWidth) return null;
+  if (!showPagename && !showImageWidth) return null;
 
   const record = (patch: Partial<DocFixProposals>): void =>
     setProposals({ ...(proposals ?? {}), ...patch });
@@ -102,11 +88,6 @@ export function DocumentationFixProposals(): React.ReactElement | null {
   const currentPagename = startHelpPhpText !== null ? parsePagename(startHelpPhpText) : null;
   const currentName = currentPagename ?? "";
   const expected = expectedPagename(displayName);
-  const welcomeBody = startWelcomeHtmText !== null ? normalizeDocBody(startWelcomeHtmText) : "";
-  const helpBody = startHelpPhpText !== null ? normalizeDocBody(startHelpPhpText) : "";
-  const difference = firstBodyDifference(welcomeBody, helpBody);
-  const welcomeSnippet = difference.welcome;
-  const helpSnippet = difference.help;
   const kbCssList = kbCssPaths.join(", ");
   const imageFinding = findings.find((f) => f.code === OSK_IMAGE_CODE);
   const imageFindingMessage = imageFinding?.message ?? "";
@@ -168,84 +149,6 @@ export function DocumentationFixProposals(): React.ReactElement | null {
                 <Trans id="editor.help.docFixProposals.decline">Decline</Trans>
               </button>
             </div>
-          )}
-        </div>
-      )}
-
-      {showBodySync && (
-        <div style={rowStyle} data-testid="doc-fix-body-sync">
-          <strong>
-            <Trans id="editor.help.docFixProposals.bodySync.title">Welcome and help page text</Trans>
-          </strong>
-          <span>
-            <Trans id="editor.help.docFixProposals.bodySync.detail">
-              The welcome page and the help page carry different text. First difference — welcome: “
-              {welcomeSnippet}” · help: “{helpSnippet}”
-            </Trans>
-          </span>
-          {proposals?.bodySync === "welcome" || proposals?.bodySync === "help" ? (
-            <div style={buttonRowStyle}>
-              <span>
-                {proposals.bodySync === "welcome" ? (
-                  <Trans id="editor.help.docFixProposals.bodySync.appliedWelcome">
-                    Applied — the help page now carries the welcome page's text.
-                  </Trans>
-                ) : (
-                  <Trans id="editor.help.docFixProposals.bodySync.appliedHelp">
-                    Applied — the welcome page now carries the help page's text.
-                  </Trans>
-                )}
-              </span>
-              <button type="button" onClick={() => clear("bodySync")}>
-                <Trans id="editor.help.docFixProposals.undo">Undo</Trans>
-              </button>
-            </div>
-          ) : proposals?.bodySync === "declined" ? (
-            <div style={buttonRowStyle}>
-              <span>
-                <Trans id="editor.help.docFixProposals.bodySync.declined">
-                  Declined — the two pages keep their different text.
-                </Trans>
-              </span>
-              <button type="button" onClick={() => clear("bodySync")}>
-                <Trans id="editor.help.docFixProposals.changeAnswer">Change answer</Trans>
-              </button>
-            </div>
-          ) : (
-            <>
-              <div style={buttonRowStyle} role="radiogroup" aria-label={t({ id: "editor.help.docFixProposals.bodySync.canonicalLabel", message: "Which page's text should both pages carry?" })}>
-                <label>
-                  <input
-                    type="radio"
-                    name="doc-fix-body-canonical"
-                    checked={canonical === "welcome"}
-                    onChange={() => setCanonical("welcome")}
-                  />{" "}
-                  <Trans id="editor.help.docFixProposals.bodySync.welcomeCanonical">
-                    Use the welcome page's text
-                  </Trans>
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="doc-fix-body-canonical"
-                    checked={canonical === "help"}
-                    onChange={() => setCanonical("help")}
-                  />{" "}
-                  <Trans id="editor.help.docFixProposals.bodySync.helpCanonical">
-                    Use the help page's text
-                  </Trans>
-                </label>
-              </div>
-              <div style={buttonRowStyle}>
-                <button type="button" onClick={() => record({ bodySync: canonical })}>
-                  <Trans id="editor.help.docFixProposals.bodySync.apply">Make both pages match</Trans>
-                </button>
-                <button type="button" onClick={() => record({ bodySync: "declined" })}>
-                  <Trans id="editor.help.docFixProposals.decline">Decline</Trans>
-                </button>
-              </div>
-            </>
           )}
         </div>
       )}

@@ -116,6 +116,9 @@
   "pb_use_case": [
     "§8"
   ],
+  "pf_body_parity": [
+    "specs/080-documentation-completeness"
+  ],
   "pf_history_entry": [
     "specs/080-documentation-completeness"
   ],

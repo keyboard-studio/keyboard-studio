@@ -19,13 +19,13 @@ import {
 } from "./registry.ts";
 
 describe("questionRegistry", () => {
-  // 9 Phase A + 47 Phase B + 27 Phase F + 2 Phase G + 31 Reserve = 116 question
+  // 9 Phase A + 47 Phase B + 28 Phase F + 2 Phase G + 31 Reserve = 117 question
   // modules, + 22 gallery decision modules (spec 090 T008; +custom-css, +help-docs,
-  // +welcome-htm on the css/html editor steps; +language-list, spec 111; +caps-handling, spec 112; +missing-letters-review, +upgrades-review, spec 111; +fallback-policy, issue #2539; +icon, #2485) = 140 total, minus track_choice (removed 2026-11-06) = 139
-  // (re-verified 2026-11-06 -- update this count in the same change that adds
+  // +welcome-htm on the css/html editor steps; +language-list, spec 111; +caps-handling, spec 112; +missing-letters-review, +upgrades-review, spec 111; +fallback-policy, issue #2539; +icon, #2485; +body-parity, issue #2530) = 141 total, minus track_choice (removed 2026-11-06) = 140
+  // (re-verified 2026-11-07 -- update this count in the same change that adds
   // or removes a questionRegistry entry.)
-  it("has exactly the verified inventory of 139 entries", () => {
-    expect(Object.keys(questionRegistry).length).toBe(139);
+  it("has exactly the verified inventory of 140 entries", () => {
+    expect(Object.keys(questionRegistry).length).toBe(140);
   });
 
   it("no entry has a 'default' key (namespace-import leak guard)", () => {

@@ -91,12 +91,15 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
   // The minimum-questions contract. Anything that needs research (which font
   // covers the repertoire, canonical mark order) or support experience the
   // author does not have yet must stay OFF this path.
-  it("purpose is the ONLY required question in Phase F", () => {
+  it("the required questions in Phase F are the description, the body-parity choice, and the gate", () => {
     const required = modular.questions
       .filter((q) => q.required === true)
       .map((q) => q.id);
     // pf_more_detail_gate is a single click, not content the author must author.
-    expect(required).toEqual(["pf_welcome_paragraph", "pf_more_detail_gate"]);
+    // pf_body_parity is required but conditional (issue #2530): it is only
+    // asked when the 11.9 finding is live, and then the author must choose —
+    // there is no sensible blank.
+    expect(required).toEqual(["pf_welcome_paragraph", "pf_body_parity", "pf_more_detail_gate"]);
   });
 
   it("the default path (gate = No) is 7 screens", () => {

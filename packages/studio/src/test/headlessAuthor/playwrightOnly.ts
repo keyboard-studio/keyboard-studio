@@ -81,8 +81,9 @@ export const PLAYWRIGHT_ONLY: readonly PlaywrightOnlyRule[] = [
   },
   {
     rule: "documentation-fix-proposals",
-    component: "components/DocumentationFixProposals.tsx",
-    reason: "per-finding fix proposals applied by button; no walk policy accepts them",
+    component: "components/DocumentationFixProposals.tsx (pagename + image-width rows)",
+    reason:
+      "per-finding fix proposals applied by button; no walk policy accepts them — the body-parity choice left this list for the pf_body_parity flow question (issue 2530)",
   },
   {
     rule: "more-detail-gate-yes",

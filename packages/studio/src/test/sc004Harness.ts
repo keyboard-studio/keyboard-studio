@@ -190,6 +190,7 @@ export function runAdaptFlow(kb: (typeof KEYBOARDS)[number]) {
       getWorkingIR: () => store.getState().ir,
       getDecisions: () => decisions,
       getHistoryEntryState: () => store.getState().historyEntryState,
+      getDocFixProposals: () => store.getState().docFixProposals,
       applyWorkingCopyPatch: (patch, writes) => {
         applied++;
         const wc = store.getState();
@@ -200,6 +201,7 @@ export function runAdaptFlow(kb: (typeof KEYBOARDS)[number]) {
         if (patch.attribution !== undefined) wc.setAttribution(patch.attribution);
         if (patch.helpDocs !== undefined) wc.setHelpDocs(patch.helpDocs);
         if (patch.historyEntryState !== undefined) wc.setHistoryEntryState(patch.historyEntryState);
+        if (patch.docFixProposals !== undefined) wc.setDocFixProposals(patch.docFixProposals);
       },
     } as ReducerDeps;
     applyDecisionEffects(

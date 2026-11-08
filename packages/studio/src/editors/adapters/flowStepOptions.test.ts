@@ -35,6 +35,7 @@ import pfCreditsMod from "../../survey/questions/f/pf_credits.ts";
 import pfWelcomeParagraphMod from "../../survey/questions/f/pf_welcome_paragraph.ts";
 
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import type { InstantiationMode } from "../../stores/workingCopyStore.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { runLiveExtractionFromStores } from "../../decisions/liveExtraction.ts";
 import { buildExtractContext, type ExtractContext } from "../../decisions/extractContext.ts";
@@ -268,12 +269,47 @@ describe("phaseFOptions.buildContext", () => {
       ...ctx,
       history_heading: "",
       history_bullets: "",
+      // Issue #2530: the body-parity routing token + snippet tokens are
+      // always present; the finding is not live on an uninstantiated copy.
+      body_parity_live: "false",
+      body_parity_welcome: "",
+      body_parity_help: "",
     });
   });
 
   it("returns just the (empty) HISTORY tokens when deps.surveyContext is empty (default)", () => {
     const { deps } = buildDeps({ surveyContext: {} });
-    expect(phaseFOptions.buildContext(deps)).toEqual({ history_heading: "", history_bullets: "" });
+    expect(phaseFOptions.buildContext(deps)).toEqual({
+      history_heading: "",
+      history_bullets: "",
+      body_parity_live: "false",
+      body_parity_welcome: "",
+      body_parity_help: "",
+    });
+  });
+
+  // Issue #2530: on an adaptation whose inherited pages differ, the
+  // routing token is live and the snippet tokens carry the first
+  // difference as plain text (never raw HTML).
+  it("reports the finding live with plain-text snippets on an adaptation with differing pages", () => {
+    useWorkingCopyStore.getState().reset();
+    useWorkingCopyStore.setState({
+      instantiationMode: "adapt-existing",
+      startWelcomeHtmText: "<html><body><p>Welcome to Test Keyboard</p></body></html>",
+      startHelpPhpText:
+        "<?php\n  $pagename = 'Test Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<html><body><p>Something totally different.</p></body></html>",
+    });
+    try {
+      const { deps } = buildDeps({ surveyContext: {} });
+      const ctx = phaseFOptions.buildContext(deps);
+      expect(ctx["body_parity_live"]).toBe("true");
+      expect(ctx["body_parity_welcome"]).toBe("Welcome to Test Keyboard");
+      expect(ctx["body_parity_help"]).toBe("Something totally different.");
+      expect(ctx["body_parity_welcome"]).not.toContain("<");
+      expect(ctx["body_parity_help"]).not.toContain("<");
+    } finally {
+      useWorkingCopyStore.getState().reset();
+    }
   });
 
   // spec 079 US5: once onMount has derived a proposal (historyEntryState
@@ -616,11 +652,35 @@ describe("extraction pass — Phase F choice defaults", () => {
       .filter((d) => d !== undefined && (d.type === "bool" || d.type === "radio"));
     expect(choice.length).toBeGreaterThanOrEqual(3);
     for (const d of choice) {
+      // pf_body_parity only seeds when the 11.9 finding is live (issue
+      // #2530): arrange an adaptation with differing inherited pages for
+      // its iteration, then restore the copy state the other questions
+      // seed from, so the loop stays order-independent.
+      let prevBodyParity: {
+        instantiationMode: InstantiationMode;
+        startWelcomeHtmText: string | null;
+        startHelpPhpText: string | null;
+      } | null = null;
+      if (d.id === "pf_body_parity") {
+        const wc = useWorkingCopyStore.getState();
+        prevBodyParity = {
+          instantiationMode: wc.instantiationMode,
+          startWelcomeHtmText: wc.startWelcomeHtmText,
+          startHelpPhpText: wc.startHelpPhpText,
+        };
+        useWorkingCopyStore.setState({
+          instantiationMode: "adapt-existing",
+          startWelcomeHtmText: "<html><body><p>Welcome to Test Keyboard</p></body></html>",
+          startHelpPhpText:
+            "<?php\n  $pagename = 'Test Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<html><body><p>Something totally different.</p></body></html>",
+        });
+      }
       const seed = passSeedWithGateOpen(d.id);
       expect(seed, d.id).toBeDefined();
       if (d.options !== undefined) {
         expect(d.options.map((o) => o.value), d.id).toContain(seed);
       }
+      if (prevBodyParity !== null) useWorkingCopyStore.setState(prevBodyParity);
     }
   });
 });

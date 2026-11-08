@@ -40,6 +40,11 @@ import type { QuestionModule } from "../../survey/types.ts";
 import ilAuthorNameModule from "../../survey/questions/a/il_author_name.ts";
 import ilAuthorEmailModule from "../../survey/questions/a/il_author_email.ts";
 import { startCopyrightHolders } from "../../lib/startCopyrightHolders.ts";
+import {
+  bodyParitySnippets,
+  isBodyParityLive,
+  type BodyParityInputs,
+} from "../../lib/bodyParity.ts";
 import ilCopyrightHolderModule from "../../survey/questions/a/il_copyright_holder.ts";
 
 /** A recorded decision's string value, or undefined when absent/non-string. */
@@ -363,6 +368,26 @@ function readAdaptiveDescriptionContext(): AdaptiveDescriptionContext {
  */
 
 /**
+ * Reads the working-copy slices `pf_body_parity`'s routing token and
+ * snippet tokens need (issue #2530), straight off `getState()` — the
+ * same on-demand pattern as `readAdaptiveDescriptionContext` above.
+ * The recorded `help-body-parity` decision comes from the deps' live
+ * decision set, so a re-entry after answering still routes to the
+ * question (the finding having cleared once the bodies sync).
+ */
+function readBodyParityInputs(decisions: DecisionSet): BodyParityInputs {
+  const state = useWorkingCopyStore.getState();
+  const recorded = decisions["help-body-parity"]?.value;
+  return {
+    instantiationMode: state.instantiationMode,
+    startWelcomeHtmText: state.startWelcomeHtmText,
+    startHelpPhpText: state.startHelpPhpText,
+    docFixProposals: state.docFixProposals,
+    ...(typeof recorded === "string" ? { bodyParityDecision: recorded } : {}),
+  };
+}
+
+/**
  * The version HISTORY's proposed heading is stamped with (spec 079 FR-010),
  * mirroring `serializeWorkingCopy.ts`'s own `rawVersion`/`resolvePublishVersion`
  * derivation exactly (`startIr.header.version?.trim() || "1.0"`, bumped only
@@ -393,12 +418,22 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
     const bullets = historyState !== null
       ? (historyState.editedBullets ?? historyState.proposal.bullets)
       : [];
+    // Issue #2530: the body-parity routing token and first-difference
+    // snippets for pf_body_parity's `{{body_parity_*}}` tokens. The live
+    // token is always present ("true"/"false") so the conditional `next`
+    // on pf_welcome_paragraph is deterministic; the snippets resolve to
+    // "" when the question is not live.
+    const bodyParityInputs = readBodyParityInputs(deps.decisions);
+    const bodyParity = bodyParitySnippets(bodyParityInputs);
     return {
       ...deps.surveyContext,
       history_heading: historyState !== null
         ? historyEntryHeading(historyState.proposal.version, historyState.proposal.dateIso)
         : "",
       history_bullets: bullets.map((bullet) => `- ${bullet}`).join("\n"),
+      body_parity_live: isBodyParityLive(bodyParityInputs) ? "true" : "false",
+      body_parity_welcome: bodyParity.welcome,
+      body_parity_help: bodyParity.help,
     };
   },
 

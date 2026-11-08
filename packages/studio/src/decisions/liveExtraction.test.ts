@@ -431,3 +431,72 @@ describe("buildLiveExtractContext — base-help troubleshooting extraction (issu
     useWorkingCopyStore.getState().reset();
   });
 });
+
+describe("runLiveExtraction — pf_body_parity (issue #2530)", () => {
+  async function bodyParityModules() {
+    const welcomeMod = (await import("../survey/questions/f/pf_welcome_paragraph.ts")).default;
+    const bodyParityMod = (await import("../survey/questions/f/pf_body_parity.ts")).default;
+    return [welcomeMod, bodyParityMod];
+  }
+
+  it("seeds the legacy answer from phaseF.bodyParityProposal", async () => {
+    const store = fakeStore();
+    const result = runLiveExtraction({
+      modules: await bodyParityModules(),
+      ctx: ctx({ phaseF: { bodyParityLive: true, bodyParityProposal: "keep-different" } }),
+      store,
+    });
+    expect(result.seeded).toContain("help-body-parity");
+    expect(store.decisions["help-body-parity"]).toEqual({
+      id: "help-body-parity",
+      value: "keep-different",
+      provenance: "extracted",
+      source: "basic_kbdfr",
+    });
+  });
+
+  it("seeds the welcome default when the finding is live and no legacy answer exists", async () => {
+    const store = fakeStore();
+    const result = runLiveExtraction({
+      modules: await bodyParityModules(),
+      ctx: ctx({ phaseF: { bodyParityLive: true } }),
+      store,
+    });
+    expect(result.seeded).toContain("help-body-parity");
+    expect(store.decisions["help-body-parity"]).toEqual({
+      id: "help-body-parity",
+      value: "welcome",
+      provenance: "default",
+    });
+  });
+
+  it("seeds nothing when the finding is not live", async () => {
+    const store = fakeStore();
+    const result = runLiveExtraction({
+      modules: await bodyParityModules(),
+      ctx: ctx({ phaseF: {} }),
+      store,
+    });
+    expect(result.seeded).not.toContain("help-body-parity");
+    expect(store.decisions["help-body-parity"]).toBeUndefined();
+  });
+
+  it("an asked answer stands, with the welcome default offered beside it", async () => {
+    const store = fakeStore({
+      "help-body-parity": { id: "help-body-parity", value: "help", provenance: "asked" },
+    });
+    const result = runLiveExtraction({
+      modules: await bodyParityModules(),
+      ctx: ctx({ phaseF: { bodyParityLive: true } }),
+      store,
+    });
+    expect(result.seeded).not.toContain("help-body-parity");
+    expect(result.offered).toContain("help-body-parity");
+    expect(store.decisions["help-body-parity"]).toEqual({
+      id: "help-body-parity",
+      value: "help",
+      provenance: "asked",
+      offered: "welcome",
+    });
+  });
+});

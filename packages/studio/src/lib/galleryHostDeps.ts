@@ -24,6 +24,7 @@ export function buildGalleryHostDeps(): GalleryHostDeps {
     getDecisions: () => getDecisionSnapshot(),
     getWorkingIR: () => useWorkingCopyStore.getState().ir,
     getHistoryEntryState: () => useWorkingCopyStore.getState().historyEntryState,
+    getDocFixProposals: () => useWorkingCopyStore.getState().docFixProposals,
     applyWorkingCopyPatch: (patch, writes) => {
       const wc = useWorkingCopyStore.getState();
       if (patch.ir !== undefined && wc.ir !== null) {
@@ -33,6 +34,7 @@ export function buildGalleryHostDeps(): GalleryHostDeps {
       if (patch.attribution !== undefined) wc.setAttribution(patch.attribution);
       if (patch.helpDocs !== undefined) wc.setHelpDocs(patch.helpDocs);
       if (patch.historyEntryState !== undefined) wc.setHistoryEntryState(patch.historyEntryState);
+      if (patch.docFixProposals !== undefined) wc.setDocFixProposals(patch.docFixProposals);
     },
   };
 }
