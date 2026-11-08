@@ -897,5 +897,12 @@
         "packages/studio/src/locales/fr/messages.json"
       ]
     }
-  }
+  },
+  "concerns": [
+    {
+      "note": "T105 blocked: ruling 9 says assign-then-code-edit is an FR-063(b) review flag, but the T098 Apply gate (compileCandidateKmn unplaceable) refuses the Apply. Needs a product decision; the E2E row is test.fixme. Partial work in 76b8d874.",
+      "step": "implement"
+    }
+  ],
+  "last_action": "T105 partial committed 76b8d874; blocked on ruling 9 vs Apply gate"
 }
