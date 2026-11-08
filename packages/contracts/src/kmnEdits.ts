@@ -41,6 +41,11 @@ export interface ContentAnchor {
   prev?: string;
   /** The next sibling's canonical text, when there is one. */
   next?: string;
+  /**
+   * The key a single-key rule answers (ruling 10): set at Apply when an Assign-tab assignment
+   * claims that key, so the change still finds its rule after the assignment rewrites the text.
+   */
+  keystroke?: { vkey: string; modifiers: string[] };
 }
 
 export type IRChange =
@@ -62,7 +67,7 @@ export type IRChange =
 export interface OwnerRef {
   /** Index into the entry's `changes`. */
   change: number;
-  owner: "deadkeys" | "rules-step" | "layout-tab" | "code-tab" | "identity" | "another-step";
+  owner: "deadkeys" | "rules-step" | "layout-tab" | "code-tab" | "identity" | "assign-tab" | "another-step";
 }
 
 /** One Code-tab Apply. */

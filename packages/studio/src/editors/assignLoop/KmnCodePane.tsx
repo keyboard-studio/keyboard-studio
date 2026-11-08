@@ -26,6 +26,8 @@ import { diffIR, emitKmn, findOwners, parseKmn, runAllChecks } from "@keyboard-s
 import type { IRChange, KeyboardIR, LintFinding, OwnerRef } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { compileCandidateKmn } from "../../lib/compileCandidateKmn.ts";
+import { loadAssignedKeys } from "../../lib/assignedKeys.ts";
+import { anchorAssignedKeys } from "../../lib/claimedInputs.ts";
 import { ConfirmDialog } from "./parts/ConfirmDialog.tsx";
 import {
   lintKmnCodeText,
@@ -351,8 +353,18 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
     // The base is the working IR as the editor shows it: the emitted text, re-parsed. A comment the
     // working IR holds as freestanding (a blank line used to follow it) is re-parsed as leading a
     // store, so diffing the live IR itself would report an edit the author never made.
-    const changes = diffIR(parseKmn(emitKmn(irAtClick), id).ir, after.ir);
-    if (changes.length === 0) return;
+    const diffed = diffIR(parseKmn(emitKmn(irAtClick), id).ir, after.ir);
+    if (diffed.length === 0) return;
+    // Ruling 10: a rule on a key the Assign tab owns is anchored by key (before the compile gate
+    // below, so the projection finds it) and flagged as overriding the Assign tab.
+    let assignedKeys: Awaited<ReturnType<typeof loadAssignedKeys>> = [];
+    try {
+      assignedKeys = await loadAssignedKeys();
+    } catch {
+      assignedKeys = [];
+    }
+    if (!mountedRef.current) return;
+    const { changes, overrides: assignOverrides } = anchorAssignedKeys(diffed, assignedKeys);
     // 1c. One candidate compile, on this click only.
     setCompiling(true);
     setApplyError(null);
@@ -396,7 +408,7 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
     }
     // 3. Who does this override?
     const startIr = useWorkingCopyStore.getState().startIr;
-    const overrides = startIr === null ? [] : findOwners(irAtClick, startIr, changes);
+    const overrides = [...(startIr === null ? [] : findOwners(irAtClick, startIr, changes)), ...assignOverrides];
     const candidate: PendingApply = { irAtClick, changes, overrides };
     if (overrides.length > 0) {
       setPending(candidate);
@@ -417,6 +429,8 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
         return t({ id: "editor.assignLoop.mechanisms.code.owner.codeTab", message: "an earlier Code tab edit" });
       case "identity":
         return t({ id: "editor.assignLoop.mechanisms.code.owner.identity", message: "the keyboard identity" });
+      case "assign-tab":
+        return t({ id: "editor.assignLoop.mechanisms.code.owner.assignTab", message: "the Assign tab" });
       case "another-step":
         return t({ id: "editor.assignLoop.mechanisms.code.owner.anotherStep", message: "another step" });
     }

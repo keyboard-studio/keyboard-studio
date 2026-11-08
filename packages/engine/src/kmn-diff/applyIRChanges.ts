@@ -83,6 +83,26 @@ function lineBetween(seq: readonly SeqItem[], idx: number): number | undefined {
   return undefined;
 }
 
+/** Whether `rule` is a single-key rule on `key` (the key's vkey and exact modifier set). */
+function answersKey(rule: IRRule, key: { vkey: string; modifiers: readonly string[] }): boolean {
+  if (rule.context.length !== 1) return false;
+  const el = rule.context[0]!;
+  if (el.kind !== "vkey" || el.name !== key.vkey) return false;
+  const have = new Set(el.modifiers);
+  return have.size === key.modifiers.length && key.modifiers.every((m) => have.has(m));
+}
+
+/** Index of the item `at` names; a keystroke anchor is the fallback when the text is not found (ruling 10). */
+function locateItem(seq: readonly SeqItem[], at: ContentAnchor): number | undefined {
+  const byText = locate(seq, at);
+  if (byText !== undefined || at.keystroke === undefined) return byText;
+  const hits: number[] = [];
+  seq.forEach((item, i) => {
+    if (item.kind === "rule" && answersKey(item.node as IRRule, at.keystroke!)) hits.push(i);
+  });
+  return hits.length === 1 ? hits[0] : undefined;
+}
+
 export function applyIRChanges(ir: KeyboardIR, changes: readonly IRChange[]): ApplyIRChangesResult {
   const mint = makeMinter(ir);
   const work: KeyboardIR = {
@@ -224,7 +244,7 @@ export function applyIRChanges(ir: KeyboardIR, changes: readonly IRChange[]): Ap
         return insertNode(c.at.container, c.at, c.node);
       case "remove": {
         const seq = sequenceOf(work, c.at.container);
-        const idx = locate(seq, c.at);
+        const idx = locateItem(seq, c.at);
         if (idx === undefined || idx < 0) return false;
         removeItem(c.at.container, seq[idx]!);
         return true;
@@ -232,7 +252,7 @@ export function applyIRChanges(ir: KeyboardIR, changes: readonly IRChange[]): Ap
       case "replace": {
         const container = c.at.container;
         const seq = sequenceOf(work, container);
-        const idx = locate(seq, c.at);
+        const idx = locateItem(seq, c.at);
         if (idx === undefined || idx < 0) return false;
         const old = seq[idx]!;
         if (old.kind === "rule" && isRule(c.node) && container.kind === "group") {

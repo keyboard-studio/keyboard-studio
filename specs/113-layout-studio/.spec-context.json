@@ -471,10 +471,18 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-08T00:13:38.931Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T105",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T05:55:52.860Z"
     }
   ],
   "unattended": true,
-  "currentTask": "T104",
+  "currentTask": "T105",
   "task_summaries": {
     "T049": {
       "status": "DONE",
@@ -895,6 +903,22 @@
       "files": [
         "packages/studio/src/locales/en/messages.json",
         "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T105": {
+      "status": "DONE",
+      "did": "Ruling 10 scenario 4a: keystroke anchor + assign-tab owner, Apply anchors assigned keys, changed-in-code note, inventory counts kmn-edits, E2E 4a row passing",
+      "files": [
+        "packages/contracts/src/kmnEdits.ts",
+        "packages/contracts/src/schemas.ts",
+        "packages/engine/src/kmn-diff/applyIRChanges.ts",
+        "packages/studio/src/editors/assignLoop/KmnCodePane.tsx",
+        "packages/studio/src/editors/assignLoop/AssignedKeysChangedInCode.tsx",
+        "packages/studio/src/lib/assignedKeys.ts",
+        "packages/studio/src/lib/claimedInputs.ts",
+        "packages/studio/src/lib/inventoryDiff.ts",
+        "packages/studio/src/hooks/useInventoryDiff.ts",
+        "packages/studio/e2e/layout-tab.spec.ts"
       ]
     }
   },

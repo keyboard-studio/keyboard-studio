@@ -120,6 +120,32 @@ describe("Code-tab entries", () => {
     expect(KmnEditSchema.safeParse({ ...kept, target: -1 }).success).toBe(false);
   });
 
+  it("round-trips a keystroke anchor and the assign-tab owner (ruling 10)", () => {
+    const keyed: KmnEdit = {
+      seq: 9,
+      at: 2000,
+      op: "code-apply",
+      changes: [
+        {
+          change: "replace",
+          at: { ...ANCHOR, keystroke: { vkey: "K_G", modifiers: ["SHIFT"] } },
+          old: RULE,
+          node: { ...RULE, nodeId: "rule#10" },
+        },
+      ],
+      overrides: [{ change: 0, owner: "assign-tab" }],
+    };
+    expect(KmnEditSchema.parse(keyed)).toEqual(keyed);
+  });
+
+  it("rejects a malformed keystroke anchor", () => {
+    const bad = {
+      ...codeEdit,
+      changes: [{ change: "remove", at: { ...ANCHOR, keystroke: { vkey: "K_G" } }, old: RULE }],
+    };
+    expect(KmnEditSchema.safeParse(bad).success).toBe(false);
+  });
+
   it("keeps the strictly increasing seq rule across arms", () => {
     expect(KmnEditsValueSchema.safeParse({ entries: [codeEdit, { ...kept, seq: 9 }] }).success).toBe(false);
   });

@@ -70,7 +70,7 @@ import type {
 } from "./decisionRecord";
 import { DECISION_RECORD_FORMAT, DECISION_SUMMARY_LIMIT } from "./decisionRecord";
 import type { HelpDocsAnswers } from "./help-docs";
-import type { CodeEdit, IRChange, IRNode, KmnEdit, KmnEditsValue, ReviewKept, StoreValue } from "./kmnEdits";
+import type { CodeEdit, ContentAnchor, IRChange, IRNode, KmnEdit, KmnEditsValue, OwnerRef, ReviewKept, StoreValue } from "./kmnEdits";
 import type { LayoutOperation, LayoutOutput, ModifierToken } from "./layoutOps";
 import type { AssignableTo, Expect } from "./utils/schemaGuards";
 import type {
@@ -1088,6 +1088,7 @@ const ContentAnchorSchema = z.object({
   text: z.string(),
   prev: z.string().optional(),
   next: z.string().optional(),
+  keystroke: z.object({ vkey: z.string(), modifiers: z.array(z.string()) }).optional(),
 });
 
 export const IRChangeSchema = z.discriminatedUnion("change", [
@@ -1115,7 +1116,7 @@ export const IRChangeSchema = z.discriminatedUnion("change", [
 
 const OwnerRefSchema = z.object({
   change: z.number().int().nonnegative(),
-  owner: z.enum(["deadkeys", "rules-step", "layout-tab", "code-tab", "identity", "another-step"]),
+  owner: z.enum(["deadkeys", "rules-step", "layout-tab", "code-tab", "identity", "assign-tab", "another-step"]),
 });
 
 const entryBase = { seq: z.number().int().nonnegative(), at: z.number() };
@@ -1396,4 +1397,8 @@ type _KmnEditOpsGuard = Expect<Equal<z.infer<typeof KmnEditSchema>["op"], KmnEdi
 type _CodeEditGuard = Expect<AssignableTo<z.infer<typeof CodeEditSchema>, CodeEdit>>;
 type _ReviewKeptGuard = Expect<AssignableTo<z.infer<typeof ReviewKeptSchema>, ReviewKept>>;
 type _IRChangeGuard = Expect<AssignableTo<z.infer<typeof IRChangeSchema>, IRChange>>;
+type _OwnerRefGuard = Expect<Equal<z.infer<typeof OwnerRefSchema>["owner"], OwnerRef["owner"]>>;
+type _ContentAnchorKeystrokeGuard = Expect<
+  Equal<NonNullable<z.infer<typeof ContentAnchorSchema>["keystroke"]>, NonNullable<ContentAnchor["keystroke"]>>
+>;
 type _IRChangeKindsGuard = Expect<Equal<z.infer<typeof IRChangeSchema>["change"], IRChange["change"]>>;

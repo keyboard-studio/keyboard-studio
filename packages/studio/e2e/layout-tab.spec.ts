@@ -408,26 +408,48 @@ test.describe("spec 113 Layout tab - US8", () => {
     await expect(page.getByTestId("editor-view-tab-code")).toHaveText("Code (1)");
   });
 
-  // Pending a product decision. Ruling 9 says this order is also an FR-063 (b) review flag: the
-  // edit is recorded, not applied in the download, and flagged. Today the Apply gate's projection
-  // check (compileCandidateKmn "unplaceable") refuses the Apply instead: it shows "does not fit the
-  // keyboard as it will be built", records nothing, and leaves the tab at "Code". Either amend
-  // ruling 9 and scenario 4 to accept the refusal, or let the gate record an edit whose only miss is
-  // a rule an assignment claims. Then flip this to `test`, or change its assertions.
-  test.fixme("ruling 9: the key is assigned in the Assign tab, then edited in code; the edit is not applied and is flagged", async ({ page }) => {
+  // Ruling 10, scenario 4a: on a key the Assign tab already assigns, the most recent edit wins. The
+  // code edit is accepted after the owner confirm, is in the download, is flagged, and the Assign tab
+  // shows the key as changed in code.
+  test("ruling 10: the key is assigned in the Assign tab, then edited in code; the edit wins and is flagged", async ({ page }) => {
     await reachMechanicalGallery(page, "basic_kbdus", "en", "ŋ");
     await page.getByTestId("editor-view-tab-assign").click();
     await driveMechanismsGallery(page, { placements: { "ŋ": { key: "K_E" } } });
 
     await reopenMechanisms(page);
+    await page.getByTestId("editor-view-tab-assign").click();
+    // The completed step is locked and the Code tab follows that lock; any edit in the Assign tab
+    // unlocks it (marking the next character for later review leaves the assignment as it is).
+    await page.locator("button", { hasText: "Mark for later review" }).click({ timeout: 30_000 });
+    await expect(page.getByText("Desktop layout unlocked for editing")).toBeVisible();
     await page.getByTestId("editor-view-tab-code").click();
     await expect(page.getByTestId("kmn-code-pane")).toBeVisible({ timeout: 60_000 });
     await codeReplaceAll(page, "[K_E] > U+0065", "[K_E] > U+00A4");
-    await codeApply(page);
-    const flag = page.getByTestId("kmn-code-review-flag");
-    await expect(flag).toHaveCount(1, { timeout: 120_000 });
-    await expect(flag).toContainText("could not be applied to the keyboard as built");
+    await expect(page.getByTestId("kmn-code-dirty")).toBeVisible();
+    await page.getByTestId("kmn-code-apply").click();
+    await expect(page.getByTestId("kmn-code-owner-confirm")).toContainText("Assign tab", { timeout: 120_000 });
+    await page.getByRole("button", { name: "Apply anyway" }).click();
+    await expect(page.getByTestId("kmn-code-dirty")).toHaveCount(0, { timeout: 120_000 });
+    await expect(page.getByTestId("kmn-code-review-flag")).toHaveCount(1, { timeout: 120_000 });
     await expect(page.getByTestId("editor-view-tab-code")).toHaveText("Code (1)");
-    await expectDownloadHasAssignmentNotEdit(page);
+
+    // The Assign tab shows the key as changed in code.
+    await page.getByTestId("editor-view-tab-assign").click();
+    await expect(page.getByTestId("assign-changed-in-code-keys")).toContainText("E");
+
+    // The character the edit displaces (the "e" that K_E typed) returns to the letters to place, so
+    // the step is open again; place it on a free key and finish the step so the download is reachable.
+    await expect(page.getByText(/still needs? an assignment or a mark for later review before you can finish: e\./)).toBeVisible();
+    await page.getByRole("button", { name: "Go to U+0065 e" }).click();
+    await driveMechanismsGallery(page, { placements: { e: { key: "K_Q" } } });
+    await expect(page.locator('a[href="#output"]')).toBeEnabled({ timeout: 60_000 });
+    await navigateToOutput(page);
+    const download = await triggerDownload(page);
+    const zip = unzipSync(new Uint8Array(fs.readFileSync((await download.path())!)));
+    const kmn = Object.entries(zip).find(([name]) => name.endsWith(".kmn"));
+    expect(kmn, "the download carries a .kmn").toBeDefined();
+    const kmnText = new TextDecoder().decode(kmn![1]);
+    expect(kmnText, "the code edit is in the download").toMatch(/\[K_E\] > U\+00A4/i);
+    expect(kmnText, "the assignment's rule it replaced is gone").not.toMatch(/\[K_E\] > U\+014B/i);
   });
 });

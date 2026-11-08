@@ -11,7 +11,10 @@ import { renderHook } from "@testing-library/react";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { IRGroup, MechanismAssignment } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { diffIR, parseKmn } from "@keyboard-studio/engine";
+import type { KmnEdit } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useInventoryDiff } from "../hooks/useInventoryDiff.ts";
 import { useInventoryCoverageGate } from "../hooks/useInventoryCoverageGate.ts";
 import { deriveInventoryCoverageGate, deriveInventoryDiff } from "./inventoryDiff.ts";
@@ -77,4 +80,44 @@ describe("deriveInventoryDiff / deriveInventoryCoverageGate equal the hooks", ()
       expect(gate).toEqual(gateHook);
     });
   }
+});
+
+describe("Code-tab edits count (spec 113 ruling 10)", () => {
+  const KMN = [
+    "store(&NAME) 'inv'",
+    "begin Unicode > use(main)",
+    "group(main) using keys",
+    "+ [K_G] > 'g'",
+    "+ [K_H] > 'h'",
+    "",
+  ].join("\n");
+
+  function seedFromKmn(): void {
+    const ir = parseKmn(KMN, "inv").ir;
+    const vfs = createVirtualFS([{ path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false }]);
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().recordPhase({ phase: "B", answers: [], confirmedInventory: ["g", "h", "ĝ"] });
+  }
+
+  function recordReplacingG(): void {
+    const before = parseKmn(KMN, "inv").ir;
+    const after = parseKmn(KMN.replace("'g'", "'ĝ'"), "inv").ir;
+    const entry: KmnEdit = { seq: 1, at: 0, op: "code-apply", changes: diffIR(before, after), overrides: [] };
+    useDecisionStore.getState().record({ id: "kmn-edits", value: { entries: [entry] }, provenance: "asked" });
+  }
+
+  afterEach(() => useDecisionStore.getState().reset());
+
+  it("replacing g with the g-circumflex in code puts g back in the letters to place", () => {
+    seedFromKmn();
+    expect(renderHook(() => useInventoryDiff()).result.current.lettersToAdd).toEqual(["ĝ"]);
+    recordReplacingG();
+    const hook = renderHook(() => useInventoryDiff()).result.current;
+    expect(hook.lettersToAdd).toEqual(["g"]);
+    expect(hook.alreadyProduced).toEqual(["h", "ĝ"]);
+    const s = useWorkingCopyStore.getState();
+    const kmnEdits = (useDecisionStore.getState().decisions["kmn-edits"]!.value as { entries: KmnEdit[] }).entries;
+    const oneShotDiff = deriveInventoryDiff({ startIr: s.startIr, inventory: s.session.confirmedInventory, phaseResults: s.phaseResults, kmnEdits });
+    expect(oneShotDiff.lettersToAdd).toEqual(["g"]);
+  });
 });

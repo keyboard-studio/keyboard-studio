@@ -30,6 +30,11 @@ vi.mock("../../lib/compileCandidateKmn.ts", () => ({
   compileCandidateKmn: (changes: unknown) => compileMock.fn(changes),
 }));
 
+const assignedMock = vi.hoisted(() => ({ fn: vi.fn() }));
+vi.mock("../../lib/assignedKeys.ts", () => ({
+  loadAssignedKeys: () => assignedMock.fn(),
+}));
+
 const editorMocks = vi.hoisted(() => ({
   setModelMarkers: vi.fn(),
   revealLineInCenter: vi.fn(),
@@ -253,6 +258,8 @@ describe("KmnCodePane Apply (spec 113 US8)", () => {
 
   const changedRule = () => editorText().replace("+ U+0063 > U+0064", "+ U+0063 > U+0065");
 
+  beforeEach(() => assignedMock.fn.mockResolvedValue([]));
+
   afterEach(() => {
     useWorkingCopyStore.setState({ startIr: null, undoStack: [] });
   });
@@ -404,5 +411,49 @@ describe("KmnCodePane Apply (spec 113 US8)", () => {
     });
     expect(recorded()).toBeUndefined();
     expect(useWorkingCopyStore.getState().ir).toBe(ir);
+  });
+
+  describe("a key the Assign tab owns (ruling 10)", () => {
+    const KEYED = [
+      "store(&NAME) 'testkbd'",
+      "begin Unicode > use(main)",
+      "group(main) using keys",
+      "+ [K_G] > 'g'",
+      "+ [K_H] > 'h'",
+      "",
+    ].join("\n");
+    const keyedIr = (): KeyboardIR => parseKmn(KEYED, "testkbd").ir;
+    const changedG = () => editorText().replace("+ [K_G] > U+0067", "+ [K_G] > U+011D");
+
+    it("anchors the edit by key, names the Assign tab in the confirm, and the gate sees the keystroke", async () => {
+      seed(keyedIr(), keyedIr());
+      assignedMock.fn.mockResolvedValue([{ vkey: "K_G", modifiers: [] }]);
+      compileMock.fn.mockResolvedValue({ status: "ok" } satisfies CandidateCompileResult);
+      render(<KmnCodePane />);
+      edit(changedG());
+      await clickApply();
+      const gated = compileMock.fn.mock.calls.at(-1)![0] as Array<{ at: { keystroke?: unknown } }>;
+      expect(gated[0]!.at.keystroke).toEqual({ vkey: "K_G", modifiers: [] });
+      expect(screen.getByTestId("kmn-code-owner-confirm").textContent).toMatch(/Assign tab/);
+      await act(async () => {
+        fireEvent.click(screen.getByText("Apply anyway"));
+      });
+      await waitFor(() => expect(recorded()?.entries).toHaveLength(1));
+      const entry = recorded()!.entries[0] as CodeEdit;
+      expect(entry.overrides).toContainEqual({ change: 0, owner: "assign-tab" });
+    });
+
+    it("does not anchor or flag an edit on a key no assignment claims", async () => {
+      seed(keyedIr(), keyedIr());
+      assignedMock.fn.mockResolvedValue([{ vkey: "K_H", modifiers: [] }]);
+      compileMock.fn.mockResolvedValue({ status: "ok" } satisfies CandidateCompileResult);
+      render(<KmnCodePane />);
+      edit(changedG());
+      await clickApply();
+      await waitFor(() => expect(recorded()?.entries).toHaveLength(1));
+      const entry = recorded()!.entries[0] as CodeEdit;
+      expect(entry.overrides).toEqual([]);
+      expect((entry.changes[0] as { at: { keystroke?: unknown } }).at.keystroke).toBeUndefined();
+    });
   });
 });

@@ -32,7 +32,7 @@
 //     non-empty, every required slot has a value). One it would skip with a
 //     warning must not take the starting rule down with it.
 
-import type { KeyboardIR, MechanismAssignment, Pattern } from "@keyboard-studio/contracts";
+import type { IRChange, IRRule, KeyboardIR, MechanismAssignment, OwnerRef, Pattern } from "@keyboard-studio/contracts";
 import { parseKeySpec } from "@keyboard-studio/engine";
 import { mechanismClaimedSlots } from "../survey/slotOccupancy.ts";
 
@@ -128,4 +128,60 @@ export function claimedInputRuleIds(
     if (claims.some((c) => covers(c, k))) ids.add(rule.nodeId);
   }
   return ids;
+}
+
+/** A key an assignment claims: the vkey and exact modifier words of a shadowed starting rule. */
+export interface AssignedKey {
+  readonly vkey: string;
+  readonly modifiers: readonly string[];
+}
+
+/** The keystrokes of the starting rules the assignments shadow (the keys the Assign tab owns). */
+export function claimedKeystrokes(
+  startIr: KeyboardIR,
+  assignments: ReadonlyArray<MechanismAssignment>,
+  getPattern: (id: string) => Pattern | undefined,
+): AssignedKey[] {
+  const ids = claimedInputRuleIds(startIr, assignments, getPattern);
+  const main = startIr.groups.find((g) => g.name === "main");
+  const keys: AssignedKey[] = [];
+  for (const rule of main?.rules ?? []) {
+    const el = rule.context[0];
+    if (ids.has(rule.nodeId) && el !== undefined && el.kind === "vkey") {
+      keys.push({ vkey: el.name, modifiers: el.modifiers });
+    }
+  }
+  return keys;
+}
+
+function sameKey(rule: IRRule, key: AssignedKey): boolean {
+  const el = rule.context.length === 1 ? rule.context[0] : undefined;
+  if (el === undefined || el.kind !== "vkey" || el.name.toUpperCase() !== key.vkey.toUpperCase()) return false;
+  const have = new Set(el.modifiers.map((m) => m.toUpperCase()));
+  return have.size === key.modifiers.length && key.modifiers.every((m) => have.has(m.toUpperCase()));
+}
+
+/**
+ * Ruling 10: a `replace` or `remove` of a single-key rule in `main` whose key an Assign-tab
+ * assignment claims gets a keystroke anchor, so it still finds its rule in the projected keyboard
+ * (where the assignment has rewritten the text), and an `assign-tab` override, so the confirm names
+ * the Assign tab and the review flags it. Other changes pass through unchanged.
+ */
+export function anchorAssignedKeys(
+  changes: readonly IRChange[],
+  keys: readonly AssignedKey[],
+): { changes: IRChange[]; overrides: OwnerRef[] } {
+  const overrides: OwnerRef[] = [];
+  const out = changes.map((c, i): IRChange => {
+    if (c.change !== "replace" && c.change !== "remove") return c;
+    if (c.at.container.kind !== "group" || c.at.container.name !== "main") return c;
+    if (!("context" in c.old)) return c;
+    const old = c.old;
+    const key = keys.find((k) => sameKey(old, k));
+    if (key === undefined) return c;
+    overrides.push({ change: i, owner: "assign-tab" });
+    const keystroke = { vkey: key.vkey, modifiers: [...key.modifiers] };
+    return { ...c, at: { ...c.at, keystroke } };
+  });
+  return { changes: out, overrides };
 }

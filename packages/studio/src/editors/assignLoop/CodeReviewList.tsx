@@ -110,6 +110,8 @@ export function CodeReviewList({ flags, value, onViewInCode }: CodeReviewListPro
         return t({ id: "editor.assignLoop.mechanisms.code.owner.codeTab", message: "an earlier Code tab edit" });
       case "identity":
         return t({ id: "editor.assignLoop.mechanisms.code.owner.identity", message: "the keyboard identity" });
+      case "assign-tab":
+        return t({ id: "editor.assignLoop.mechanisms.code.owner.assignTab", message: "the Assign tab" });
       case "another-step":
         return t({ id: "editor.assignLoop.mechanisms.code.owner.anotherStep", message: "another step" });
     }

@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { IRChange, IRRule, KeyboardIR } from "@keyboard-studio/contracts";
-import { emit } from "../codec/emit.js";
+import { emit, emitRule } from "../codec/emit.js";
 import { applyIRChanges } from "./applyIRChanges.js";
 import { diffIR } from "./diffIR.js";
 import { findOwners } from "./findOwners.js";
@@ -37,6 +37,62 @@ describe("applyIRChanges", () => {
     const result = applyIRChanges(a, changes);
     expect(result.misses).toEqual([]);
     expect(emit(result.ir)).toBe(emit(b));
+  });
+
+  describe("keystroke anchor (ruling 10)", () => {
+    const main = { kind: "group" as const, name: "main", usingKeys: true };
+    const keyed = (vkey: string, modifiers: string[] = []) => ({ vkey, modifiers });
+    const ruleOf = (text: string): IRRule => parseText(editLine(BASE_KMN, "+ [K_D] > 'd'", text)).groups[0]!.rules[3]!;
+
+    const outputOf = (ir: KeyboardIR, vkey: string): string | undefined => {
+      const r = ir.groups[0]!.rules.find((x) => x.context.some((c) => c.kind === "vkey" && c.name === vkey));
+      return r?.output.map((o) => (o.kind === "char" ? o.value : "?")).join("");
+    };
+
+    it("replaces the rule by key when the text anchor misses", () => {
+      const a = parseText(BASE_KMN);
+      const result = applyIRChanges(a, [
+        {
+          change: "replace",
+          at: { container: main, text: "+ [K_D] > 'something the assignment rewrote'", keystroke: keyed("K_D") },
+          old: ruleOf("+ [K_D] > 'd'"),
+          node: ruleOf("+ [K_D] > 'D'"),
+        },
+      ]);
+      expect(result.misses).toEqual([]);
+      expect(outputOf(result.ir, "K_D")).toBe("D");
+    });
+
+    it("removes the rule by key when the text anchor misses", () => {
+      const a = parseText(BASE_KMN);
+      const result = applyIRChanges(a, [
+        { change: "remove", at: { container: main, text: "stale", keystroke: keyed("K_D") }, old: ruleOf("+ [K_D] > 'd'") },
+      ]);
+      expect(result.misses).toEqual([]);
+      expect(outputOf(result.ir, "K_D")).toBeUndefined();
+    });
+
+    it("prefers the text anchor when it is found", () => {
+      const a = parseText(BASE_KMN);
+      const result = applyIRChanges(a, [
+        {
+          change: "replace",
+          at: { container: main, text: emitRule(ruleOf("+ [K_D] > 'd'"), true), keystroke: keyed("K_E") },
+          old: ruleOf("+ [K_D] > 'd'"),
+          node: ruleOf("+ [K_D] > 'D'"),
+        },
+      ]);
+      expect(outputOf(result.ir, "K_D")).toBe("D");
+      expect(outputOf(result.ir, "K_E")).toBe("e");
+    });
+
+    it("is a miss when no rule answers the key or the modifiers differ", () => {
+      const a = parseText(BASE_KMN);
+      const miss = (k: ReturnType<typeof keyed>): number[] =>
+        applyIRChanges(a, [{ change: "remove", at: { container: main, text: "stale", keystroke: k }, old: ruleOf("+ [K_D] > 'd'") }]).misses;
+      expect(miss(keyed("K_Q"))).toEqual([0]);
+      expect(miss(keyed("K_D", ["SHIFT"]))).toEqual([0]);
+    });
   });
 
   it("does not mutate its input", () => {
