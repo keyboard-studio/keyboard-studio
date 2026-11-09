@@ -126,6 +126,14 @@ for (const arr of regionVariantsByBare.values()) {
   arr.sort((a, b) => a.region.localeCompare(b.region));
 }
 
+const representativeByLang = new Map();
+for (const entry of raw) {
+  if (!entry.tag || entry.tag.startsWith('_')) continue;
+  const lang = entry.tag.split('-')[0].toLowerCase();
+  const cur = representativeByLang.get(lang);
+  if (!cur || entry.tag.length < cur.tag.length) representativeByLang.set(lang, entry);
+}
+
 for (const entry of raw) {
   // Skip underscore-prefixed header records (_version, _globalvar, _phonvar, etc.)
   if (!entry.tag || entry.tag.startsWith('_')) {
@@ -133,11 +141,10 @@ for (const entry of raw) {
     continue;
   }
 
-  // Only process bare language subtags (no '-' in tag).
-  // Macrolanguages without a bare-subtag tagset (e.g. "zh") are intentionally
-  // absent from the generated index — they are represented upstream only via
-  // individual variety codes (e.g. "cmn", "yue"), never as a single bare entry.
-  if (entry.tag.includes('-')) continue;
+  // One representative tagset per language subtag: the shortest `tag`. Languages
+  // with no bare tagset (e.g. zh -> zh-CN, zh-TW) are represented by their
+  // shortest regional/script tagset rather than dropped.
+  if (representativeByLang.get(entry.tag.split('-')[0].toLowerCase()) !== entry) continue;
 
   const { full, iso639_3, iso639_3extra, localname, name, regions, names, localnames, regionname } = entry;
 
@@ -158,11 +165,11 @@ for (const entry of raw) {
 
   // Attach region variants only when the subtag is region-ambiguous (>1 distinct
   // region) — that is the region-disambiguation trigger (spec 030 US3 / FR-014).
-  const variants = regionVariantsByBare.get(entry.tag.toLowerCase()) ?? [];
+  const variants = regionVariantsByBare.get(entry.tag.split('-')[0].toLowerCase()) ?? [];
   const isRegionAmbiguous = variants.length > 1;
 
   const record = {
-    code: entry.tag.toLowerCase(),
+    code: entry.tag.split('-')[0].toLowerCase(),
     ...(iso639_3 !== undefined ? { iso639_3: iso639_3.toLowerCase() } : {}),
     ...(defaultScript !== undefined ? { defaultScript } : {}),
     ...(defaultRegion !== undefined ? { defaultRegion } : {}),
@@ -174,7 +181,7 @@ for (const entry of raw) {
     ...(isRegionAmbiguous ? { regionVariants: variants } : {}),
   };
 
-  const tagKey = entry.tag.toLowerCase();
+  const tagKey = entry.tag.split('-')[0].toLowerCase();
   index.set(tagKey, record);
 
   // Also index under iso639_3 and each iso639_3extra (lowercased)
