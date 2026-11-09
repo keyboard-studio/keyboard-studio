@@ -257,8 +257,8 @@ Commit: `spec 115 T020-T029`.
 
 **Wave 1 — tests:**
 
-- [ ] T038 [P] [US3] Write failing `minimalTag` and `minimalTagOf` tests: every row of the table in contracts/langtags-api.md (including `ca + Latn + AD + valencia` → `ca-AD-valencia`, `oc + FR + gascon` → `oc-gascon`, and the `qaa` rows that must keep their region), plus the SC-003 property test over all 9,596 tagsets — packages/engine/src/langtags/minimalTag.test.ts
-- [ ] T039 [P] [US3] Write failing studio tests:
+- [x] T038 [P] [US3] Write failing `minimalTag` and `minimalTagOf` tests: every row of the table in contracts/langtags-api.md (including `ca + Latn + AD + valencia` → `ca-AD-valencia`, `oc + FR + gascon` → `oc-gascon`, and the `qaa` rows that must keep their region), plus the SC-003 property test over all 9,596 tagsets — packages/engine/src/langtags/minimalTag.test.ts
+- [x] T039 [P] [US3] Write failing studio tests:
   - `buildTargetBcp47` delegates to `minimalTag`, with a region equal to the default omitted;
   - the "Specify a region…" field in the chooser's **Customize** panel routes `il_language_region` for a single-region language;
   - existing walks route no new screen (research R9).
@@ -267,16 +267,16 @@ Commit: `spec 115 T020-T029`.
 
 **Wave 2 — implementation:**
 
-- [ ] T040 [US3] Implement `minimalTag(choice)` and `minimalTagOf(tag)`.
+- [x] T040 [US3] Implement `minimalTag(choice)` and `minimalTagOf(tag)`.
   - Key the lookup on (canonical language, variants, private use) from `parseBcp47`. Use the dialect tagset, else the bare tagset; never `resolveLangtag`'s string fallback (research R2).
   - Return the tagset `tag` on an exact match. Otherwise omit script and region where each equals that tagset's default.
   - Carry extensions through.
   - Export both from the langtags barrel.
 
   Files: packages/engine/src/langtags/minimalTag.ts, packages/engine/src/langtags/index.ts
-- [ ] T041 [US3] Make `buildTargetBcp47` call `minimalTag`, with a new optional `dialectSubtag` parameter (empty until US2). Delete the private `isSuppressedScript`, and keep `fonipa` and `romanization-Latn` as inputs mapped to parts. Add a dependency-cruiser rule (G1, FR-035): only `survey/languageChooser/` may import from `@ethnolib/find-language`, so EthnoLib's tag builders can never reach the output path — packages/studio/src/survey/targetBcp47.ts, .dependency-cruiser.cjs
-- [ ] T042 [US3] Replace `minimalLocale` with `minimalTagOf` at `document.ts:286` and `ldml-export/package.ts:58`; delete T015's interim code — packages/engine/src/ldml-export/lower/document.ts, packages/engine/src/ldml-export/package.ts
-- [ ] T043 [US3] Region on demand (research R9):
+- [x] T041 [US3] Make `buildTargetBcp47` call `minimalTag`, with a new optional `dialectSubtag` parameter (empty until US2). Delete the private `isSuppressedScript`, and keep `fonipa` and `romanization-Latn` as inputs mapped to parts. Add a dependency-cruiser rule (G1, FR-035): only `survey/languageChooser/` may import from `@ethnolib/find-language`, so EthnoLib's tag builders can never reach the output path — packages/studio/src/survey/targetBcp47.ts, .dependency-cruiser.cjs
+- [x] T042 [US3] Replace `minimalLocale` with `minimalTagOf` at `document.ts:286` and `ldml-export/package.ts:58`; delete T015's interim code — packages/engine/src/ldml-export/lower/document.ts, packages/engine/src/ldml-export/package.ts
+- [x] T043 [US3] Region on demand (research R9):
   - The "Specify a region…" field in the chooser's **Customize** panel sets the routing input `ctx.ilRegionRequested`.
   - **The region help text and option labels are survey text owned by the content team (Article VI): mark them for content review.**
   - `il_language_region` routes when `hasRegionVariants` or `ilRegionRequested`.
