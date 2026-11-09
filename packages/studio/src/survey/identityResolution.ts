@@ -141,6 +141,26 @@ export function createIdentityResolution(): IdentityResolution {
     evaluateIdentityDefaults();
   }
 
+  // Record why the picked language matched a dialect or variety name (spec 115),
+  // or forget the record when the pick was a direct hit. This is the question's
+  // own decision (`language-search-match`), a fact derived from the pick; the
+  // code, script and autonym seeds below stay `default` proposals.
+  function recordSearchMatch(match: LanguageSummary["match"]): void {
+    const store = useDecisionStore.getState();
+    if (match === undefined) {
+      if (store.decisions["language-search-match"] !== undefined) store.forget("language-search-match");
+      return;
+    }
+    const existing = store.decisions["language-search-match"];
+    if (existing !== undefined && JSON.stringify(existing.value) === JSON.stringify(match)) return;
+    store.record({
+      id: "language-search-match",
+      value: match,
+      provenance: "derived",
+      source: "il_language_english",
+    });
+  }
+
   // Reset every resolved-entry-derived seed. Called when the English name is
   // cleared / matches nothing (free text → graceful degradation, FR-003). The
   // autonym is re-evaluated afterwards: with no entry behind it, its declared
@@ -158,6 +178,7 @@ export function createIdentityResolution(): IdentityResolution {
     onEntryResolved(questionId, entry) {
       if (questionId !== "il_language_english") return;
       resolvedSummary = entry;
+      recordSearchMatch(entry?.match);
       if (entry === null) {
         clearSeeds();
         return;

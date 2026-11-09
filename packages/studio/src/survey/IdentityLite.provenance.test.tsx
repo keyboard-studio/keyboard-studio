@@ -19,18 +19,18 @@ import type { LanguageDefaults, LanguageSummary } from "@keyboard-studio/contrac
 
 const PROVENANCE_CAPTION = "Suggested from langtags — edit if needed";
 
-// "xx" resolves to a region-ambiguous entry (2 regionVariants) whose PRIMARY
+// "ewo" (Ewondo, a real chooser entry whose langtags defaults are faked here) resolves to a region-ambiguous entry (2 regionVariants) whose PRIMARY
 // defaults have NO autonym. Region AA's variant supplies one (case: a variant
 // grants a value the primary lacked — must gain a caption); region BB's variant
 // has none (case: a variant that grants nothing must stay uncaptioned).
 const XX_DEFAULTS: LanguageDefaults = {
-  code: "xx",
+  code: "ewo",
   defaultScript: "Latn",
   regions: [],
   autonym: undefined,
-  englishName: "Xx Language",
+  englishName: "Ewondo",
   // English/alternate names (langtags name + names) — offered as extra Q2 choices.
-  englishNames: ["Xx Language", "Xy Alt"],
+  englishNames: ["Ewondo", "Xy Alt"],
   regionVariants: [
     {
       region: "AA",
@@ -49,14 +49,14 @@ const XX_DEFAULTS: LanguageDefaults = {
   ],
 };
 
-// "yy" resolves to a region-ambiguous entry whose PRIMARY defaults DO have an
+// "bfd" (Bafut, likewise) resolves to a region-ambiguous entry whose PRIMARY defaults DO have an
 // autonym (case: a variant that lacks an autonym must clear a stale caption).
 const YY_DEFAULTS: LanguageDefaults = {
-  code: "yy",
+  code: "bfd",
   defaultScript: "Latn",
   regions: [],
   autonym: "Primary Autonym",
-  englishName: "Yy Language",
+  englishName: "Bafut",
   regionVariants: [
     {
       region: "AA",
@@ -79,8 +79,8 @@ const YY_DEFAULTS: LanguageDefaults = {
 // il_language_region (spec 030 US3). Distinct englishNames so a listbox row can
 // be selected unambiguously.
 const SUMMARIES: LanguageSummary[] = [
-  { code: "xx", englishName: "Xx Language", hasRegionVariants: true },
-  { code: "yy", englishName: "Yy Language", hasRegionVariants: true },
+  { code: "ewo", englishName: "Ewondo", hasRegionVariants: true },
+  { code: "bfd", englishName: "Bafut", hasRegionVariants: true },
 ];
 
 vi.mock("../lib/langtagsDefaults.ts", async (importOriginal) => {
@@ -90,12 +90,13 @@ vi.mock("../lib/langtagsDefaults.ts", async (importOriginal) => {
     loadLangtags: () =>
       Promise.resolve({
         getLanguageDefaults: (code: string) => {
-          if (code === "xx") return XX_DEFAULTS;
-          if (code === "yy") return YY_DEFAULTS;
+          if (code === "ewo") return XX_DEFAULTS;
+          if (code === "bfd") return YY_DEFAULTS;
           return null;
         },
         listLanguages: () => SUMMARIES,
         lookupByName: () => SUMMARIES,
+        allDialectTagsets: [],
       }),
   };
 });
@@ -110,7 +111,7 @@ async function renderReady(): Promise<HTMLElement> {
   // placeholder flips from "Loading languages..." once loaded).
   await waitFor(() => {
     const input = screen.getByRole<HTMLInputElement>("combobox");
-    expect(input.placeholder).toMatch(/Type your language/);
+    expect(input.placeholder).toMatch(/Search by name/);
   });
   return container;
 }
@@ -119,10 +120,10 @@ async function renderReady(): Promise<HTMLElement> {
 // (spec 030 US1). Selection — not typing — fires onEntryResolved with the entry.
 // The identity flow auto-advances on selection (advanceOnSelect), so picking the
 // row routes to the region step with no explicit Next click.
-async function selectLanguage(code: string): Promise<void> {
+async function selectLanguage(name: string): Promise<void> {
   const input = screen.getByRole<HTMLInputElement>("combobox");
-  fireEvent.focus(input); // opens the listbox (populated from listLanguages)
-  const option = await screen.findByRole("option", { name: new RegExp(`\\(${code}\\)`) });
+  fireEvent.change(input, { target: { value: name } }); // the chooser lists nothing until text is typed
+  const option = await screen.findByRole("option", { name: new RegExp("^" + name) });
   fireEvent.mouseDown(option);
   await waitFor(() => {
     expect(screen.getByText(/Which region is your language from\?/)).toBeTruthy();
@@ -151,7 +152,7 @@ function autonymOptionValues(): string[] {
 describe("IdentityLite Q2 own-language name (spec 030 US2 — langtags-name choices, Q1 fallback)", () => {
   it("defaults to the primary own-script name and offers ONLY own-script names (not the English/alternate names)", async () => {
     await renderReady();
-    await selectLanguage("xx"); // englishName "Xx Language"
+    await selectLanguage("Ewondo");
     await commitRegion("AA"); // variant AA local name: "Variant Autonym"
 
     await waitFor(() => {
@@ -168,11 +169,11 @@ describe("IdentityLite Q2 own-language name (spec 030 US2 — langtags-name choi
 
   it("falls back to the Q1 name (no caption) when the language has no own-script name, still offering the English/alternate names", async () => {
     await renderReady();
-    await selectLanguage("xx");
+    await selectLanguage("Ewondo");
     await commitRegion("BB"); // variant BB: no own-script names (englishNames remain)
 
     await waitFor(() => {
-      expect(screen.getByRole<HTMLInputElement>("combobox").value).toBe("Xx Language");
+      expect(screen.getByRole<HTMLInputElement>("combobox").value).toBe("Ewondo");
     });
     // No own-script name → default is the Q1 name (author input) → no caption,
     // but the English/alternate names are still offered as dropdown choices.
@@ -182,11 +183,11 @@ describe("IdentityLite Q2 own-language name (spec 030 US2 — langtags-name choi
 
   it("with no recorded names at all, defaults to the Q1 name as free text (no dropdown, no caption)", async () => {
     await renderReady();
-    await selectLanguage("yy"); // englishName "Yy Language"; no englishNames, BB has no local names
+    await selectLanguage("Bafut"); // no englishNames, BB has no local names
     await commitRegion("BB");
 
     await waitFor(() => {
-      expect(screen.getByRole<HTMLInputElement>("combobox").value).toBe("Yy Language");
+      expect(screen.getByRole<HTMLInputElement>("combobox").value).toBe("Bafut");
     });
     expect(autonymOptionValues()).toEqual([]);
     expect(screen.queryByText(PROVENANCE_CAPTION)).toBeNull();

@@ -6,7 +6,7 @@
 // NFD-decomposed spelling of the SAME name (byte-different, NFC-equal) produced
 // two separate rows instead of one.
 //
-// "zz" mirrors IdentityLite.autoAdvance.test.tsx's no-region-variant fixture
+// "am" (Amharic: a real chooser entry whose langtags defaults are faked here) mirrors IdentityLite.autoAdvance.test.tsx's no-region-variant fixture
 // (hasRegionVariants: false → Q1 selection auto-advances straight to Q2), kept
 // deliberately simple since this test only needs to reach Q2 and read its
 // options — not exercise the region-variant reseed path.
@@ -22,25 +22,26 @@ const NFC_NAME = "Tiếng Việt";
 const NFD_NAME = NFC_NAME.normalize("NFD");
 
 const ZZ_DEFAULTS: LanguageDefaults = {
-  code: "zz",
-  iso639_3: "zzz",
+  code: "am",
+  iso639_3: "amh",
   defaultScript: "Latn",
   regions: [],
   autonym: NFC_NAME,
-  englishName: "Zeta",
+  englishName: "Amharic",
   // The SAME own-script name recorded twice, once NFC and once NFD — the
   // dedup fix must collapse these into a single dropdown row.
   localNames: [NFC_NAME, NFD_NAME],
 };
 
 const SUMMARIES: LanguageSummary[] = [
-  { code: "zz", englishName: "Zeta", autonym: NFC_NAME, hasRegionVariants: false },
+  { code: "am", englishName: "Amharic", autonym: NFC_NAME, hasRegionVariants: false },
 ];
 
 const FAKE_MODULE = {
-  getLanguageDefaults: (code: string) => (code === "zz" ? ZZ_DEFAULTS : null),
+  getLanguageDefaults: (code: string) => (code === "am" ? ZZ_DEFAULTS : null),
   listLanguages: () => SUMMARIES,
   lookupByName: () => SUMMARIES,
+  allDialectTagsets: [] as const,
 };
 
 vi.mock("../lib/langtagsDefaults.ts", async (importOriginal) => {
@@ -75,13 +76,13 @@ describe("IdentityLite getSeedOptions autonym dedup (PR #1055 regression)", () =
     render(<IdentityLite onComplete={vi.fn()} />);
     await waitFor(() => {
       expect(screen.getByRole<HTMLInputElement>("combobox").placeholder).toMatch(
-        /Type your language/,
+        /Search by name/,
       );
     });
 
-    // Q1: pick "Zeta" → auto-advance to Q2 (no region variants).
-    fireEvent.focus(screen.getByRole("combobox"));
-    const option = await screen.findByRole("option", { name: /\(zz\)/ });
+    // Q1: pick "Amharic" → auto-advance to Q2 (no region variants).
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "Amharic" } });
+    const option = await screen.findByRole("option", { name: /^Amharic/ });
     fireEvent.mouseDown(option);
     await waitFor(() => {
       expect(

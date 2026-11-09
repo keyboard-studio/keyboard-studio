@@ -50,6 +50,7 @@ const MOCK_MOD = {
   listLanguages: () => [HAUSA_SUMMARY],
   lookupByName: (q: string) =>
     [HAUSA_SUMMARY].filter((l) => l.englishName.toLowerCase().includes(q.toLowerCase())),
+  allDialectTagsets: [] as const,
 };
 
 vi.mock("../lib/langtagsDefaults.ts", async (importOriginal) => {
@@ -70,7 +71,7 @@ async function reachLanguageCode(): Promise<void> {
   render(<IdentityLite onComplete={vi.fn()} />, { withStepNav: true });
 
   const q1 = await screen.findByRole<HTMLInputElement>("combobox");
-  fireEvent.focus(q1);
+  fireEvent.change(q1, { target: { value: "Hausa" } });
   const option = await screen.findByRole("option", { name: /Hausa/ });
   fireEvent.mouseDown(option); // resolves Hausa + auto-advances (advanceOnSelect)
 

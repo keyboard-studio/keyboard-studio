@@ -98,8 +98,8 @@ The parser, the shared types and the generated data. Nothing here changes what a
 
 **Wave 1 — vendoring and tests:**
 
-- [ ] T020 [P] [US1] Vendor `useLanguageChooser.ts` from EthnoLib `components/language-chooser/react/common/language-chooser-react-hook` (the source matching 0.3.7). Keep the MIT header and the source URL and commit, and import from `@ethnolib/find-language`. Add a typecheck-only test that the return keys match the contract (`languageResults`, `onSearchStringChange`, `selectLanguage`, `selectUnlistedLanguage`, `selectManuallyEnteredTagLanguage`, `selectScript`, `saveLanguageDetails`, `readyToSubmit`, `resetTo`) — packages/studio/src/survey/languageChooser/vendor/useLanguageChooser.ts, packages/studio/src/survey/languageChooser/vendor/useLanguageChooser.test.ts
-- [ ] T021 [P] [US1] Write failing tests for `makeDialectSearcher` and `dialectResultModifier` (contract § merge rule):
+- [x] T020 [P] [US1] Vendor `useLanguageChooser.ts` from EthnoLib `components/language-chooser/react/common/language-chooser-react-hook` (the source matching 0.3.7). Keep the MIT header and the source URL and commit, and import from `@ethnolib/find-language`. Add a typecheck-only test that the return keys match the contract (`languageResults`, `onSearchStringChange`, `selectLanguage`, `selectUnlistedLanguage`, `selectManuallyEnteredTagLanguage`, `selectScript`, `saveLanguageDetails`, `readyToSubmit`, `resetTo`) — packages/studio/src/survey/languageChooser/vendor/useLanguageChooser.ts, packages/studio/src/survey/languageChooser/vendor/useLanguageChooser.test.ts
+- [x] T021 [P] [US1] Write failing tests for `makeDialectSearcher` and `dialectResultModifier` (contract § merge rule):
   - "Gascon" → Occitan with `match` `{relation: "dialect", glottocode: "gasc1240", countries: ["ES","FR"]}`;
   - "Sursilvan" → Romansh;
   - **langtags dialect names (C2):** "Rabinal" → Achi with `match` `{relation: "dialect", source: "langtags", dialectTag: "acr-x-rabinal"}`; "Valencian" → Catalan with `{relation: "variety", dialectTag: "ca-valencia"}`;
@@ -114,7 +114,7 @@ The parser, the shared types and the generated data. Nothing here changes what a
   - **multi-parent (U2):** a prefix query matching dialects of two different parents lists both, each with its countries (FR-004).
 
   File: packages/studio/src/survey/languageChooser/dialectSearch.test.ts
-- [ ] T022 [P] [US1] Write the failing behaviour-kept tests (FR-038):
+- [x] T022 [P] [US1] Write the failing behaviour-kept tests (FR-038):
   - suggestions update as the author types;
   - `resolveTypedLanguage` over `ILanguage` resolves a unique exonym, else a unique alias, and is null when ambiguous (the existing cases ported);
   - picking or resolving calls `onEntryResolved` with the matching `LanguageDefaults`, and the code, script and autonym seeds are recorded with `default` provenance;
@@ -123,7 +123,7 @@ The parser, the shared types and the generated data. Nothing here changes what a
   - **accents (U1, FR-005):** "Arbereshe" and "Arbëreshë" both find `aae`; "catala" finds `ca`; "Gascón" finds Occitan via the dialect searcher.
 
   Files: packages/studio/src/survey/resolveTypedLanguage.test.ts, packages/studio/src/survey/languageChooser/LanguageChooser.test.tsx
-- [ ] T023 [P] [US1] Write the measurement tests:
+- [x] T023 [P] [US1] Write the measurement tests:
   - SC-001: at least 95% of the 13,392 Glottolog dialects have their parent in the top 5;
   - SC-002: 229/229 langtags dialect tagsets reachable;
   - SC-007 / FR-006: the top-result code for 200 seeded language-name samples vs today's `lookupByName`, with exceptions in `searchParity.fixture.json`;
@@ -135,24 +135,24 @@ The parser, the shared types and the generated data. Nothing here changes what a
 
 **Wave 2 — implementation:**
 
-- [ ] T024 [P] [US1] Implement:
+- [x] T024 [P] [US1] Implement:
   - `makeDialectSearcher(glottologRows, langtagsDialects)`: an EthnoLib `LanguageSearcher` over both Glottolog dialect rows and the langtags variant and `-x-` tagsets (`dialectTagsetsFor` data, carrying `dialectTag`);
   - `dialectResultModifier(searcher, parentFor)`, applying the contract's merge rule. The rule uses only the query and each result's names, because the modifier receives no tier information.
 
   Files: packages/studio/src/survey/languageChooser/dialectSearch.ts
-- [ ] T025 [P] [US1] Generalise `resolveTypedLanguage` to `ILanguage` (`exonym`, `names`); keep the rule. Update `languageResultsFor` for the headless path to call EthnoLib's search with the dialect modifier — packages/studio/src/survey/resolveTypedLanguage.ts
-- [ ] T026 [P] [US1] Port the chooser UI with no MUI: `LanguageChooser` (the existing combobox, fed by `languageResults`, capped at 50) and `LanguageCard` as row content (name, autonym, alternate names, regions, code, and the match line per the contract's table); `ScriptCard`; and `CustomizePanel` (its "Specify a region…" field and its dialect name field). Use studio styles, message ids (spec 046) and accessible names that include the match line (spec 056). **The labels and match-line wording are survey text owned by the content team (Article VI): mark them for content review** — packages/studio/src/survey/languageChooser/{LanguageChooser,LanguageCard,ScriptCard,CustomizePanel}.tsx, packages/studio/src/locales/
+- [x] T025 [P] [US1] Generalise `resolveTypedLanguage` to `ILanguage` (`exonym`, `names`); keep the rule. Update `languageResultsFor` for the headless path to call EthnoLib's search with the dialect modifier — packages/studio/src/survey/resolveTypedLanguage.ts
+- [x] T026 [P] [US1] Port the chooser UI with no MUI: `LanguageChooser` (the existing combobox, fed by `languageResults`, capped at 50) and `LanguageCard` as row content (name, autonym, alternate names, regions, code, and the match line per the contract's table); `ScriptCard`; and `CustomizePanel` (its "Specify a region…" field and its dialect name field). Use studio styles, message ids (spec 046) and accessible names that include the match line (spec 056). **The labels and match-line wording are survey text owned by the content team (Article VI): mark them for content review** — packages/studio/src/survey/languageChooser/{LanguageChooser,LanguageCard,ScriptCard,CustomizePanel}.tsx, packages/studio/src/locales/
 
 **Wave 3 — wiring:**
 
-- [ ] T027 [US1] Map chooser state to decisions (research R7 table) through `identityResolution.onEntryResolved` and the answer commit, never directly to IR.
+- [x] T027 [US1] Map chooser state to decisions (research R7 table) through `identityResolution.onEntryResolved` and the answer commit, never directly to IR.
   - **Create the `language-search-match` DecisionId here** (IR paths `[]`), with its persistence test; T035 and T048 use it.
   - **Registry (FR-047, Article IX):** change `il_language_english` to `provides: ["language-name", "language-search-match", "language-glottocode"]`, with `language-glottocode` itself created in T072. Code, script and autonym are written only as `default`-provenance proposals, as `seedFromEntry` does today; never as answers.
   - Lazy-load the glottolog `./dialects` chunk on the first query of 3 or more characters (contract § merge rule).
 
   Files: packages/studio/src/decisions/decisionTypes.ts, packages/studio/src/survey/identityResolution.ts, packages/studio/src/survey/languageChooser/LanguageChooser.tsx
-- [ ] T028 [US1] Render `il_language_english` with `LanguageChooser` in place of `LangtagsComboboxField`'s name mode. Keep `LangtagsComboboxField` for other callers, and drop name mode if it becomes unused. Put the chooser behind a dynamic `import()` so it and EthnoLib's data load with the language step (FR-037). Add a build test that the entry chunk does not contain `@ethnolib/find-language` (G2) — packages/studio/src/survey/QuestionField.tsx, packages/studio/src/survey/IdentityLite.tsx, packages/studio/src/survey/languageChooser/lazyBoundary.test.ts
-- [ ] T029 [US1] Populate `searchParity.fixture.json` and `ethnolibParity.fixture.json` from a first run, each exception with a reason; then T023 must pass with no unlisted exceptions — packages/studio/src/survey/languageChooser/*.fixture.json
+- [x] T028 [US1] Render `il_language_english` with `LanguageChooser` in place of `LangtagsComboboxField`'s name mode. Keep `LangtagsComboboxField` for other callers, and drop name mode if it becomes unused. Put the chooser behind a dynamic `import()` so it and EthnoLib's data load with the language step (FR-037). Add a build test that the entry chunk does not contain `@ethnolib/find-language` (G2) — packages/studio/src/survey/QuestionField.tsx, packages/studio/src/survey/IdentityLite.tsx, packages/studio/src/survey/languageChooser/lazyBoundary.test.ts
+- [x] T029 [US1] Populate `searchParity.fixture.json` and `ethnolibParity.fixture.json` from a first run, each exception with a reason; then T023 must pass with no unlisted exceptions — packages/studio/src/survey/languageChooser/*.fixture.json
 
 **Checkpoint**:
 - T021 to T023 pass; SC-001, SC-002, SC-007 and SC-009 are printed.

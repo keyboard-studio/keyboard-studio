@@ -109,6 +109,8 @@ export interface LanguageSummary {
    * variant — i.e. a region-disambiguation step will follow (spec 030 FR-014).
    */
   hasRegionVariants?: boolean;
+  /** Why this row matched, when the query hit a dialect or variety name rather than the language itself (spec 115). */
+  match?: SearchMatch;
 }
 
 /**

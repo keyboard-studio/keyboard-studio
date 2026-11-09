@@ -10,6 +10,8 @@ import type { IRPath } from "@keyboard-studio/contracts";
 /** The typed facts the spike tracks, by stable id. */
 export type DecisionId =
   | "language-name"
+  // Spec 115: why the picked language matched a dialect/variety name the author typed.
+  | "language-search-match"
   | "language-region"
   | "language-autonym"
   | "language-code"
@@ -286,6 +288,7 @@ export interface DecisionRendererProps<T = unknown> {
  */
 export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "language-name": [],
+  "language-search-match": [],
   "language-region": [],
   "language-autonym": [],
   "language-code": [],

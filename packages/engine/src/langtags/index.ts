@@ -131,3 +131,8 @@ export {
   isRegionSubtag,
 } from "./tagsets.js";
 export type { LangtagResolution } from "./tagsets.js";
+
+// Spec 115: every langtags variant and `-x-` tagset, for the studio's dialect
+// search. `dialectTagsetsFor(language)` (with the registry-aware filters) is a
+// later task; this is the raw generated data, exported as-is.
+export { dialects as allDialectTagsets } from "./generated/dialects.js";

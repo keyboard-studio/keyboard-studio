@@ -1,0 +1,224 @@
+{
+  "exceptions": {
+    "Ancient Zapotec": {
+      "old": "xzp",
+      "new": "zpi",
+      "reason": "The new search ranks a language whose name or alternate name matches the typed name more closely above today's top result."
+    },
+    "Arabic, Judeo-Yemeni": {
+      "old": "jye",
+      "new": "",
+      "reason": "langtags files this language under an inverted or qualified name; EthnoLib lists it under a different name, so searching the whole phrase finds nothing. The words of the name find it."
+    },
+    "Banda, Togbo-Vara": {
+      "old": "tor",
+      "new": "",
+      "reason": "langtags files this language under an inverted or qualified name; EthnoLib lists it under a different name, so searching the whole phrase finds nothing. The words of the name find it."
+    },
+    "Dakka": {
+      "old": "dri",
+      "new": "dkk",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Dogoso": {
+      "old": "dts",
+      "new": "dgs",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Duala": {
+      "old": "dwu",
+      "new": "dua",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Jarawa": {
+      "old": "jjr",
+      "new": "anq",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Kalagan, Kagan": {
+      "old": "kll",
+      "new": "",
+      "reason": "langtags files this language under an inverted or qualified name; EthnoLib lists it under a different name, so searching the whole phrase finds nothing. The words of the name find it."
+    },
+    "Kamba": {
+      "old": "aks",
+      "new": "kam",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Kanum, Bädi": {
+      "old": "khd",
+      "new": "",
+      "reason": "langtags files this language under an inverted or qualified name; EthnoLib lists it under a different name, so searching the whole phrase finds nothing. The words of the name find it."
+    },
+    "Katu, Eastern": {
+      "old": "ktv",
+      "new": "",
+      "reason": "langtags files this language under an inverted or qualified name; EthnoLib lists it under a different name, so searching the whole phrase finds nothing. The words of the name find it."
+    },
+    "Kim": {
+      "old": "kim",
+      "new": "kia",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Mansi": {
+      "old": "had",
+      "new": "mns",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Matlatzinca, Atzingo": {
+      "old": "ocu",
+      "new": "",
+      "reason": "langtags files this language under an inverted or qualified name; EthnoLib lists it under a different name, so searching the whole phrase finds nothing. The words of the name find it."
+    },
+    "Middle Low German": {
+      "old": "gml",
+      "new": "nds",
+      "reason": "The new search ranks a language whose name or alternate name matches the typed name more closely above today's top result."
+    },
+    "Mixe, Juquila": {
+      "old": "mxq",
+      "new": "",
+      "reason": "langtags files this language under an inverted or qualified name; EthnoLib lists it under a different name, so searching the whole phrase finds nothing. The words of the name find it."
+    },
+    "Moji": {
+      "old": "mkg",
+      "new": "ymi",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Mono": {
+      "old": "amg",
+      "new": "mnh",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Mulao": {
+      "old": "mlm",
+      "new": "giu",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Naga, Monsang": {
+      "old": "nmh",
+      "new": "",
+      "reason": "langtags files this language under an inverted or qualified name; EthnoLib lists it under a different name, so searching the whole phrase finds nothing. The words of the name find it."
+    },
+    "Nambikuára, Southern": {
+      "old": "nab",
+      "new": "ltn",
+      "reason": "The new search ranks a language whose name or alternate name matches the typed name more closely above today's top result."
+    },
+    "Nandi": {
+      "old": "mwk",
+      "new": "niq",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Paku": {
+      "old": "jkp",
+      "new": "pku",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Pano": {
+      "old": "ndu",
+      "new": "mqz",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Pashai, Northeast": {
+      "old": "aee",
+      "new": "pbm",
+      "reason": "The new search ranks a language whose name or alternate name matches the typed name more closely above today's top result."
+    },
+    "Pere": {
+      "old": "prq",
+      "new": "pfe",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Pomo, Eastern": {
+      "old": "peb",
+      "new": "kjp",
+      "reason": "The new search ranks a language whose name or alternate name matches the typed name more closely above today's top result."
+    },
+    "Portuguese": {
+      "old": "pov",
+      "new": "pt",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Romani, Tavringer": {
+      "old": "rmu",
+      "new": "",
+      "reason": "langtags files this language under an inverted or qualified name; EthnoLib lists it under a different name, so searching the whole phrase finds nothing. The words of the name find it."
+    },
+    "Saami, Akkala": {
+      "old": "sia",
+      "new": "",
+      "reason": "langtags files this language under an inverted or qualified name; EthnoLib lists it under a different name, so searching the whole phrase finds nothing. The words of the name find it."
+    },
+    "Serua": {
+      "old": "kzx",
+      "new": "srw",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Songhay, Koyraboro Senni": {
+      "old": "ses",
+      "new": "",
+      "reason": "langtags files this language under an inverted or qualified name; EthnoLib lists it under a different name, so searching the whole phrase finds nothing. The words of the name find it."
+    },
+    "Suki": {
+      "old": "szy",
+      "new": "sui",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Taje": {
+      "old": "sjs",
+      "new": "pee",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Tamazight, Temacine": {
+      "old": "tjo",
+      "new": "",
+      "reason": "langtags files this language under an inverted or qualified name; EthnoLib lists it under a different name, so searching the whole phrase finds nothing. The words of the name find it."
+    },
+    "Thai, Southern": {
+      "old": "sou",
+      "new": "zyn",
+      "reason": "The new search ranks a language whose name or alternate name matches the typed name more closely above today's top result."
+    },
+    "Toda": {
+      "old": "trv",
+      "new": "tcx",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Totonac, Yecuatla": {
+      "old": "tlc",
+      "new": "",
+      "reason": "langtags files this language under an inverted or qualified name; EthnoLib lists it under a different name, so searching the whole phrase finds nothing. The words of the name find it."
+    },
+    "Wano": {
+      "old": "agw",
+      "new": "wno",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Wasa": {
+      "old": "dju",
+      "new": "wss",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Wayu": {
+      "old": "wyr",
+      "new": "vay",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Yawa": {
+      "old": "gnr",
+      "new": "yva",
+      "reason": "Several languages share this name; both rank at the top and the two searches break the tie differently. The chooser lists them all and the author picks."
+    },
+    "Zapotec, Cajonos": {
+      "old": "zad",
+      "new": "",
+      "reason": "langtags files this language under an inverted or qualified name; EthnoLib lists it under a different name, so searching the whole phrase finds nothing. The words of the name find it."
+    },
+    "Zapotec, Xadani": {
+      "old": "zax",
+      "new": "",
+      "reason": "langtags files this language under an inverted or qualified name; EthnoLib lists it under a different name, so searching the whole phrase finds nothing. The words of the name find it."
+    }
+  }
+}

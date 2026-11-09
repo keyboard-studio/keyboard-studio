@@ -23,6 +23,8 @@ import { decisionIRPaths, type DecisionId } from "./decisionTypes.ts";
  */
 const IR_LESS_DECISIONS: ReadonlySet<DecisionId> = new Set<DecisionId>([
   "language-name",
+  // spec 115: the dialect-name match of a language pick lands in the decision record only.
+  "language-search-match",
   "language-region",
   "language-autonym",
   "language-code",

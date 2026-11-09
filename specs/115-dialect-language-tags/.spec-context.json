@@ -184,11 +184,91 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-09T12:03:14.840Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T12:16:10.041Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T12:16:10.233Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T12:16:10.429Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T12:34:49.028Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T12:34:49.145Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T12:34:49.272Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T13:06:48.307Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T13:06:48.417Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T13:06:48.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T13:06:48.698Z"
     }
   ],
   "telemetryInstanceId": "43929674-df99-4d12-aeca-bcc0ff06e188",
   "unattended": true,
-  "currentTask": "T019",
+  "currentTask": "T027",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -341,6 +421,103 @@
       "files": [
         "utilities/facet-index/build-index.ts",
         "utilities/facet-index/declared-bcp47-tags-classifier.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Vendored useLanguageChooser from EthnoLib react-hook 0.3.7 (a012e66) with MIT header; typecheck-level key test",
+      "files": [
+        "packages/studio/src/survey/languageChooser/vendor/useLanguageChooser.ts",
+        "packages/studio/src/survey/languageChooser/vendor/useLanguageChooser.test.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "dialectSearch tests: Gascon/Sursilvan/Rabinal/Valencian/Gheg, merge rule, macrolanguage, fallback, multi-parent",
+      "files": [
+        "packages/studio/src/survey/languageChooser/dialectSearch.test.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "makeDialectSearcher + dialectResultModifier (merge rule), defaultParentFor; engine barrel exports allDialectTagsets, glottolog ./dialects exports row type, LanguageSummary.match",
+      "files": [
+        "packages/studio/src/survey/languageChooser/dialectSearch.ts",
+        "packages/engine/src/langtags/index.ts",
+        "packages/glottolog/src/dialects.ts",
+        "packages/contracts/src/langtags.ts"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Behaviour-kept tests: autosuggest, resolveTypedLanguage over ILanguage, onEntryResolved seeds with default provenance, onSelectAdvance, headless parity, accents, ported pre-load/homonym/NFD/alias/cap cases",
+      "files": [
+        "packages/studio/src/survey/resolveTypedLanguage.test.ts",
+        "packages/studio/src/survey/languageChooser/LanguageChooser.test.tsx"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "resolveTypedLanguage generalised to ILanguage; languageResultsFor over EthnoLib search + dialect modifier; resolveTypedEntry/summaryFor/chooserSearch; headless driver + inventory moved",
+      "files": [
+        "packages/studio/src/survey/resolveTypedLanguage.ts",
+        "packages/studio/src/survey/languageChooser/chooserSearch.ts",
+        "packages/studio/src/test/headlessAuthor/stepDrivers/identity.ts",
+        "packages/studio/src/test/headlessAuthor/inventory/flowSteps.ts"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Ported chooser UI without MUI: LanguageChooser, LanguageCard, ScriptCard, CustomizePanel, StyledCombobox extracted; message ids + French; wording marked for content review",
+      "files": [
+        "packages/studio/src/survey/languageChooser/LanguageChooser.tsx",
+        "packages/studio/src/survey/languageChooser/LanguageCard.tsx",
+        "packages/studio/src/survey/languageChooser/ScriptCard.tsx",
+        "packages/studio/src/survey/languageChooser/CustomizePanel.tsx",
+        "packages/studio/src/survey/StyledCombobox.tsx",
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Measurement tests: SC-001 sample (97.61%), SC-002 229/229 reachable+exact, SC-007 156/200 with 44 listed, SC-009 7953 codes with 5 listed exceptions",
+      "files": [
+        "packages/studio/src/survey/languageChooser/searchParity.test.ts",
+        "packages/studio/src/survey/languageChooser/ethnolibParity.test.ts"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Follow-up: rendererWrites + answerFilledIds so answer broadcast, extraction and reload never fill language-search-match; lock tests",
+      "files": [
+        "packages/studio/src/survey/types.ts",
+        "packages/studio/src/survey/questions/answerFilledIds.ts",
+        "packages/studio/src/steps/reducer.ts",
+        "packages/studio/src/decisions/decisionFlow.ts",
+        "packages/studio/src/decisions/liveExtraction.ts",
+        "packages/studio/src/lib/draftPersistence.ts",
+        "packages/studio/src/decisions/languageSearchMatch.test.ts"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "il_language_english renders LanguageChooser behind React.lazy; name mode dropped from LangtagsComboboxField; lazyBoundary static-graph test; IdentityLite tests ported to real chooser data",
+      "files": [
+        "packages/studio/src/survey/QuestionField.tsx",
+        "packages/studio/src/survey/languageChooser/lazyBoundary.test.ts",
+        "packages/studio/src/survey/IdentityLite.autoAdvance.test.tsx",
+        "packages/studio/src/survey/IdentityLite.autonymDedup.test.tsx",
+        "packages/studio/src/survey/IdentityLite.codeMismatchWarning.test.tsx",
+        "packages/studio/src/survey/IdentityLite.provenance.test.tsx"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Parity fixtures populated from first run with per-exception reasons (44 search, 5 EthnoLib data)",
+      "files": [
+        "packages/studio/src/survey/languageChooser/searchParity.fixture.json",
+        "packages/studio/src/survey/languageChooser/ethnolibParity.fixture.json"
       ]
     }
   }

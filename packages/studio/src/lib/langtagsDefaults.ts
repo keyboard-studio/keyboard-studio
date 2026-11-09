@@ -12,7 +12,7 @@
 //   defaultsFor(code)      — look up a language code; returns null if unknown.
 //   scriptToTargetOption() — map ISO-15924 → il_target_script option value.
 
-import type { LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
+import type { DialectTagset, LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 import { regionCodeToName } from "./iso3166Names.ts";
 
 // ---------------------------------------------------------------------------
@@ -26,6 +26,8 @@ type LangtagsModule = {
   getLanguageDefaults: (subtag: string) => LanguageDefaults | null;
   listLanguages: () => readonly LanguageSummary[];
   lookupByName: (query: string) => readonly LanguageSummary[];
+  /** Every langtags variant and `-x-` tagset (spec 115): the dialect search's langtags source. */
+  allDialectTagsets: readonly DialectTagset[];
 };
 
 let _modulePromise: Promise<LangtagsModule> | null = null;

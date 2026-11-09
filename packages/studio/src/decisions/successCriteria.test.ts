@@ -19,6 +19,7 @@ import { loadFlowSourceDef, flowSources } from "../steps/flowSources.ts";
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { answerFilledIds } from "../survey/questions/answerFilledIds.ts";
 
 // ---------------------------------------------------------------------------
 // SC-001: pre-fill on 5 real keyboards
@@ -128,7 +129,10 @@ const REQUIRES_CLOSURE = [
 ];
 const SC001_FLOW_MODULES = [...SC001_MODULES, ...REQUIRES_CLOSURE];
 /** The decision ids SC-001 measures (the measured modules' provides). */
-const SC001_MEASURED_IDS = SC001_MODULES.flatMap((m) => [...(m.provides ?? [])]);
+// The decisions an extraction can fill. `language-search-match` (spec 115) is
+// recorded by il_language_english's renderer from the author's search pick, so it
+// is not one of them (see the per-keyboard check that it stays unrecorded).
+const SC001_MEASURED_IDS = SC001_MODULES.flatMap((m) => [...answerFilledIds(m)]);
 
 describe("SC-001: pre-fill on 5 real keyboards", () => {
   // language-name resolves through the lazily-loaded langtags dataset, which
@@ -179,6 +183,9 @@ describe("SC-001: pre-fill on 5 real keyboards", () => {
       expect(decisions["language-name"]?.provenance).toBe("extracted");
       expect(decisions["language-name"]?.value).toBe(kb.languageName);
       expect(decisions["language-name"]?.source).toContain(kb.id);
+
+      // The renderer-written decision is never seeded by extraction (spec 115).
+      expect(decisions["language-search-match"]).toBeUndefined();
 
       // The mechanism boundary: author-name requires author input and must
       // never be presented as extracted.
