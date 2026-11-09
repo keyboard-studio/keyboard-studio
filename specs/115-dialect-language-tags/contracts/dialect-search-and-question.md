@@ -78,10 +78,13 @@ export type FallbackRow =
 // packages/studio/src/survey/languageChooser/readTypedText.ts
 export interface TypedReading {
   language: ILanguage;                 // the close language match for the language part
-  dialect?: SearchMatch;               // FR-040 step 1, or step 3 with source "typed"
+  dialect?: SearchMatch;               // FR-040 step 1
   region?: { code: string; name: string };  // FR-040 step 2
+  unresolved?: string;                 // FR-040 step 3: the remainder, sent to the remainder chooser
   label: string;                       // "Occitan, dialect: Gascon" (message id, content-reviewed)
 }
+export function rankPlacesFor(word: string, regions: readonly IRegion[]): IRegion[];
+// countries whose name has a word sharing ≥ 3 leading letters with `word`, longest shared prefix first
 export function readTypedText(
   text: string,
   closeLanguages: (part: string) => ILanguage[],   // chooser search, keeping close results only (merge rule)
@@ -96,7 +99,13 @@ Rules:
 3. Interpret the remainder (FR-040):
    - **Dialect.** It matches a dialect of that language when the folded remainder equals the dialect's name, or equals the dialect's name with the language's own name words removed. So "Royal" matches "Royal Bafut" for `bfd`, and "Rabinal" matches "Achi - Rabinal" for `acr`.
    - **Country.** Otherwise, it is a country name or code.
-   - **Typed name.** Otherwise, it is kept as a typed dialect name.
+   - **Unresolved.** Otherwise, the reading carries `unresolved`. Picking it opens the **remainder chooser** (`RemainderChooser.tsx`), which offers:
+     - "It's a dialect name": keeps the words, `source: "typed"`;
+     - "It's a place": a country picker ordered by `rankPlacesFor(remainder)`, then all countries;
+     - "It's one of these dialects": the language's Glottolog dialects, variants and dialect tagsets;
+     - "Leave it out".
+
+     Nothing is written until the author chooses.
 4. Prefer readings whose language part is longer. Remove duplicates by (language, dialect or region).
 
 Measured on EthnoLib 0.4.4 (every query below returns nothing or a wrong language today):
@@ -108,7 +117,22 @@ Measured on EthnoLib 0.4.4 (every query below returns nothing or a wrong languag
 | Bafut Royal, Royal Bafut | Bafut + Royal Bafut (Glottolog) |
 | Ewondo (Yabekolo) | Ewondo + Yabekolo (Glottolog) |
 | French Switzerland | French + region CH |
-| Ewondo Mvog-Ada | Ewondo + typed dialect "Mvog Ada" |
+| Ewondo Mvog-Ada | Ewondo + remainder chooser for "Mvog-Ada" (no place matches; Glottolog's Mvog-Niengue is listed among Ewondo's dialects) |
+| Swiss French | French + remainder chooser for "Swiss"; Switzerland is the first place offered |
+
+`rankPlacesFor`, measured over EthnoLib's 249 regions (`getAllRegions`):
+
+| Word | First places |
+|---|---|
+| Swiss | Switzerland |
+| Cameroonian | Cameroon, Cambodia |
+| Moroccan | Morocco |
+| Brazilian | Brazil |
+| Mexican | Mexico |
+| Belgian | Belgium, Belarus, Belize |
+| Canadian | Canada |
+| Ivorian | Côte d'Ivoire |
+| Mvog | none |
 
 Displayed list:
 1. The typed-tag proposal and the typed-text readings, if any, first.

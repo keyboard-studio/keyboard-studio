@@ -110,9 +110,15 @@ What `resolveTypedTag` returns when the search text parses as a tag: `{ language
 
 ## TypedReading (studio, transient, R14)
 
-One reading of multi-word typed text as a language part plus a dialect, a region or a typed dialect name (contract § reading typed text). Picking it writes the same decisions as a chooser pick:
-- `language-search-match` holds the dialect, or the typed name with `source: "typed"`;
+One reading of multi-word typed text as a language part plus a dialect, a region, or an **unresolved** remainder (contract § reading typed text). Picking a resolved reading writes the same decisions as a chooser pick:
+- `language-search-match` holds the dialect;
 - a region reading writes `language-region` as an asked answer, and the region question is not routed again.
+
+Picking an unresolved reading sets the language, then opens the remainder chooser. Its answer writes one of:
+- `language-search-match` with the typed name (`source: "typed"`);
+- `language-region`;
+- `language-search-match` with a listed dialect;
+- nothing ("leave it out").
 
 ## UnlistedLanguage (studio, transient → decisions, R12)
 

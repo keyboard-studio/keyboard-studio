@@ -66,7 +66,13 @@ An author types the name of the dialect they write, not the name of its parent l
 7. **Given** the author types "Ewondo" and does not click, **When** focus leaves the field, **Then** Ewondo is resolved and its code, script and autonym are proposed, as today (FR-038).
 8. **Given** the author types a dialect and its language together, in either order and with or without punctuation ("Gascon Occitan", "Occitan - Gascon", "Ewondo (Yabekolo)", "Rabinal Achi", "Bafut Royal"), **When** results are shown, **Then** the first result is the language with the dialect attached ("Occitan, dialect: Gascon"). The search alone finds nothing, or the wrong language, for all of these today.
 9. **Given** the author types a language with a place ("French Switzerland", "Switzerland French"), **When** results are shown, **Then** the language is offered with that country as its region.
-10. **Given** the author types a language plus words that match no dialect or place ("Ewondo Mvog-Ada"), **When** results are shown, **Then** the language is offered with those words kept as a dialect name for the dialect step. Nothing the author typed is silently dropped.
+10. **Given** the author types a language plus words that match no dialect or place ("Ewondo Mvog-Ada", "Swiss French"), **When** they pick that result, **Then** a small chooser asks what the extra words are:
+    - "a dialect name" (kept for the dialect step);
+    - "a place", with a country picker where countries whose names start like the words come first, so "Swiss" puts Switzerland first;
+    - "a dialect I'll find in a list", which offers the language's known dialects and variants;
+    - "leave them out".
+
+    Nothing the author typed is silently dropped or silently guessed.
 11. **Given** the author types a dialect name that exactly matches one dialect and no language (e.g. "Gascon"), **When** focus leaves the field, **Then** it resolves to the parent language with the dialect attached, as FR-038 does for language names.
 
 ---
@@ -269,9 +275,15 @@ Authors will often type their dialect, or their dialect together with their lang
 - **FR-040**: The remainder of such a reading MUST be interpreted in this order:
   1. a dialect of that language: a Glottolog dialect whose parent is that language, a registered variant whose description matches and whose prefixes allow the language, or a langtags dialect tagset of the language;
   2. a country, by English name or code, which becomes a region proposal;
-  3. otherwise, the words themselves, kept as the pending dialect name (source `typed`).
-- **FR-041**: Each reading MUST appear as one result, labelled with how the text was read ("Occitan, dialect: Gascon"; "French, region: Switzerland"; "Ewondo, dialect name: Mvog-Ada"). It MUST rank above the shared search's fuzzy results. No typed word may be dropped without being shown in some reading.
-- **FR-042**: The FR-038 resolve-without-a-click rule MUST also resolve text that names exactly one dialect, or has exactly one reading under FR-039, and no language. It resolves to the parent language with the dialect or region attached.
+  3. otherwise, it is **unresolved**: picking the reading opens a chooser for the remainder. The chooser offers:
+     - keep it as a dialect name (source `typed`);
+     - pick a place, from a country picker that ranks first the countries whose names share the remainder's first three or more letters;
+     - pick from the language's dialects and variants;
+     - leave the words out.
+
+     The studio never guesses which.
+- **FR-041**: Each reading MUST appear as one result, labelled with how the text was read ("Occitan, dialect: Gascon"; "French, region: Switzerland"; "Ewondo, plus 'Mvog-Ada': choose what it is"). It MUST rank above the shared search's fuzzy results. No typed word may be dropped or interpreted without being shown to the author.
+- **FR-042**: The FR-038 resolve-without-a-click rule MUST also resolve text that names exactly one dialect, or has exactly one *resolved* reading under FR-039 (step 1 or 2), and no language. It resolves to the parent language with the dialect or region attached. An unresolved reading (step 3) never resolves without a click; it waits for the chooser.
 
 ### Key Entities
 
@@ -299,8 +311,11 @@ Authors will often type their dialect, or their dialect together with their lang
   - "Rabinal Achi", "Achi Rabinal";
   - "Royal Bafut", "Bafut Royal";
   - "Yabekolo Ewondo", "Ewondo (Yabekolo)";
-  - "French Switzerland";
-  - "Ewondo Mvog-Ada" (kept as a typed dialect name).
+  - "French Switzerland".
+
+  And each unresolved query returns the right language first, with the remainder chooser offered:
+  - "Ewondo Mvog-Ada";
+  - "Swiss French", where Switzerland is the first place offered.
 
   Today none of these does. The set lives in a test fixture and grows as authors report misses.
 
@@ -311,7 +326,7 @@ Authors will often type their dialect, or their dialect together with their lang
 - **Glottolog alternate names are out of scope.** Search uses each dialect's primary Glottolog name; Glottolog's other names (a separate data file not fetched today) are a possible follow-up. The fuzzy tier catches some spelling variants.
 - **The shared chooser's data is its own langtags snapshot** (EthnoLib's committed copy, langtags API 1.4, refreshed 2026-07). It is not pinned to the studio's langtags commit; FR-034 keeps the two honest.
 - **Whether Keyman's keyboards repository accepts `qaa-x-` tags is unverified.** Row 10.4 flags them; the studio does not block them.
-- **Places by country name, not by adjective.** FR-040 matches country names and codes ("French Switzerland", "French CH"), not adjectives such as "Swiss French". The pinned data has no adjectives (demonyms), and adding them needs a data source chosen by the owner. "Swiss French" therefore falls to FR-040 step 3 (kept as a typed dialect name "Swiss") unless a demonym source is added.
+- **Places by country name; adjectives go to the chooser.** FR-040 matches country names and codes ("French Switzerland", "French CH") automatically. Adjectives such as "Swiss" have no data source, so they reach the remainder chooser (FR-040 step 3), where the shared-prefix ranking puts Switzerland first. No demonym data is needed (owner suggestion, 2026-11-09).
 - **No separate display name.** Bloom asks for a display name; the studio already asks for the English name and the autonym, which serve that purpose.
 - **Only Glottolog dialects with an ISO-coded parent are searchable.** The 314 others are not offered.
 - **The IANA variant registry becomes a pinned prebuild input**, fetched and checksummed like langtags, so validation and proposals are reproducible.
@@ -324,6 +339,7 @@ Authors will often type their dialect, or their dialect together with their lang
 
 - Q: For a dialect keyboard (e.g. Gascon), should the package list only the dialect tag, or the parent language too? → A: Dialect tag only (`oc-gascon`). The keyboard claims exactly what it is for. How keyman.com matches a parent-language search against a dialect tag is unverified; recorded as an assumption, not a requirement.
 - Q: What happens when the language or dialect is in no list? → A: Every path ends in a proposal (User Story 6). An unmatched dialect name is kept while the author finds its language; an unlisted language takes a code if the author knows one, else a proposed `qaa-x-` tag.
+- Q: What if the extra words typed with a language match no dialect or place? → A: Ask, don't guess. A small chooser asks whether they are a dialect name, a place (country picker), a listed dialect, or should be left out (FR-040 step 3).
 - Q: Build our own search or reuse Bloom's? → A: Reuse SIL's shared language chooser (EthnoLib, as in Bloom): adapt its component to the studio's React and use its search backend.
 
 ## Out of Scope

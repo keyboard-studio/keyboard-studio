@@ -74,6 +74,8 @@ Script with the Playwright CLI against `pnpm dev`:
      - `Gascon Occitan` → "Occitan, dialect: Gascon", first, and the tag ends `oc-gascon`;
      - `Ewondo (Yabekolo)` → `ewo-x-yabekolo`;
      - `French Switzerland` → `fr-CH`;
+     - `Swiss French` → French, then "What is 'Swiss'?" with Switzerland first under "It's a place" → `fr-CH`;
+     - `Ewondo Mvog-Ada` → Ewondo, then the remainder chooser; "It's a dialect name" → `ewo-x-mvogada`;
      - typing `Gascon` alone and tabbing away resolves to Occitan with the dialect.
 7. **Open path.** Open a keyboard and add `sr-Latn-RS` to the language list: a hint offers "Use `sr-Latn`". Add `sq-AL-gheg`: an error.
 

@@ -203,13 +203,20 @@ Commit: `spec 115 T020-T029`.
   - fewer than 2 words → no reading;
   - a longer language part wins;
   - duplicates removed;
-  - "Swiss French" → French + typed dialect "Swiss" (no demonyms, spec Assumptions);
+  - "Swiss French" and "Ewondo Mvog-Ada" → unresolved readings (`unresolved` set; no dialect or region guessed);
+  - `rankPlacesFor` per the contract's table (Swiss → Switzerland first, …, Mvog → none);
   - no typed word dropped without appearing in a label.
 
   File: packages/studio/src/survey/languageChooser/readTypedText.test.ts
-- [ ] T066 [US6] Implement `readTypedText` (contract § reading typed text). `dialectsOf(iso)` draws on the Glottolog rows, the registry (`variantsFor`, by description) and `dialectTagsetsFor`, with the language's own name words stripped. `countries` uses English country names and ISO 3166-1 codes from the chooser data (`getAllRegions`) — packages/studio/src/survey/languageChooser/readTypedText.ts
-- [ ] T067 [US6] Show readings first in the list, labelled (message ids; **the reading labels are survey text owned by the content team (Article VI): mark them for content review**). Picking a reading writes the same decisions as a pick (data-model § TypedReading). Extend the resolve-without-a-click rule (FR-042) to a unique dialect name or a unique reading, in both the UI and the headless author — packages/studio/src/survey/languageChooser/LanguageChooser.tsx, packages/studio/src/survey/resolveTypedLanguage.ts, packages/studio/src/locales/
-- [ ] T068 [US6] Add the SC-010 query set as a fixture-driven test over the full chooser (EthnoLib + dialect modifier + readings): the first result is the right language with the right dialect or region. The fixture is documented as the place to add misses authors report — packages/studio/src/survey/languageChooser/typedDialect.fixture.json, packages/studio/src/survey/languageChooser/typedDialect.test.ts
+- [ ] T066 [US6] Implement `readTypedText` and `rankPlacesFor` (contract § reading typed text). `dialectsOf(iso)` draws on the Glottolog rows, the registry (`variantsFor`, by description) and `dialectTagsetsFor`, with the language's own name words stripped. `countries` uses English country names and ISO 3166-1 codes from the chooser data (`getAllRegions`) — packages/studio/src/survey/languageChooser/readTypedText.ts
+- [ ] T067 [US6] Show readings first in the list, labelled.
+  - Picking a resolved reading writes the same decisions as a pick (data-model § TypedReading).
+  - Picking an unresolved reading opens the new `RemainderChooser`: dialect name, place (country picker ordered by `rankPlacesFor`), listed dialect, or leave it out. Nothing is written until the author chooses.
+  - Extend the resolve-without-a-click rule (FR-042) to a unique dialect name or a unique *resolved* reading, in both the UI and the headless author. An unresolved reading never auto-resolves. The headless author answers the remainder chooser from its script, as it does any question.
+  - Message ids for all labels. **The reading labels and remainder-chooser text are survey text owned by the content team (Article VI): mark them for content review.**
+
+  Files: packages/studio/src/survey/languageChooser/{LanguageChooser,RemainderChooser}.tsx, packages/studio/src/survey/resolveTypedLanguage.ts, packages/studio/src/locales/
+- [ ] T068 [US6] Add the SC-010 query set as a fixture-driven test over the full chooser (EthnoLib + dialect modifier + readings): the first result is the right language with the right dialect or region, or, for the unresolved queries, with the remainder chooser offered and the expected first place. The fixture is documented as the place to add misses authors report — packages/studio/src/survey/languageChooser/typedDialect.fixture.json, packages/studio/src/survey/languageChooser/typedDialect.test.ts
 
 **Wave 4:**
 
