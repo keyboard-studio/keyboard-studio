@@ -197,9 +197,25 @@ Commit: `spec 115 T020-T029`.
 - [ ] T034 [P] [US6] Implement `resolveTypedTag(text)` (parser plus `registeredLanguage`); show its proposal first in the list — packages/studio/src/survey/languageChooser/resolveTypedTag.ts
 - [ ] T035 [US6] Add the fallback rows and the "Can't find it?" link. Implement "is a dialect" (writes the `language-search-match` decision with the pending name, re-labels the search) and `UnlistedLanguagePanel`, mirroring EthnoLib's unlisted and manual-tag paths but checking with `parseBcp47` and `registeredLanguage`. Messages per spec 046. **The fallback rows, unlisted-panel text and the ISO 639-3 explanation are survey text owned by the content team (Article VI): mark them for content review** — packages/studio/src/survey/languageChooser/{LanguageChooser,UnlistedLanguagePanel}.tsx, packages/studio/src/locales/
 - [ ] T036 [US6] Turn `il_language_code` into a confirmation of the chooser's result. **Change** reopens the chooser or the typed-code check; there is no unchecked free text. Update its fixtures (the `bft` free-text fixture becomes a checked entry) — packages/studio/src/survey/questions/a/il_language_code.ts
+**Wave 3 — dialects typed in the language field (FR-039 to FR-042, research R14; IDs T065-T068 were added after the second analysis pass, so they are out of sequence):**
+
+- [ ] T065 [P] [US6] Write failing `readTypedText` tests: every row of the contract's table (the SC-010 set), plus:
+  - fewer than 2 words → no reading;
+  - a longer language part wins;
+  - duplicates removed;
+  - "Swiss French" → French + typed dialect "Swiss" (no demonyms, spec Assumptions);
+  - no typed word dropped without appearing in a label.
+
+  File: packages/studio/src/survey/languageChooser/readTypedText.test.ts
+- [ ] T066 [US6] Implement `readTypedText` (contract § reading typed text). `dialectsOf(iso)` draws on the Glottolog rows, the registry (`variantsFor`, by description) and `dialectTagsetsFor`, with the language's own name words stripped. `countries` uses English country names and ISO 3166-1 codes from the chooser data (`getAllRegions`) — packages/studio/src/survey/languageChooser/readTypedText.ts
+- [ ] T067 [US6] Show readings first in the list, labelled (message ids; **the reading labels are survey text owned by the content team (Article VI): mark them for content review**). Picking a reading writes the same decisions as a pick (data-model § TypedReading). Extend the resolve-without-a-click rule (FR-042) to a unique dialect name or a unique reading, in both the UI and the headless author — packages/studio/src/survey/languageChooser/LanguageChooser.tsx, packages/studio/src/survey/resolveTypedLanguage.ts, packages/studio/src/locales/
+- [ ] T068 [US6] Add the SC-010 query set as a fixture-driven test over the full chooser (EthnoLib + dialect modifier + readings): the first result is the right language with the right dialect or region. The fixture is documented as the place to add misses authors report — packages/studio/src/survey/languageChooser/typedDialect.fixture.json, packages/studio/src/survey/languageChooser/typedDialect.test.ts
+
+**Wave 4:**
+
 - [ ] T037 [US6] Extend row 10.4's check to flag `qaa`–`qtz` private-use language codes (FR-032); mark the wording for content review — packages/studio/src/criteria/languageTags.ts, packages/contracts/data/criteria.json
 
-**Checkpoint**: T030 to T032 pass; SC-008's eight inputs each end in a confirmed, non-blank code (asserted in T032). Commit: `spec 115 T030-T037`.
+**Checkpoint**: T030 to T032, T065 and T068 pass; SC-008's eight inputs each end in a confirmed, non-blank code (asserted in T032); SC-010's set resolves (T068). Commit: `spec 115 T030-T037, T065-T068`.
 
 ---
 

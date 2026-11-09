@@ -108,6 +108,12 @@ Prefix rule (FR-021): a variant is allowed when some prefix's subtags are all pr
 
 What `resolveTypedTag` returns when the search text parses as a tag: `{ language, script?, region?, dialectSubtag?, registeredName?, warning? }`. The author picks it like a search result; it then writes the same decisions a chooser pick does.
 
+## TypedReading (studio, transient, R14)
+
+One reading of multi-word typed text as a language part plus a dialect, a region or a typed dialect name (contract § reading typed text). Picking it writes the same decisions as a chooser pick:
+- `language-search-match` holds the dialect, or the typed name with `source: "typed"`;
+- a region reading writes `language-region` as an asked answer, and the region question is not routed again.
+
 ## UnlistedLanguage (studio, transient → decisions, R12)
 
 | Field | Rule |

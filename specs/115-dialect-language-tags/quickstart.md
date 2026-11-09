@@ -70,6 +70,11 @@ Script with the Playwright CLI against `pnpm dev`:
    - Type a made-up name, choose "… is a dialect: find its language", then pick Occitan: the dialect step proposes `oc-x-…` from the name.
    - Choose "My language isn't listed" with no code: `qaa-x-…` is proposed. With code `zzz`: a warning.
    - In every case the code question shows a confirmed, non-blank code (SC-008).
+   - **Dialect typed as the language (SC-010):**
+     - `Gascon Occitan` → "Occitan, dialect: Gascon", first, and the tag ends `oc-gascon`;
+     - `Ewondo (Yabekolo)` → `ewo-x-yabekolo`;
+     - `French Switzerland` → `fr-CH`;
+     - typing `Gascon` alone and tabbing away resolves to Occitan with the dialect.
 7. **Open path.** Open a keyboard and add `sr-Latn-RS` to the language list: a hint offers "Use `sr-Latn`". Add `sq-AL-gheg`: an error.
 
 ## 6. Gates

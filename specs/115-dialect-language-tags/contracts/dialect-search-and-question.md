@@ -72,8 +72,46 @@ export type FallbackRow =
   | { kind: "unlisted"; text: string };       // FR-031/032
 ```
 
+## Studio: reading typed text as language + dialect or place (FR-039 to FR-042)
+
+```ts
+// packages/studio/src/survey/languageChooser/readTypedText.ts
+export interface TypedReading {
+  language: ILanguage;                 // the close language match for the language part
+  dialect?: SearchMatch;               // FR-040 step 1, or step 3 with source "typed"
+  region?: { code: string; name: string };  // FR-040 step 2
+  label: string;                       // "Occitan, dialect: Gascon" (message id, content-reviewed)
+}
+export function readTypedText(
+  text: string,
+  closeLanguages: (part: string) => ILanguage[],   // chooser search, keeping close results only (merge rule)
+  dialectsOf: (iso: string) => readonly { name: string; match: SearchMatch }[],  // Glottolog + registry + langtags, for one language
+  countries: (part: string) => { code: string; name: string } | undefined,       // English country name or ISO 3166-1 code
+): TypedReading[];
+```
+
+Rules:
+1. Split the folded text on spaces, hyphens, commas and parentheses. Fewer than 2 words → `[]`.
+2. For each split into a language part and a remainder (language part at the start or the end), ask `closeLanguages(languagePart)`.
+3. Interpret the remainder (FR-040):
+   - **Dialect.** It matches a dialect of that language when the folded remainder equals the dialect's name, or equals the dialect's name with the language's own name words removed. So "Royal" matches "Royal Bafut" for `bfd`, and "Rabinal" matches "Achi - Rabinal" for `acr`.
+   - **Country.** Otherwise, it is a country name or code.
+   - **Typed name.** Otherwise, it is kept as a typed dialect name.
+4. Prefer readings whose language part is longer. Remove duplicates by (language, dialect or region).
+
+Measured on EthnoLib 0.4.4 (every query below returns nothing or a wrong language today):
+
+| Typed | Reading |
+|---|---|
+| Gascon Occitan, Occitan - Gascon | Occitan + `gascon` (registered variant) |
+| Rabinal Achi | Achi + `acr-x-rabinal` (langtags) |
+| Bafut Royal, Royal Bafut | Bafut + Royal Bafut (Glottolog) |
+| Ewondo (Yabekolo) | Ewondo + Yabekolo (Glottolog) |
+| French Switzerland | French + region CH |
+| Ewondo Mvog-Ada | Ewondo + typed dialect "Mvog Ada" |
+
 Displayed list:
-1. The typed-tag proposal, if any, first.
+1. The typed-tag proposal and the typed-text readings, if any, first.
 2. Chooser results, with dialect hits appended.
 3. The two fallback rows, whenever no result is *close* in the sense of the merge rule (FR-029). They are also always reachable through a "Can't find it?" link.
 

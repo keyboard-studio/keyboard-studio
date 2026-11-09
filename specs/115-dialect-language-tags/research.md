@@ -219,6 +219,36 @@ The `.kmn`-only upgrade-pair mechanism (`upgradePairs.ts:65`) is not reused. It 
 
 **Measured**: Glottolog cannot supply a code for unlisted languages. Only 16 of its 759 languages without an ISO code have a "closest ISO" code, and most of the 759 are extinct. So `qaa-x-` is the honest proposal.
 
+## R14. People type their dialect when asked for their language (owner, 2026-11-09)
+
+**Finding**: authors will answer "what language?" with a dialect, or with the dialect and the language together. Measured on EthnoLib 0.4.4:
+
+| Typed | EthnoLib result |
+|---|---|
+| "Gascon Occitan" | nothing |
+| "Occitan Gascon" | nothing |
+| "Royal Bafut" | nothing |
+| "Bafut Royal" | nothing |
+| "Yabekolo Ewondo" | nothing |
+| "Ewondo (Yabekolo)" | nothing |
+| "Rabinal Achi" | Chiangmai Sign Language |
+| "Swiss French" | Swiss-French Sign Language |
+
+A single dialect name works through the dialect searcher (R4). Combined text does not, because the fuzzy search scores the whole string.
+
+**Decision**: a reading layer in front of the chooser (FR-039 to FR-042, contract § reading typed text):
+- split the text into a language part (start or end) and a remainder;
+- keep readings whose language part matches a language closely;
+- interpret the remainder as a dialect of that language, then a country, then a typed dialect name.
+
+Readings rank above fuzzy results and are labelled with how the text was read, so nothing typed is lost silently. The resolve-without-a-click rule extends to a unique dialect name or a unique reading.
+
+**Dialect name matching strips the language's own words**: Glottolog writes "Royal Bafut" and langtags writes "Achi - Rabinal", but authors type "Bafut Royal" and "Rabinal Achi".
+
+**Not done: adjectives for places** ("Swiss French"). Neither langtags nor the registry carries demonyms, so FR-040 matches country names and codes only, and "Swiss" would be kept as a typed dialect name. A demonym source is an owner decision (R11).
+
+**Alternative rejected**: patching EthnoLib's fuzzy options (token-set matching). It would change ranking for every query, and SC-007's parity fixture would churn; the reading layer only adds rows.
+
 ## R13. Languages missing from the studio's langtags index (shipped defect)
 
 `codegen-langtags.mjs:140` keeps only tagsets whose `tag` has no hyphen. Languages whose canonical langtags tag carries a region or script have no bare tagset, so they are dropped from `defaultsIndex` and from search. That is 15 languages at the pinned commit:
@@ -232,4 +262,5 @@ The `.kmn`-only upgrade-pair mechanism (`upgradePairs.ts:65`) is not reused. It 
 - **Windows registration of `-x-` tags**: keep langtags' `windows` field (R3); no behaviour change.
 - **Glottolog alternate names**: deferred (R4); the fuzzy tier (R7) covers some spelling variants.
 - **Keyman keyboards repository and `qaa-x-` tags**: unverified; row 10.4 flags, nothing blocks.
+- **Place adjectives ("Swiss French")**: needs a demonym data source; owner to choose, or leave it to the typed-dialect fallback (R14).
 - **EthnoLib data refresh cadence**: manual upstream. The FR-034 fixture is re-reviewed on every `@ethnolib/find-language` bump.

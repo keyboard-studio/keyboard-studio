@@ -64,6 +64,10 @@ An author types the name of the dialect they write, not the name of its parent l
 5. **Given** a query naming a country or a language code, **When** results are shown, **Then** languages of that country, or the language with that code, are listed.
 6. **Given** a query with a small spelling error, **When** no closer match exists, **Then** the intended language is offered as a close match.
 7. **Given** the author types "Ewondo" and does not click, **When** focus leaves the field, **Then** Ewondo is resolved and its code, script and autonym are proposed, as today (FR-038).
+8. **Given** the author types a dialect and its language together, in either order and with or without punctuation ("Gascon Occitan", "Occitan - Gascon", "Ewondo (Yabekolo)", "Rabinal Achi", "Bafut Royal"), **When** results are shown, **Then** the first result is the language with the dialect attached ("Occitan, dialect: Gascon"). The search alone finds nothing, or the wrong language, for all of these today.
+9. **Given** the author types a language with a place ("French Switzerland", "Switzerland French"), **When** results are shown, **Then** the language is offered with that country as its region.
+10. **Given** the author types a language plus words that match no dialect or place ("Ewondo Mvog-Ada"), **When** results are shown, **Then** the language is offered with those words kept as a dialect name for the dialect step. Nothing the author typed is silently dropped.
+11. **Given** the author types a dialect name that exactly matches one dialect and no language (e.g. "Gascon"), **When** focus leaves the field, **Then** it resolves to the parent language with the dialect attached, as FR-038 does for language names.
 
 ---
 
@@ -254,6 +258,21 @@ An author types a name the lists do not know. The studio never stops at "no resu
 
   EthnoLib's card content is shown in the dropdown rows; the studio does not switch to a full-page card grid.
 
+**Dialects typed in the language field**
+
+Authors will often type their dialect, or their dialect together with their language, when asked for their language.
+
+- **FR-039**: When the text has more than one word, the studio MUST also read it as a language part plus a remainder.
+  - Words are split on spaces, hyphens, commas and parentheses.
+  - The language part is a contiguous run of words at the start or end of the text.
+  - A reading counts when the language part matches a language closely (its name or code; contract § merge rule).
+- **FR-040**: The remainder of such a reading MUST be interpreted in this order:
+  1. a dialect of that language: a Glottolog dialect whose parent is that language, a registered variant whose description matches and whose prefixes allow the language, or a langtags dialect tagset of the language;
+  2. a country, by English name or code, which becomes a region proposal;
+  3. otherwise, the words themselves, kept as the pending dialect name (source `typed`).
+- **FR-041**: Each reading MUST appear as one result, labelled with how the text was read ("Occitan, dialect: Gascon"; "French, region: Switzerland"; "Ewondo, dialect name: Mvog-Ada"). It MUST rank above the shared search's fuzzy results. No typed word may be dropped without being shown in some reading.
+- **FR-042**: The FR-038 resolve-without-a-click rule MUST also resolve text that names exactly one dialect, or has exactly one reading under FR-039, and no language. It resolves to the parent language with the dialect or region attached.
+
 ### Key Entities
 
 - **Language choice**: language code, optional script, optional region, optional dialect subtag. The source of the composed tag.
@@ -275,6 +294,15 @@ An author types a name the lists do not know. The studio never stops at "no resu
 - **SC-007**: For 200 sampled language-name queries, the top result's language code matches today's search, apart from the exceptions listed in the fixture.
 - **SC-008**: For every one of these inputs, the author ends with a confirmed, non-blank language code in at most four actions after typing: a listed name, a dialect name, a code, a tag, a misspelled name, an unlisted dialect, and an unlisted language with or without a known code.
 - **SC-009**: Every language in the chooser's data resolves in the studio's pinned langtags with the same default script, apart from the exceptions listed in the fixture.
+- **SC-010**: Each query in this set returns the right language as the first result, with the dialect or region attached:
+  - "Gascon Occitan", "Occitan Gascon", "Occitan - Gascon";
+  - "Rabinal Achi", "Achi Rabinal";
+  - "Royal Bafut", "Bafut Royal";
+  - "Yabekolo Ewondo", "Ewondo (Yabekolo)";
+  - "French Switzerland";
+  - "Ewondo Mvog-Ada" (kept as a typed dialect name).
+
+  Today none of these does. The set lives in a test fixture and grows as authors report misses.
 
 ## Assumptions
 
@@ -283,6 +311,7 @@ An author types a name the lists do not know. The studio never stops at "no resu
 - **Glottolog alternate names are out of scope.** Search uses each dialect's primary Glottolog name; Glottolog's other names (a separate data file not fetched today) are a possible follow-up. The fuzzy tier catches some spelling variants.
 - **The shared chooser's data is its own langtags snapshot** (EthnoLib's committed copy, langtags API 1.4, refreshed 2026-07). It is not pinned to the studio's langtags commit; FR-034 keeps the two honest.
 - **Whether Keyman's keyboards repository accepts `qaa-x-` tags is unverified.** Row 10.4 flags them; the studio does not block them.
+- **Places by country name, not by adjective.** FR-040 matches country names and codes ("French Switzerland", "French CH"), not adjectives such as "Swiss French". The pinned data has no adjectives (demonyms), and adding them needs a data source chosen by the owner. "Swiss French" therefore falls to FR-040 step 3 (kept as a typed dialect name "Swiss") unless a demonym source is added.
 - **No separate display name.** Bloom asks for a display name; the studio already asks for the English name and the autonym, which serve that purpose.
 - **Only Glottolog dialects with an ISO-coded parent are searchable.** The 314 others are not offered.
 - **The IANA variant registry becomes a pinned prebuild input**, fetched and checksummed like langtags, so validation and proposals are reproducible.
