@@ -75,7 +75,7 @@ export type FallbackRow =
 Displayed list:
 1. The typed-tag proposal, if any, first.
 2. Chooser results, with dialect hits appended.
-3. The two fallback rows, whenever nothing ranks above the fuzzy tier (FR-029). They are also always reachable through a "Can't find it?" link.
+3. The two fallback rows, whenever no result is *close* in the sense of the merge rule (FR-029). They are also always reachable through a "Can't find it?" link.
 
 ## Behaviour kept from today's field (FR-038)
 
@@ -136,7 +136,9 @@ outputs: [{ target: "package-descriptor", field: "bcp47" }],
 lookupDefault: (ctx) => DialectProposal | null,   // data-model § DialectProposal
 ```
 
-It is registered in `flowModules.identity_lite`, `IDENTITY_QUESTIONS`, and the parity pins. Its position is whatever `orderDecisions` derives.
+It is registered in `flowModules.identity_lite`, `IDENTITY_QUESTIONS`, and the parity pins. Its position is whatever `orderDecisions` derives. Routing:
+- `il_target_script.next` → `il_language_dialect` only when gated in. The gate is set by a dialect search match, or by the Customize dialect field (`ctx.ilDialectRequested`). It is not set merely because the language has registered variants: `fr`, `en` and `de` all do.
+- When routed, the dialect question is the identity step's last question; otherwise `il_target_script` stays last (research R8).
 
 **Dialect question rendering**:
 - With a proposal: one line, `Tag: oc-gascon (registered variant for Gascon)`, with **Confirm**, **Edit** and **No dialect**.

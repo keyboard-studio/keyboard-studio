@@ -83,7 +83,7 @@ Having picked a dialect, the author sees a one-line proposal: the tag the keyboa
 4. **Given** any proposal, **When** it is shown, **Then** it names its source (registered variant, langtags, or made from the name), and nothing is written until the author confirms.
 5. **Given** a confirmed dialect, **When** the keyboard is built, **Then** the package, help documents and LDML export all carry the same minimal tag.
 6. **Given** a confirmed dialect from Glottolog, **When** the working copy is saved, **Then** the dialect's Glottolog code is stored as metadata, so the tag can be revisited if the dialect later gets a registered variant.
-7. **Given** an author who picked a language directly (not a dialect), **When** they reach the dialect step, **Then** it is offered as optional, lists that language's known variants and dialects, and accepts a private-use name. Skipping it leaves the tag as today.
+7. **Given** an author who picked a language directly (not a dialect), **When** they open the dialect field under **Customize** (the dialect step is not shown unasked), **Then** it is offered as optional, lists that language's known variants and dialects, and accepts a private-use name. Skipping it leaves the tag as today.
 
 ---
 
@@ -202,7 +202,7 @@ An author types a name the lists do not know. The studio never stops at "no resu
 
 - **FR-007**: The studio MUST provide an optional dialect step after the region choice, declared in the decision registry with typed inputs (language, script, region, chosen search match) and writes (dialect subtag, its source, Glottolog code), per Article IX. Its position MUST come from the dependency sort, not a stored order.
 - **FR-008**: When the language was reached through a dialect name, the step MUST propose a dialect subtag in this order of preference: a registered IANA variant whose recorded prefixes allow the chosen language (and script, if the prefix requires one); the langtags `-x-` tagset for that dialect; a private-use subtag made from the dialect name. A dialect is linked to a registered variant when the variant's registry description matches the dialect's name (ignoring case and diacritics) and its prefixes allow the language; the link is a proposal the author confirms, like any other.
-- **FR-009**: When the language was chosen directly, the step MUST list that language's registered variants (filtered by prefix) and langtags variant and `-x-` tagsets, and accept a typed dialect name, from which it proposes a private-use subtag.
+- **FR-009**: When the language was chosen directly, the dialect step MUST be shown only if the author asks for it (Customize), and MUST then list that language's registered variants (filtered by prefix) and langtags variant and `-x-` tagsets, and accept a typed dialect name, from which it proposes a private-use subtag.
 - **FR-010**: Every proposal MUST show its source and the resulting full tag, and MUST take effect only when the author confirms it (Article X). The author MUST be able to remove the dialect part.
 - **FR-011**: A made-from-name private-use subtag MUST be 1 to 8 ASCII letters or digits, lowercase, with accents folded and spaces and punctuation removed. The author MUST be able to edit it; an ill-formed edit MUST block confirmation with a reason.
 - **FR-012**: The studio MUST store the chosen dialect's Glottolog code, when there is one, with the working copy's identity metadata.
@@ -234,7 +234,7 @@ An author types a name the lists do not know. The studio never stops at "no resu
 **Nothing matches (US6)**
 
 - **FR-028**: Text that parses as a language code or tag MUST resolve to a proposal of its parts. A language subtag MUST be checked against the registered language subtags (IANA registry, pinned as in FR-021), and the registered name shown for confirmation.
-- **FR-029**: When the search has no result above the fuzzy tier, or at any time on request, the result list MUST end with two choices: "*text* is a dialect: find its language" and "My language isn't listed".
+- **FR-029**: When no result matches the text closely (its name or code starts with the text, as a word; otherwise only the shared search's looser, fuzzy matches are present), or at any time on request, the result list MUST end with two choices: "*text* is a dialect: find its language" and "My language isn't listed".
 - **FR-030**: Choosing "*text* is a dialect" MUST keep the text as the pending dialect name and return the author to the search to find the parent language. The dialect step then proposes from the kept name (FR-008, third preference; source `typed`).
 - **FR-031**: "My language isn't listed" MUST take a language name (pre-filled with the text) and an optional code. A code MUST be checked as in FR-028: a registered code is accepted with its name, a private-use code (`qaa`–`qtz`) is accepted, a well-formed unregistered code is accepted with a warning, and an ill-formed code blocks confirmation with its reason.
 - **FR-032**: With no code, the studio MUST propose `qaa-x-` plus a subtag made from the language name (FR-011 rule), explain why, and point to how to request an ISO 639-3 code. Row 10.4 MUST flag the tag at review.

@@ -166,12 +166,23 @@ The chosen search match is recorded as a decision too. Today it lives only in cl
 
 **Rationale**: Article IX: the question exists only through the registry, and its position comes from `orderDecisions` over provides/requires. The stored `next` edges are routing, not order; the parity pins (`stepOrder.parity.test.ts:159`, `legacyStepIds.test.ts:98`, `orderParity.test.ts`, `manifest.specref.json`) are updated in the same change.
 
+**Routing**:
+- Because the question requires `target-script`, it sorts after `il_target_script`. That question is today the identity step's last question; `IdentityLite.resume.test.tsx` pins this, and `il_language_code.next` leads to it.
+- **Decision**: route to it **only when there is something to say**, gated in `identityResolution.nextOverride` like region (R9). Any one of these triggers it:
+  - the search match carries a dialect (Glottolog, langtags, or a typed pending name);
+  - the author used the dialect field in the chooser's **Customize** panel.
+
+  The gate does not fire just because the language has registered variants. Measured: `fr` (`1694acad`, `gallo`), `en` (10 variants) and `de` (`1901`, `1996`, `viennese`) all do, so that trigger would add the question to most walks, including the `basic_kbdfr` golden walk. For a directly picked language, Customize lists its variants and dialect tagsets (FR-009).
+- When routed, `il_target_script.next` is `il_language_dialect`, which becomes the step's last question. Otherwise `il_target_script` stays last, and the dialect decision is `""` (no dialect), a confirmed default (Article X: a value, never a blank).
+- **Rejected**: routing every walk through the question. It costs one **Continue** for most authors and changes every golden and headless walk, against the same reasoning as R9.
+- Drafts saved before this change resume as today.
+
 ## R9. Region for any language (FR-017)
 
 **Decision**: the region becomes **available on demand**, not shown to everyone. FR-017 says "available", and US3 scenario 2 says "when the author wants a region".
 - **Ambiguous languages** (`hasRegionVariants`, about 2.6% of languages): the region question is routed as today; `identityResolution.nextOverride` (:242) is unchanged.
-- **All other languages**: the identity screen shows a "Specify a region…" link under the language confirmation. It opens the same `il_language_region` question.
-  - The question is still routed only through the registry; the link sets the routing input `ctx.ilRegionRequested`.
+- **All other languages**: the chooser's **Customize** panel has a "Specify a region…" field. Using it opens the same `il_language_region` question.
+  - The question is still routed only through the registry; the field sets the routing input `ctx.ilRegionRequested`.
   - The default region is pre-filled.
   - Nothing is written unless the author picks a region.
 - **Region options**: the language's langtags `regions` with `defaultRegion` first and marked "default", then "Other region…" for any ISO 3166-1 code.
@@ -190,7 +201,7 @@ The `.kmn`-only upgrade-pair mechanism (`upgradePairs.ts:65`) is not reused. It 
 
 ## R12. Nothing matches (User Story 6)
 
-**Decision**: a thin layer in front of the chooser's search, plus two fallback rows at the end of every result list that has no hit above the fuzzy tier.
+**Decision**: a thin layer in front of the chooser's search, plus two fallback rows at the end of every result list that has no *close* result ([contract § merge rule](contracts/dialect-search-and-question.md#merge-rule)).
 
 1. **Code or tag first (FR-028).**
    - If the text parses as a BCP 47 tag (`parseBcp47`, R1) and its language subtag is registered, propose its parts. The chooser's search alone returns nothing for `oc-gascon`.

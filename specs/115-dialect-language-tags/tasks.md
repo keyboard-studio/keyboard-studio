@@ -183,7 +183,7 @@ Commit: `spec 115 T020-T029`.
 
   File: packages/studio/src/survey/languageChooser/resolveTypedTag.test.ts
 - [ ] T032 [P] [US6] Write failing UI tests:
-  - the two fallback rows appear when nothing ranks above the fuzzy tier, and always via "Can't find it?";
+  - the two fallback rows appear when no result is *close* (contract § merge rule; e.g. "Ewondoo" shows them below the fuzzy Ewondo row), and always via "Can't find it?";
   - "is a dialect" keeps the text in `language-search-match` (`source: "typed"`) and re-labels the search;
   - the unlisted panel: name pre-filled; code checks per FR-031; no code → `qaa-x-` from the name (FR-011 rule), with the explanation and request link;
   - `il_language_code` rejects unchecked free text (FR-033);
@@ -214,7 +214,7 @@ Commit: `spec 115 T020-T029`.
 - [ ] T038 [P] [US3] Write failing `minimalTag` and `minimalTagOf` tests: every row of the table in contracts/langtags-api.md (including `ca + Latn + AD + valencia` → `ca-AD-valencia` and `oc + FR + gascon` → `oc-gascon`), plus the SC-003 property test over all 9,596 tagsets — packages/engine/src/langtags/minimalTag.test.ts
 - [ ] T039 [P] [US3] Write failing studio tests:
   - `buildTargetBcp47` delegates to `minimalTag`, with a region equal to the default omitted;
-  - **Customize** / "Specify a region…" routes `il_language_region` for a single-region language;
+  - the "Specify a region…" field in the chooser's **Customize** panel routes `il_language_region` for a single-region language;
   - existing walks route no new screen (research R9).
 
   Files: packages/studio/src/survey/targetBcp47.test.ts, packages/studio/src/survey/identityResolution.test.ts
@@ -253,7 +253,7 @@ Commit: `spec 115 T038-T043`.
 
 **Goal**: picking or typing a dialect yields a confirmed dialect subtag in the tag, with the glottocode saved (FR-007 to FR-013, FR-018).
 
-**Independent test**: Gascon → `oc-gascon` (registered variant); Rabinal → `acr-x-rabinal` (langtags); Aranese → `oc-x-aranese` (from the name); the `.kps` lists exactly one `<Language>`.
+**Independent test**: Gascon → `oc-gascon` (registered variant); Rabinal → `acr-x-rabinal` (langtags); Yabekolo → `ewo-x-yabekolo` (from the name); Aranese → `oc-aranes` (registered variant, linked by description); the `.kps` lists exactly one `<Language>`.
 
 **Wave 1 — tests:**
 
@@ -286,9 +286,16 @@ Commit: `spec 115 T038-T043`.
 - [ ] T051 [US2] Create the question module `il_language_dialect` (contracts § Question modules).
   - Declaration: `provides: ["language-dialect"]`; `requires: ["language-code", "target-script", "language-region"]`; optional; `outputs` bcp47; `lookupDefault` → `proposeDialect`.
   - Add it to `flowModules.identity_lite` and to `SEEDED_QUESTIONS`.
-  - Order comes only from `orderDecisions` (Article IX).
+  - Order comes only from `orderDecisions` (Article IX). Routing is separate and stored in `next`, gated the same way region is (research R8, R9):
+    - `il_target_script.next` is `il_language_dialect` only when one of these holds:
+      - the search match carries a dialect (Glottolog, langtags, or a typed pending name);
+      - the author used the dialect field in the chooser's **Customize** panel (`ctx.ilDialectRequested`);
+    - The gate does **not** fire merely because the language has registered variants. French, English and German all do (`fr`: `1694acad`, `gallo`), so that would add the question to most walks. For a directly picked language, the variants are offered in **Customize**.
+    - otherwise `il_target_script` stays the step's last question, and the dialect decision stays `""` (no dialect, a confirmed default).
+  - Implement the gate in `identityResolution.nextOverride`, beside the region gate.
+  - T053 covers both endings: the resume test and the parity pins, with and without the dialect question.
 
-  Files: packages/studio/src/survey/questions/a/il_language_dialect.ts, packages/studio/src/survey/questions/flowModules.ts, packages/studio/src/survey/identityResolution.ts
+  Files: packages/studio/src/survey/questions/a/il_language_dialect.ts, packages/studio/src/survey/questions/a/il_target_script.ts, packages/studio/src/survey/questions/flowModules.ts, packages/studio/src/survey/identityResolution.ts
 - [ ] T052 [US2] Render the dialect question.
   - With a proposal: one line with **Confirm**, **Edit** and **No dialect**.
   - Without one: a list of `variantsFor` and `dialectTagsetsFor`, plus a "Dialect name" box.
@@ -299,7 +306,13 @@ Commit: `spec 115 T038-T043`.
   - Pass `dialectSubtag` into `buildTargetBcp47` from both producers (`IdentityLite.tsx:53`, `identitySelectors.ts:87`).
 
   Files: packages/studio/src/survey/IdentityLite.tsx, packages/studio/src/survey/questions/a/il_language_dialect.ts, packages/studio/src/survey/languageChooser/CustomizePanel.tsx, packages/studio/src/locales/
-- [ ] T053 [US2] Update the step and order parity pins for the new question — packages/studio/src/steps/stepOrder.parity.test.ts, packages/studio/src/lib/legacyStepIds.test.ts, packages/studio/src/decisions/orderParity.test.ts, packages/studio/src/steps/manifest.specref.json
+- [ ] T053 [US2] Update the step and order parity pins, and the resume test, for the new question.
+  - **Without a dialect gate** (e.g. Ewondo picked by name): `il_target_script` is still the last question, and the existing resume behaviour is unchanged.
+  - **With the gate** (e.g. Gascon): `il_language_dialect` is last, and a draft resumed after `il_target_script` lands on it.
+  - A draft saved before this change resumes as today.
+  - Confirm the golden-walk e2e (Copy from `basic_kbdfr`) and the headless walks gain no question. French has registered variants, but the gate ignores them (T051).
+
+  Files: packages/studio/src/steps/stepOrder.parity.test.ts, packages/studio/src/lib/legacyStepIds.test.ts, packages/studio/src/decisions/orderParity.test.ts, packages/studio/src/steps/manifest.specref.json, packages/studio/src/survey/IdentityLite.resume.test.tsx
 
 **Checkpoint**: T044 to T046 pass; studio vitest green; parity pins updated in this commit. Commit: `spec 115 T044-T053`.
 
@@ -337,7 +350,7 @@ Commit: `spec 115 T038-T043`.
 
 - [ ] T061 Script the quickstart §5 manual walk with the Playwright CLI against `pnpm dev`, covering both the Copy and Open paths:
   - the autosuggest-kept checks;
-  - Gascon, Rabinal and Aranese;
+  - Gascon, Rabinal, Aranese and Yabekolo;
   - region on demand;
   - dialect re-proposal;
   - the US6 inputs;

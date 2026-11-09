@@ -56,8 +56,9 @@ Script with the Playwright CLI against `pnpm dev`:
    - Separately: pick French, use "Specify a region…", choose Canada. The tag is `fr-CA`. Choose France instead, and the tag is `fr`.
    - Build. The `.kps` has one `<Language ID="oc-gascon">`.
 2. Repeat with `Rabinal`: the proposal is `acr-x-rabinal (langtags)`.
-3. **Made-from-name subtag.** Pick a Glottolog-only dialect, e.g. `Aranese`. The proposal is `oc-x-aranese (made from the name)`.
-   - Edit it to `aranese-valley`: Confirm is disabled, with the reason "private-use subtags are 1-8 letters or digits".
+3. **Made-from-name subtag.** Pick a Glottolog-only dialect, e.g. `Yabekolo` (an Ewondo dialect). The proposal is `ewo-x-yabekolo (made from the name)`.
+   - Edit it to `yabekolo-east`: Confirm is disabled, with the reason "private-use subtags are 1-8 letters or digits".
+   - Contrast: `Aranese` proposes `oc-aranes` (registered variant), and `Sursilvan` proposes `rm-sursilv`.
 4. Change the language to Catalan. The dialect answer is flagged as re-proposed, not silently kept.
 5. **Autosuggest kept (FR-038).**
    - Type `Ewon`: suggestions appear as you type, with Ewondo's card content.
