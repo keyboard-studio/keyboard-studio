@@ -18,6 +18,10 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { defaultsIndex, languages } from "./generated/index.js";
+import { tagsets } from "./generated/tagsets.js";
+import { dialects } from "./generated/dialects.js";
+import { registeredVariants } from "./generated/variants.js";
+import { registeredLanguages } from "./generated/registeredLanguages.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..", "..", "..", "..");
@@ -108,5 +112,67 @@ describe("codegen determinism (T011)", () => {
       expect(entry).toBeDefined();
       expect(entry!.code).toBe(lang.code);
     }
+  });
+});
+
+// Spec 115 T010 — the dialect / registry tables. Row counts are pinned to the
+// inputs the generated files were built from; when an input is absent the count
+// check is skipped visibly (sort and stability checks need no input).
+const REGISTRY_FILE = join(
+  ROOT,
+  "node_modules",
+  "language-subtag-registry",
+  "data",
+  "json",
+  "registry.json"
+);
+const registryPresent = existsSync(REGISTRY_FILE);
+
+function isSortedBy<T>(rows: readonly T[], key: (row: T) => string): boolean {
+  for (let i = 1; i < rows.length; i++) {
+    const a = key(rows[i - 1] as T);
+    const b = key(rows[i] as T);
+    if (a.localeCompare(b) > 0) return false;
+  }
+  return true;
+}
+
+function hasUniqueKeys<T>(rows: readonly T[], key: (row: T) => string): boolean {
+  return new Set(rows.map(key)).size === rows.length;
+}
+
+describe("codegen determinism: tagsets, dialects and registry tables (spec 115 T010)", () => {
+  it("tagsets.ts is sorted by tag with unique tags and 6 columns", () => {
+    expect(tagsets.length).toBeGreaterThan(0);
+    expect(isSortedBy(tagsets, (r) => r[0])).toBe(true);
+    expect(hasUniqueKeys(tagsets, (r) => r[0])).toBe(true);
+    expect(tagsets.every((r) => r.length === 6)).toBe(true);
+  });
+
+  it("dialects.ts is sorted by tag with unique tags", () => {
+    expect(isSortedBy(dialects, (r) => r.tag)).toBe(true);
+    expect(hasUniqueKeys(dialects, (r) => r.tag)).toBe(true);
+  });
+
+  it("variants.ts is sorted by subtag with unique subtags", () => {
+    expect(isSortedBy(registeredVariants, (r) => r.subtag)).toBe(true);
+    expect(hasUniqueKeys(registeredVariants, (r) => r.subtag)).toBe(true);
+  });
+
+  it("registeredLanguages.ts is sorted by subtag with unique subtags", () => {
+    expect(isSortedBy(registeredLanguages, (r) => r.subtag)).toBe(true);
+    expect(hasUniqueKeys(registeredLanguages, (r) => r.subtag)).toBe(true);
+  });
+
+  it.skipIf(!dataPresent)("dialects.ts has 229 rows at the pinned langtags input", () => {
+    expect(dialects.length).toBe(229);
+  });
+
+  it.skipIf(!registryPresent)("variants.ts has 134 rows at the pinned registry input", () => {
+    expect(registeredVariants.length).toBe(134);
+  });
+
+  it.skipIf(!registryPresent)("registeredLanguages.ts has 8268 rows at the pinned registry input", () => {
+    expect(registeredLanguages.length).toBe(8268);
   });
 });

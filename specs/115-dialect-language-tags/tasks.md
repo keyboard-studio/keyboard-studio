@@ -32,20 +32,20 @@ The parser, the shared types and the generated data. Nothing here changes what a
 
 **Wave 0 — first, own commit (shipped defect, research R13):**
 
-- [ ] T009 Fix the shipped defect R13: key `defaultsIndex` on the language subtag, taking the shortest-`tag` tagset per language, so `zh`, `isv`, `con`, `aux`, `nul`, `ocm`, `prn`, `sgn`, `spx`, `tpo`, `txr`, `xaq`, `xcc`, `xce` and `xib` resolve. Add tests (`getLanguageDefaults("zh")`, `("isv")` defined; `("ewo")` unchanged). It runs before T006, which edits the same file, so the fix commit applies cleanly on `main`'s code and can be cherry-picked alone. **Own commit:** `fix(engine): langtags index drops languages with no bare tagset` — scripts/codegen-langtags.mjs, packages/engine/src/langtags/generated/index.ts, packages/engine/src/langtags/index.test.ts
+- [x] T009 Fix the shipped defect R13: key `defaultsIndex` on the language subtag, taking the shortest-`tag` tagset per language, so `zh`, `isv`, `con`, `aux`, `nul`, `ocm`, `prn`, `sgn`, `spx`, `tpo`, `txr`, `xaq`, `xcc`, `xce` and `xib` resolve. Add tests (`getLanguageDefaults("zh")`, `("isv")` defined; `("ewo")` unchanged). It runs before T006, which edits the same file, so the fix commit applies cleanly on `main`'s code and can be cherry-picked alone. **Own commit:** `fix(engine): langtags index drops languages with no bare tagset` — scripts/codegen-langtags.mjs, packages/engine/src/langtags/generated/index.ts, packages/engine/src/langtags/index.test.ts
 
 **Wave 1 — independent (T006 after T009):**
 
-- [ ] T003 [P] Write failing tests for `parseBcp47`, `formatBcp47`, `isWellFormedBcp47`, `scriptSubtagOf` and `regionSubtagOf`, one per row of the table in contracts/bcp47-parser.md. Replace the `scriptSubtagOf("lif-x-Deva") === "Deva"` assertion with `undefined`, and add `buu-x-koya`, `kqe-x-east` and `en-u-co-phon` → `undefined` (research R1) — packages/contracts/src/utils/bcp47.test.ts
-- [ ] T004 [P] Add the types `Bcp47Parts`, `Bcp47ParseError`, `SearchMatch` (including `source: "typed"`), `DialectTagset`, `VariantEntry` and `RegisteredLanguage` (data-model.md). Additive only; no `Pattern` or `Criterion` change — packages/contracts/src/langtags.ts, packages/contracts/src/utils/bcp47.ts
-- [ ] T005 [P] Write `scripts/codegen-registry.mjs`. It reads `language-subtag-registry/data/json/variant.json` and `language.json` and writes `variants.ts` (134 rows: `{subtag, descriptions, prefixes, deprecated}`) and `registeredLanguages.ts` (about 8,200 rows: `{subtag, description, scope?, macrolanguage?}`, including the `qaa..qtz` range). Both are sorted, with a header naming the package version and `File-Date`. Add it to the root scripts and to `prebuild`, after `codegen-langtags` — scripts/codegen-registry.mjs, package.json, packages/engine/src/langtags/generated/{variants,registeredLanguages}.ts
-- [ ] T006 [P] Change `scripts/codegen-langtags.mjs` for dialects:
+- [x] T003 [P] Write failing tests for `parseBcp47`, `formatBcp47`, `isWellFormedBcp47`, `scriptSubtagOf` and `regionSubtagOf`, one per row of the table in contracts/bcp47-parser.md. Replace the `scriptSubtagOf("lif-x-Deva") === "Deva"` assertion with `undefined`, and add `buu-x-koya`, `kqe-x-east` and `en-u-co-phon` → `undefined` (research R1) — packages/contracts/src/utils/bcp47.test.ts
+- [x] T004 [P] Add the types `Bcp47Parts`, `Bcp47ParseError`, `SearchMatch` (including `source: "typed"`), `DialectTagset`, `VariantEntry` and `RegisteredLanguage` (data-model.md). Additive only; no `Pattern` or `Criterion` change — packages/contracts/src/langtags.ts, packages/contracts/src/utils/bcp47.ts
+- [x] T005 [P] Write `scripts/codegen-registry.mjs`. It reads `language-subtag-registry/data/json/variant.json` and `language.json` and writes `variants.ts` (134 rows: `{subtag, descriptions, prefixes, deprecated}`) and `registeredLanguages.ts` (about 8,200 rows: `{subtag, description, scope?, macrolanguage?}`, including the `qaa..qtz` range). Both are sorted, with a header naming the package version and `File-Date`. Add it to the root scripts and to `prebuild`, after `codegen-langtags` — scripts/codegen-registry.mjs, package.json, packages/engine/src/langtags/generated/{variants,registeredLanguages}.ts
+- [x] T006 [P] Change `scripts/codegen-langtags.mjs` for dialects:
   - stop folding non-bare tagsets into `regionVariants` (:110-124);
   - emit `generated/dialects.ts`, one row per variant or `-x-` tagset (229), with the fields in data-model.md § DialectTagset;
   - add `windows` as a sixth column of the `tagsets.ts` rows (:323-333).
 
   Files: scripts/codegen-langtags.mjs, packages/engine/src/langtags/generated/{dialects,tagsets}.ts
-- [ ] T007 [P] Change `scripts/codegen-glottolog.mjs`:
+- [x] T007 [P] Change `scripts/codegen-glottolog.mjs`:
   - keep `Countries` on language and dialect records;
   - emit `src/generated/dialects.ts` with three kinds of row (contract § Glottolog dialect rows):
     - `dialect`: each dialect whose `Language_ID` parent has an ISO code (13,392);
@@ -58,9 +58,9 @@ The parser, the shared types and the generated data. Nothing here changes what a
 
 **Wave 2 — after wave 1:**
 
-- [ ] T008 Implement `parseBcp47`, `formatBcp47`, `isWellFormedBcp47` and `regionSubtagOf` (moved from keyboard-lint), and rewrite `scriptSubtagOf` on the parser, until T003 passes. Pure TS, with no JSON or data import (`/api` bundle safety) — packages/contracts/src/utils/bcp47.ts
-- [ ] T010 [P] Extend the codegen determinism test to cover `tagsets.ts`, `dialects.ts`, `variants.ts` and `registeredLanguages.ts`: sorted, stable, row counts at the pinned inputs. It skips visibly when inputs are absent — packages/engine/src/langtags/codegen-determinism.test.ts
-- [ ] T011 [P] Add the `./dialects` subpath export (types and import) and a `dialects.ts` entry exporting `dialectRows`. Do not import it from `src/index.ts`, so the main entry's bundle is unchanged — packages/glottolog/package.json, packages/glottolog/src/dialects.ts
+- [x] T008 Implement `parseBcp47`, `formatBcp47`, `isWellFormedBcp47` and `regionSubtagOf` (moved from keyboard-lint), and rewrite `scriptSubtagOf` on the parser, until T003 passes. Pure TS, with no JSON or data import (`/api` bundle safety) — packages/contracts/src/utils/bcp47.ts
+- [x] T010 [P] Extend the codegen determinism test to cover `tagsets.ts`, `dialects.ts`, `variants.ts` and `registeredLanguages.ts`: sorted, stable, row counts at the pinned inputs. It skips visibly when inputs are absent — packages/engine/src/langtags/codegen-determinism.test.ts
+- [x] T011 [P] Add the `./dialects` subpath export (types and import) and a `dialects.ts` entry exporting `dialectRows`. Do not import it from `src/index.ts`, so the main entry's bundle is unchanged — packages/glottolog/package.json, packages/glottolog/src/dialects.ts
 
 **Checkpoint**: `pnpm build` green; the contracts parser tests and T009's tests pass. Commits: the T009 fix first, then `spec 115 T001-T008, T010-T011`.
 

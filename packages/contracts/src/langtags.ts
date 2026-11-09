@@ -125,3 +125,58 @@ export interface LangtagsProvenance {
   /** Display text shown to the author, e.g. "Suggested from langtags — edit if needed". */
   caption: string;
 }
+
+// ---------------------------------------------------------------------------
+// Dialect / variety search types (spec 115, data-model.md). Additive.
+// ---------------------------------------------------------------------------
+
+/**
+ * Attached to a chooser result when it was reached through something other
+ * than the language's own name (a Glottolog dialect or langtags variety), or
+ * holding the pending dialect name typed by the author (`source: "typed"`).
+ */
+export interface SearchMatch {
+  name: string;
+  /** `variety`: registered variants and langtags variant tagsets; `dialect`: Glottolog dialects and langtags `-x-` tagsets; `alias`: alternate name of the language itself. */
+  relation: "alias" | "dialect" | "variety";
+  source: "langtags" | "glottolog" | "iana" | "typed";
+  glottocode?: string;
+  /** Set when langtags or the registry already gives a dialect tag, e.g. `oc-gascon`. */
+  dialectTag?: string;
+  /** From the parent when the dialect has none, e.g. `["ES","FR"]`. */
+  countries?: string[];
+}
+
+/** One generated row per langtags variant or `-x-` tagset. */
+export interface DialectTagset {
+  /** e.g. `acr-x-rabinal` */
+  tag: string;
+  /** e.g. `acr-Latn-GT-x-rabinal` */
+  full: string;
+  language: string;
+  /** e.g. `x-rabinal` */
+  dialectSubtag: string;
+  names: string[];
+  localNames: string[];
+  /** langtags `variants`. */
+  variants: string[];
+  /** langtags `windows`, e.g. `acr-Latn-x-rabinal`. */
+  windows: string;
+}
+
+/** One row of the IANA registry's variant subtags. */
+export interface VariantEntry {
+  subtag: string;
+  descriptions: string[];
+  /** Tags the variant may follow; empty means allowed anywhere. */
+  prefixes: string[];
+  deprecated: boolean;
+}
+
+/** One row of the IANA registry's language subtags. */
+export interface RegisteredLanguage {
+  subtag: string;
+  description: string;
+  scope?: string;
+  macrolanguage?: string;
+}

@@ -14,6 +14,10 @@
     "./bridge": {
       "types": "./dist/bridge.d.ts",
       "import": "./dist/bridge.js"
+    },
+    "./dialects": {
+      "types": "./dist/dialects.d.ts",
+      "import": "./dist/dialects.js"
     }
   },
   "scripts": {
