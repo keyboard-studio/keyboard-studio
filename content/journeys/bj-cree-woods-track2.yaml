@@ -18,6 +18,10 @@
 
 journey_id: bj-cree-woods-track2
 
+# The walk's authoring track, declared up front (the track question is
+# gone — see survey/journeyFixture.ts). Absent means \"copy\".
+track: adapt
+
 persona:
   language: Western Cree (TH-Woods)
   script: Cans
@@ -33,9 +37,6 @@ events:
 
   # --- choose_base (Track 2: adapt bj_cree_woods) ---
   - { stepId: choose_base, questionId: base_keyboard_id, value: "bj_cree_woods" }
-
-  # --- track (adapt — project_name is skipped, side-trail CYOA fork, derived from gatedBy) ---
-  - { stepId: track, questionId: track_choice, value: "adapt" }
 
   # --- attribution (attribution flow, #1901: asked after the track choice) ---
   - { stepId: attribution, questionId: il_author_name, value: "Bill Jancewicz" }
@@ -69,17 +70,11 @@ events:
 
   # --- marks / punctuation / convenience: no fixture events (auto-skip) ---
 
-  # --- carve (Phase D — the real carve.spec.ts scenario, recorded verbatim) ---
-  - { stepId: carve, action_type: gallery_edit, summary: "discarded character U+14EC (ᓬ); cascaded to rule#18 and rule#20, its sole producers in bj_cree_woods" }
+  # --- carve / mechanisms: hidden on Open (spec 111 -- the feature galleries are
+  # not walked when the keyboard is opened as it is), so no fixture events ---
 
-  # --- mechanisms (Phase C — carve.spec.ts's confirmMechanismsEmpty walk) ---
-  - { stepId: mechanisms, action_type: mechanism_edit, summary: "no new characters to add — empty mechanisms diff (all discovered characters already on the adapted base)" }
-
-  # --- touch_seed_source (side-trail fork) ---
-  - { stepId: touch_seed_source, questionId: touch_seed_source, value: "import-adapt" }
-
-  # --- touch (Phase E — carve.spec.ts's driveTouchGallery walk) ---
-  - { stepId: touch, action_type: touch_edit, summary: "touch layout carried over from the adapted desktop assignments; no additional touch-only characters" }
+  # --- touch_seed_source / touch: hidden on Open when the keyboard already has a
+  # touch layout (spec 111 FR-009), so no fixture events ---
 
   # --- help (phase_f_helpdocs flow, default 5-screen path) ---
   - { stepId: help, questionId: pf_welcome_paragraph, value: "This keyboard lets you type Woods Cree (Nîhithawîwin) in Canadian Aboriginal Syllabics on any computer." }

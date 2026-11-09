@@ -289,10 +289,15 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
       "identity",
       "layout",
       "choose_base",
-      "track",
-      // #1901: the author/copyright screen walks after the track choice.
+      // #1901: the author/copyright screen walks after the base choice
+      // (the track is recorded by the start screen, not asked).
       "attribution",
       "project_name",
+      // spec 111: the Open language list, a gated side trail.
+      "open_languages",
+      // spec 111 Open walk: the conditional pages, gated on the open-issues decision.
+      "open_missing_letters",
+      "open_upgrades",
       "characters",
       "marks",
       "punctuation",
@@ -302,12 +307,16 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
       "deadkeys",
       "rules",
       "mechanisms",
+      // #2549: the fallback-policy step walks after mechanisms, before OSK.
+      "fallback_policy",
       "osk",
       "touch_seed_source",
       "touch",
       "css",
       "help",
       "html",
+      // #2485: the icon editor step walks after Documentation.
+      "icon",
     ]);
   });
 
@@ -328,11 +337,12 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
     expect(identity.decisionIds).not.toContain("copyright-holder");
   });
 
-  it("frozen trail: project_name is a gated side trail joining characters", () => {
+  it("project_name is a gated side trail joining the first ungated spine screen after it", () => {
     const projectName = screens.find((s) => s.id === "project_name")!;
     expect(projectName.kind).toBe("question");
     expect(projectName.spine).toBe(false);
-    expect(projectName.joinTarget).toBe("characters");
+    const after = screens.slice(screens.indexOf(projectName) + 1);
+    expect(projectName.joinTarget).toBe(after.find((s) => s.spine && s.gatedBy === undefined)?.id);
     expect(projectName.gatedBy).toBeDefined();
     expect(projectName.gatedBy!(decision("authoring-track", "copy"))).toBe(true);
     expect(projectName.gatedBy!(decision("authoring-track", "adapt"))).toBe(false);
@@ -357,7 +367,15 @@ describe("deriveScreens — the live registry list (frozen baseline)", () => {
 
   it("every other screen is an ungated spine screen", () => {
     for (const s of screens) {
-      if (s.id === "project_name" || s.id === "touch_seed_source") continue;
+      if (
+        s.id === "project_name" ||
+        s.id === "touch_seed_source" ||
+        s.id === "open_languages" ||
+        s.id === "open_missing_letters" ||
+        s.id === "open_upgrades"
+      ) {
+        continue;
+      }
       expect(s.spine, s.id).toBe(true);
       expect(s.gatedBy, s.id).toBeUndefined();
       expect(s.joinTarget, s.id).toBeUndefined();

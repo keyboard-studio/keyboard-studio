@@ -69,10 +69,10 @@ function ctxWith(overrides: Partial<ResolveContext> = {}): ResolveContext {
     questionRegistry: REGISTRY,
     traversal: traversal({
       activeStepId: "characters",
-      history: ["identity", "layout", "choose_base", "track"],
-      selectedTrack: "adapt",
+      history: ["identity", "layout", "choose_base", "attribution"],
+      selectedTrack: "copy",
     }),
-    decisions: decisionsForTrack("adapt"),
+    decisions: decisionsForTrack("copy"),
     hasProject: true,
   };
   const merged = { ...base, ...overrides };
@@ -217,7 +217,7 @@ describe("section marks — one per non-active manifest step", () => {
 
   it("every manifest step up to and including 'help' earns exactly one mark on this author's path", () => {
     // #1901: the author's history runs through the attribution step
-    // (track -> attribution -> characters on this adapt path) — a
+    // (attribution -> project_name -> characters on this copy path) — a
     // traversal that reached characters without it can no longer occur,
     // and a behind-active step absent from history reads as not-on-path.
     const dots = buildProgressDots({
@@ -225,20 +225,20 @@ describe("section marks — one per non-active manifest step", () => {
       ctx: ctxWith({
         traversal: traversal({
           activeStepId: "characters",
-          history: ["identity", "layout", "choose_base", "track", "attribution"],
-          selectedTrack: "adapt",
+          history: ["identity", "layout", "choose_base", "attribution", "project_name"],
+          selectedTrack: "copy",
         }),
       }),
       lookupQuestionLabel: stubLabel,
     });
-    // "adapt" skips project_name (FR-049a) — every OTHER on-path step has a mark.
+    // open_languages is Open-only (spec 111) — every OTHER on-path step has a mark.
     const onPathIds = manifest
-      .filter((s) => s.id !== "project_name" && s.id !== "package")
+      .filter((s) => !s.id.startsWith("open_") && s.id !== "package")
       .map((s) => s.id);
     for (const id of onPathIds) {
       expect(dots.some((d) => d.id === id || d.location.step === id)).toBe(true);
     }
-    expect(dots.some((d) => d.id === "project_name")).toBe(false);
+    expect(dots.some((d) => d.id === "open_languages")).toBe(false);
   });
 });
 
@@ -252,7 +252,7 @@ describe("upcoming section marks — the projected remaining path", () => {
     const dots = buildProgressDots({
       record: recordOf([]),
       ctx: ctxWith({
-        traversal: traversal({ activeStepId: "track", history: ["identity", "choose_base"], selectedTrack: "adapt" }),
+        traversal: traversal({ activeStepId: "attribution", history: ["identity", "choose_base"], selectedTrack: "adapt" }),
       }),
       lookupQuestionLabel: stubLabel,
     });
@@ -263,7 +263,7 @@ describe("upcoming section marks — the projected remaining path", () => {
     const dots = buildProgressDots({
       record: recordOf([]),
       ctx: ctxWith({
-        traversal: traversal({ activeStepId: "track", history: ["identity", "choose_base"], selectedTrack: "copy" }),
+        traversal: traversal({ activeStepId: "attribution", history: ["identity", "choose_base"], selectedTrack: "copy" }),
       }),
       lookupQuestionLabel: stubLabel,
     });
@@ -277,7 +277,7 @@ describe("upcoming section marks — the projected remaining path", () => {
         traversal: traversal({
           activeStepId: "help",
           history: manifest.map((s) => s.id).slice(0, manifest.findIndex((s) => s.id === "help")),
-          selectedTrack: "adapt",
+          selectedTrack: "copy",
         }),
       }),
       lookupQuestionLabel: stubLabel,
@@ -302,8 +302,8 @@ describe("upcoming section marks — the projected remaining path", () => {
       ctx: ctxWith({
         traversal: traversal({
           activeStepId: "touch",
-          history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve", "mechanisms"],
-          selectedTrack: "adapt",
+          history: ["identity", "choose_base", "attribution", "characters", "marks", "convenience", "carve", "mechanisms"],
+          selectedTrack: "copy",
         }),
       }),
       lookupQuestionLabel: stubLabel,
@@ -444,8 +444,8 @@ describe("within-step walk dots — the active section's question marks", () => 
       ctx: ctxWith({
         traversal: traversal({
           activeStepId: "mechanisms",
-          history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve"],
-          selectedTrack: "adapt",
+          history: ["identity", "choose_base", "attribution", "characters", "marks", "convenience", "carve"],
+          selectedTrack: "copy",
         }),
         stepPositions: { mechanisms: ["u00e1", "u00e9", "u00ed"] },
       }),
@@ -649,8 +649,8 @@ describe("badges (§3c) — from selectWorkToDo() fixtures", () => {
       ctx: ctxWith({
         traversal: traversal({
           activeStepId: "carve",
-          history: ["identity", "choose_base", "track", "characters", "marks", "convenience"],
-          selectedTrack: "adapt",
+          history: ["identity", "choose_base", "attribution", "characters", "marks", "convenience"],
+          selectedTrack: "copy",
         }),
         stepPositions: { mechanisms: ["u00e1"] },
       }),
@@ -668,8 +668,8 @@ describe("badges (§3c) — from selectWorkToDo() fixtures", () => {
       ctx: ctxWith({
         traversal: traversal({
           activeStepId: "carve",
-          history: ["identity", "choose_base", "track", "characters", "marks", "convenience"],
-          selectedTrack: "adapt",
+          history: ["identity", "choose_base", "attribution", "characters", "marks", "convenience"],
+          selectedTrack: "copy",
         }),
       }),
       lookupQuestionLabel: stubLabel,
@@ -770,8 +770,8 @@ describe("§5 jump target — badged collapsed section vs. unbadged", () => {
       ctx: ctxWith({
         traversal: traversal({
           activeStepId: "carve",
-          history: ["identity", "choose_base", "track", "characters", "marks", "convenience"],
-          selectedTrack: "adapt",
+          history: ["identity", "choose_base", "attribution", "characters", "marks", "convenience"],
+          selectedTrack: "copy",
         }),
         stepPositions: { mechanisms: ["u00e1"] },
       }),
@@ -826,8 +826,8 @@ describe("jumping back (T065, FR-063)", () => {
       ctx: ctxWith({
         traversal: traversal({
           activeStepId: "touch",
-          history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve", "mechanisms"],
-          selectedTrack: "adapt",
+          history: ["identity", "choose_base", "attribution", "characters", "marks", "convenience", "carve", "mechanisms"],
+          selectedTrack: "copy",
         }),
       }),
       lookupQuestionLabel: stubLabel,
@@ -840,8 +840,8 @@ describe("jumping back (T065, FR-063)", () => {
       ctx: ctxWith({
         traversal: traversal({
           activeStepId: "characters",
-          history: ["identity", "choose_base", "track"],
-          selectedTrack: "adapt",
+          history: ["identity", "choose_base", "attribution"],
+          selectedTrack: "copy",
         }),
       }),
       lookupQuestionLabel: stubLabel,
@@ -861,7 +861,7 @@ describe("optional screens left blank, and outcome-satisfied steps", () => {
     ctxWith({
       traversal: traversal({
         activeStepId: "marks",
-        history: ["identity", "choose_base", "track", "characters"],
+        history: ["identity", "choose_base", "attribution", "characters"],
       }),
     });
 

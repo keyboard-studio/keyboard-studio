@@ -25,6 +25,8 @@ import { buildReadmeFacts } from "../lib/readmeFacts.ts";
 import { readmeFactsInputFrom } from "../lib/readmeFactsInput.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
+import { applyCarveMutate } from "../steps/editorMutate.ts";
+import { resolveDocMemberText, type AuthoredDocs } from "../lib/authoredDocs.ts";
 
 export interface DocsPreview {
   readmeMd: string;
@@ -62,6 +64,8 @@ export function useDocsPreview(): DocsPreview {
   const isAdaptation = useWorkingCopyStore((s) => s.instantiationMode === "adapt-existing");
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const carveChars = useWorkingCopyStore((s) => s.carveChars);
+  const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
+  const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const fallbackPolicy = useWorkingCopyStore((s) => s.fallbackPolicy);
   const decisions = useDecisionStore((s) => s.decisions);
   // Issue #1908: the recorded documentation-fix proposals. Read under the
@@ -70,6 +74,13 @@ export function useDocsPreview(): DocsPreview {
   const docFixProposals = useWorkingCopyStore((s) =>
     s.instantiationMode === "adapt-existing" ? s.docFixProposals : null,
   );
+  // Documentation-step overrides (specs/html-editor): a touched member's
+  // authored text replaces the rendered preview, so preview cannot disagree
+  // with the produced package (spec 061 FR-005/FR-010).
+  const authoredWelcomeHtm = useWorkingCopyStore((s) => s.authoredWelcomeHtm);
+  const authoredReadmeHtm = useWorkingCopyStore((s) => s.authoredReadmeHtm);
+  const authoredReadmeMd = useWorkingCopyStore((s) => s.authoredReadmeMd);
+  const authoredHelpPhp = useWorkingCopyStore((s) => s.authoredHelpPhp);
 
   return useMemo(() => {
     const displayName = identity?.displayName ?? startKeyboard?.displayName ?? "";
@@ -79,7 +90,19 @@ export function useDocsPreview(): DocsPreview {
     const platforms = startIr ? ["any"] : [];
     // Same input the output projection passes (serializeWorkingCopy step 5c):
     // the start prose is non-null on Track 2 only.
-    const ir = workingIr ?? startIr;
+    // Removals are applied at projection, never to the store's working IR, so
+    // the guide documents the carved IR — the same applyCarveMutate the
+    // projection runs (as deriveDesktopModifications does for its preview).
+    // The output path re-reads the projected .kmn itself; this synchronous
+    // approximation omits projection-only steps such as touch-key rule
+    // deletion, which can only remove more.
+    const uncarvedIr = workingIr ?? startIr;
+    const ir =
+      uncarvedIr !== null && (deletedNodeIds.size > 0 || deletedItemIds.size > 0 || carveChars.size > 0)
+        ? applyCarveMutate(uncarvedIr, deletedNodeIds, deletedItemIds, carveChars, {
+            ...(fallbackPolicy !== undefined ? { fallbackPolicy } : {}),
+          })
+        : uncarvedIr;
     const docContent =
       ir !== null
         ? buildDocContent({
@@ -124,12 +147,26 @@ export function useDocsPreview(): DocsPreview {
       ),
       ...(Object.keys(inheritedFixes).length > 0 ? { inheritedFixes } : {}),
     };
+    const authored: AuthoredDocs = {
+      authoredWelcomeHtm,
+      authoredReadmeHtm,
+      authoredReadmeMd,
+      authoredHelpPhp,
+    };
     return {
-      readmeMd: renderReadmeMd(input),
-      readmeHtm: renderReadmeHtm(input),
-      welcomeHtm: renderWelcomeHtm(input, startWelcomeHtmText, [], startHelpPhpText),
-      helpPhp: renderHelpPhp(input, startHelpPhpText, startWelcomeHtmText),
+      readmeMd: resolveDocMemberText("readme-md", renderReadmeMd(input), authored),
+      readmeHtm: resolveDocMemberText("readme-htm", renderReadmeHtm(input), authored),
+      welcomeHtm: resolveDocMemberText(
+        "welcome-htm",
+        renderWelcomeHtm(input, startWelcomeHtmText, [], startHelpPhpText),
+        authored,
+      ),
+      helpPhp: resolveDocMemberText(
+        "help-php",
+        renderHelpPhp(input, startHelpPhpText, startWelcomeHtmText),
+        authored,
+      ),
       typingGuideSuppressed: docContent?.typingGuideSuppressed ?? false,
     };
-  }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText, docFixProposals, isAdaptation, startVfs, carveChars, fallbackPolicy, decisions]);
+  }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText, docFixProposals, isAdaptation, startVfs, carveChars, deletedNodeIds, deletedItemIds, fallbackPolicy, decisions, authoredWelcomeHtm, authoredReadmeHtm, authoredReadmeMd, authoredHelpPhp]);
 }

@@ -222,6 +222,12 @@ const KMCMP_CODE_PREFIX: Record<LintSeverity, string> = {
  * (`KM_ERROR_KMCMP_5251101`) so a diagnostic can be matched back to
  * kmn_compiler_errors.h; its prefix follows the decoded severity.
  *
+ * The diagnostic is also tagged with its compile-target `platform`
+ * (#2378): `"web"` for the KmwCompiler namespace (`0x7000`) plus the
+ * web-only KmnCompiler codes, `"desktop"` for every other KmnCompiler
+ * code. A non-numeric code has no platform to decode and stays untagged
+ * (unowned — general panels keep showing it).
+ *
  * @internal Exported for unit test.
  */
 export function mapKmnCompilerEvent(
@@ -242,6 +248,13 @@ export function mapKmnCompilerEvent(
     typeof message.code === "number" && Number.isInteger(message.code)
       ? tables.severity(message.code)
       : "warning";
+  // Tag the compile-target platform once, here at the engine boundary
+  // (#2378). Non-numeric codes carry no namespace to decode and stay
+  // untagged; so do codes from namespaces tables.platform() does not know.
+  const platform =
+    typeof message.code === "number" && Number.isInteger(message.code)
+      ? tables.platform(message.code)
+      : undefined;
   const codeSuffix = String(message.code ?? message.errorCode ?? "UNKNOWN")
     .replace(/[^A-Z0-9_]/gi, "_")
     .toUpperCase();
@@ -255,6 +268,7 @@ export function mapKmnCompilerEvent(
     severity,
     layer: "A",
     message: text,
+    ...(platform !== undefined ? { platform } : {}),
     ...(typeof line === "number" && line > 0
       ? {
           location: {

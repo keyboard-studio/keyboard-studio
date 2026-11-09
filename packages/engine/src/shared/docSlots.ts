@@ -32,7 +32,7 @@ export interface DocSlotModel {
   hasLinks: string;
   /** helpSiteHeader(displayName); help form only. */
   helpHeader: string;
-  /** The shared inline style (DOC_PAGE_STYLE); welcome and help forms only, so the two pages carry identical CSS. */
+  /** The shared inline style (DOC_PAGE_STYLE); welcome, help and readme.htm forms, so the pages carry identical CSS. */
   pageStyle: string;
   /** Non-empty exactly on a fresh (non-inherited) render, so the shared body opens with the page's one <h1>. */
   pageHeading: string;
@@ -169,6 +169,26 @@ export function stripGeneratedBlocks(inheritedProse: string): string {
     text = closingBody === -1 ? text.slice(0, legacy) : text.slice(0, legacy) + text.slice(closingBody);
   }
   return text;
+}
+
+/**
+ * The text of a hand-written document with its generated section replaced by
+ * `generated` (a suggested regeneration, FR-028). Only the text between the
+ * first DOC_GENERATED_START / DOC_GENERATED_END pair changes; everything the
+ * author wrote stays byte-identical. A document with no markers gets a marked
+ * block appended (before `</body>` for a page, else at the end), so a later
+ * regeneration has a place to land.
+ */
+export function replaceGeneratedBlock(current: string, generated: string): string {
+  const start = current.indexOf(DOC_GENERATED_START);
+  const end = start === -1 ? -1 : current.indexOf(DOC_GENERATED_END, start + DOC_GENERATED_START.length);
+  if (start !== -1 && end !== -1) {
+    return `${current.slice(0, start + DOC_GENERATED_START.length)}\n${generated}\n${current.slice(end)}`;
+  }
+  const block = `${DOC_GENERATED_START}\n${generated}\n${DOC_GENERATED_END}`;
+  const closingBody = current.toLowerCase().lastIndexOf("</body>");
+  if (closingBody !== -1) return `${current.slice(0, closingBody)}${block}\n${current.slice(closingBody)}`;
+  return current === "" || current.endsWith("\n") ? `${current}${block}\n` : `${current}\n${block}\n`;
 }
 
 /** Escape a value for an `.htm` or `.php` form. */

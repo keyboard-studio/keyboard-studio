@@ -33,6 +33,8 @@ import {
   type TouchLayoutIR,
 } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../../stores/workingCopyStore.ts";
+import { isOpenMode } from "../../../lib/openMode.ts";
+import { readVfsText } from "../../../lib/vfsText.ts";
 import {
   lintTouchLayoutText,
   type TouchCodeMarker,
@@ -67,8 +69,21 @@ export function TouchCodePane({ layout }: { layout: TouchLayoutIR | null }) {
   const { t } = useLingui();
   const commitKeyEditBatch = useWorkingCopyStore((s) => s.commitKeyEditBatch);
 
-  // The canonical text for the current layout (Q3 text source).
-  const canonical = layout === null ? null : emitTouchLayout(layout);
+  const mode = useWorkingCopyStore((s) => s.instantiationMode);
+  const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  // Open mode (spec 111 FR-009, research R7): the pane shows the file's own
+  // text and Apply replaces the file, bypassing the structural-edit refusal --
+  // the author is editing the real file, not composing key operations.
+  const openPath =
+    isOpenMode(mode) && startKeyboard !== null
+      ? `source/${startKeyboard.id}.keyman-touch-layout`
+      : null;
+  const openText =
+    openPath !== null && startVfs !== null ? readVfsText(startVfs, openPath) : undefined;
+
+  // The canonical text for the current layout (Q3 text source; Open: the file).
+  const canonical = layout === null ? null : (openText ?? emitTouchLayout(layout));
 
   // Editor text. `null` until the first canonical text arrives.
   const [text, setText] = useState<string | null>(null);
@@ -246,6 +261,18 @@ export function TouchCodePane({ layout }: { layout: TouchLayoutIR | null }) {
       setApplyError(
         err instanceof Error ? err.message : String(err),
       );
+      return;
+    }
+    if (openText !== undefined && openPath !== null) {
+      // Open: a formatting-only change is still a change to the file.
+      if (current === canonical) return;
+      const result = useWorkingCopyStore.getState().replaceStartingPointFromText(openPath, current);
+      if (!result.ok) {
+        setApplyError(result.error);
+        return;
+      }
+      justAppliedRef.current = true;
+      setApplyError(null);
       return;
     }
     const diff = diffTouchLayouts(layout, after, raw);

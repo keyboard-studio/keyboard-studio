@@ -98,6 +98,7 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
       "setStartDocCssTexts",
       "setStartPackageFonts",
       "setBaselineDocFindings",
+      "setStartSource",
       "setStartDocProfile",
     ],
     fields: [
@@ -119,6 +120,7 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
       "startPackageFonts",
       "startDocProfile",
       "baselineDocFindings",
+      "startSource",
       "removalCapabilities",
     ],
     decisionIds: ["base-keyboard"],
@@ -264,7 +266,7 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
   },
   {
     id: "fallback-policy",
-    label: "Keyboard-wide fallback policy (Assign Mechanisms step)",
+    label: "Keyboard-wide fallback policy (Fallback policy step)",
     phase: 3,
     status: "pending",
     storeActions: ["setFallbackPolicy"],
@@ -275,7 +277,7 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
     decisionIds: [],
     evidence: [
       "specs/076-rule-behaviours/fallback-surface-design.md §5: one keyboard-wide setting replaces the per-combination carveDispositions store and the closed-keyboard card",
-      "EDITOR-AUTHORED: written by the fallback-policy section of the Assign Mechanisms step, no decision record",
+      "EDITOR-AUTHORED: written by the Fallback policy manifest step; `fallback-policy` gallery decision recorded on Continue (issue 2539), restored by the decision-point replay (issue 2366)",
     ],
   },
   {
@@ -361,13 +363,42 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
       "inventory-carve-deadkeys.md §A.0: carveTouchKeepInert has no value field (D-090-31) and no live writer — dormant, registered under carve",
     ],
   },
+  {
+    id: "custom-css",
+    label: "Custom CSS step (OSK stylesheet text)",
+    phase: 6,
+    status: "pending",
+    storeActions: ["setCustomCss"],
+    fields: ["customCss"],
+    decisionIds: [],
+    evidence: [
+      "CssEditor's Continue writes the stylesheet text to workingCopyStore.customCss, which projectWorkingCopyVfs step 0b projects into the VFS; no decision module records it yet (NO-DECISION-SOURCE)",
+    ],
+  },
+  {
+    id: "authored-docs",
+    label: "Documentation step (authored doc-member overrides)",
+    phase: 6,
+    status: "pending",
+    storeActions: [
+      "setAuthoredWelcomeHtm",
+      "setAuthoredReadmeHtm",
+      "setAuthoredReadmeMd",
+      "setAuthoredHelpPhp",
+    ],
+    fields: ["authoredWelcomeHtm", "authoredReadmeHtm", "authoredReadmeMd", "authoredHelpPhp"],
+    decisionIds: ["welcome-htm"],
+    evidence: [
+      "HtmlEditor writes the edited doc text to workingCopyStore.authored* fields, which projectWorkingCopyVfs step 0b projects into the VFS and serializeWorkingCopy step 5c re-applies after regeneration (specs/html-editor); the welcome-htm decision records the step's completion (lib/htmlStepCompletion.ts)",
+    ],
+  },
 ];
 
 /**
  * Every member of WorkingCopyState, classified by its backbone source.
- * Transcribed exactly from inventory-store-backbone.md §1 (130 members:
- * 56 fields + 74 actions; class counts STARTING-POINT 33,
- * DECISION-DERIVED 26, OVERLAY-CHANNEL 8, EDITOR-AUTHORED 24,
+ * Transcribed exactly from inventory-store-backbone.md §1 (138 members:
+ * 60 fields + 78 actions; class counts STARTING-POINT 33,
+ * DECISION-DERIVED 26, OVERLAY-CHANNEL 8, EDITOR-AUTHORED 32,
  * SURVEY-SLOT 15, EPHEMERAL 18, UNCLASSIFIED 6). The gate's census arm
  * verifies these keys against the live interface, so a transcription
  * slip — or a new store member — fails loudly.
@@ -404,6 +435,7 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   touchKeyIdentity: { kind: "field", class: "EDITOR-AUTHORED" },
   startDocProfile: { kind: "field", class: "STARTING-POINT" },
   baselineDocFindings: { kind: "field", class: "STARTING-POINT" },
+  startSource: { kind: "field", class: "STARTING-POINT" },
   ir: { kind: "field", class: "DECISION-DERIVED" },
   removalCapabilities: { kind: "field", class: "STARTING-POINT" },
   deletedNodeIds: { kind: "field", class: "DECISION-DERIVED" },
@@ -425,6 +457,11 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   desktopLocked: { kind: "field", class: "SURVEY-SLOT" },
   sequenceFlaggedChars: { kind: "field", class: "SURVEY-SLOT" },
   touchLayoutJson: { kind: "field", class: "SURVEY-SLOT" },
+  customCss: { kind: "field", class: "EDITOR-AUTHORED" },
+  authoredWelcomeHtm: { kind: "field", class: "EDITOR-AUTHORED" },
+  authoredReadmeHtm: { kind: "field", class: "EDITOR-AUTHORED" },
+  authoredReadmeMd: { kind: "field", class: "EDITOR-AUTHORED" },
+  authoredHelpPhp: { kind: "field", class: "EDITOR-AUTHORED" },
   touchDraft: { kind: "field", class: "EDITOR-AUTHORED" },
   galleryIntrosSeen: { kind: "field", class: "EPHEMERAL" },
   keyEditOverlay: { kind: "field", class: "EDITOR-AUTHORED" },
@@ -465,6 +502,11 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   lockDesktop: { kind: "action", class: "SURVEY-SLOT" },
   unlockDesktop: { kind: "action", class: "SURVEY-SLOT" },
   setTouchLayoutJson: { kind: "action", class: "SURVEY-SLOT" },
+  setCustomCss: { kind: "action", class: "EDITOR-AUTHORED" },
+  setAuthoredWelcomeHtm: { kind: "action", class: "EDITOR-AUTHORED" },
+  setAuthoredReadmeHtm: { kind: "action", class: "EDITOR-AUTHORED" },
+  setAuthoredReadmeMd: { kind: "action", class: "EDITOR-AUTHORED" },
+  setAuthoredHelpPhp: { kind: "action", class: "EDITOR-AUTHORED" },
   setTouchDraft: { kind: "action", class: "EDITOR-AUTHORED" },
   markGalleryIntroSeen: { kind: "action", class: "EPHEMERAL" },
   commitKeyEdit: { kind: "action", class: "EDITOR-AUTHORED" },
@@ -482,6 +524,8 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   reset: { kind: "action", class: "EPHEMERAL" },
   instantiateFromStart: { kind: "action", class: "STARTING-POINT" },
   instantiateFromExisting: { kind: "action", class: "STARTING-POINT" },
+  // Open mode (spec 111 FR-009): swaps a starting-point file and startIr together.
+  replaceStartingPointFromText: { kind: "action", class: "STARTING-POINT" },
   setIdentity: { kind: "action", class: "OVERLAY-CHANNEL" },
   setAttribution: { kind: "action", class: "OVERLAY-CHANNEL" },
   setLicenseUnparseable: { kind: "action", class: "STARTING-POINT" },
@@ -505,6 +549,7 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   setTouchKeyIdentity: { kind: "action", class: "EDITOR-AUTHORED" },
   setStartDocProfile: { kind: "action", class: "STARTING-POINT" },
   setBaselineDocFindings: { kind: "action", class: "STARTING-POINT" },
+  setStartSource: { kind: "action", class: "STARTING-POINT" },
   isInstantiated: { kind: "action", class: "STARTING-POINT" },
   markStale: { kind: "action", class: "EPHEMERAL" },
   clearStale: { kind: "action", class: "EPHEMERAL" },

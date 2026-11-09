@@ -209,6 +209,82 @@ describe("MechanismGallery — kbgen suggestion gated on the current char's prod
     // Badge already reads count >= 1 (base-direct) — no suggestion may show.
     expect(screen.queryByText(/Suggested: Replace Q with ɛ/i)).toBeNull();
   });
+
+  // Issue #2536 — accepting one character's suggestion must not turn another
+  // character's strip badge green while that character still shows a pending proposal.
+  it("after accepting an em-dash suggestion, the ellipsis chip stays red (badge 0) while its suggestion row still offers", async () => {
+    const emDash = "\u2014";
+    const ellipsis = "\u2026";
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromStart(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+
+    seedInventory([emDash, ellipsis]);
+
+    const placementMap: PlacementMap = makePlacementMap({
+      bcp47Context: "test",
+      baseLayoutFamily: "QWERTY",
+      entries: [
+        {
+          codepoint: "U+2014",
+          candidates: [
+            {
+              vkey: "K_MINUS",
+              modifiers: [],
+              mechanism: "direct",
+              priorSource: "corpus",
+              priorCount: 3,
+              confidence: 0.85,
+            },
+          ],
+        },
+        {
+          codepoint: "U+2026",
+          candidates: [
+            {
+              vkey: "K_PERIOD",
+              modifiers: [],
+              mechanism: "direct",
+              priorSource: "corpus",
+              priorCount: 3,
+              confidence: 0.85,
+            },
+          ],
+        },
+      ],
+    });
+
+    await act(async () => {
+      render(
+        <MechanismGallery selectedStartKeyboard={basicKbdus} placementMap={placementMap} />,
+        { withStepNav: true },
+      );
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+
+    fireEvent.click(within(strip).getByTestId("char-scroll-chip-2014"));
+    await waitFor(() => {
+      expectCurrentChar(emDash);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Accept suggestion: replace the .* key with/u }));
+
+    await waitFor(() => {
+      expect(within(strip).getByTestId("char-scroll-badge-2026").textContent).toBe("0");
+    });
+
+    fireEvent.click(within(strip).getByTestId("char-scroll-chip-2026"));
+    await waitFor(() => {
+      expectCurrentChar(ellipsis);
+    });
+    await waitFor(() => {
+      expect(suggestionRowText()).toMatch(/Suggested: Replace the .* key with ['']…['']/i);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -324,7 +400,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // covered (accepted above), so an "Added" chip ("Remove U+00E0 à") also
     // carries "U+00E0" in its own aria-label — an unscoped query would be
     // ambiguous.
-    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(onBack).not.toHaveBeenCalled();
     await waitFor(() => {
       expectCurrentChar("à");
@@ -370,7 +446,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     });
 
     // Navigate back to "à" without ever resolving its suggestion.
-    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
     await waitFor(() => {
       expectCurrentChar("à", { marked: true });
     });

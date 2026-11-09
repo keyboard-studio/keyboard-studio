@@ -31,9 +31,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   driveAttributionStep,
-  chooseAdaptTrack,
   acceptProjectName,
   confirmPrefill,
   buildOneCharacterList,
@@ -353,7 +352,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     // Walk the wizard.
     await fillIdentityLite(page);
     await pickStartKeyboardCopyEdit(page);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -407,7 +406,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     // target, so the preview loads a real compiled .js here.
     await fillIdentityLite(page);
     await pickStartKeyboardCopyEdit(page);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -425,7 +424,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     // Walk the full wizard and reach the Output screen.
     await fillIdentityLite(page);
     await pickStartKeyboard(page, FIXTURE.startKeyboardId);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -481,7 +480,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
       languageCode: FIXTURE.languageCode,
     });
     await pickStartKeyboard(page, FIXTURE.startKeyboardId);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -560,45 +559,6 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     expect(helpText).toContain("$pagename = ");
     expect(helpText).toContain("require_once('header.php')");
   });
-
-  test("adapt track: emitted .kps declares the author's language, not the und placeholder", async ({
-    page,
-  }) => {
-    // The adapt track skips project_name, which on the copy track is what writes
-    // the identity-lite language onto the working copy. The working copy must
-    // still start with that language, or every `identity.bcp47` reader runs
-    // without it — the carve needed set never consults the language's exemplars,
-    // and the descriptor below falls back to `und`.
-    await driveIdentityLite(page, {
-      english: FIXTURE.english,
-      autonym: FIXTURE.autonym,
-      script: FIXTURE.targetScript,
-      languageCode: FIXTURE.languageCode,
-    });
-    await pickStartKeyboard(page, FIXTURE.startKeyboardId);
-    await chooseAdaptTrack(page);
-    await driveAttributionStep(page);
-    await confirmPrefill(page);
-    await completePhaseB(page);
-    await finishGalleryWork(page);
-    await navigateToOutput(page);
-    const download = await triggerDownload(page);
-
-    const dlPath = await download.path();
-    expect(dlPath).not.toBeNull();
-    const entries = Object.entries(unzipSync(new Uint8Array(fs.readFileSync(dlPath!))));
-    const kps = entries.find(([name]) => name.endsWith(".kps"));
-    expect(kps, "zip must contain a .kps package file").toBeDefined();
-    const kpsText = new TextDecoder().decode(kps![1]);
-
-    // Same composed tag and display text as the copy-track test above.
-    const languageElements = kpsText.match(/<Language\b[^>]*>[^<]*<\/Language>/g) ?? [];
-    expect(
-      languageElements,
-      ".kps must declare exactly one language: the author's composed tag, with their language's English name",
-    ).toEqual([`<Language ID="fr">${FIXTURE.english}</Language>`]);
-    expect(kpsText).not.toContain('<Language ID="und">');
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -611,11 +571,11 @@ test.describe("Track 1 (copy-edit) E2E", () => {
 // kmcmplib compile (see triggerDownload + the base-compile note above).
 // ---------------------------------------------------------------------------
 
-/** Walk identity → base → track(copy) → project-name → prefill → Phase B → Output tab. */
+/** Walk identity → base → attribution → project-name → prefill → Phase B → Output tab. */
 async function walkToOutput(page: Page, fx: WalkFixture): Promise<void> {
   await fillIdentityLite(page, fx);
   await pickStartKeyboardCopyEdit(page, fx);
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page);
   await acceptProjectName(page);
   await confirmPrefill(page);
@@ -767,7 +727,7 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     // (not including) the Output-tab hop.
     await fillIdentityLite(page);
     await pickStartKeyboard(page, FIXTURE.startKeyboardId);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -898,6 +858,7 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     // navigation — no reload yet).
     await page.goto("/#welcome");
     await page.getByRole("button", { name: "Continue as guest" }).click();
+    await page.getByTestId("start-new").click();
     await page.waitForSelector('[data-testid="identity-panel"]', { timeout: 15_000 });
 
     // A SUBSEQUENT reload must start fresh — the cleared draft must not

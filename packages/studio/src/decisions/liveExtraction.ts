@@ -25,9 +25,11 @@ import type { QuestionModule } from "../survey/types.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
+import { authoringTrackProviderModule } from "../survey/questions/authoringTrackProvider.ts";
 import type { Decision, DecisionId, DecisionSet } from "./decisionTypes.ts";
 import { deepEqual } from "./deepEqual.ts";
 import type { ExtractContext } from "./extractContext.ts";
+import { startCopyrightHolders } from "../lib/startCopyrightHolders.ts";
 import { buildExtractContext } from "./extractContext.ts";
 import { filterGated, orderDecisions } from "./orderDecisions.ts";
 import { deriveSurveyContext } from "./identitySelectors.ts";
@@ -38,6 +40,11 @@ import {
 } from "../lib/phaseFSeeds.ts";
 import type { PhaseFSeedContext } from "../lib/phaseFSeeds.ts";
 import { proposeTroubleshooting } from "../lib/troubleshootingProposal.ts";
+import {
+  isBodyParityLive,
+  legacyBodyParityAnswer,
+  type BodyParityInputs,
+} from "../lib/bodyParity.ts";
 import {
   combineTroubleshootingProposals,
   extractBaseHelpTroubleshootingLines,
@@ -249,6 +256,11 @@ export function runLiveExtraction(deps: LiveExtractionDeps): LiveExtractionResul
 export function buildLiveExtractContext(): ExtractContext {
   const wc = useWorkingCopyStore.getState();
   const ctx = buildExtractContext(wc.startIr, wc.startKeyboard);
+  ctx.startHolders = startCopyrightHolders(
+    wc.startLicenseText,
+    wc.startHolderOverride,
+    wc.startIr,
+  );
   // Spec 092 (T036): Phase F's derivations read working-copy slices and
   // two identity-derived values that are not part of the bundle — supply
   // them from the same stores the old PHASE_F_SEEDS readers read, so the
@@ -304,6 +316,26 @@ export function buildLiveExtractContext(): ExtractContext {
     facetTroubleshootingProposal,
     baseHelpTroubleshootingLines,
   );
+  // Issue #2530: the body-parity question's liveness and legacy answer,
+  // computed from the working-copy store (G-17 — the pf_* module reads
+  // the computed values off the context). The legacy proposal is offered
+  // only when the question is live, so a stale slice on the copy track
+  // (or matching pages) seeds nothing.
+  const bodyParityDecisionValue =
+    useDecisionStore.getState().decisions["help-body-parity"]?.value;
+  const bodyParityInputs: BodyParityInputs = {
+    instantiationMode: wc.instantiationMode,
+    startWelcomeHtmText: wc.startWelcomeHtmText,
+    startHelpPhpText: wc.startHelpPhpText,
+    docFixProposals: wc.docFixProposals,
+    ...(typeof bodyParityDecisionValue === "string"
+      ? { bodyParityDecision: bodyParityDecisionValue }
+      : {}),
+  };
+  const bodyParityLive = isBodyParityLive(bodyParityInputs);
+  const bodyParityProposal = bodyParityLive
+    ? legacyBodyParityAnswer(wc.docFixProposals)
+    : undefined;
   ctx.phaseF = {
     ...(welcomePrefill !== undefined ? { welcomePrefill } : {}),
     ...(projectUrlProposal !== undefined ? { projectUrlProposal } : {}),
@@ -313,6 +345,8 @@ export function buildLiveExtractContext(): ExtractContext {
     ...(troubleshootingProposal !== undefined
       ? { troubleshootingProposal }
       : {}),
+    ...(bodyParityLive ? { bodyParityLive } : {}),
+    ...(bodyParityProposal !== undefined ? { bodyParityProposal } : {}),
     ...(surveyContext["author_contact"] !== undefined
       ? { authorContact: surveyContext["author_contact"] }
       : {}),
@@ -332,7 +366,11 @@ export function buildLiveExtractContext(): ExtractContext {
  */
 export function runLiveExtractionFromStores(): LiveExtractionResult {
   return runLiveExtraction({
-    modules: Object.values(questionRegistry),
+    // The authoring-track provider rides along: the registry no longer
+    // has a question providing authoring-track (the track question is
+    // gone), and orderDecisions throws on the character-inventory
+    // module's requires edge without it.
+    modules: [...Object.values(questionRegistry), authoringTrackProviderModule],
     ctx: buildLiveExtractContext(),
     store: useDecisionStore.getState(),
   });

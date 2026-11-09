@@ -119,6 +119,9 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE",
   "KM_LINT_KPS_FONT_MISSING",
   "KM_LINT_MANDATED_CHAR_MISSING",
+  // Issue #2593 — 18.13 packaged-font glyph coverage (check-font-glyph-
+  // coverage.ts, run via runCriteriaChecks).
+  "KM_LINT_FONT_GLYPH_COVERAGE",
   // Spec 084 KPJ pair — one reader (check-kpj) pins the judged .kpj's
   // <Options><Version> to criterion 1.10's current format from both
   // directions. The constant was settled by Matthew's 2026-10-14
@@ -213,4 +216,16 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_DEPRECATED_HEADER_OR_UNUSED_STORE",
   "KM_LINT_TOUCH_LAYER_MISSING_CONTROL_KEYS",
   "KM_LINT_FILENAME_CONVENTION",
+  // §7.28 — cased-script keyboards declare store(&CasedKeys).
+  "KM_LINT_CASEDKEYS_MISSING",
+  // §18.16 — touch caps layer complete, reached by double-tapping Shift.
+  "KM_LINT_TOUCH_CAPS_LAYER",
+  // §18.17 — consistent Ctrl/RAlt touch keys.
+  "KM_LINT_TOUCH_MODIFIER_KEYS",
+  // §18.18 — touch symbol layer present and linked by K_SYMBOLS keys.
+  "KM_LINT_TOUCH_SYMBOLS_LAYER",
+  // §7.29 — no rule types content on Ctrl without Alt (spec 114).
+  "KM_LINT_RAW_CTRL",
+  // §7.30 — advisory on sided Ctrl rules (spec 114).
+  "KM_LINT_SIDED_CTRL_ADVISORY",
 ]);

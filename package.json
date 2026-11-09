@@ -40,6 +40,7 @@
     "nfd-tolerance-corpus": "node utilities/nfd-tolerance-corpus/run.mjs",
     "test:km-triage": "node --test \"utilities/km-triage-app/*.test.js\"",
     "test:sweep-issues": "node --test scripts/file-sweep-issues.test.mjs",
+    "test:step-nav-lint": "node --test scripts/step-nav-lint.test.mjs",
     "test:supportability-scanner": "vitest run --root utilities/supportability-scanner",
     "test:corpus-eval": "tsc --noEmit -p utilities/corpus-eval && vitest run --root utilities/corpus-eval",
     "typecheck": "pnpm -r typecheck",
@@ -66,8 +67,7 @@
     "crowdin:diagnose": "node utilities/crowdin-diagnose/index.js",
     "crowdin:diagnose:selftest": "node utilities/crowdin-diagnose/selftest.js",
     "test:affected": "node scripts/test-affected.mjs",
-    "test:pr": "node scripts/test-pr.mjs",
-    "prepare": "husky"
+    "test:pr": "node scripts/test-pr.mjs"
   },
   "devDependencies": {
     "@crowdin/cli": "^4.14.4",
@@ -79,10 +79,10 @@
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-lingui": "^0.14.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "husky": "^9.1.7",
     "prettier": "^3.8.3",
     "tsx": "^4.19.0",
     "typescript": "^6.0.3",
+    "undici-types": "~6.21.0",
     "vite": "^7.0.0",
     "vitest": "^4.1.6",
     "yaml": "^2.9.0"

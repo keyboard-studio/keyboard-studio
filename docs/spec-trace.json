@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-11-01",
+  "lastUpdated": "2026-11-06",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -13,7 +13,7 @@
     },
     "§2": {
       "title": "2. Why this exists",
-      "hash": "sha256:888302e2a8922968",
+      "hash": "sha256:0274035cfbd7cf07",
       "status": "reference",
       "implements": [],
       "decisions": [],
@@ -203,7 +203,7 @@
     },
     "§15": {
       "title": "15. Acceptance scenarios",
-      "hash": "sha256:5413c8950f782caf",
+      "hash": "sha256:9ac46266d2975c0f",
       "status": "unimplemented",
       "implements": [],
       "decisions": [],
@@ -246,7 +246,7 @@
     },
     "§3a": {
       "title": "3a. What the user brings (skill envelope)",
-      "hash": "sha256:0443812a6f9bc549",
+      "hash": "sha256:e594fea6e2fce69a",
       "status": "reference",
       "implements": [],
       "decisions": [],
@@ -254,7 +254,7 @@
     },
     "§3b": {
       "title": "3b. What success looks like (outcome envelope)",
-      "hash": "sha256:11b3c8f11494d8c0",
+      "hash": "sha256:3f008ebe79c2e098",
       "status": "reference",
       "implements": [],
       "decisions": [],
@@ -262,7 +262,7 @@
     },
     "§3c": {
       "title": "3c. Defaults are the product",
-      "hash": "sha256:b21138ce96b9aa5c",
+      "hash": "sha256:24621d05fb65547d",
       "status": "reference",
       "implements": [],
       "decisions": [],
@@ -270,7 +270,7 @@
     },
     "specs/002-defaults-engine": {
       "title": "Feature Specification: Defaults engine (propose-then-confirm proposers)",
-      "hash": "sha256:d7a9076892fb900b",
+      "hash": "sha256:1815f98c6f385e55",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -1084,7 +1084,7 @@
     },
     "specs/102-keyboard-docs-templates": {
       "title": "Feature Specification: Keyboard documentation templates and version policy",
-      "hash": "sha256:64f94bf471e8184b",
+      "hash": "sha256:cc3d1a36ef45d7e8",
       "status": "implemented",
       "implements": [],
       "decisions": [],
@@ -1100,7 +1100,7 @@
     },
     "specs/104-touch-key-id-criteria": {
       "title": "Feature Specification: Touch key identity criteria — when a touch key is K_, U_, or T_",
-      "hash": "sha256:084b6f855d941f15",
+      "hash": "sha256:f899ddef1f324a64",
       "status": "implemented",
       "implements": [
         "packages/contracts/src/touchProduction.ts",
@@ -1151,7 +1151,7 @@
     },
     "specs/106-consistent-keyboard-output": {
       "title": "Feature Specification: Consistent keyboard output from base + decisions + carve",
-      "hash": "sha256:19598cba3d1181b4",
+      "hash": "sha256:1a24087376aa41bb",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -1167,7 +1167,15 @@
     },
     "specs/110-readme-template": {
       "title": "Feature Specification: README template driven by authoring choices",
-      "hash": "sha256:e84ef2e58271aae6",
+      "hash": "sha256:51ff964cb8aa296c",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/111-open-existing-keyboard": {
+      "title": "Feature Specification: Open an existing keyboard",
+      "hash": "sha256:9bce3b767c961412",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -1182,8 +1190,8 @@
       "notes": ""
     },
     "specs/html-editor": {
-      "title": "Feature Specification: HTML editor step",
-      "hash": "sha256:07f105927dcf0953",
+      "title": "Feature Specification: HTML editor step — Documentation with file selector + WYSIWYG",
+      "hash": "sha256:612a25f258b9820c",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -1192,6 +1200,22 @@
     "specs/osk-editor": {
       "title": "Feature Specification: OSK editor step",
       "hash": "sha256:cb99e2149a18c715",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/112-cased-keys": {
+      "title": "Feature Specification: Caps Lock and `&CasedKeys`",
+      "hash": "sha256:4c6340695c920abe",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/icon-editor": {
+      "title": "Feature Specification: Icon editor step",
+      "hash": "sha256:b00bab60c9122b65",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

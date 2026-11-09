@@ -77,7 +77,7 @@ Each story phase ends with the same three gate tasks:
      b. `deadkeyOverlay.ops`: set it from `deadkeys-defined.value.ops`. Replay applies the ops to the IR, but the projection reads the store (`serializeWorkingCopy.ts:511`).
      c. Assignments: `physical-layout.value.assignments` -> `recordAssignments` (`stores/workingCopyStore.ts:994`).
      d. `contextToleranceOverlay`: it cannot be derived from the value. At `tolerance`, await `applyContextToleranceDecision` (`lib/contextToleranceApply.ts:62`, async compile + simulate).
-     e. `fallbackPolicy`: it is in no decision value and not in the record (`survey/carve/carveValue.ts:29-33`). The harness uses DEFAULT; this limitation is recorded in the fixture header.
+     e. `fallbackPolicy`: superseded by issue #2366 (`5a12ff74`): it is now the `fallback-policy` decision, recorded at the step and restored by the fixture through `migrateFallbackPolicy`; a record without it replays with `DEFAULT_FALLBACK_POLICY`.
   6. Call `buildOutputBundle()`.
   7. Return the compiled result, a `simulate` closure and the gates.
 - [x] T012 [US1] Add the script `fixtures:decision-points` to `packages/studio/package.json`. It runs `scripts/genDecisionPoints.ts`, which writes `src/lib/__fixtures__/decision-points/<base>/<profile>/<point>.decisions.json` from the T003 records, and its output must be deterministic. Generate and commit the JSON.
@@ -188,36 +188,9 @@ Each story phase ends with the same three gate tasks:
 
 ---
 
-## Phase 7: User Story 5 — Caps handling decision (P2)
+## Phase 7: User Story 5 — Caps handling decision (moved)
 
-**Goal**: FR-050 to FR-055. **Independent test**: G5 passes on every fixture at `caps`; the NCAPS WASM check is green on the four bases; the sil_cameroon_qwerty adapt offer compiles with zero warnings. **Branch**: `km/106-caps-handling`.
-
-- [ ] T042 [P] [US5] Write tests in `packages/studio/src/survey/questions/gallery/capsHandling.test.ts`:
-  - the casing gate (a caseless alphabet gives mode none, not asked);
-  - the copy default with QWERTY and AZERTY floors;
-  - the union with a non-letter key carrying ŋ/Ŋ on base/shift and on RAlt/Shift+RAlt.
-  - The four decision-point fixtures cannot show the US5 gap (all are copy-track bases that already carry `&CasedKeys`). Add a synthetic fixture with ŋ/Ŋ on a non-letter key and a caseless base, and extend G5 to read store-routed pairs (`any(altgrKeys) > index(...)`), so G5 fails before T048 and passes after it.
-- [ ] T043 [P] [US5] Write adapt-track tests:
-  - an explicit CAPS/NCAPS start IR is offered only when the simulator outputs under {none, SHIFT, CAPS, SHIFT+CAPS} match for every key;
-  - otherwise the offer is withheld with a reason;
-  - `&CasedKeys` already present is extracted.
-- [ ] T044 [US5] Add the `caps-handling` decision id to `packages/studio/src/decisions/decisionTypes.ts`. Add the `CapsHandlingValue` type and its zod mirror (if decision values are schema-validated) next to the module.
-- [ ] T045 [US5] Write the module `packages/studio/src/survey/questions/gallery/capsHandling.ts`:
-  - `screen: "layout"`, `requires: ["character-inventory","windows-layout"]`, `apply: () => ({})`;
-  - `lookupDefault` for copy and `extract` for adapt;
-  - register it in `survey/questions/registry.ts` (Art. IX).
-- [ ] T046 [US5] Write the renderer `packages/studio/src/survey/caps/CapsHandlingStep.tsx`:
-  - provenance shown;
-  - the key set listed;
-  - an adapt offer with before/after evidence;
-  - auto-complete as `not-asked` for caseless scripts, following the `ConvenienceCharsStep` :250-267 precedent;
-  - en/fr i18n;
-  - accessibility per spec 056.
-- [ ] T047 [US5] Remove the `ensureCasedKeysStore` call from `scaffoldIR` in `packages/engine/src/scaffolder/scaffold-ir.ts` (:274) and export the family key constants. Update the scaffolder tests that expected the silent store.
-- [ ] T048 [US5] Add projection step 2.8 to `packages/studio/src/lib/projectWorkingCopyVfs.ts`, after 2.7 and before 3. It writes or removes `store(&CasedKeys)` from the decision plus the assigned keys that carry a pair. When the adapt simplification is accepted, it also strips the CAPS/NCAPS rules. Wire it through `projectionInputFromState`.
-- [ ] T049 [US5] Companion pre-accept: in `packages/studio/src/editors/assignLoop/casePairCompanion.ts` and `MechanismGallery.tsx` (:5219, :3630), Apply includes the companion when the key is in the derived set and the counterpart is in the alphabet. The banner stays visible and dismissible.
-- [ ] T050 [P] [US5] Add a touch parity test in `packages/engine/src/scaffolder/cleanTouchLayout.test.ts`: every cased letter on `default` is on `shift` and `caps`, and `caps` keys carry no `nextlayer`.
-- [ ] T051 [US5] Gate. Commit `feat(studio): caps handling as a decision with &CasedKeys`, push, and open a PR.
+T042–T051 moved to [specs/112-cased-keys](../112-cased-keys/spec.md) (2026-11-03). None were started.
 
 ---
 
@@ -225,10 +198,10 @@ Each story phase ends with the same three gate tasks:
 
 **Goal**: FR-060 and FR-061. **Independent test**: G2 = 0 on every fixture at `tolerance`. **Branch**: `km/106-tolerance-default`.
 
-- [ ] T052 [P] [US6] Write seeded-context simulator tests in `packages/studio/src/test/decisionPoint.tolerance.corpus.test.ts`: NFC `ǎ` and NFD `a`+U+030C behave identically for the guard, peel and whole-stack.
-- [ ] T053 [US6] Add `origin?: "default" | "asked"` to `MarksContextToleranceDecision` in `packages/contracts/src/surveyPhaseResult.ts` (:202), with the zod mirror in the same commit.
-- [ ] T054 [US6] In `packages/studio/src/survey/marks/ContextToleranceStation.tsx`, when there are gap findings and no decision, show the normalization as pre-accepted (default, with a "change" link), and record `decisionFromProposal` with `origin: "default"` on the station's **Continue**, not on render. This keeps Art. X: nothing applies before the author continues. Add en/fr i18n. `recordToDecisionSet` and the fixtures record the same default.
-- [ ] T055 [US6] Gate. Commit `feat(studio): context normalization accepted by default`, push, and open a PR.
+- [x] T052 [P] [US6] Write seeded-context simulator tests in `packages/studio/src/test/decisionPoint.tolerance.corpus.test.ts`: NFC `ǎ` and NFD `a`+U+030C behave identically for the guard, peel and whole-stack. **As built** (2026-11-07): 5 tests, split by recorded backspace — Bafut (whole-stack) covers guard + whole-stack + typing, camqwerty (peel) covers peel + typing. Bafut peel is out of scope per the spec 062 scope note (only precomposed-output units are covered by the unwrap generator).
+- [x] T053 [US6] Add `origin?: "default" | "asked"` to `MarksContextToleranceDecision` in `packages/contracts/src/surveyPhaseResult.ts` (:202), with the zod mirror in the same commit. **As built**: `origin` on the interface and on `MarksContextToleranceDecisionSchema` (`z.enum(["default","asked"]).optional()`); schema round-trip test added.
+- [x] T054 [US6] In `packages/studio/src/survey/marks/ContextToleranceStation.tsx`, when there are gap findings and no decision, show the normalization as pre-accepted (default, with a "change" link), and record `decisionFromProposal` with `origin: "default"` on the station's **Continue**, not on render. This keeps Art. X: nothing applies before the author continues. Add en/fr i18n. `recordToDecisionSet` and the fixtures record the same default. **As built**: the default view shows on both the normalization-step and per-rule paths (no path qualifier in T054/FR-060); explicit confirm/decline records `origin: "asked"`; the Continue hook in `MarksSeriesStep.tsx` records the default via `defaultToleranceDecision`. Fixtures record a deferred-default marker (`origin: "default"`, empty fingerprint) which `installToleranceOverlay` derives into the concrete decision from the live analysis — so the marker survives re-analysis while a real fingerprint still gates staleness. Landing the default exposed a G4 interaction: the applied step's `generated_cn_*` stores hold the pasted alternates and repackage the keyboard's own repertoire, so G4 now exempts those stores as a whole (contract line updated; `NORMALIZATION_STORE_PREFIX` exported via the engine's context-tolerance subpath). Removing the KNOWN_GAPS row exposed a second interaction: the headless author's mid-walk step accept goes stale at replay (later decisions grow the repertoire, changing the step content) while the gap rules it covers are unchanged — `installToleranceOverlay` now re-derives the step when the fingerprint's site + gap-rule components still match. Camazerty G2 remains: 16 findings after the default (down from 17), all rules matching precomposed `è` + a second mark — a normalization-coverage follow-up, not a default-accept gap; the US6 row stays.
+- [x] T055 [US6] Gate. Commit `feat(studio): context normalization accepted by default`, push, and open a PR.
 
 ---
 

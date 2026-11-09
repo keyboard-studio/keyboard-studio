@@ -234,11 +234,6 @@ const SESSION: ReadonlyArray<{ stepId: string; result: unknown; act: () => void 
     },
   },
   {
-    stepId: "track",
-    result: { track: "copy" },
-    act: () => {},
-  },
-  {
     stepId: "characters",
     result: phaseResult([{ questionId: "b_inventory", answerType: "char-list", value: ["ɓ"] }]),
     act: () => {
@@ -499,8 +494,13 @@ describe("FR-007 / SC-008 — the projected keyboard does not depend on recordin
     // US6) on a base that ships no images, on both runs equally, so twelve
     // is the new floor. A projection that collapsed to one would still make
     // the loop below vacuous.
-    expect(withRecording.vfs.size).toBe(12);
-    expect([...withRecording.vfs.keys()].some((p) => /^source\/welcome\/ks-layout-desktop-.*\.svg$/.test(p))).toBe(true);
+    //
+    // This session opens a keyboard that carries its own descriptor, which is
+    // Open (spec 111): its documentation is carried, not regenerated, so there
+    // is no generated welcome/help/readme.htm and no layout chart, and the
+    // floor is the fixture's own files plus the completed package members.
+    expect(withRecording.vfs.size).toBe(8);
+    expect([...withRecording.vfs.keys()].some((p) => /^source\/welcome\/ks-layout-desktop-.*\.svg$/.test(p))).toBe(false);
     for (const [path, entry] of withRecording.vfs) {
       expectSameBytes(withoutRecording.vfs.get(path), entry, path);
     }

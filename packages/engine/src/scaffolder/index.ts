@@ -167,6 +167,21 @@ function rewriteKpjFilePaths(xml: string, startId: string, keyboardId: string): 
   );
 }
 
+/**
+ * Rewrite `.kmw-keyboard-<fromId>` — the wrapper class KeymanWeb puts around a
+ * keyboard — to `.kmw-keyboard-<toId>`, so a stylesheet written for one id
+ * still matches after a rename. After the literal id, require a token boundary
+ * that does NOT treat `-` as a boundary (\b does — `r` and `-` are word vs
+ * non-word), so compound classes like `.kmw-keyboard-<id>-variant` are not
+ * half-rewritten. Still block `from_id_extra` (\w continues with `_`). Escaped
+ * `fromId` avoids regex metacharacters in ids.
+ */
+export function rewriteKmwKeyboardSelectors(css: string, fromId: string, toId: string): string {
+  if (fromId === toId) return css;
+  const re = new RegExp(`kmw-keyboard-${escapeForRegex(fromId)}(?![\\w-])`, "g");
+  return css.replace(re, `kmw-keyboard-${toId}`);
+}
+
 /** @internal Exported for unit testing only. */
 export function renameFilesInVfs(vfs: VirtualFS, startId: string, keyboardId: string): void {
   // Sibling-file extensions that conventionally use the keyboard id as
@@ -223,15 +238,12 @@ export function renameFilesInVfs(vfs: VirtualFS, startId: string, keyboardId: st
   }
 
   // Rewrite `.kmw-keyboard-<startId>` selectors in every *.css entry.
-  // Word-boundary anchor ensures we don't rewrite substrings that start with
-  // the base id followed by additional alphanumerics (e.g. `start_id_extra`).
   // Iterated AFTER the file-rename pass so the matched *.css files already
   // live at their new <keyboardId>.css paths.
-  const cssBaseClassRe = new RegExp(`kmw-keyboard-${startId}\\b`, "g");
   for (const cssPath of vfs.list("").filter((p) => p.endsWith(".css"))) {
     const cssEntry = vfs.get(cssPath);
     if (cssEntry === undefined || typeof cssEntry.content !== "string") continue;
-    const rewritten = cssEntry.content.replace(cssBaseClassRe, `kmw-keyboard-${keyboardId}`);
+    const rewritten = rewriteKmwKeyboardSelectors(cssEntry.content, startId, keyboardId);
     if (rewritten !== cssEntry.content) {
       vfs.set(cssPath, rewritten, false);
     }
@@ -463,6 +475,37 @@ function attributionText(
   return { line: singleLineNotice(block), license: renderLicense(block), holderCount: block.length };
 }
 
+/** The `.kps <Info>` copyright and author fields, each omitted when there is nothing to state. */
+function attributionDescriptorFields(
+  copyrightLine: string | null | undefined,
+  attribution: Attribution | undefined,
+): Pick<PackageDescriptorIdentity, "copyrightLine" | "authorName" | "authorEmail"> {
+  return {
+    ...(copyrightLine !== undefined && copyrightLine !== null ? { copyrightLine } : {}),
+    ...(attribution !== undefined && attribution.authorName.trim() !== ""
+      ? { authorName: attribution.authorName.trim() }
+      : {}),
+    ...(attribution?.authorEmail !== undefined && attribution.authorEmail !== ""
+      ? { authorEmail: attribution.authorEmail }
+      : {}),
+  };
+}
+
+/**
+ * The `.kps <Info>` copyright and author fields for a derived keyboard, from
+ * the same accumulated holder block {@link generateStubs} writes LICENSE.md
+ * from. For the output path's descriptor writer, which generates the `.kps`
+ * before `generateStubs` would: without these the package names no author
+ * and no copyright (spec 064 FR-003).
+ */
+export function packageAttributionFields(
+  attribution: Attribution | undefined,
+  inherited: readonly import("@keyboard-studio/contracts").CopyrightHolder[],
+  emitYear: number = new Date().getFullYear(),
+): Pick<PackageDescriptorIdentity, "copyrightLine" | "authorName" | "authorEmail"> {
+  return attributionDescriptorFields(attributionText(attribution, emitYear, inherited).line, attribution);
+}
+
 export function generateStubs(
   vfs: VirtualFS,
   keyboardId: string,
@@ -628,15 +671,7 @@ export function generateStubs(
     const identity: PackageDescriptorIdentity = {
       displayName,
       ...(languages[0] !== undefined ? { languageTag: languages[0] } : {}),
-      ...(copyrightLine !== undefined && copyrightLine !== null
-        ? { copyrightLine }
-        : {}),
-      ...(attribution !== undefined && attribution.authorName.trim() !== ""
-        ? { authorName: attribution.authorName.trim() }
-        : {}),
-      ...(attribution?.authorEmail !== undefined && attribution.authorEmail !== ""
-        ? { authorEmail: attribution.authorEmail }
-        : {}),
+      ...attributionDescriptorFields(copyrightLine, attribution),
     };
     vfs.set(
       kpsPath,

@@ -1,220 +1,121 @@
 /**
  * CssEditor — custom CSS editor step (after Touch Gallery).
  *
- * An optional step for authoring the keyboard's custom CSS
- * (`&KMW_EMBEDCSS` stylesheet, `.css` file in the package).
+ * The keyboard's own OSK stylesheet (`&KMW_EMBEDCSS`), edited in the shared
+ * two-pane gallery layout: the CSS on the left, the real KeymanWeb preview
+ * (touch or desktop, the same pane the galleries use) on the right.
  *
- * Features:
- * - Monaco editor for CSS (lazy-loaded)
- * - Live preview: Touch layout and Desktop OSK side-by-side or toggleable,
- *   with the custom CSS applied via a <style> tag
- * - Optional: "Skip" / "No custom CSS" — if empty, no .css file is written
- * - On Continue: passes { css } via onComplete for the output pipeline
- *
- * CSS affects mostly touch, but possibly the desktop OSK too — so preview both.
+ * - The editor opens on the keyboard's existing stylesheet, or on what the
+ *   author left here before.
+ * - Apply pushes the text through the working-copy projection, so the preview
+ *   recompiles with it exactly as the zip will carry it.
+ * - Continue records the result in the working copy (`customCss`); a step left
+ *   untouched leaves the start keyboard's stylesheet alone.
+ * - The editor shows `.kmw-keyboard-` selectors under the author's keyboard id,
+ *   as the output will; the working copy keeps them under the start id, as the
+ *   start files do, so the projection can relink them to whatever id is current.
  */
 
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
-import { generateKvksFromIR } from "@keyboard-studio/engine";
-import type { KvksIR, TouchLayoutIR } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { parseTouchLayoutOrNull } from "../../lib/docContent.ts";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
+import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
+import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
+import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
+import { rewriteKmwKeyboardSelectors } from "@keyboard-studio/engine";
+import { readKeyboardCss } from "../../lib/customCss.ts";
+import { galleryGhostBtn, TEXT_DIM } from "../../lib/galleryTheme.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
+import { AssignLoopShell } from "./AssignLoopShell.tsx";
+import { GalleryPreviewPane } from "./PreviewPane.tsx";
 
 // Lazy-load the Monaco pane so it never lands in the main chunk.
 const CssCodePane = lazy(() =>
   import("./CssCodePane.tsx").then((m) => ({ default: m.CssCodePane })),
 );
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type PreviewMode = "touch" | "desktop" | "side-by-side";
-
-// ---------------------------------------------------------------------------
-// Preview components
-// ---------------------------------------------------------------------------
-
-/** Simplified touch layout preview — renders phone platform keys. */
-function TouchPreview({ layout, customCss }: { layout: TouchLayoutIR | null; customCss: string }) {
-  const { t } = useLingui();
-  if (!layout) {
-    return (
-      <div style={{ padding: 16, color: "var(--app-text-muted)", fontSize: 13 }}>
-        {t({ id: "editor.assignLoop.css.preview.noTouch", message: "No touch layout available." })}
-      </div>
-    );
-  }
-
-  const phone = layout.platforms.find((p) => p.id === "phone") ?? layout.platforms[0];
-  if (!phone) {
-    return (
-      <div style={{ padding: 16, color: "var(--app-text-muted)", fontSize: 13 }}>
-        {t({ id: "editor.assignLoop.css.preview.noTouch", message: "No touch layout available." })}
-      </div>
-    );
-  }
-
-  const layer = phone.layers[0];
-  if (!layer) return null;
-
-  return (
-    <div className="css-preview-touch" style={{ padding: 12 }}>
-      <style>{customCss}</style>
-      <div style={{ fontSize: 12, color: "var(--app-text-muted)", marginBottom: 8 }}>
-        {t({ id: "editor.assignLoop.css.preview.touchLabel", message: "Touch (phone)" })}
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {layer.rows.map((row, ri) => (
-          <div key={ri} style={{ display: "flex", gap: 4 }}>
-            {row.keys.map((key) => (
-              <div
-                key={key.id}
-                className="kmw-key"
-                style={{
-                  flex: 1,
-                  minHeight: 44,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "var(--app-surface)",
-                  border: "1px solid var(--app-border)",
-                  borderRadius: 6,
-                  fontSize: 16,
-                  color: "var(--app-text)",
-                }}
-              >
-                {key.text ?? key.id}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** Simplified desktop OSK preview — renders KvksIR layers. */
-function DesktopPreview({ kvks, customCss }: { kvks: KvksIR | null; customCss: string }) {
-  const { t } = useLingui();
-  if (!kvks || kvks.layers.length === 0) {
-    return (
-      <div style={{ padding: 16, color: "var(--app-text-muted)", fontSize: 13 }}>
-        {t({ id: "editor.assignLoop.css.preview.noDesktop", message: "No desktop OSK available." })}
-      </div>
-    );
-  }
-
-  const layer = kvks.layers[0];
-  if (!layer) return null;
-
-  // Simple grid: 10 keys per row
-  const rows: Array<typeof layer.keys> = [];
-  for (let i = 0; i < layer.keys.length; i += 10) {
-    rows.push(layer.keys.slice(i, i + 10));
-  }
-
-  return (
-    <div className="css-preview-desktop" style={{ padding: 12 }}>
-      <style>{customCss}</style>
-      <div style={{ fontSize: 12, color: "var(--app-text-muted)", marginBottom: 8 }}>
-        {t({ id: "editor.assignLoop.css.preview.desktopLabel", message: "Desktop OSK" })}
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {rows.map((rowKeys, ri) => (
-          <div key={ri} style={{ display: "flex", gap: 4 }}>
-            {rowKeys.map((key) => (
-              <div
-                key={key.vkey}
-                className="kmw-key"
-                style={{
-                  flex: 1,
-                  minHeight: 40,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "var(--app-surface)",
-                  border: "1px solid var(--app-border)",
-                  borderRadius: 6,
-                  fontSize: 14,
-                  color: "var(--app-text)",
-                }}
-              >
-                {key.label || key.vkey}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
 export function CssEditor({ onComplete, onBack }: EditorStepProps) {
   const { t } = useLingui();
-  const ir = useWorkingCopyStore((s) => s.ir);
-  const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
-  const kbdname = useWorkingCopyStore((s) => s.ir?.header.name ?? "keyboard");
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  const identity = useWorkingCopyStore((s) => s.identity);
+  const committedCss = useWorkingCopyStore((s) => s.customCss);
+  const setCustomCss = useWorkingCopyStore((s) => s.setCustomCss);
 
-  const [css, setCss] = useState("");
-  const [previewMode, setPreviewMode] = useState<PreviewMode>("side-by-side");
-  const [skipped, setSkipped] = useState(false);
+  const startId = startKeyboard?.id ?? "";
+  const keyboardId = identity?.keyboardId ?? startId;
+  const toDisplay = (css: string | null) => (css === null ? null : rewriteKmwKeyboardSelectors(css, startId, keyboardId));
 
-  // Parse touch layout
-  // `touchLayoutJson` is the raw Keyman touch-layout file (`{ phone: { layer: [...] } }`),
-  // not the IR; it has no `platforms`, so it must go through the codec.
-  const touchLayout = useMemo<TouchLayoutIR | null>(
-    () => parseTouchLayoutOrNull(touchLayoutJson),
-    [touchLayoutJson],
+  // The start keyboard's own stylesheet, as the working copy holds it (null when it has none there).
+  const startCssText = useMemo(
+    () => (startVfs === null || startKeyboard === null ? null : (readKeyboardCss(startVfs, startKeyboard.id)?.text ?? null)),
+    [startVfs, startKeyboard],
   );
 
-  // Generate desktop OSK
-  const kvks = useMemo<KvksIR | null>(() => {
-    if (!ir) return null;
-    try {
-      return generateKvksFromIR(ir, kbdname);
-    } catch {
-      return null;
-    }
-  }, [ir, kbdname]);
+  // The text the author has applied this visit; null until they apply (or clear) something.
+  const [applied, setApplied] = useState<string | null>(null);
+  // Bumped by "Discard changes" to remount the editor on the seed text.
+  const [editorGeneration, setEditorGeneration] = useState(0);
 
-  const handleApply = (newCss: string) => {
-    setCss(newCss);
-    setSkipped(false);
+  const scaffoldSpec = useMemo<ScaffoldSpec | null>(
+    () =>
+      identity?.keyboardId != null
+        ? { keyboardId: identity.keyboardId, displayName: identity.displayName ?? "" }
+        : null,
+    [identity?.keyboardId, identity?.displayName],
+  );
+  const vfsTransform = useWorkingCopyTransform(applied !== null ? { liveCss: applied } : undefined);
+  const { stage, retry } = useKeyboardArtifact(startKeyboard, scaffoldSpec, vfsTransform);
+
+  // The preview's own VFS is the other place the stylesheet shows up: whatever styles the preview is what the editor should open
+  // on, even where the working copy's start VFS does not carry the file. Taken once, before any edit of this visit.
+  const [previewCssText, setPreviewCssText] = useState<string | null>(null);
+  useEffect(() => {
+    if (stage.kind !== "ready" || previewCssText !== null || applied !== null) return;
+    setPreviewCssText(readKeyboardCss(stage.vfs, stage.keyboardId)?.text ?? "");
+  }, [stage, previewCssText, applied]);
+
+  // What the editor opens on: this step's earlier result, else the keyboard's own stylesheet. Null while the preview has yet to say.
+  // The preview's text is already relinked (it is the projected VFS); the other two are stored under the start id.
+  const seedText = toDisplay(committedCss ?? startCssText) ?? previewCssText ?? (stage.kind === "error" ? "" : null);
+
+  // Back to what the step opened on: the preview and the editor both drop this visit's edits.
+  const handleDiscard = () => {
+    setApplied(null);
+    setEditorGeneration((g) => g + 1);
   };
 
-  const handleSkip = () => {
-    setSkipped(true);
-    setCss("");
-  };
-
+  // Clearing the editor and applying it removes the keyboard's stylesheet; an untouched step leaves it as it was.
   const handleContinue = () => {
-    // If skipped or empty, pass empty css (no .css file written)
-    // Otherwise pass the CSS for the output pipeline
-    onComplete({ css: skipped ? "" : css });
+    if (applied !== null) setCustomCss(rewriteKmwKeyboardSelectors(applied, keyboardId, startId));
+    onComplete({ css: applied ?? seedText ?? "" });
   };
 
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 16,
-        padding: 24,
-        height: "100%",
-        overflowY: "auto",
-      }}
-    >
-      <h1 style={{ margin: 0, fontSize: 20, color: "var(--app-text)" }}>
-        {t({ id: "editor.assignLoop.css.title", message: "Custom CSS" })}
-      </h1>
-      <p style={{ margin: 0, fontSize: 13, color: "var(--app-text-muted)" }}>
+  // Footer nav (spec 081, #2527): Back / Continue publish to the footer
+  // instead of rendering in the sticky in-body bar. The "Discard changes"
+  // button stays in the body — it is an editor action, not step nav.
+  // Test id is unchanged, so e2e keeps finding css-continue in the footer.
+  usePublishStepNav({
+    ...(onBack !== undefined
+      ? {
+          back: {
+            label: t({ id: "editor.assignLoop.css.back", message: "Back" }),
+            onClick: onBack,
+            testId: "css-back",
+          },
+        }
+      : {}),
+    forward: {
+      label: t({ id: "editor.assignLoop.css.continue", message: "Continue" }),
+      onClick: handleContinue,
+      testId: "css-continue",
+    },
+  });
+
+  const leftContent = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16, height: "100%", boxSizing: "border-box" }}>
+      <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM }}>
         {t({
           id: "editor.assignLoop.css.description",
           message:
@@ -222,154 +123,50 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
         })}
       </p>
 
-      {/* Preview mode toggle */}
-      <div style={{ display: "flex", gap: 8 }}>
-        {(
-          [
-            ["touch", t({ id: "editor.assignLoop.css.previewMode.touch", message: "Touch" })],
-            ["desktop", t({ id: "editor.assignLoop.css.previewMode.desktop", message: "Desktop" })],
-            ["side-by-side", t({ id: "editor.assignLoop.css.previewMode.sideBySide", message: "Side by side" })],
-          ] as Array<[PreviewMode, string]>
-        ).map(([mode, label]) => (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => setPreviewMode(mode)}
-            aria-pressed={previewMode === mode}
-            style={{
-              padding: "6px 12px",
-              fontSize: 13,
-              borderRadius: 6,
-              border: `1px solid ${previewMode === mode ? "var(--app-accent)" : "var(--app-border)"}`,
-              background: previewMode === mode ? "var(--app-accent-bg)" : "var(--app-surface)",
-              color: "var(--app-text)",
-              cursor: "pointer",
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Editor + Preview */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: previewMode === "side-by-side" ? "1fr 1fr" : "1fr",
-          gap: 16,
-          flex: 1,
-          minHeight: 0,
-        }}
-      >
-        {/* CSS Editor */}
-        <div style={{ display: "flex", flexDirection: "column", minHeight: 300 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--app-text)", marginBottom: 8 }}>
-            {t({ id: "editor.assignLoop.css.editorLabel", message: "CSS" })}
-          </div>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <Suspense
-              fallback={
-                <div style={{ padding: 16, color: "var(--app-text-muted)", fontSize: 13 }}>
-                  {t({ id: "editor.assignLoop.css.code.loading", message: "Loading editor…" })}
-                </div>
-              }
-            >
-              <CssCodePane initialText={css} onApply={handleApply} />
-            </Suspense>
-          </div>
-          <button
-            type="button"
-            onClick={handleSkip}
-            style={{
-              marginTop: 8,
-              padding: "6px 12px",
-              fontSize: 13,
-              borderRadius: 6,
-              border: "1px solid var(--app-border)",
-              background: "var(--app-surface)",
-              color: "var(--app-text-muted)",
-              cursor: "pointer",
-              alignSelf: "flex-start",
-            }}
-          >
-            {t({ id: "editor.assignLoop.css.skip", message: "No custom CSS (skip)" })}
-          </button>
-        </div>
-
-        {/* Preview */}
-        {(previewMode === "touch" || previewMode === "side-by-side") && (
-          <div
-            style={{
-              border: "1px solid var(--app-border)",
-              borderRadius: 8,
-              background: "var(--app-surface)",
-              overflow: "auto",
-              minHeight: 300,
-            }}
-          >
-            <TouchPreview layout={touchLayout} customCss={css} />
-          </div>
-        )}
-        {(previewMode === "desktop" || previewMode === "side-by-side") && (
-          <div
-            style={{
-              border: "1px solid var(--app-border)",
-              borderRadius: 8,
-              background: "var(--app-surface)",
-              overflow: "auto",
-              minHeight: 300,
-            }}
-          >
-            <DesktopPreview kvks={kvks} customCss={css} />
-          </div>
-        )}
-      </div>
-
-      {/* Footer */}
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          paddingTop: 16,
-          borderTop: "1px solid var(--app-border)",
-        }}
-      >
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            style={{
-              padding: "10px 20px",
-              fontSize: 14,
-              borderRadius: 6,
-              border: "1px solid var(--app-border)",
-              background: "var(--app-surface)",
-              color: "var(--app-text)",
-              cursor: "pointer",
-            }}
-          >
-            {t({ id: "editor.assignLoop.css.back", message: "Back" })}
-          </button>
-        )}
-        <div style={{ flex: 1 }} />
-        <button
-          type="button"
-          data-testid="css-continue"
-          onClick={handleContinue}
-          style={{
-            padding: "10px 24px",
-            fontSize: 14,
-            borderRadius: 6,
-            border: "1px solid var(--app-accent)",
-            background: "var(--app-accent-bg)",
-            color: "var(--app-text)",
-            cursor: "pointer",
-            fontWeight: 600,
-          }}
+      {/* The editor takes every pixel the pane has; a flex column gives Monaco's height:100% a definite box to resolve against. */}
+      <div style={{ flex: 1, minHeight: 300, display: "flex", flexDirection: "column" }}>
+        <Suspense
+          fallback={
+            <div style={{ padding: 16, color: TEXT_DIM, fontSize: 13 }}>
+              {t({ id: "editor.assignLoop.css.code.loading", message: "Loading editor…" })}
+            </div>
+          }
         >
-          {t({ id: "editor.assignLoop.css.continue", message: "Continue" })}
-        </button>
+          {seedText === null ? (
+            <div style={{ padding: 16, color: TEXT_DIM, fontSize: 13 }}>
+              {t({ id: "editor.assignLoop.css.code.loading", message: "Loading editor…" })}
+            </div>
+          ) : (
+            <CssCodePane key={editorGeneration} initialText={seedText} onApply={setApplied} />
+          )}
+        </Suspense>
       </div>
+
+      <button
+        type="button"
+        onClick={handleDiscard}
+        disabled={applied === null}
+        style={{ ...galleryGhostBtn, alignSelf: "flex-start", ...(applied === null ? { opacity: 0.5, cursor: "not-allowed" } : {}) }}
+      >
+        {t({ id: "editor.assignLoop.css.discard", message: "Discard changes" })}
+      </button>
     </div>
+  );
+
+  return (
+    <AssignLoopShell
+      headingText={t({ id: "editor.assignLoop.css.title", message: "Custom CSS" })}
+      modalityLabel={t({ id: "editor.assignLoop.css.editorLabel", message: "CSS" })}
+      leftContent={leftContent}
+      rightContent={
+        <GalleryPreviewPane
+          startKeyboard={startKeyboard}
+          stage={stage}
+          retry={retry}
+          defaultOskMode="touch"
+          heading={t({ id: "editor.assignLoop.preview.heading", message: "Live preview" })}
+        />
+      }
+    />
   );
 }

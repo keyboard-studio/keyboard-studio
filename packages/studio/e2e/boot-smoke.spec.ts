@@ -24,6 +24,8 @@ const ROOT_RENDERS = [
   // Dashboard/profile tab (#1477 FR-009 audit — unscanned by any walk spec,
   // which all stay on the survey/preview/output/trail tabs).
   { name: "profile tab", url: "/#profile", axe: true, seed: true },
+  // The New-or-Open choice (spec 111).
+  { name: "start screen", url: "/#start", axe: true, seed: true },
 ];
 
 for (const { name, url, axe, seed } of ROOT_RENDERS) {
@@ -58,3 +60,19 @@ for (const { name, url, axe, seed } of ROOT_RENDERS) {
     }
   });
 }
+
+// Spec 111 FR-001: after "Continue as guest" the author chooses New or Open, both
+// on screen. toBeInViewport, not toBeVisible: Playwright counts an element
+// clipped below an overflow:hidden pane as visible, which is how the Open entry
+// once shipped unreachable. The nav wordmark leads back to the choice.
+test("guest reaches New and Open, and the wordmark leads back", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue as guest" }).click();
+  await expect(page.getByTestId("start-new")).toBeInViewport({ timeout: 30_000 });
+  await expect(page.getByRole("region", { name: /open an existing keyboard/i })).toBeInViewport();
+
+  await page.getByTestId("start-new").click();
+  await expect(page).toHaveURL(/#survey/);
+  await page.getByRole("link", { name: "Keyboard Studio" }).click();
+  await expect(page.getByTestId("start-new")).toBeInViewport({ timeout: 30_000 });
+});

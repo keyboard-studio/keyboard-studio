@@ -25,14 +25,18 @@ import { relativeTime, type RelativeTimeValue } from "../lib/relativeTime.ts";
 import { BG_CARD, BORDER, TEXT_MAIN, TEXT_DIM, BLUE_ACTION, FONT } from "../survey/surveyStyles.ts";
 
 // Friendly labels for the step the draft was left on, as lazy msg()
-// descriptors resolved per-render below.
-const STEP_LABELS: Record<DraftMeta["activeStepId"], MessageDescriptor> = {
+// descriptors resolved per-render below. Partial: a draft saved on a
+// retired step (e.g. the removed track step) has no entry, and the
+// banner falls back to the raw step id (see below).
+const STEP_LABELS: Partial<Record<DraftMeta["activeStepId"], MessageDescriptor>> = {
   identity: msg({ id: "resumeDraft.steps.identity", message: "language identity" }),
   layout: msg({ id: "resumeDraft.steps.layout", message: "community keyboard layout" }),
   choose_base: msg({ id: "resumeDraft.steps.chooseBase", message: "choosing a starting keyboard" }),
-  track: msg({ id: "resumeDraft.steps.track", message: "authoring track" }),
   attribution: msg({ id: "resumeDraft.steps.attribution", message: "author & copyright" }),
   project_name: msg({ id: "resumeDraft.steps.projectName", message: "project name" }),
+  open_languages: msg({ id: "resumeDraft.steps.openLanguages", message: "languages" }),
+  open_missing_letters: msg({ id: "resumeDraft.steps.openMissingLetters", message: "letters" }),
+  open_upgrades: msg({ id: "resumeDraft.steps.openUpgrades", message: "upgrades" }),
   characters: msg({ id: "resumeDraft.steps.characters", message: "characters" }),
   marks: msg({ id: "resumeDraft.steps.marks", message: "combining marks" }),
   punctuation: msg({ id: "resumeDraft.steps.punctuation", message: "punctuation" }),
@@ -42,12 +46,14 @@ const STEP_LABELS: Record<DraftMeta["activeStepId"], MessageDescriptor> = {
   deadkeys: msg({ id: "resumeDraft.steps.deadkeys", message: "deadkeys" }),
   rules: msg({ id: "resumeDraft.steps.rules", message: "rules" }),
   mechanisms: msg({ id: "resumeDraft.steps.mechanisms", message: "mechanisms" }),
+  fallback_policy: msg({ id: "resumeDraft.steps.fallbackPolicy", message: "fallback policy for undefined keys" }),
   osk: msg({ id: "resumeDraft.steps.osk", message: "on-screen keyboard" }),
   touch_seed_source: msg({ id: "resumeDraft.steps.touchSeedSource", message: "touch starting point" }),
   touch: msg({ id: "resumeDraft.steps.touch", message: "touch layout" }),
   css: msg({ id: "editor.assignLoop.css.title", message: "Custom CSS" }),
   help: msg({ id: "resumeDraft.steps.help", message: "help & docs" }),
   html: msg({ id: "editor.assignLoop.html.title", message: "Documentation" }),
+  icon: msg({ id: "editor.assignLoop.icon.title", message: "Keyboard icon" }),
   done: msg({ id: "resumeDraft.steps.done", message: "the final step" }),
   unsupported: msg({ id: "resumeDraft.steps.unsupported", message: "an unsupported script" }),
 };
@@ -125,7 +131,10 @@ const discardButton: CSSProperties = {
 
 export function ResumeDraftBanner({ meta, onResume, onDiscard }: ResumeDraftBannerProps) {
   const { t, i18n } = useLingui();
-  const stepLabel = t(STEP_LABELS[meta.activeStepId]) ?? meta.activeStepId;
+  // A draft saved on a retired step (e.g. the removed track step) has no
+  // label entry; fall back to the raw step id rather than crashing the banner.
+  const stepDescriptor = STEP_LABELS[meta.activeStepId];
+  const stepLabel = stepDescriptor !== undefined ? t(stepDescriptor) : meta.activeStepId;
   const name =
     meta.label !== null
       ? `"${meta.label}"`

@@ -209,4 +209,11 @@ export interface MarksContextToleranceDecision {
   fingerprint: string;
   /** Set by the apply effect after a successful write. */
   appliedFingerprint?: string;
+  /**
+   * How the decision was reached (spec 106 FR-060): `"default"` when the
+   * author took the station's pre-accepted normalization by continuing,
+   * `"asked"` when the author chose explicitly at the station. Absent on
+   * decisions recorded before US6.
+   */
+  origin?: "default" | "asked";
 }

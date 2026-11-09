@@ -38,8 +38,10 @@ interface JourneyCase {
   visitsOnce?: readonly string[];
   /** The step the replay ends on. */
   lastStep?: string;
-  /** The replay's last edge is html->done (help and html editor steps precede output). */
+  /** The replay's last edge is icon->done (help, html and icon editor steps precede output). */
   endsAtDone: boolean;
+  /** The last edge when it is not html->done: Open skips help and html when its documents are fine. */
+  lastEdge?: string;
 }
 
 const JOURNEYS: readonly JourneyCase[] = [
@@ -49,7 +51,6 @@ const JOURNEYS: readonly JourneyCase[] = [
     visits: [
       "identity",
       "choose_base",
-      "track",
       "attribution",
       "project_name",
       "characters",
@@ -60,8 +61,9 @@ const JOURNEYS: readonly JourneyCase[] = [
       "css",
       "help",
       "html",
+      "icon",
     ],
-    lastStep: "html",
+    lastStep: "icon",
     endsAtDone: true,
   },
   {
@@ -70,7 +72,6 @@ const JOURNEYS: readonly JourneyCase[] = [
     visits: [
       "identity",
       "choose_base",
-      "track",
       "attribution",
       "project_name",
       "characters",
@@ -81,16 +82,18 @@ const JOURNEYS: readonly JourneyCase[] = [
       "css",
       "help",
       "html",
+      "icon",
     ],
-    lastStep: "html",
+    lastStep: "icon",
     endsAtDone: true,
   },
   {
     name: "bj-cree-woods-track2",
     summary: "replays the Track 2 adapt spine through the syllabic Phase B branch (US1, T012)",
-    // Adapt track skips project_name (gated side-trail fork).
-    visits: ["carve"],
-    skips: ["project_name"],
+    // Adapt track (Open, spec 111) skips project_name and the opt-in galleries, and
+    // visits the Open-only language list, Letters and (a non-basic keyboard) Mechanisms.
+    visits: ["open_languages", "open_missing_letters", "mechanisms"],
+    skips: ["project_name", "carve"],
     endsAtDone: true,
   },
   {
@@ -125,7 +128,7 @@ describe.each(JOURNEYS)("replayJourney — $name", (j) => {
       expect(result.exercisedStepIds.filter((s) => s === id)).toHaveLength(1);
     }
     if (j.lastStep !== undefined) expect(result.exercisedStepIds.at(-1)).toBe(j.lastStep);
-    if (j.endsAtDone) expect(result.exercisedEdges.at(-1)).toBe("html->done");
+    if (j.endsAtDone) expect(result.exercisedEdges.at(-1)).toBe(j.lastEdge ?? "icon->done");
   });
 });
 

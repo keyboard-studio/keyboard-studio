@@ -39,11 +39,13 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Bambara | `bambara` | `bm` | Sekou Goro | `../keyboards/release/b/bambara` |
 | Bamum | `bamum` | `bax` | Lorna Evans | `../keyboards/release/b/bamum` |
 | Western Cree (TH-Woods) | `bj_cree_woods` | `cr` | Bill Jancewicz | `../keyboards/release/bj/bj_cree_woods` |
+| Naskapi (Common) | `bj_naskapi_common` | `nsk` | Bill Jancewicz | `../keyboards/release/bj/bj_naskapi_common` |
 | BU Phonetic | `bu_phonetic` | `fr`, `de`, `und-Latn`, `es` | J. Albert Bickford | `../keyboards/release/b/bu_phonetic` |
 | Bukawa | `bukawa` | `buk` | William Eckermann | `../keyboards/release/b/bukawa` |
 | Cabecar | `cabecar` | `cjp-Latn` | Victoria Quint | `../keyboards/release/c/cabecar` |
 | Chechen Latin | `chechen_latin` | `ce-Latn` | Chechen Language | `../keyboards/release/c/chechen_latin` |
 | Clavier du Burkina | `clavbur9` | `bm`, `bbo`, `beh`, `bfo`, `bib`, `bmq`, `bof`, `box`, `bwj`, `bwq`, `bwy`, `bxl`, `cme`, `dgd`, `dgs` … (+18 more) | © SIL Burkina Faso | `../keyboards/release/c/clavbur9` |
+| Coptic (Greek) | `coptic_greek` | `cop` | Michael Everson | `../keyboards/release/c/coptic_greek` |
 | Simplified Chinese | `cs_pinyin` | `zh` | SIL International | `../keyboards/release/c/cs_pinyin` |
 | Common Devanagari | `common_devanagari` | `hi` | © 2021 WIn Publishing Trust | `../keyboards/release/c/common_devanagari` |
 | Dega | `dega` | `rad`, `kpm`, `cmo`, `jra`, `bdq` | Y Phič Hđơ̆k | `../keyboards/release/d/dega` |
@@ -58,6 +60,8 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Enga | `enga` | `enq-Latn` | Stanley Stanis Kaka | `../keyboards/release/e/enga` |
 | Enggano | `enggano` | `eno` | Mary Dalrymple | `../keyboards/release/e/enggano` |
 | Esperanto Plus | `eo_plus` | `eo` | Andrea Vaccari | `../keyboards/release/e/eo_plus` |
+| EUJMO | `esperanto_sava_eujao` | `eo-Shaw` | Kreis Johannes Ĝenberĝ | `../keyboards/release/e/esperanto_sava_eujao` |
+| ewe | `ewe` | `ee` | dcshcilab | `../keyboards/release/e/ewe` |
 | Dane-Z̲aa Z̲áágéʔ | `fv_dane_zaa_zaage` | `bea` | Clarissa Forbes | `../keyboards/release/fv/fv_dane_zaa_zaage` |
 | X̱aayda-X̱aad Kil | `fv_hlgaagilda_xaayda_kil` | `hax` | (c) 2008-2024 FirstVoices, SIL International. Portions (c) 2006 Chris Harvey | `../keyboards/release/fv/fv_hlgaagilda_xaayda_kil` |
 | Northern Tutchone | `fv_northern_tutchone` | `ttm-Latn` | (c) 2008-2019 FirstVoices, SIL International. Portions (c) 2006 Chris Harvey | `../keyboards/release/fv/fv_northern_tutchone` |
@@ -69,10 +73,12 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Gautami Devanagari | `gautami_devanagari` | `hi`, `sa` | Gautam Sengupta | `../keyboards/release/gautami/gautami_devanagari` |
 | Gautami IndiTran | `gautami_inditran` | `la` | Gautam Sengupta | `../keyboards/release/gautami/gautami_inditran` |
 | Gautami Thamizh/Tamil | `gautami_thamizh_tamil` | `ta` | Gautam Sengupta | `../keyboards/release/gautami/gautami_thamizh_tamil` |
+| Gandhari | `gandhari` | `sa-Latn`, `pgd-Latn` | Andrew Glass | `../keyboards/release/g/gandhari` |
 | Geba Karen (Myanmar) | `geba_karen_mymr` | `kvq` | Copyright © SIL Global | `../keyboards/release/g/geba_karen_mymr` |
 | GFF Amharic | `gff_amharic` | `am` | The Geʾez Frontier Foundation | `../keyboards/release/gff/gff_amharic` |
 | GFF Geʾez Manuscript | `gff_geez_emufi` | `gez` | The Geʾez Frontier Foundation | `../keyboards/experimental/gff/gff_geez_emufi` |
 | Ghana | `ghana` | `ak-Latn`, `ee-Latn`, `ada-Latn`, `dga-Latn`, `hag-Latn`, `nzi-Latn`, `xsm-Latn` | © 2017-2020 SIL International | `../keyboards/release/g/ghana` |
+| Greek Classical | `greekclassical` | `cpg`, `el`, `grc-Grek`, `pnt`, `tsd`, `yej` | Manuel Lopez | `../keyboards/release/g/greekclassical` |
 | Haroi | `haroi` | `hro`, `vi` | © SIL Global | `../keyboards/release/h/haroi` |
 | Hausa Kano | `hausa_kano` | `ha-Latn` | Hamza Sulayman | `../keyboards/release/h/hausa_kano` |
 | Bengali Phonetic (ITRANS) | `itrans_bengali` | `bn`, `as` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_bengali` |
@@ -93,9 +99,11 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Postmodern English US DualStroke | `postmodern_english_us_dualstroke` | `en-QP` | The Postmodern English Project | `../keyboards/release/p/postmodern_english_us_dualstroke` |
 | Arabic Phonetic (SIL) | `sil_arabic_phonetic` | `ar`, `arq-Arab`, `abv-Arab`, `shu-Arab`, `acy-Arab`, `avl-Arab`, `arz-Arab`, `afb-Arab`, `acw-Arab`, `ayl-Arab`, `acm-Arab`, `ary-Arab`, `ars-Arab`, `apc-Arab`, `ayp-Arab` … (+8 more) | Marc Durdin and Tamara Duff | `../keyboards/release/sil/sil_arabic_phonetic` |
 | Indígenas Bolivianos | `sil_bolivia` | `ay`, `aro`, `cav`, `cao`, `cap`, `cax`, `ese`, `gnw`, `gn`, `gui`, `gyr`, `ign`, `qu-BO`, `qul`, `srq` … (+2 more) | (c) 2022 SIL International | `../keyboards/release/sil/sil_bolivia` |
+| Bunong ឞូន៝ង (SIL) | `sil_bunong` | `cmo-Khmr` | © SIL Global | `../keyboards/release/sil/sil_bunong` |
 | Cherokee Nation (SIL) | `sil_cherokee_nation` | `chr-Cher` | © 2012-2020 SIL International | `../keyboards/release/sil/sil_cherokee_nation` |
 | Dzongkha (SIL) | `sil_dzongkha` | `dz-BT` | © SIL Global | `../keyboards/release/sil/sil_dzongkha` |
 | Polytonic Greek (SIL) | `sil_greek_polytonic` | `grc-Grek`, `el` | D I Bevan | `../keyboards/release/sil/sil_greek_polytonic` |
+| Indic Roman Transliteration (SIL) | `sil_indic_roman` | `hi-Latn`, `as-Latn`, `bn-Latn` | © SIL Global | `../keyboards/release/sil/sil_indic_roman` |
 | Kayah [Myanmar] (SIL) | `sil_kayah_mymr` | `kyu-Mymr` | © SIL Global | `../keyboards/release/sil/sil_kayah_mymr` |
 | Kcho (SIL) | `sil_kcho` | `mwq`, `dao` | SIL Global | `../keyboards/release/sil/sil_kcho` |
 | Khmer Angkor | `khmer_angkor` | `km` | Makara Sok | `../keyboards/release/k/khmer_angkor` |
@@ -123,6 +131,8 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Khmer (SIL) | `sil_khmer` | `km`, `brb`, `cmo-Khmr`, `jra-Khmr`, `kdt-Khmr`, `krr`, `krv`, `kxm-Khmr`, `tpu` | D. Kanjahn | `../keyboards/release/sil/sil_khmer` |
 | MADHURÂH (SIL) | `sil_madurese` | `mad` | Copyright © SIL Global | `../keyboards/release/sil/sil_madurese` |
 | Myanmar3 (SIL) | `sil_myanmar_my3` | `my` | © SIL Global | `../keyboards/release/sil/sil_myanmar_my3` |
+| Nigeria Dot (SIL) | `sil_nigeria_dot` | `anc`, `ann`, `atg`, `bom`, `bzw`, `enn`, `gkn`, `ig`, `igb`, `ige`, `ikw`, `jbu`, `yaz` | Heidi Rosendall | `../keyboards/release/sil/sil_nigeria_dot` |
+| Nigeria Underline (SIL) | `sil_nigeria_underline` | `ank`, `bys`, `iri`, `kad`, `kaj`, `kcg`, `kdl`, `ldb`, `lnu`, `tiv` | Heidi Rosendall | `../keyboards/release/sil/sil_nigeria_underline` |
 | Pan Africa Mnemonic (SIL) | `sil_pan_africa_mnemonic` | `bjt`, `bin`, `efi`, `ee`, `fon`, `ff`, `fub-Latn`, `fue`, `fuh`, `ha`, `idu`, `ig`, `dyu`, `kbp`, `kr` … (+12 more) | Lorna Evans | `../keyboards/release/sil/sil_pan_africa_mnemonic` |
 | Kannada WinScript (NLCI) | `nlci_kannada_winscript` | `kn`, `kfi-Knda`, `tcy`, `sa-Knda` | Binila Sanki, SG NLCI | `../keyboards/release/nlci/nlci_kannada_winscript` |
 | Telugu Winscript (NLCI) | `nlci_telugu_winscript` | `te` | Binila Sanki, SG NLCI | `../keyboards/release/nlci/nlci_telugu_winscript` |
@@ -137,6 +147,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Yorùbá with Dot | `sil_yoruba_dot` | `yo-Latn` | P. Baehr | `../keyboards/release/sil/sil_yoruba_dot` |
 | Yorùbá 8 | `sil_yoruba8` | `yo-Latn` | P. Baehr | `../keyboards/release/sil/sil_yoruba8` |
 | Sorani Behdini (Qwerty) | `sorani_behdini_arab_qwerty` | `ku-Arab`, `kmr-Arab`, `ku-Arab-TR`, `ckb` | © SIL Global | `../keyboards/release/s/sorani_behdini_arab_qwerty` |
+| Swanalekha Malayalam | `swanalekha_malayalam` | `ml` | Ramesh Kunnappully | `../keyboards/release/s/swanalekha_malayalam` |
 | sxava_eo | `sxava_eo` | `eo` | © 2023 Veotri | `../keyboards/release/s/sxava_eo` |
 | Taiwan Austronesian | `taiwan_austronesian` | `ami-Latn-001` | cathaylab | `../keyboards/release/t/taiwan_austronesian` |
 | Takri | `takri` | `xnr-Takr` | (c) manik | `../keyboards/release/t/takri` |
@@ -148,6 +159,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Todhri | `todhri` | `sq-Todr`, `als-Todr` | © SIL Global | `../keyboards/release/t/todhri` |
 | Triqui Itunyoso | `triqui_itunyoso` | `trq` | Kayla Shames | `../keyboards/release/t/triqui_itunyoso` |
 | Toto | `txo_toto` | `txo` | Toby Anderson | `../keyboards/release/t/txo_toto` |
+| Turkmen Cyrillic | `turkmen_cyrl` | `tk-Cyrl` | © 2002-2020 David Gray | `../keyboards/release/t/turkmen_cyrl` |
 | Unifon | `unifon` | `en` | SIL International | `../keyboards/experimental/u/unifon` |
 | Vietnamese Telex | `vietnamese_telex` | `vi` | Mike Vo | `../keyboards/release/v/vietnamese_telex` |
 | Wancho | `wancho` | `nnp-Wcho` | Banwang Losu | `../keyboards/experimental/w/wancho` |

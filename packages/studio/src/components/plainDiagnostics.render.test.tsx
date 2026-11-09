@@ -50,6 +50,26 @@ describe("DiagnosticsPanel — plain diagnostics", () => {
     expect(screen.getByText("Something in the keyboard couldn't be built.")).toBeTruthy();
     expect(screen.getByText("Try undoing your last change.")).toBeTruthy();
   });
+
+  it("shows web-tagged diagnostics too — the review panel filters nothing (#2378)", () => {
+    const { container } = render(
+      <DiagnosticsPanel
+        diagnostics={[
+          {
+            code: "KM_ERROR_KMCMP_5271556",
+            severity: "error",
+            layer: "A",
+            message: "Touch layout file does not exist.",
+            platform: "web",
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("The touch layout file for your keyboard is missing.")).toBeTruthy();
+    expect(screen.getByText("Undo the change that removed it, or rebuild the touch layout.")).toBeTruthy();
+    const details = container.querySelector("details");
+    expect(details?.textContent).toContain("KM_ERROR_KMCMP_5271556");
+  });
 });
 
 describe("PreviewPaneOverlay — plain diagnostics", () => {

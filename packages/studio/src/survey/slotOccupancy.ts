@@ -9,7 +9,12 @@
 // and occupied-cost factors in placementRationale.ts, and for the gallery's
 // displacement (demotion) proposal: an assignment that lands on an occupied
 // slot shadows the incumbent (Keyman first-match-wins), so the incumbent
-// must be named and re-homed, never silently lost.
+// must be named and re-homed, never silently lost. A slot the ledger does
+// not cover still types the host layout's letter (pass-through, #2525) —
+// `displacedFor` consults the host lookup for exactly those slots, so the
+// pass-through incumbent is named for displacement purposes without
+// materializing every host key into the ledger (the rationale's spare-hole
+// factor keeps reading IR + session occupancy only).
 //
 // Slot identity reuses the contracts `collisions()` serialization
 // (`vkey|sorted-modifiers`, packages/contracts/src/placementMap.ts) so a
@@ -27,6 +32,8 @@
 //   - Deadkey-only trigger rules (output is a lone deadkey token) produce
 //     no glyph and are skipped, as are backspace-correction rules (the
 //     same `contextHasDirectBackspace` predicate buildProducedSet uses).
+//   - Touch-only virtual keys (`T_*`, `U_*`) are not physical slots and are
+//     skipped, matching the session overlay's physical-modality filter.
 //   - Opaque fragments (ir.raw without a typed rule) are invisible here.
 //     Occupancy is KNOWN occupancy; copy built on it must not claim
 //     exhaustiveness.
@@ -75,13 +82,30 @@ export function slotKeyFor(
 // Occupancy ledger
 // ---------------------------------------------------------------------------
 
-export type SlotSource = "base" | "session";
+export type SlotSource = "base" | "session" | "host";
+
+/**
+ * A host-layout lookup for one slot: the glyph the typist's host layout
+ * types there, or null when the slot is unknown on the host (see
+ * survey/hostOccupancy.ts — unanimity across the likely hosts, never a
+ * guess). Consulted only by {@link displacedFor}, for slots the ledger
+ * itself does not cover.
+ */
+export type HostCharFor = (
+  vkey: string,
+  modifiers: readonly string[],
+) => string | null;
 
 export interface SlotOccupant {
   /** The glyph (one NFC grapheme) this slot currently types. */
   char: string;
   /** Whether the occupant comes from the working IR or a session assignment. */
   source: SlotSource;
+}
+
+/** Keyman's touch-only virtual keys: `T_` (custom) and `U_` (Unicode) ids. */
+function isTouchOnlyVkey(name: string): boolean {
+  return /^[TU]_/i.test(name);
 }
 
 /** True when a rule's whole output is a lone deadkey token (an S-02 trigger). */
@@ -133,6 +157,10 @@ export function buildSlotOccupancy(
         if (rule.context.length !== 1) continue;
         const vkeyEl = rule.context[0];
         if (vkeyEl === undefined || vkeyEl.kind !== "vkey") continue;
+        // Physical slots only, like the session overlay below: a touch-only
+        // T_/U_ key is reached by no keystroke, so counting it would let a
+        // glyph look "still produced elsewhere" when desktop has lost it.
+        if (isTouchOnlyVkey(vkeyEl.name)) continue;
         const glyphs = new Set<string>();
         collectFromElements(rule.output, storeMap, glyphs, false);
         // Conservative: only a single-glyph output names an incumbent.
@@ -490,17 +518,32 @@ export function isStillNeeded(char: string, needSets: NeedSets): boolean {
 /**
  * The glyph an assignment to (vkey, modifiers) would displace, or null when
  * the slot is free or already types `selfChar` itself.
+ *
+ * Pass-through (#2525): when the ledger has no incumbent for the slot —
+ * no IR rule, no session assignment — the keystroke falls through to the
+ * host layout, and the host's output on the slot is the incumbent for
+ * displacement purposes (`source: "host"`). A ledger incumbent always
+ * wins over the host: the IR rule is what the keyboard actually does.
+ * Without a host lookup the slot is simply free, as before.
  */
 export function displacedFor(
   occupancy: ReadonlyMap<string, SlotOccupant>,
   vkey: string,
   modifiers: readonly string[],
   selfChar: string,
+  hostCharFor?: HostCharFor,
 ): SlotOccupant | null {
   const occupant = occupancy.get(slotKeyFor(vkey, modifiers)) ?? null;
-  if (occupant === null) return null;
-  if (occupant.char.normalize("NFC") === selfChar.normalize("NFC")) return null;
-  return occupant;
+  if (occupant !== null) {
+    if (occupant.char.normalize("NFC") === selfChar.normalize("NFC")) return null;
+    return occupant;
+  }
+  if (hostCharFor === undefined) return null;
+  const hostChar = hostCharFor(vkey, modifiers);
+  if (hostChar === null) return null;
+  const hostGlyph = hostChar.normalize("NFC");
+  if (hostGlyph === selfChar.normalize("NFC")) return null;
+  return { char: hostGlyph, source: "host" };
 }
 
 /**

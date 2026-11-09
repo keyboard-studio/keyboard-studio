@@ -1,25 +1,31 @@
-// welcomeHtm — gallery decision module for `welcome-htm` (HTML editor step).
+// welcomeHtm — gallery decision module for `welcome-htm` (Documentation step).
 //
-// The welcome.htm editor step (#2481) records the authored manual at completion;
-// this module names the decision so spec 091's derivation includes the "html"
-// screen after help.
+// The Documentation editor step (specs/html-editor) records the authored
+// documentation at completion; this module names the decision so spec 091's
+// derivation includes the "html" screen after help.
+//
+// Recording is step-side (lib/htmlStepCompletion.ts, the completeOskStep
+// precedent): HtmlEditor writes the authored text to the working-copy
+// store directly and Continue records the `welcome-htm` decision.
+// `apply` stays a no-op — WorkingCopyPatch has no authored-docs channel,
+// so a module apply cannot store these fields; `writes` stays empty for
+// the same reason (it names IR paths, and the doc members are VFS files,
+// not IR locations).
 //
 // Boundary (FR-003): a gallery module is a pure descriptor — no store imports.
 
 import type { GalleryModule } from "../../types.ts";
-import { UnmigratedGalleryRenderer } from "./placeholderRenderer.tsx";
+import type { WelcomeHtmValue } from "../../assignLoop/welcomeHtmValue.ts";
+import { WelcomeHtmDecisionRenderer } from "../../assignLoop/WelcomeHtmDecisionRenderer.tsx";
+
+export type { WelcomeHtmValue } from "../../assignLoop/welcomeHtmValue.ts";
 
 export const definition = {
   id: "welcomeHtm",
   type: "notice" as const,
-  prompt: "What should the welcome page say?",
-  audit_label: "Welcome page",
+  prompt: "What should the documentation say?",
+  audit_label: "Documentation",
 };
-
-/** Markdown source for welcome.htm; empty keeps the scaffold default. */
-export interface WelcomeHtmValue {
-  html: string;
-}
 
 const welcomeHtm: GalleryModule<WelcomeHtmValue> = {
   definition,
@@ -29,7 +35,7 @@ const welcomeHtm: GalleryModule<WelcomeHtmValue> = {
   inputs: [],
   writes: [],
   apply: () => ({}),
-  renderer: UnmigratedGalleryRenderer,
+  renderer: WelcomeHtmDecisionRenderer,
   fixtures: {
     valid: [{ value: undefined, note: "no decision recorded yet" }],
     invalid: [],

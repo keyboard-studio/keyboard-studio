@@ -385,3 +385,111 @@ describe("judgeForeignKeyboard end to end", () => {
     expect(await status171(pr(2, 0, 1))).toBe("needs-human");
   });
 });
+
+describe("authored mode shows the same reviewer context (/review parity)", () => {
+  // The authored assembly builds this from its own judged VFS — no PR,
+  // so no scope note and no comment counts. The kps carries an Author
+  // so the copyright rows have a second place to compare.
+  const vfs = createVirtualFS([
+    entry("README.md", "# Ibibio Tonal\n\nbody"),
+    entry(
+      "HISTORY.md",
+      "Title\n=====\n\n1.1 (2026-01-02)\n----\n* x\n\n1.0 (2015)\n----\n* y\n",
+    ),
+    entry(
+      "source/welcome.htm",
+      "<html><style>x{}</style><p>Welcome. To install, download the package. Type letters.</p></html>",
+    ),
+    entry("source/readme.htm", "<p>one two three</p>"),
+  ]);
+  const kps =
+    '<Package><Info><Name URL="">Ibibio Tonal</Name><Description URL="">Desc</Description><Author URL="https://example.org">Jo Author</Author></Info></Package>';
+  const src = buildReviewerSource({
+    vfs,
+    kpsText: kps,
+    kpsLanguages: ["ibb-Latn"],
+    keyboardIR: undefined,
+    reviewContext: undefined,
+    isUpgradePr: false,
+    langtags: (s) =>
+      s === "ibb" ? { name: "Ibibio", script: "Latn", region: "NG" } : null,
+  });
+  const authored = (over: Partial<CriteriaInput> = {}) =>
+    makeInput({ mode: "authored", reviewerSource: src, ...over });
+  const lines = (id: string, input: CriteriaInput) =>
+    rowOf(id, input).evidence().lines.join("\n");
+
+  it("name, excerpt, and history rows show the same context, still Needs author", () => {
+    const five = rowOf("5.1-", authored());
+    expect(five.status).toBe("needs-author");
+    expect(lines("5.1-", authored())).toContain('README title: "Ibibio Tonal"');
+    expect(lines("5.1-", authored())).toContain('.kps <Info><Name>: "Ibibio Tonal"');
+    expect(lines("6.2-", authored())).toContain("readme.htm: 3 words");
+    expect(lines("6.5-", authored())).toMatch(/To install, download the package/);
+    expect(lines("3.2-", authored())).toMatch(/HISTORY.md excerpt: "Title/);
+    // No PR here: no scope note on any of them.
+    for (const id of ["5.1-", "6.2-", "6.5-", "3.2-"]) {
+      expect(lines(id, authored())).not.toContain("Source file unchanged by this PR.");
+    }
+  });
+
+  it("copyright rows show the LICENSE line beside the .kps author", () => {
+    const verified = new Map([
+      [
+        "KM_LINT_COPYRIGHT_ABSENT",
+        ["File: LICENSE.md", 'Found: "Copyright (C) 2015-2020 Fixture Holder"'],
+      ],
+    ]);
+    const t = lines("4.3-", authored({ verifiedByCode: verified }));
+    expect(t).toContain('LICENSE.md copyright: "Copyright (C) 2015-2020 Fixture Holder"');
+    expect(t).toContain('.kps <Info><Author>: "Jo Author" (https://example.org)');
+  });
+
+  it("4.2 is Not applicable in authored mode too when LICENSE and HISTORY share one year", () => {
+    const singleYear = buildReviewerSource({
+      vfs: createVirtualFS([
+        entry("HISTORY.md", "Title\n=====\n\n1.0 (2026)\n----\n* y\n"),
+      ]),
+      kpsText: undefined,
+      kpsLanguages: [],
+      keyboardIR: undefined,
+      reviewContext: undefined,
+      isUpgradePr: false,
+    });
+    expect(singleYear.historyYears).toEqual({ earliest: 2026, latest: 2026 });
+    const verified = new Map([
+      ["KM_LINT_COPYRIGHT_ABSENT", ['Found: "Copyright © 2026 GemaGemia"']],
+    ]);
+    const input = makeInput({
+      mode: "authored",
+      verifiedByCode: verified,
+      reviewerSource: singleYear,
+    });
+    expect(rowOf("4.2-", input).status).toBe("not-applicable");
+    expect(lines("4.2-", input)).toContain(
+      "The LICENSE.md year and every HISTORY.md entry fall in the same year",
+    );
+    // The multi-year history stays Needs author: the keyboard was
+    // updated across years, so the range question still stands.
+    expect(
+      rowOf(
+        "4.2-",
+        makeInput({ mode: "authored", verifiedByCode: verified, reviewerSource: src }),
+      ).status,
+    ).toBe("needs-author");
+  });
+
+  it("language rows show the tag lines but stay with the author — no auto-verdict", () => {
+    const row = rowOf("10.4-", authored());
+    expect(row.status).toBe("needs-author");
+    expect(lines("10.4-", authored())).toContain(
+      ".kps language ibb-Latn: Ibibio; default Latn, NG",
+    );
+  });
+
+  it("17.1 stays with a human: no PR counts exist in authored mode", () => {
+    const row = rowOf("17.1-", authored());
+    expect(row.status).toBe("needs-human");
+    expect(lines("17.1-", authored())).not.toMatch(/comment\(s\) on the diff/);
+  });
+});

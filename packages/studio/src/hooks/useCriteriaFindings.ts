@@ -47,6 +47,7 @@ import type {
   VirtualFS,
 } from "@keyboard-studio/contracts";
 import { KeyboardLintEngine } from "@keymanapp/keyboard-lint";
+import type { LintContext } from "@keymanapp/keyboard-lint";
 
 import {
   applyInventoryOutcome,
@@ -54,6 +55,8 @@ import {
 } from "../criteria/assembleLintContext.ts";
 import { computeAssemblyVerdicts } from "../criteria/assemblyVerdicts.ts";
 import { buildCriteriaInventory } from "../criteria/buildCriteriaInventory.ts";
+import { buildOpenCriteriaInventory } from "../criteria/buildOpenInventory.ts";
+import { isOpenMode } from "../lib/openMode.ts";
 import type {
   CriteriaAssemblyVerdict,
 } from "../criteria/criteriaTypes.ts";
@@ -79,6 +82,7 @@ import { useDocumentationFindings } from "./useDocumentationFindings.ts";
  * engine ever reports the same problem.
  */
 import { mergeLintFindings } from "../criteria/mergeFindings.ts";
+import type { ExpectedCoverage } from "../criteria/criteriaTypes.ts";
 export { mergeLintFindings };
 
 export interface CriteriaFindings {
@@ -94,6 +98,15 @@ export interface CriteriaFindings {
   keyboardId: string | null;
   /** The judged artifact's VFS (null until the stage is ready). */
   vfs: VirtualFS | null;
+  /**
+   * The assembled lint context for the judged VFS (null until the run is
+   * current): the parsed keyboard IR, the .kps text and declared language
+   * tags, and the rest of CriteriaLintInput. The authored criteria
+   * assembly reads it to build the reviewer-source facts (names,
+   * language tags, document excerpts) the /review report already shows
+   * — same VFS, same context, same lines.
+   */
+  lintCtx: LintContext | null;
   /**
    * The stage's compile result (Batch 1: the §§7.6/7.21 severity
    * mapping reads it via CriteriaInput.compileResult). Null until the
@@ -111,6 +124,12 @@ export interface CriteriaFindings {
   assemblyVerdicts: ReadonlyMap<string, CriteriaAssemblyVerdict>;
   /** The working copy's instantiation mode, for the resolver's facts. */
   instantiationMode: "adapt-existing" | "new-from-base" | null;
+  /**
+   * Open mode (spec 111 FR-018a): how many of the keyboard's listed languages
+   * had exemplar data for the expected-characters check. Null on Copy, and
+   * until the run settles.
+   */
+  expectedCoverage: ExpectedCoverage | null;
 }
 
 interface EngineRun {
@@ -122,9 +141,12 @@ interface EngineRun {
    * is instantiated. */
   judgedVfs: VirtualFS;
   judgedKeyboardId: string;
+  /** The assembled lint context for the judged VFS, inventory folded in. */
+  lintCtx: LintContext;
   findings: LintFinding[];
   verifiedByCode: Map<string, string[]>;
   contextMissing: Record<string, string>;
+  expectedCoverage: ExpectedCoverage | null;
 }
 
 export function useCriteriaFindings(stage: Stage): CriteriaFindings {
@@ -281,17 +303,37 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
       );
       if (cancelled) return;
 
-      const build = buildCriteriaInventory({
-        languageTags,
-        script: surveyContext.script_family ?? assembled.script,
-        confirmed: {
-          ...(session.alphabet !== undefined
-            ? { alphabet: session.alphabet }
-            : {}),
-          confirmedInventory: session.confirmedInventory,
-        },
-        sourcedByTag,
-      });
+      // Open (spec 111 FR-018a): the expected characters are the exemplar
+      // union of the keyboard's own languages, not the author's confirmed
+      // decisions. Re-runs with this effect whenever the language list
+      // (identity / decisions / projected .kps) changes.
+      let expectedCoverage: ExpectedCoverage | null = null;
+      let build;
+      if (isOpenMode(instantiationMode)) {
+        const open = buildOpenCriteriaInventory({
+          languageTags,
+          script: surveyContext.script_family ?? assembled.script,
+          sourcedByTag,
+        });
+        build = open.build;
+        expectedCoverage = {
+          withData: open.coverage.withData,
+          total: open.coverage.total,
+          sourcesByChar: open.sourcesByChar,
+        };
+      } else {
+        build = buildCriteriaInventory({
+          languageTags,
+          script: surveyContext.script_family ?? assembled.script,
+          confirmed: {
+            ...(session.alphabet !== undefined
+              ? { alphabet: session.alphabet }
+              : {}),
+            confirmedInventory: session.confirmedInventory,
+          },
+          sourcedByTag,
+        });
+      }
       const { ctx, contextMissing } = applyInventoryOutcome(
         assembled,
         build.kind === "built"
@@ -310,9 +352,11 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
             forStageVfs: stageVfs,
             judgedVfs: vfs,
             judgedKeyboardId: keyboardId,
+            lintCtx: ctx,
             findings: engine.findings,
             verifiedByCode: engine.verifiedByCode,
             contextMissing,
+            expectedCoverage,
           });
       } catch {
         // A failed engine run must not wedge the page: report no engine
@@ -323,9 +367,11 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
             forStageVfs: stageVfs,
             judgedVfs: vfs,
             judgedKeyboardId: keyboardId,
+            lintCtx: ctx,
             findings: [],
             verifiedByCode: new Map(),
             contextMissing,
+            expectedCoverage,
           });
       }
     })();
@@ -347,6 +393,7 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
     decisions,
     contrastiveAttestation,
     startVfs,
+    instantiationMode,
   ]);
 
   const runIsCurrent =
@@ -365,8 +412,10 @@ export function useCriteriaFindings(stage: Stage): CriteriaFindings {
     ready: readyStage !== null && runIsCurrent,
     keyboardId: runIsCurrent ? engineRun.judgedKeyboardId : null,
     vfs: runIsCurrent ? engineRun.judgedVfs : null,
+    lintCtx: runIsCurrent ? engineRun.lintCtx : null,
     compileResult: readyStage?.compileResult ?? null,
     assemblyVerdicts,
     instantiationMode: startKeyboard !== null ? instantiationMode : null,
+    expectedCoverage: runIsCurrent ? engineRun.expectedCoverage : null,
   };
 }

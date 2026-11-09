@@ -37,7 +37,8 @@ function escapeQuote(s: string): string {
 export function applyIdentityStubMutation(
   vfs: VirtualFS,
   keyboardId: string,
-  identity: { name?: string; copyright?: string; version?: string }
+  identity: { name?: string; copyright?: string; version?: string },
+  opts?: { open?: boolean }
 ): void {
   const path = `source/${keyboardId}.kmn`;
   const entry = vfs.get(path);
@@ -52,32 +53,52 @@ export function applyIdentityStubMutation(
     );
   }
 
+  // Open mode (a keyboard opened for update): rewritten lines keep their own
+  // line ending, and a missing &KEYBOARDVERSION is inserted after &VERSION,
+  // which is never touched. Copy keeps the original behaviour.
+  const open = opts?.open === true;
+  const eol = (line: string): string => (open && line.endsWith("\r") ? "\r" : "");
   const lines = entry.content.split("\n");
 
   // Rewrite lines for name/copyright/version if the store already exists.
   let nameFound = false;
+  let versionFound = false;
   const rewritten = lines.map((line) => {
     if (
       identity.name !== undefined &&
       /^\s*store\s*\(\s*&NAME\s*\)/i.test(line)
     ) {
       nameFound = true;
-      return `store(&NAME) '${escapeQuote(identity.name)}'`;
+      return `store(&NAME) '${escapeQuote(identity.name)}'${eol(line)}`;
     }
     if (
       identity.copyright !== undefined &&
       /^\s*store\s*\(\s*&COPYRIGHT\s*\)/i.test(line)
     ) {
-      return `store(&COPYRIGHT) '${escapeQuote(identity.copyright)}'`;
+      return `store(&COPYRIGHT) '${escapeQuote(identity.copyright)}'${eol(line)}`;
     }
     if (
       identity.version !== undefined &&
       /^\s*store\s*\(\s*&KEYBOARDVERSION\s*\)/i.test(line)
     ) {
-      return `store(&KEYBOARDVERSION) '${escapeQuote(identity.version)}'`;
+      versionFound = true;
+      return `store(&KEYBOARDVERSION) '${escapeQuote(identity.version)}'${eol(line)}`;
     }
     return line;
   });
+
+  // Open: INSERT store(&KEYBOARDVERSION) right after store(&VERSION) when absent.
+  if (open && identity.version !== undefined && !versionFound) {
+    const versionIdx = rewritten.findIndex((l) => /^\s*store\s*\(\s*&VERSION\s*\)/i.test(l));
+    if (versionIdx >= 0) {
+      const crlf = (rewritten[versionIdx] ?? "").endsWith("\r");
+      rewritten.splice(
+        versionIdx + 1,
+        0,
+        `store(&KEYBOARDVERSION) '${escapeQuote(identity.version)}'${crlf ? "\r" : ""}`,
+      );
+    }
+  }
 
   // INSERT store(&NAME) when a name was requested but no &NAME store existed.
   if (identity.name !== undefined && !nameFound) {

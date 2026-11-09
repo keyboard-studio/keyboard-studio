@@ -8,10 +8,12 @@
  *   identity-lite: english "Test", autonym "Test Autonym", language code
  *     "fr", target script "other" (the driveIdentityLite defaults +
  *     languageCode "fr" — the same fixture spec 088's SC-001 walk uses)
- *     -> layout confirm -> base picker (basic_kbdfr) -> track (copy)
+ *     -> layout confirm -> base picker (basic_kbdfr) -> attribution (copy
+ *       is the default: the track question is gone, the start screen
+ *       records copy or StudioShell defaults it)
  *       -> attribution (#1901): author "Test Author", email + holder blank
  *         (the driveAttributionStep defaults — the same ANSWERS the walk
- *         always gave, at their post-track position)
+ *         always gave, at their post-base position)
  *       -> project name (accept the pre-fill) -> prefill confirm
  *         -> characters: build-list method, add "é" (marks / punctuation /
  *            invisibles / convenience accepted as proposed). NOTE:
@@ -77,7 +79,7 @@ import {
   seedReturningVisitor,
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   driveAttributionStep,
   acceptProjectName,
   confirmPrefill,
@@ -86,7 +88,6 @@ import {
   driveMechanismsGallery,
   driveTouchGallery,
   driveCssEditorStep,
-  driveHtmlEditorStep,
   driveHelpPhase,
   triggerDownload,
 } from "./helpers/surveyFlow";
@@ -152,7 +153,7 @@ test("spec 089 SC-001: golden walk emits the baseline source zip byte-for-byte",
 
   await driveIdentityLite(page, { languageCode: "fr" });
   await pickStartKeyboard(page, "basic_kbdfr");
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page, { authorName: "Test Author" });
   await acceptProjectName(page);
   await confirmPrefill(page);
@@ -182,8 +183,8 @@ test("spec 089 SC-001: golden walk emits the baseline source zip byte-for-byte",
   await driveMechanismsGallery(page);
   await driveTouchGallery(page);
   await driveCssEditorStep(page);
+  // driveHelpPhase walks the rest of the tail (html editor included) to #output.
   await driveHelpPhase(page, "Welcome to the keyboard.", "Press a key to start.");
-  await driveHtmlEditorStep(page);
   await page.waitForURL(/#output$/, { timeout: 30_000 });
 
   const download = await triggerDownload(page);

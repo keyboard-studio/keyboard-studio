@@ -336,6 +336,40 @@ export function keyMatchesRemovalSetWithProduction(
 }
 
 /**
+ * The touch-only key ids (`T_` / `U_`) a removal carves AS AN IDENTITY: an id
+ * that produces a removed character in any occurrence's layer state is
+ * carved in every occurrence, including layers whose state gives it no rule.
+ * Cameroon QWERTY's T_1DC4 is bound by `+ [SHIFT T_1DC4]` and also sits on
+ * rightalt-caps, which no rule covers; per-occurrence matching blanks the
+ * shift copy and leaves the other as a dead key. This is the same identity
+ * rule the output projection's keycap pass and `carveTouchCharacter` apply,
+ * and the replay has to apply it too: once the producing copy is blanked,
+ * the projection has nothing left to recognise the survivor by.
+ *
+ * `K_` ids are excluded. A `K_` id names a physical key whose productions
+ * differ by layer by design (`SHIFT K_Q` may produce a carved mark while
+ * `K_Q` still types q), so it is only ever matched per occurrence.
+ *
+ * `occurrences` is every main key and gesture entry, each with the id of the
+ * layer it sits on.
+ */
+export function carvedTouchIdentityIds(
+  occurrences: Iterable<{ readonly entry: { id?: string; sp?: number; nextlayer?: string }; readonly layerId: string }>,
+  removalSet: ReadonlySet<string>,
+  production: ResolveTouchProductionInputs,
+): Set<string> {
+  const ids = new Set<string>();
+  for (const { entry, layerId } of occurrences) {
+    const id = entry.id;
+    if (typeof id !== "string" || ids.has(id)) continue;
+    const family = touchKeyIdFamily(id);
+    if (family !== "T_" && family !== "U_") continue;
+    if (candidateMatchesViaProduction(entry, removalSet, { production, layerId })) ids.add(id);
+  }
+  return ids;
+}
+
+/**
  * The production-resolver inputs a placement replay needs to address keys
  * through spec 104's resolver (FR-003/FR-021): the keyboard the layout
  * belongs to and its spec 063 rule-join index. Optional at every call site

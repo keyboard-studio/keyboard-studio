@@ -164,9 +164,8 @@ textarea::placeholder {
  * content-driven: 40 px under a fine pointer, and 52 px under a coarse one so a
  * nav button's 44 px `.ks-hit-target` fits without growing the strip. A class
  * rather than an inline style because the pointer query cannot be inline. */
-/* The footer's height, published on :root so content that must clear the
- * bar (the narrow floating preview button) can read it. 0 while
- * no footer is mounted (before the journey starts). */
+/* The footer's height, published on :root so the footer frame itself can
+ * read it. 0 while no footer is mounted (before the journey starts). */
 :root {
   --studio-footer-h: 0px;
 }

@@ -39,6 +39,8 @@ import { DiscardIcon, ChevronIcon } from '../assignLoop/parts/carveShared.tsx';
 import { RemovedDropdown } from '../assignLoop/parts/StatusBar.tsx';
 import type { RemovedItem } from '../assignLoop/parts/StatusBar.tsx';
 import { useCarveNeededSet } from '../../hooks/useCarveNeededSet.ts';
+import { useRemovalWarning } from '../../hooks/useRemovalWarning.ts';
+import { RemovalWarningNotice } from '../../components/RemovalWarningNotice.tsx';
 import { usePublishStepNav } from '../../hooks/usePublishStepNav.ts';
 import { useIsNarrow } from '../../hooks/useViewport.ts';
 
@@ -776,6 +778,11 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
   const cascadeRestore = useWorkingCopyStore((s) => s.cascadeRestore);
   const restoreAll = useWorkingCopyStore((s) => s.restoreAll);
+  // FR-006: a carved character a listed language needs gets a dismissable
+  // warning; the carve itself is never blocked.
+  const carveChars = useWorkingCopyStore((s) => s.carveChars);
+  const carvedCharList = useMemo(() => [...carveChars], [carveChars]);
+  const { warnings: removalWarnings, dismiss: dismissRemovalWarning } = useRemovalWarning(carvedCharList);
 
   // irToCharacterView's `confirmedInventory` param drives ONLY the "in your
   // alphabet" (inAlpha) flag and is documented NFC-normalized regardless of
@@ -1212,7 +1219,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     onBack !== undefined
       ? {
           back: {
-            label: t({ id: 'editor.carve.backButton', message: '← Back' }),
+            label: t({ id: 'editor.carve.backButton', message: 'Back' }),
             onClick: onBack,
             testId: 'carve-back',
           },
@@ -1262,6 +1269,12 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
           </p>
         </div>
       </div>
+
+      {removalWarnings.length > 0 && (
+        <div style={{ padding: '10px 22px 0' }}>
+          <RemovalWarningNotice warnings={removalWarnings} onDismiss={dismissRemovalWarning} />
+        </div>
+      )}
 
       {/* Status strip */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '12px 22px', borderBottom: '1px solid var(--app-border)', background: 'var(--app-surface)' }}>

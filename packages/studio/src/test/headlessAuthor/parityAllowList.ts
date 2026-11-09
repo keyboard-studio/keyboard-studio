@@ -62,4 +62,44 @@ export const PARITY_ALLOW_LIST: readonly ParityAllowEntry[] = [
       "marks.marks_guard.behaviour answer; the record still carries the walker's hand-set guard answer.",
     explainedBy: "record-age:origin/main 874b44b1 (start-of-line box)",
   },
+  {
+    caseId: "p1-whole-bafut-kbdus",
+    decisionId: "track_choice",
+    reason:
+      "The track_choice question was retired (PR 2568): the track now defaults to copy and is never asked, " +
+      "so the author records no track_choice survey answer; the record still carries the tool-proposed " +
+      "track_choice answer from the old walk. Agency-only difference: the authoring-track values still match, " +
+      "so compareParity sees no value difference for this entry.",
+    explainedBy: "PR 2568 (track_choice removal)",
+  },
+  {
+    caseId: "p4-unwrap-bafut-camqwerty",
+    decisionId: "track_choice",
+    reason:
+      "The track_choice question was retired (PR 2568): the track now defaults to copy and is never asked, " +
+      "so the author records no track_choice survey answer; the record still carries the tool-proposed " +
+      "track_choice answer from the old walk. Agency-only difference: the authoring-track values still match, " +
+      "so compareParity sees no value difference for this entry.",
+    explainedBy: "PR 2568 (track_choice removal)",
+  },
+  {
+    caseId: "p1-whole-ewondo-kbdfr",
+    decisionId: "track_choice",
+    reason:
+      "The track_choice question was retired (PR 2568): the track now defaults to copy and is never asked, " +
+      "so the author records no track_choice survey answer; the record still carries the tool-proposed " +
+      "track_choice answer from the old walk. Agency-only difference: the authoring-track values still match, " +
+      "so compareParity sees no value difference for this entry.",
+    explainedBy: "PR 2568 (track_choice removal)",
+  },
+  {
+    caseId: "p4-unwrap-ewondo-camazerty",
+    decisionId: "track_choice",
+    reason:
+      "The track_choice question was retired (PR 2568): the track now defaults to copy and is never asked, " +
+      "so the author records no track_choice survey answer; the record still carries the tool-proposed " +
+      "track_choice answer from the old walk. Agency-only difference: the authoring-track values still match, " +
+      "so compareParity sees no value difference for this entry.",
+    explainedBy: "PR 2568 (track_choice removal)",
+  },
 ];

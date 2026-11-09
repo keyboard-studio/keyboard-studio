@@ -31,7 +31,15 @@ import type {
   IRRule,
   KeyboardIR,
 } from "@keyboard-studio/contracts";
-import { parseKmn, emitKmn, deriveCarvedIr, collectCharContributors, removedTouchKeyRuleIds } from "@keyboard-studio/engine";
+import {
+  parseKmn,
+  emitKmn,
+  deriveCarvedIr,
+  collectCharContributors,
+  removedTouchKeyRuleIds,
+  applyDesktopModificationsToRawJson,
+} from "@keyboard-studio/engine";
+import { buildTouchKeyRuleIndex } from "@keyboard-studio/contracts";
 import {
   lookupHostOutput,
   REFERENCE_BASES,
@@ -474,5 +482,51 @@ describe("issue #2418: carved T_ mark keys lose their .kmn rules (real keyboard)
     // Surgical: the desktop producer of the same carved mark is still
     // suppressed (`> nul`), not deleted — its key remains pressable.
     expect(fixedKmn).toMatch(/\+\s*\[K_LBRKT\]\s*>\s*nul/);
+  });
+
+  // The Ewondo hand test: the touch step's desktop-modification replay runs
+  // first and blanks the carved keys, so the layout the projection sees has
+  // already lost them. Two things went wrong there. The replay blanked only
+  // the occurrences whose layer state has a rule (shift T_1DC4), keeping
+  // the rightalt-caps copies as dead keys; and the projection, seeing no
+  // carved key leave, rewrote every carved T_ rule to `> nul`.
+  it("after the touch step's replay has blanked the carved keys, none survive and their rules are still deleted", () => {
+    const { json: replayed } = applyDesktopModificationsToRawJson(
+      layoutJson,
+      { removals: CARVED_MARKS_2418, placements: [] },
+      { ir: startIr, ruleIndex: buildTouchKeyRuleIndex(startIr) },
+    );
+    for (const id of CARVED_TOUCH_IDS_2418) {
+      expect(replayed, `carved key ${id} must leave the touch layout on every layer`).not.toContain(`"${id}"`);
+    }
+
+    const outcome = removedTouchKeyRuleIds(startIr, replayed, {
+      slotIds: carveSlotIds,
+      wholeNodeIds: carveRuleIds,
+    });
+    const fixed = deriveCarvedIr(startIr, {
+      deletedNodeIds: new Set([...carveRuleIds, ...outcome.additionalDeletedRuleIds]),
+      deletedItemIds: new Set([...carveRuleIds, ...carveSlotIds]),
+      fallbackPolicy: "swallow",
+      suppressionExemptIds: outcome.suppressionExemptIds,
+    });
+    const fixedKmn = emitKmn(fixed.ir);
+    for (const id of CARVED_TOUCH_IDS_2418) {
+      expect(fixedKmn, `carved key ${id} must leave no rule behind`).not.toContain(id);
+    }
+    expect(fixedKmn).toMatch(/\+\s*\[K_LBRKT\]\s*>\s*nul/);
+  });
+
+  it("a rule for a key the layout never placed is left alone unless the carve names it", () => {
+    // T_0300's rules are not carved here; drop the key from the layout and
+    // the outcome must still not claim them.
+    const withoutT0300 = layoutJson.replace(/"T_0300"/g, '"T_OTHER"');
+    const outcome = removedTouchKeyRuleIds(startIr, withoutT0300, {
+      slotIds: carveSlotIds,
+      wholeNodeIds: carveRuleIds,
+    });
+    const t0300Rule = findBareKeyRule(startIr, "T_0300", []);
+    expect(outcome.suppressionExemptIds.has(t0300Rule.nodeId)).toBe(false);
+    expect(outcome.additionalDeletedRuleIds.has(t0300Rule.nodeId)).toBe(false);
   });
 });

@@ -22,11 +22,45 @@ import type { I18n, MessageDescriptor } from "@lingui/core";
 import type { KvksIR } from "@keyboard-studio/contracts";
 import {
   generateKvksFromIR,
+  parseKvks,
+  emitKvks,
   oskContinueResult,
   DESKTOP_GEOMETRY,
+  DESKTOP_GEOMETRY_ISO,
 } from "@keyboard-studio/engine";
+import { lookupHostOutput, DEADKEY, type BaseLayoutId } from "../../lib/referenceBaseLayouts.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
+import { isOpenMode } from "../../lib/openMode.ts";
+import { readVfsText } from "../../lib/vfsText.ts";
+
+/**
+ * The base keyboard (the OS layout) whose characters "Display underlying"
+ * shows. The studio cannot see the typist's machine, so the US layout stands in,
+ * as Keyman Developer does.
+ */
+const BASE_UNDERLYING_LAYOUT: BaseLayoutId = "us";
+
+/** Kvks shift code ("S", "CA", ...) to the modifier tokens the reference tables key on. */
+function baseModifiersForShift(shift: string): string[] {
+  const mods: string[] = [];
+  if (shift.includes("S")) mods.push("SHIFT");
+  if (shift.includes("C")) mods.push("CTRL");
+  if (shift.includes("A")) mods.push("ALT");
+  return mods;
+}
+
+/** Base-keyboard character for a key on a layer, or "" when unknown / a deadkey. */
+function baseUnderlyingChar(vkey: string, shift: string): string {
+  const cell = lookupHostOutput(BASE_UNDERLYING_LAYOUT, vkey, baseModifiersForShift(shift));
+  return cell === undefined || cell === DEADKEY ? "" : cell;
+}
+
+/** Open mode: the `.kvks` path in the opened keyboard's files. */
+function openKvksFilePath(keyboardId: string): string {
+  return `source/${keyboardId}.kvks`;
+}
 
 // The Code tab pane. Lazy-loaded so the Monaco bundle never lands in the
 // main chunk (same discipline as TouchCodePane).
@@ -123,15 +157,37 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
   const ir = useWorkingCopyStore((s) => s.ir);
   const kbdname = useWorkingCopyStore((s) => s.ir?.header.name ?? "keyboard");
 
-  // Base KvksIR generated from the IR (the "reset" baseline).
+  const mode = useWorkingCopyStore((s) => s.instantiationMode);
+  const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  // Open mode (spec 111 FR-009): edit the keyboard's existing `.kvks`; generate
+  // one only when the file is missing.
+  const openKvksPath =
+    isOpenMode(mode) && startKeyboard !== null
+      ? openKvksFilePath(startKeyboard.id)
+      : null;
+  const openKvksText =
+    openKvksPath !== null && startVfs !== null
+      ? readVfsText(startVfs, openKvksPath)
+      : undefined;
+
+  // Base KvksIR: the existing file on Open, otherwise generated from the IR
+  // (the "reset" baseline).
   const baseKvks = useMemo<KvksIR | null>(() => {
+    if (openKvksText !== undefined) {
+      try {
+        return parseKvks(openKvksText);
+      } catch {
+        return null;
+      }
+    }
     if (!ir) return null;
     try {
       return generateKvksFromIR(ir, kbdname);
     } catch {
       return null;
     }
-  }, [ir, kbdname]);
+  }, [ir, kbdname, openKvksText]);
 
   // Current (edited) KvksIR + undo history.
   const [kvks, setKvks] = useState<KvksIR | null>(baseKvks);
@@ -143,73 +199,95 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Geometry lookup for the active layer's keys (before early return).
-  const geomById = useMemo(() => {
+  const geomAnsi = useMemo(() => {
     const m = new Map<string, { row: number; x: number; width: number }>();
     for (const g of DESKTOP_GEOMETRY) m.set(g.id, g);
+    return m;
+  }, []);
+  const geomIso = useMemo(() => {
+    const m = new Map<string, { row: number; x: number; width: number }>();
+    for (const g of DESKTOP_GEOMETRY_ISO) m.set(g.id, g);
     return m;
   }, []);
 
   // Sync when base regenerates (e.g. IR changes).
   const effectiveKvks = kvks ?? baseKvks;
 
+  const undo = () => {
+    setHistory((h) => {
+      if (h.length === 0) return h;
+      const prev = h[h.length - 1];
+      if (prev) {
+        setKvks(prev);
+        setError(null);
+        if (openKvksPath !== null && openKvksText !== undefined) {
+          useWorkingCopyStore.getState().replaceStartingPointFromText(openKvksPath, emitKvks(prev));
+        }
+      }
+      return h.slice(0, -1);
+    });
+  };
+
+  // Footer nav (spec 081, #2527): Back / Undo / Continue publish to the
+  // footer instead of rendering in a sticky in-body bar. Called before the
+  // no-keyboard early return, with the spec for the current render state —
+  // the fallback has no Undo, so it publishes Back + Continue only. Undo
+  // is the secondary slot, so it renders to the RIGHT of Back and Continue
+  // (ruling 2026-11-06) and its appearing never moves them. Test ids are
+  // unchanged, so e2e keeps finding osk-continue in the footer.
+  usePublishStepNav(
+    effectiveKvks === null
+      ? {
+          ...(onBack !== undefined
+            ? {
+                back: {
+                  label: t({ id: "editor.assignLoop.osk.back", message: "Back" }),
+                  onClick: onBack,
+                  testId: "osk-back",
+                },
+              }
+            : {}),
+          forward: {
+            label: t({ id: "editor.assignLoop.osk.continue", message: "Continue" }),
+            onClick: () => {
+              onComplete(oskContinueResult(null));
+            },
+            testId: "osk-continue",
+          },
+        }
+      : {
+          ...(onBack !== undefined
+            ? {
+                back: {
+                  label: t({ id: "editor.assignLoop.osk.back", message: "Back" }),
+                  onClick: onBack,
+                  testId: "osk-back",
+                },
+              }
+            : {}),
+          secondary: {
+            label: t({ id: "editor.assignLoop.osk.undo", message: "Undo" }),
+            onClick: undo,
+            testId: "osk-undo",
+            disabled: history.length === 0,
+          },
+          forward: {
+            label: t({ id: "editor.assignLoop.osk.continue", message: "Continue" }),
+            onClick: () => {
+              // The customized KvksIR emitted to .kvks XML (the lifted
+              // product seam — the headless author calls the same function).
+              onComplete(oskContinueResult(effectiveKvks));
+            },
+            testId: "osk-continue",
+          },
+        },
+  );
+
   if (!effectiveKvks) {
     return (
       <div>
         <div style={{ padding: 24, color: TEXT_DIM }}>
           {t({ id: "editor.assignLoop.osk.noKeyboard", message: "No keyboard loaded." })}
-        </div>
-        {/* Footer with Continue so the step can be skipped when no Kvks is available.
-            Pinned to the bottom bar (sticky) so nav stays reachable. */}
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            margin: "auto -24px -24px",
-            padding: "16px 24px",
-            borderTop: `1px solid ${BORDER}`,
-            background: BG_CANVAS,
-            position: "sticky",
-            bottom: 0,
-            zIndex: 10,
-          }}
-        >
-          {onBack && (
-            <button
-              type="button"
-              onClick={onBack}
-              style={{
-                padding: "10px 20px",
-                fontSize: 14,
-                borderRadius: 6,
-                border: `1px solid ${BORDER}`,
-                background: BG_CARD,
-                color: TEXT_MAIN,
-                cursor: "pointer",
-              }}
-            >
-              {t({ id: "editor.assignLoop.osk.back", message: "Back" })}
-            </button>
-          )}
-          <div style={{ flex: 1 }} />
-          <button
-            type="button"
-            data-testid="osk-continue"
-            onClick={() => {
-              onComplete(oskContinueResult(null));
-            }}
-            style={{
-              padding: "10px 24px",
-              fontSize: 14,
-              borderRadius: 6,
-              border: `1px solid ${ACCENT}`,
-              background: ACCENT_BG,
-              color: TEXT_MAIN,
-              cursor: "pointer",
-              fontWeight: 600,
-            }}
-          >
-            {t({ id: "editor.assignLoop.osk.continue", message: "Continue" })}
-          </button>
         </div>
       </div>
     );
@@ -224,18 +302,10 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
     setHistory((h) => [...h, effectiveKvks]);
     setKvks(next);
     setError(null);
-  };
-
-  const undo = () => {
-    setHistory((h) => {
-      if (h.length === 0) return h;
-      const prev = h[h.length - 1];
-      if (prev) {
-        setKvks(prev);
-        setError(null);
-      }
-      return h.slice(0, -1);
-    });
+    // Open: an edit lands in the existing file (a missing file is not created).
+    if (openKvksPath !== null && openKvksText !== undefined) {
+      useWorkingCopyStore.getState().replaceStartingPointFromText(openKvksPath, emitKvks(next));
+    }
   };
 
   const handleSelectKey = (vkey: string) => {
@@ -326,8 +396,17 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
     [],
     [],
   ];
+  const showUnderlying = effectiveKvks.displayUnderlying === true;
+  const showKey102 = effectiveKvks.key102 === true;
+  const geomById = showKey102 ? geomIso : geomAnsi;
   if (activeLayer) {
-    for (const k of activeLayer.keys) {
+    // The ISO 102nd key always has a slot when ticked, even if the layer
+    // carries no entry for it (a blank cap, as in Keyman Developer).
+    const layerKeys =
+      showKey102 && !activeLayer.keys.some((k) => k.vkey === "K_oE2")
+        ? [...activeLayer.keys, { vkey: "K_oE2", label: "" }]
+        : activeLayer.keys;
+    for (const k of layerKeys) {
       const g = geomById.get(k.vkey);
       if (!g) continue;
       const row = rows[g.row];
@@ -432,6 +511,7 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
         {rows.map((rowKeys, ri) => (
           <div key={ri} style={{ display: "flex", gap: 4, marginBottom: 4 }}>
             {rowKeys.map(({ vkey, label, width }) => {
+              const underlying = showUnderlying ? baseUnderlyingChar(vkey, effectiveShift) : "";
               const isSelected =
                 selected?.vkey === vkey && selected?.shift === effectiveShift;
               const isBlank = label === "";
@@ -462,8 +542,26 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
+                    position: "relative",
                   }}
                 >
+                  {underlying !== "" && (
+                    <span
+                      aria-hidden="true"
+                      data-testid={`osk-underlying-${vkey}`}
+                      style={{
+                        position: "absolute",
+                        top: 2,
+                        left: 4,
+                        fontSize: 10,
+                        lineHeight: 1,
+                        color: TEXT_DIM,
+                        opacity: 0.7,
+                      }}
+                    >
+                      {underlying}
+                    </span>
+                  )}
                   {isBlank ? "" : label}
                 </button>
               );
@@ -624,79 +722,6 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
       </div>
       </>
       )}
-
-      {/* Bottom bar: nav pinned to the viewport bottom (sticky) so Back /
-          Continue stay reachable while the key grid scrolls. */}
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          margin: "auto -24px -24px",
-          padding: "16px 24px",
-          borderTop: `1px solid ${BORDER}`,
-          background: BG_CANVAS,
-          position: "sticky",
-          bottom: 0,
-          zIndex: 10,
-        }}
-      >
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            style={{
-              padding: "10px 20px",
-              fontSize: 14,
-              borderRadius: 6,
-              border: `1px solid ${BORDER}`,
-              background: BG_CARD,
-              color: TEXT_MAIN,
-              cursor: "pointer",
-            }}
-          >
-            {t({ id: "editor.assignLoop.osk.back", message: "Back" })}
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={undo}
-          disabled={history.length === 0}
-          style={{
-            padding: "10px 20px",
-            fontSize: 14,
-            borderRadius: 6,
-            border: `1px solid ${BORDER}`,
-            background: BG_CARD,
-            color: TEXT_MAIN,
-            cursor: history.length === 0 ? "not-allowed" : "pointer",
-            opacity: history.length === 0 ? 0.5 : 1,
-          }}
-        >
-          {t({ id: "editor.assignLoop.osk.undo", message: "Undo" })}
-        </button>
-        <div style={{ flex: 1 }} />
-        <button
-          type="button"
-          data-testid="osk-continue"
-          onClick={() => {
-            // The customized KvksIR emitted to .kvks XML (the lifted
-            // product seam — the headless author calls the same function).
-            onComplete(oskContinueResult(effectiveKvks));
-          }}
-          style={{
-            padding: "10px 24px",
-            fontSize: 14,
-            borderRadius: 6,
-            border: `1px solid ${ACCENT}`,
-            background: ACCENT_BG,
-            color: TEXT_MAIN,
-            cursor: "pointer",
-            fontWeight: 600,
-          }}
-        >
-          {t({ id: "editor.assignLoop.osk.continue", message: "Continue" })}
-        </button>
-      </div>
     </div>
   );
 }

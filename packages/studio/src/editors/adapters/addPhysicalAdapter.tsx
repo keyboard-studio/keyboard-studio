@@ -42,7 +42,6 @@ import { completePhysicalLayoutStep } from "../../lib/mechanismStepCompletion.ts
 import type { EditorStepProps } from "../../steps/types.ts";
 import { MechanismGallery } from "../assignLoop/MechanismGallery.tsx";
 import { CodeReviewList, useCodeReviewFlags } from "../assignLoop/CodeReviewList.tsx";
-import { FallbackPolicySection } from "../fallback/FallbackPolicySection.tsx";
 
 // Lazy-loaded so the Monaco bundle never lands in the main chunk (same
 // discipline as TouchCodePane).
@@ -141,8 +140,6 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
     onComplete(undefined);
   }
 
-  // Interim host for the keyboard-wide fallback policy (the Behaviours step
-  // that will own it has not landed): a collapsed section below the gallery.
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* eslint-disable-next-line jsx-a11y/interactive-supports-focus -- roving-tabindex model: DOM focus lives on the individual role="tab" buttons (tabIndex 0 for the active tab, -1 for the rest), never on this container, which intentionally has no tabIndex. */}
@@ -210,7 +207,7 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
               flexDirection: "column",
             }}
           >
-            {tab === "assign" && isActive && (
+            {tab === "assign" && (
               <MechanismGallery
                 selectedStartKeyboard={startKeyboard}
                 onComplete={handleComplete}
@@ -254,7 +251,6 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
           </div>
         );
       })}
-      <FallbackPolicySection />
     </div>
   );
 }

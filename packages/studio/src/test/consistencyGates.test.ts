@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import type { CompilerDiagnostic, KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
+import type { CompilerDiagnostic, KeyboardIR, TouchLayoutIR, VirtualFS } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
 import type { Decision, DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
 import { checkConsistencyGates, type GateId, type GateInput, type GateResult } from "./consistencyGates.ts";
@@ -137,6 +137,22 @@ describe("G4: one output form", () => {
     const r = await gate("G4", { vfs: vfsOf(body), decisions: plusMark });
     expect(r.pass).toBe(false);
   });
+  it("passes a match-only normalization store holding the pasted form (US6)", async () => {
+    // The step's head stores must hold the pasted alternates (the keyboard's
+    // other form) to match them; they never reach the output.
+    const body =
+      "store(generated_cn_0) U+00E1\ngroup(main) using keys\n+ any(generated_cn_0) + [K_A] > 'a'\n";
+    const r = await gate("G4", { vfs: vfsOf(body), decisions: plusMark });
+    expect(r.pass).toBe(true);
+  });
+  it("exempts a normalization store even when it feeds an output (US6)", async () => {
+    // The step's produced-form stores repackage the keyboard's own repertoire
+    // (policed at its source); they are lookup tables, not new production.
+    const body =
+      "store(generated_cn_0) U+00E1\ngroup(main) using keys\n+ any(generated_cn_0) + [K_A] > index(generated_cn_0, 1)\n";
+    const r = await gate("G4", { vfs: vfsOf(body), decisions: plusMark });
+    expect(r.pass).toBe(true);
+  });
   it("reports, but does not fail, a starting rule kept by carve", async () => {
     const body = "group(main) using keys\n+ [K_A] > U+00E1\n";
     const r = await gate("G4", { vfs: vfsOf(body), decisions: plusMark, startIr: irOf(body) });
@@ -180,6 +196,41 @@ describe("G5: &CasedKeys iff cased", () => {
     const r = await gate("G5", { vfs: vfsOf(`store(&CasedKeys) [K_B]\n${pair}`), decisions: cased, point: "caps" });
     expect(r.pass).toBe(false);
   });
+  it("passes none and explicit rules when the store is absent; fails none when it is present", async () => {
+    const none = setOf(decision("character-inventory", { chars: ["a", "A"] }), decision("caps-handling", { mode: "none" }));
+    const explicit = setOf(decision("character-inventory", { chars: ["a", "A"] }), decision("caps-handling", { mode: "explicit-rules" }));
+    expect((await gate("G5", { vfs: vfsOf(pair), decisions: none, point: "caps" })).pass).toBe(true);
+    expect((await gate("G5", { vfs: vfsOf(pair), decisions: explicit, point: "caps" })).pass).toBe(true);
+    expect((await gate("G5", { vfs: vfsOf(`store(&CasedKeys) [K_A]
+${pair}`), decisions: none, point: "caps" })).pass).toBe(false);
+  });
+  it("reads a non-letter and a store-routed RAlt pair as cased keys", async () => {
+    const eng = setOf(decision("character-inventory", { chars: ["a", "A", "ŋ", "Ŋ"] }));
+    const body = `${pair}+ [K_LBRKT] > 'ŋ'
++ [SHIFT K_LBRKT] > 'Ŋ'
++ [RALT K_N] > 'ŋ'
++ [SHIFT RALT K_N] > 'Ŋ'
+`;
+    const missing = await gate("G5", { vfs: vfsOf(`store(&CasedKeys) [K_A]
+${body}`), decisions: eng, point: "caps" });
+    expect(missing.pass).toBe(false);
+    expect(missing.detail.join(" ")).toContain("K_LBRKT");
+    expect(missing.detail.join(" ")).toContain("K_N");
+    const covered = await gate("G5", { vfs: vfsOf(`store(&CasedKeys) [K_A] [K_LBRKT] [K_N]
+${body}`), decisions: eng, point: "caps" });
+    expect(covered.pass).toBe(true);
+  });
+  it("does not demand a key another plane gives a different pair (R1 conflict)", async () => {
+    const eng = setOf(decision("character-inventory", { chars: ["a", "A", "e", "E"] }));
+    const body = `${pair}+ [K_E] > 'e'
++ [SHIFT K_E] > 'E'
++ [RALT K_E] > '€'
++ [SHIFT RALT K_E] > '£'
+`;
+    const r = await gate("G5", { vfs: vfsOf(`store(&CasedKeys) [K_A]
+${body}`), decisions: eng, point: "caps" });
+    expect(r.pass).toBe(true);
+  });
   it("fails &CasedKeys on a caseless alphabet", async () => {
     const r = await gate("G5", { vfs: vfsOf(`store(&CasedKeys) [K_A]\n${pair}`), decisions: caseless, point: "caps" });
     expect(r.pass).toBe(false);
@@ -191,6 +242,20 @@ describe("G6: no lost touch letters", () => {
     JSON.stringify({
       phone: { layer: [{ id: "default", row: [{ key: texts.map((text) => ({ text })) }] }] },
     });
+  const startTouchWithDefaultTexts = (texts: string[]): TouchLayoutIR => ({
+    platforms: [
+      {
+        id: "phone",
+        layers: [
+          {
+            id: "default",
+            rows: [{ keys: texts.map((text, i) => ({ id: `K_${i}`, nodeId: `n${i}`, text })) }],
+          },
+        ],
+      },
+    ],
+    nodeIds: [],
+  });
   const alphabet = setOf(decision("character-inventory", { chars: ["a", "ŋ", "A"] }));
   it("passes when every owed letter is on the default layer", async () => {
     const vfs = vfsOf(KEY_A, { "source/t.keyman-touch-layout": layout(["a", "ŋ"]) });
@@ -200,6 +265,27 @@ describe("G6: no lost touch letters", () => {
   it("fails when a letter is missing from the default layer", async () => {
     const vfs = vfsOf(KEY_A, { "source/t.keyman-touch-layout": layout(["a"]) });
     const r = await gate("G6", { vfs, decisions: alphabet, includeTouch: true });
+    expect(r).toMatchObject({ applicable: true, pass: false });
+    expect(r.detail.join(" ")).toContain("ŋ");
+  });
+  it("when start touch is known, does not fail for letters the starting default layer never showed", async () => {
+    const vfs = vfsOf(KEY_A, { "source/t.keyman-touch-layout": layout(["a"]) });
+    const r = await gate("G6", {
+      vfs,
+      decisions: alphabet,
+      includeTouch: true,
+      startTouchIr: startTouchWithDefaultTexts(["a"]),
+    });
+    expect(r).toMatchObject({ applicable: true, pass: true });
+  });
+  it("when start touch is known, fails if a letter present on the starting default layer disappears", async () => {
+    const vfs = vfsOf(KEY_A, { "source/t.keyman-touch-layout": layout(["a"]) });
+    const r = await gate("G6", {
+      vfs,
+      decisions: alphabet,
+      includeTouch: true,
+      startTouchIr: startTouchWithDefaultTexts(["a", "ŋ"]),
+    });
     expect(r).toMatchObject({ applicable: true, pass: false });
     expect(r.detail.join(" ")).toContain("ŋ");
   });

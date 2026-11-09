@@ -16,7 +16,8 @@ import { expect, type Page } from "playwright/test";
 import {
   driveIdentityLite as driveIdentityLiteBase,
   pickStartKeyboard,
-  chooseAdaptTrack,
+  confirmCopyTrack,
+  acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
@@ -138,10 +139,11 @@ export async function driveToTouchStep(
   await page.goto("/");
   await driveIdentityLite(page);
   await pickStartKeyboard(page, START_KEYBOARD_ID);
-  await chooseAdaptTrack(page);
+  await confirmCopyTrack(page);
   // The attribution step (#1901) sits between track and prefill — this
   // prelude predated it and parked every consumer at confirmPrefill (#2053).
   await driveAttributionStep(page);
+  await acceptProjectName(page);
   await confirmPrefill(page);
   await buildOneCharacterList(page, PLACED_CHAR);
   await skipCarve(page);

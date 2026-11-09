@@ -43,6 +43,10 @@ describe("phaseOfStep", () => {
     expect(phaseOfStep("help")?.letter).toBe("F");
   });
 
+  it("returns the F/'Finalize' phase for 'icon' (icon editor, after Documentation)", () => {
+    expect(phaseOfStep("icon")?.letter).toBe("F");
+  });
+
   // One parametrised case per real manifest step id (excluding UNPHASED_STEP_IDS)
   // asserting it resolves to SOME phase — drives the "every manifest step has a
   // phase" invariant off the real manifest rather than a hardcoded id list.

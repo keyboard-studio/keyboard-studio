@@ -169,7 +169,7 @@ describe("MechanismGallery — mark for later review", () => {
 
     // Navigating back to the marked "á": Next stays enabled (it is
     // accounted for), even though it is still not counted toward coverage.
-    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
     await waitFor(() => {
       expectCurrentChar("á", { marked: true });
     });
@@ -332,7 +332,7 @@ describe("MechanismGallery — Continue-blocked inline hint (no modal)", () => {
     }
   });
 
-  it("the ← back button navigates freely while characters remain unimplemented (no modal, no block)", async () => {
+  it("the Back button navigates freely while characters remain unimplemented (no modal, no block)", async () => {
     const onBack = vi.fn();
     seedInventory(["á", "é"]);
     const { container } = await act(async () =>
@@ -350,13 +350,13 @@ describe("MechanismGallery — Continue-blocked inline hint (no modal)", () => {
     });
     expect(container.querySelector("dialog")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
     await waitFor(() => {
       expectCurrentChar("á", { marked: true });
     });
     expect(container.querySelector("dialog")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(onBack).toHaveBeenCalledOnce();
     expect(container.querySelector("dialog")).toBeNull();
   });
@@ -425,7 +425,7 @@ describe("MechanismGallery — Back button", () => {
     await act(async () => {
       render(<MechanismGallery selectedStartKeyboard={basicKbdus} />, { withStepNav: true });
     });
-    expect(screen.queryByRole("button", { name: /← back/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
   });
 
   it("renders a Back button when onBack is provided (before done)", async () => {
@@ -436,7 +436,7 @@ describe("MechanismGallery — Back button", () => {
         <MechanismGallery selectedStartKeyboard={basicKbdus} onBack={onBack} />, { withStepNav: true }
       );
     });
-    const btn = screen.getByRole("button", { name: /← back/i });
+    const btn = screen.getByRole("button", { name: "Back" });
     expect(btn).toBeTruthy();
     fireEvent.click(btn);
     expect(onBack).toHaveBeenCalledOnce();
@@ -495,7 +495,7 @@ describe("MechanismGallery — positional Back/Next navigation", () => {
     expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
 
     // --- Back from "í" (idx 2) lands on "é" (idx 1) — covered, not skipped. ---
-    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
     await waitFor(() => {
       expectCurrentChar("é");
     });
@@ -514,18 +514,18 @@ describe("MechanismGallery — positional Back/Next navigation", () => {
     });
 
     // --- Back twice more: "í" → "é" → "á" (idx 0), both covered, neither skipped. ---
-    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
     await waitFor(() => {
       expectCurrentChar("é");
     });
-    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
     await waitFor(() => {
       expectCurrentChar("á");
     });
     expect(onBack).not.toHaveBeenCalled();
 
     // --- Back from "á" (idx 0) — first position, nowhere further back — calls onBack. ---
-    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(onBack).toHaveBeenCalledOnce();
   });
 });
@@ -705,7 +705,7 @@ describe("MechanismGallery — Back after marking the only character", () => {
 
     // Back is still positional: idx 0 has no prior position, so it calls
     // onBack — not gated by the character having just been marked.
-    const backBtn = screen.getByRole("button", { name: /← back/i });
+    const backBtn = screen.getByRole("button", { name: "Back" });
     expect(backBtn).toBeTruthy();
     fireEvent.click(backBtn);
     expect(onBack).toHaveBeenCalledOnce();

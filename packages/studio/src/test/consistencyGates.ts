@@ -13,12 +13,14 @@ import type {
   KeyboardIR,
   OutputElement,
   StoreItem,
+  TouchLayoutIR,
   VirtualFS,
 } from "@keyboard-studio/contracts";
 import { parseKmn, confirmedCaseCounterpart, normalizationFormForOutputForm } from "@keyboard-studio/engine";
-import { computeContextTolerance } from "@keyboard-studio/engine/context-tolerance";
+import { casedKeySet, declaredCasedKeys, keyPlaneOutputs } from "@keyboard-studio/contracts";
+import { computeContextTolerance, NORMALIZATION_STORE_PREFIX } from "@keyboard-studio/engine/context-tolerance";
 import { lintContextTolerance } from "@keymanapp/keyboard-lint";
-import type { DecisionSet } from "../decisions/decisionTypes.ts";
+import type { CapsHandlingValue, DecisionSet } from "../decisions/decisionTypes.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { readVfsText } from "../lib/vfsText.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
@@ -48,6 +50,13 @@ export interface GateInput {
    * verdict into generated (enforced) and starting (known gap) stores.
    */
   startIr?: KeyboardIR;
+  /**
+   * Starting keyboard's parsed touch layout (when present). G6 uses it to split
+   * "inherited default-layer gaps" from regressions: a letter missing from the
+   * projected default layer is only a failure when the starting layout already
+   * had that letter labeled on the default layer.
+   */
+  startTouchIr?: TouchLayoutIR;
   /** A second projection of the same inputs, for G7. */
   repeatVfs?: VirtualFS;
   /** G6 reads the touch layout; fixtures do not reproduce the touch step, so it is opt-in. */
@@ -196,8 +205,19 @@ function g4(input: GateInput, ir: KeyboardIR | undefined): GateResult {
       for (const run of outputRuns(r.output)) check(`${g.name} rule ${r.nodeId}`, run, starting);
     }
   }
+  // The normalization step's stores are its internal lookup tables, not
+  // output content: the head stores hold the pasted alternates (the
+  // keyboard's other form) so the step can match them, and the produced-form
+  // stores repackage the keyboard's own output repertoire -- which G4 already
+  // polices at its source (starting rules are reported, not failed; session
+  // rules are checked via their outputs). The step cannot satisfy G4
+  // strictly: it must reproduce the keyboard's own produced clusters,
+  // including a starting rule's precomposed output, so its stores are exempt
+  // as a whole. (US6: the default-accepted step otherwise fails G4 on every
+  // NFD-output keyboard the moment it applies.)
   for (const s of ir.stores) {
     if (s.isSystem) continue;
+    if (s.name.toLowerCase().startsWith(NORMALIZATION_STORE_PREFIX)) continue;
     const wholeStore = start.stores.has(storeKey(s.name, s.items));
     // Per item: a carve trims a starting store without making what is left generated.
     const startHeld = new Set((start.storeItems.get(s.name) ?? []).map((i) => JSON.stringify(i)));
@@ -210,69 +230,66 @@ function g4(input: GateInput, ir: KeyboardIR | undefined): GateResult {
   return out;
 }
 
-/** Expand `[K_A]..[K_Z]` and `[K_0]..[K_9]` ranges (the only ones CasedKeys uses) into key names. */
-function casedKeyNames(items: readonly StoreItem[]): Set<string> {
-  const names = new Set<string>();
-  for (let i = 0; i < items.length; i++) {
-    const it = items[i]!;
-    if (it.kind !== "vkey") continue;
-    const next = items[i + 1];
-    const end = items[i + 2];
-    if (next?.kind === "raw" && next.text === ".." && end?.kind === "vkey") {
-      const a = it.name.slice(2);
-      const b = end.name.slice(2);
-      if (a.length === 1 && b.length === 1) {
-        for (let c = a.charCodeAt(0); c <= b.charCodeAt(0); c++) names.add(`K_${String.fromCharCode(c)}`);
-      }
-      i += 2;
-    } else {
-      names.add(it.name);
-    }
-  }
-  return names;
-}
-
 function g5(input: GateInput, ir: KeyboardIR | undefined): GateResult {
   if (!atOrAfter(input.point, "caps")) return notApplicable("G5", "applies at caps and later");
   if (ir === undefined) return result("G5", ["projected .kmn missing"]);
   const alphabet = new Set(confirmedChars(input.decisions));
   const cased = [...alphabet].some((c) => confirmedCaseCounterpart(c, alphabet) !== null);
-  const store = ir.stores.find((s) => s.isSystem && s.name.toLowerCase() === "casedkeys");
+  const declared = declaredCasedKeys(ir);
   if (!cased) {
-    return result("G5", store === undefined ? [] : ["&CasedKeys is present but the alphabet has no case pair"]);
+    // A store the copied keyboard already declared is starting content, left as copied.
+    const inherited = input.startIr !== undefined && declaredCasedKeys(input.startIr) !== undefined;
+    return result(
+      "G5",
+      declared === undefined || inherited ? [] : ["&CasedKeys is present but the alphabet has no case pair"],
+    );
   }
-  if (store === undefined) return result("G5", ["the alphabet is cased but &CasedKeys is absent"]);
+  // The decision decides what the store should be (spec 112 R10). No recorded
+  // decision reads as the seeded default, cased keys.
+  const mode = (input.decisions["caps-handling"]?.value as CapsHandlingValue | undefined)?.mode ?? "cased-keys";
+  if (mode === "explicit-rules") return result("G5", []);
+  if (mode === "none") {
+    return result("G5", declared === undefined ? [] : ["&CasedKeys is present but caps handling is none"]);
+  }
+  if (declared === undefined) return result("G5", ["the alphabet is cased but &CasedKeys is absent"]);
 
-  // Every assigned key, on every modifier plane, whose plain and SHIFT outputs
-  // form a case pair (FR-052: the layout-family list is the floor, not the ceiling).
-  const planeKey = (name: string, mods: readonly string[]): string => `${name}|${[...mods].sort().join("+")}`;
-  const byPlane = new Map<string, string>();
-  for (const g of ir.groups) {
-    for (const r of g.rules) {
-      const [only, ...rest] = r.context;
-      if (only?.kind !== "vkey" || rest.length > 0) continue;
-      if (r.output.length === 0 || r.output.some((e) => e.kind !== "char")) continue;
-      const key = planeKey(only.name, only.modifiers);
-      if (!byPlane.has(key)) byPlane.set(key, outputRuns(r.output)[0]!);
-    }
-  }
-  const covered = casedKeyNames(store.items);
-  const missing: string[] = [];
-  for (const [k, lower] of byPlane) {
-    const [name, plane] = k.split("|") as [string, string];
-    const mods = plane === "" ? [] : plane.split("+");
-    if (mods.includes("SHIFT")) continue;
-    const upper = byPlane.get(planeKey(name, [...mods, "SHIFT"]));
-    if (upper === undefined) continue;
-    const pair = confirmedCaseCounterpart(lower, alphabet, undefined, "toUpper");
-    if (pair?.counterpart === upper && !covered.has(name)) {
-      missing.push(`${name}${plane === "" ? "" : ` ${plane}`} (${lower}/${upper})`);
-    }
-  }
+  // Every key with a case pair on a used plane, RAlt pairs read through the
+  // store-routed outputs, minus the keys another plane gives a different pair
+  // (research R1). The layout-family floor is not the ceiling (FR-052), so the
+  // expected set is derived from the projected keyboard alone.
+  const expected = casedKeySet(ir, { floor: [] }).keys;
+  const outputs = keyPlaneOutputs(ir);
+  const missing = expected
+    .filter((k) => !declared.has(k))
+    .map((k) => {
+      const planes = outputs.get(k) ?? {};
+      const pair = planes.base !== undefined && planes.shift !== undefined
+        ? `${planes.base}/${planes.shift}`
+        : `${planes.ralt ?? "?"}/${planes["shift-ralt"] ?? "?"}`;
+      return `${k} (${pair})`;
+    });
   return result("G5", missing.length === 0 ? [] : [`&CasedKeys misses cased key(s): ${missing.join(", ")}`]);
 }
 
 type TouchLayoutJson = Record<string, { layer?: { id: string; row?: { key?: { text?: string }[] }[] }[] }>;
+
+/** NFC-normalized `text` of each key on each platform's default layer (G6 surface). */
+function defaultLayerPresentTextsFromTouchIr(touch: TouchLayoutIR | undefined): Map<string, Set<string>> {
+  const m = new Map<string, Set<string>>();
+  if (touch === undefined) return m;
+  for (const p of touch.platforms) {
+    const layer = p.layers.find((l) => l.id === "default");
+    if (layer === undefined) continue;
+    const texts = new Set<string>();
+    for (const row of layer.rows) {
+      for (const k of row.keys) {
+        if (k.text !== undefined && k.text !== "") texts.add(k.text.normalize("NFC"));
+      }
+    }
+    m.set(p.id, texts);
+  }
+  return m;
+}
 
 function g6(input: GateInput): GateResult {
   if (input.includeTouch !== true) return notApplicable("G6", "walk-only: the fixtures do not reproduce the touch step");
@@ -290,6 +307,8 @@ function g6(input: GateInput): GateResult {
     return !(pair !== null && pair.direction === "toLower");
   });
   const layout = JSON.parse(text) as TouchLayoutJson;
+  const startDefaultTexts = defaultLayerPresentTextsFromTouchIr(input.startTouchIr);
+  const hasStartSplit = input.startTouchIr !== undefined;
   const problems: string[] = [];
   for (const [platform, def] of Object.entries(layout)) {
     const layer = def.layer?.find((l) => l.id === "default");
@@ -297,7 +316,16 @@ function g6(input: GateInput): GateResult {
     const present = new Set(
       (layer.row ?? []).flatMap((r) => (r.key ?? []).map((k) => (k.text ?? "").normalize("NFC"))),
     );
-    const missing = owed.filter((c) => !present.has(c.normalize("NFC")));
+    const inherited =
+      platform === "phone" || platform === "tablet" || platform === "desktop"
+        ? (startDefaultTexts.get(platform) ?? new Set<string>())
+        : new Set<string>();
+    const missing = owed.filter((c) => {
+      const n = c.normalize("NFC");
+      if (present.has(n)) return false;
+      if (!hasStartSplit) return true;
+      return inherited.has(n);
+    });
     if (missing.length > 0) problems.push(`${platform} default layer lacks: ${missing.join(" ")}`);
   }
   return result("G6", problems);

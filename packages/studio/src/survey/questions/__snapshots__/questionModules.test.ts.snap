@@ -130,6 +130,8 @@ exports[`live question modules > b/q_tp2_fallback_tier_prefill.ts > definition c
 
 exports[`live question modules > b/q_tp3_orthography_join.ts > definition contract 1`] = `"radio | required | next null | options [join, decline] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
 
+exports[`live question modules > f/pf_body_parity.ts > definition contract 1`] = `"radio | required | next pf_font_guidance | options [welcome, help, keep-different] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
 exports[`live question modules > f/pf_canonical_order.ts > definition contract 1`] = `"short_text | optional | next pf_script_glossary | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > f/pf_contact_info.ts > definition contract 1`] = `"text | optional | next null | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
@@ -182,15 +184,15 @@ exports[`live question modules > f/pf_usage_tip_4.ts > definition contract 1`] =
 
 exports[`live question modules > f/pf_usage_tip_5.ts > definition contract 1`] = `"text | optional | next pf_credits | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
-exports[`live question modules > f/pf_welcome_paragraph.ts > definition contract 1`] = `"text | required | next pf_font_guidance | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+exports[`live question modules > f/pf_welcome_paragraph.ts > definition contract 1`] = `"text | required | next [ctx.body_parity_live == 'true' -> pf_body_parity; (default) -> pf_font_guidance] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > g/project_display_name.ts > definition contract 1`] = `"short_text | required | next project_keyboard_id | prompt | help_text | validate | no blank fixture | inputs [header.bcp47] | writes [header.name]"`;
 
 exports[`live question modules > g/project_keyboard_id.ts > definition contract 1`] = `"short_text | required | next null | prompt | help_text | validate | no blank fixture | inputs [header.bcp47] | writes [header.keyboardId]"`;
 
-exports[`live question modules > g/track_choice.ts > definition contract 1`] = `"radio | required | next null | options [copy, adapt] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
-
 exports[`live question modules > gallery/baseKeyboard.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > gallery/capsHandling.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > gallery/carvedLayout.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
@@ -200,13 +202,20 @@ exports[`live question modules > gallery/customCss.ts > definition contract 1`] 
 
 exports[`live question modules > gallery/deadkeysDefined.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes [groups, stores, raw]"`;
 
+exports[`live question modules > gallery/fallbackPolicy.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | no blank fixture | inputs [] | writes []"`;
+
 exports[`live question modules > gallery/helpDocs.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > gallery/icon.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > gallery/invisiblesInventory.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > gallery/kmnEdits.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes [groups, stores, comments, raw, header]"`;
+exports[`live question modules > gallery/languageList.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > gallery/marksTreatment.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > gallery/missingLetters.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > gallery/oskLayout.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
@@ -221,6 +230,8 @@ exports[`live question modules > gallery/ruleSet.ts > definition contract 1`] = 
 exports[`live question modules > gallery/touchLayout.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > gallery/touchSeedSource.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > gallery/upgrades.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > gallery/welcomeHtm.ts > definition contract 1`] = `"notice | required (absent) | next (absent) | prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
 

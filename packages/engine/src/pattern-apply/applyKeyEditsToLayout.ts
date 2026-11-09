@@ -56,15 +56,22 @@
  * ## Geometry stays read-only, with one documented consequence
  *
  * `width`/`pad` are absent from `EditableKeyFields` (see keyEditOps.ts) — no
- * operation authors them directly. `remove`'s `"redistribute"` outcome is the
- * ONE place this applier writes `width`: the removed key's own width (if any)
- * is split evenly across the remaining keys in its row (contracts/
+ * operation authors them directly. `remove` writes geometry only as a
+ * CONSEQUENCE of removing a key, never as a field an operation authors
+ * directly, in two ways: `"redistribute"` splits the removed key's own
+ * width (if any) evenly across the remaining keys in its row (contracts/
  * key-edit-overlay.md §3; research.md R3c "remove, then redistribute the
- * freed width"). A removed key with no width, or a row left with no
- * remaining keys, has nothing to redistribute, so no width is written.
- * `"reflow"` writes nothing at all — a row's stretched final key absorbing
- * the slack unevenly is the Keyman Web runtime's own rendering behaviour, not
- * a data change this applier is responsible for.
+ * freed width"); `"reflow"` leaves the freed width as trailing padding —
+ * a `T_SPACER` key at the end of the row carrying the removed key's
+ * `width`/`pad` (#2360: deleting a key used to leave the row under-full,
+ * and every renderer stretches the last key of an under-full row to the
+ * layer maximum, so the last key came out long) — except when the row's
+ * last remaining key is a modifier key, which may absorb freed width up
+ * to (but not reaching) 3x a regular key's width, with only the excess
+ * beyond that cap going into the trailing spacer (PR #2583 follow-up;
+ * the cap is computed by keyEditOps' shared `modifierReflowSpacerWidth`).
+ * A removed key with no width, or a row left with no remaining keys, has
+ * nothing to redistribute or pad, so no width is written in either case.
  *
  * ## `scope: "family"` is not fanned out here
  *
@@ -80,6 +87,8 @@ import { NodeIdMinter } from "../shared/node-ids.js";
 import {
   applyFieldSemantics,
   applySuppressSemantics,
+  modifierReflowSpacerWidth,
+  proposeSuppressFields,
   resolveKeyAddress,
   resolveSubKeyEntry,
   type AddressableLayoutLike,
@@ -301,9 +310,23 @@ export function applyKeyEditsToLayout(
 
       case "remove": {
         const [removedKey] = row.keys.splice(keyIndex, 1);
-        if (op.outcome === "redistribute" && removedKey) {
+        if (removedKey === undefined) break;
+        if (op.outcome === "redistribute") {
           redistributeFreedWidth(row, removedKey.width);
+        } else if (op.outcome === "reflow") {
+          // The layer maximum the modifier cap measures against comes from
+          // the layer's OTHER rows, in live state — see
+          // modifierReflowSpacerWidth's doc for why the row's own total
+          // cannot serve as the reference.
+          leaveTrailingPadding(
+            row,
+            removedKey,
+            minter,
+            state.workingRows.filter((_, i) => i !== rowIndex).map((r) => r.keys),
+          );
         }
+        // "drop": nothing — the row simply has one fewer key (the Code
+        // tab diff's scaffolding outcome; see RemoveKeyOp).
         break;
       }
 
@@ -329,6 +352,184 @@ export function applyKeyEditsToLayout(
           warnings.push(
             `[key-edit-apply] move "${op.direction}" at "${op.address}" has no room in that direction — no change`,
           );
+        }
+        break;
+      }
+
+      case "moveToLayer": {
+        // SPLICE THE EXISTING NODE — the cross-layer sibling of `move`'s
+        // FR-021 guarantee: `nodeId`, `provenance`, `keycapAuthored`, `sk`,
+        // `multitap`, `flick`, `width` and `pad` survive because the object
+        // identity does. See MoveToLayerOp's doc for why remove+add cannot
+        // express this.
+        if (op.scope === "family") {
+          warnings.push(
+            `[key-edit-apply] moveToLayer at "${op.address}" carries scope "family", which has no shared referent across a layer family — operation skipped`,
+          );
+          orphaned.push(op);
+          break;
+        }
+        const platform = layout.platforms[platformIndex]!;
+        const targetLayerIndex = platform.layers.findIndex((l) => l.id === op.toLayer);
+        if (targetLayerIndex === -1) {
+          warnings.push(
+            `[key-edit-apply] moveToLayer at "${op.address}" names unknown layer "${op.toLayer}" — operation skipped`,
+          );
+          orphaned.push(op);
+          break;
+        }
+        if (targetLayerIndex === layerIndex) {
+          warnings.push(
+            `[key-edit-apply] moveToLayer at "${op.address}" targets its own layer "${op.toLayer}" — no change`,
+          );
+          break;
+        }
+        const targetState = getOrCreateLayerState(platformIndex, targetLayerIndex);
+        // Id collision on the target layer: two keys with one id cannot be
+        // told apart, so the move is refused rather than half-applied.
+        const collides = targetState.workingRows.some((r) =>
+          r.keys.some((k) => k.id === key.id),
+        );
+        if (collides) {
+          warnings.push(
+            `[key-edit-apply] moveToLayer at "${op.address}": target layer "${op.toLayer}" already has a key with id "${key.id}" — operation skipped`,
+          );
+          orphaned.push(op);
+          break;
+        }
+        // Splice out of the source row first, so a stale anchor pointing at
+        // the moved key itself falls back to append instead of inserting
+        // the key next to itself.
+        const [movedKey] = row.keys.splice(keyIndex, 1);
+        if (!movedKey) {
+          warnings.push(
+            `[key-edit-apply] moveToLayer at "${op.address}" found no key — operation skipped`,
+          );
+          orphaned.push(op);
+          break;
+        }
+        // Anchor: insert before/after a key on the target layer. Resolved
+        // against the live view (post-splice); falls back to append when
+        // absent or unresolvable.
+        let inserted = false;
+        if (op.anchorAddress !== undefined) {
+          const anchorParts = parseTouchKeyAddress(op.anchorAddress);
+          const anchorResolved =
+            anchorParts !== undefined ? resolveKeyAddress(liveView(), anchorParts) : undefined;
+          if (
+            anchorResolved !== undefined &&
+            anchorResolved.platformIndex === platformIndex &&
+            anchorResolved.layerIndex === targetLayerIndex
+          ) {
+            const anchorRow = targetState.workingRows[anchorResolved.rowIndex];
+            if (anchorRow !== undefined) {
+              const at =
+                anchorResolved.keyIndex + (op.position === "after" ? 1 : 0);
+              anchorRow.keys.splice(at, 0, movedKey);
+              inserted = true;
+            }
+          } else {
+            warnings.push(
+              `[key-edit-apply] moveToLayer at "${op.address}": anchor "${op.anchorAddress}" did not resolve on layer "${op.toLayer}" — appended instead`,
+            );
+          }
+        }
+        if (!inserted) {
+          const lastRow = targetState.workingRows[targetState.workingRows.length - 1];
+          if (lastRow === undefined) {
+            targetState.workingRows.push({ keys: [movedKey] });
+          } else {
+            lastRow.keys.push(movedKey);
+          }
+        }
+        break;
+      }
+
+      case "copyToLayer": {
+        // CLONE, not splice: the source key stays where it is and the target
+        // layer gains a deep copy — sub-keys (`sk`, `flick`, `multitap`),
+        // geometry, `provenance` and `keycapAuthored` travel because the
+        // object is cloned whole, so the guarantee cannot rot the next time
+        // `TouchKeyIR` grows a field (the FR-021 strategy, applied to a
+        // copy). The clone is a NEW node occurrence, so it gets a fresh
+        // `nodeId` (as `add` does) — the id itself is kept, which is what
+        // keeps the key's `.kmn` rules covering the copy (spec 104 FR-007).
+        // Refusals, anchor/append and `scope: "family"` mirror `moveToLayer`.
+        if (op.scope === "family") {
+          warnings.push(
+            `[key-edit-apply] copyToLayer at "${op.address}" carries scope "family", which has no shared referent across a layer family — operation skipped`,
+          );
+          orphaned.push(op);
+          break;
+        }
+        const platform = layout.platforms[platformIndex]!;
+        const targetLayerIndex = platform.layers.findIndex((l) => l.id === op.toLayer);
+        if (targetLayerIndex === -1) {
+          warnings.push(
+            `[key-edit-apply] copyToLayer at "${op.address}" names unknown layer "${op.toLayer}" — operation skipped`,
+          );
+          orphaned.push(op);
+          break;
+        }
+        if (targetLayerIndex === layerIndex) {
+          warnings.push(
+            `[key-edit-apply] copyToLayer at "${op.address}" targets its own layer "${op.toLayer}" — no change`,
+          );
+          break;
+        }
+        const targetState = getOrCreateLayerState(platformIndex, targetLayerIndex);
+        // Id collision on the target layer: two keys with one id cannot be
+        // told apart, so the copy is refused rather than half-applied (a
+        // fresh id would need a rule transplant per spec 104 FR-008).
+        const collides = targetState.workingRows.some((r) =>
+          r.keys.some((k) => k.id === key.id),
+        );
+        if (collides) {
+          warnings.push(
+            `[key-edit-apply] copyToLayer at "${op.address}": target layer "${op.toLayer}" already has a key with id "${key.id}" — operation skipped`,
+          );
+          orphaned.push(op);
+          break;
+        }
+        const copiedKey: TouchKeyIR = {
+          ...structuredClone(key),
+          nodeId: minter.mint("touchKey"),
+        };
+        // Anchor: insert before/after a key on the target layer. Resolved
+        // against the live view; falls back to append when absent or
+        // unresolvable. (Unlike the move, no splice-out precedes this, so a
+        // stale anchor pointing at the SOURCE key still resolves — on its
+        // own layer, so the layer check below correctly declines it.)
+        let inserted = false;
+        if (op.anchorAddress !== undefined) {
+          const anchorParts = parseTouchKeyAddress(op.anchorAddress);
+          const anchorResolved =
+            anchorParts !== undefined ? resolveKeyAddress(liveView(), anchorParts) : undefined;
+          if (
+            anchorResolved !== undefined &&
+            anchorResolved.platformIndex === platformIndex &&
+            anchorResolved.layerIndex === targetLayerIndex
+          ) {
+            const anchorRow = targetState.workingRows[anchorResolved.rowIndex];
+            if (anchorRow !== undefined) {
+              const at =
+                anchorResolved.keyIndex + (op.position === "after" ? 1 : 0);
+              anchorRow.keys.splice(at, 0, copiedKey);
+              inserted = true;
+            }
+          } else {
+            warnings.push(
+              `[key-edit-apply] copyToLayer at "${op.address}": anchor "${op.anchorAddress}" did not resolve on layer "${op.toLayer}" — appended instead`,
+            );
+          }
+        }
+        if (!inserted) {
+          const lastRow = targetState.workingRows[targetState.workingRows.length - 1];
+          if (lastRow === undefined) {
+            targetState.workingRows.push({ keys: [copiedKey] });
+          } else {
+            lastRow.keys.push(copiedKey);
+          }
         }
         break;
       }
@@ -624,6 +825,110 @@ function redistributeFreedWidth(row: { keys: TouchKeyIR[] }, freedWidth: number 
     const { widthWire: _staleWidthWire, ...rest } = k;
     return { ...rest, width };
   });
+}
+
+// ---------------------------------------------------------------------------
+// `remove` + `"reflow"` — leave the freed width as trailing padding (#2360)
+// ---------------------------------------------------------------------------
+
+/**
+ * Leave a reflowed-out key's freed width as trailing padding at the end of
+ * its row, so the row keeps its total width and no remaining key stretches
+ * to absorb the slack (issue #2360: "deleting keys entirely makes the last
+ * key stretch" — every renderer stretches the last key of an under-full row
+ * to the layer maximum: KeyGrid per FR-012 / ADR 0002, the builder canvas
+ * on narrow viewports, Keyman Web itself).
+ *
+ * The padding is a `T_SPACER` (`sp: 10`) key carrying the removed key's
+ * `width`/`pad` — the `sp`/`id` pairing comes from
+ * {@link proposeSuppressFields} (`"spacer"`), never a hand-rolled literal,
+ * and only the removed key's EXPLICIT geometry is written: an absent
+ * width/pad still contributes its default at render time, exactly as the
+ * removed key did, so the row total is preserved either way. When the row
+ * already ends in a spacer, that spacer grows instead of appending a
+ * second one, so repeated deletions accumulate one pad, not one spacer
+ * per deletion. A `sp: 9` blank is deliberately NOT grown — it renders a
+ * keycap outline, so widening it would widen a visible keycap, not a gap.
+ *
+ * One exception (PR #2583 follow-up to #2360, Matthew's ruling: "When the
+ * last button is a modifier key, it can be larger, as long as it's less
+ * than 3x a regular key"): when the row's last remaining key is a modifier
+ * key, that key may absorb freed width up to — but not reaching — 3x a
+ * regular key's width, and only the excess beyond the cap goes into the
+ * trailing spacer (which then carries the excess as `width` with an
+ * explicit `pad: 0`, so its row-total contribution is exactly the excess —
+ * an absent pad would add the 15 default). When the freed width fits
+ * under the cap, no spacer is left at all. The cap itself is computed by
+ * the shared {@link modifierReflowSpacerWidth}; this function only
+ * decides the spacer's shape. A row whose last key is a spacer still
+ * grows that spacer in full — the modifier behind it cannot stretch, so
+ * the cap has nothing to say.
+ *
+ * A no-op when the row is left empty — there are no remaining keys to
+ * protect from the stretch (the RemoveKeyDialog's `keepRow` default covers
+ * that case on the dialog path).
+ */
+function leaveTrailingPadding(
+  row: { keys: TouchKeyIR[] },
+  removedKey: TouchKeyIR,
+  minter: NodeIdMinter,
+  otherRowsKeys: readonly (readonly TouchKeyIR[])[],
+): void {
+  if (row.keys.length === 0) return;
+  const { spClass, sentinelId } = proposeSuppressFields("spacer");
+  const lastIndex = row.keys.length - 1;
+  const last = row.keys[lastIndex]!;
+  if (last.sp === spClass) {
+    // Grow the existing trailing pad. #2216: the geometry moved, so the
+    // retained wire hints would emit the pre-growth source values — drop
+    // them, exactly as `redistributeFreedWidth` does for `widthWire`.
+    const { widthWire: _staleWidthWire, padWire: _stalePadWire, ...rest } = last;
+    row.keys[lastIndex] = {
+      ...rest,
+      width: (last.width ?? DEFAULT_KEY_WIDTH_PCT) + (removedKey.width ?? DEFAULT_KEY_WIDTH_PCT),
+      pad: (last.pad ?? DEFAULT_KEY_PAD_PCT) + (removedKey.pad ?? DEFAULT_KEY_PAD_PCT),
+    };
+    return;
+  }
+  const modifierSpacer = modifierReflowSpacerWidth(row.keys, removedKey, otherRowsKeys);
+  if (modifierSpacer !== undefined) {
+    if (modifierSpacer > 0) {
+      const spacer: TouchKeyIR = {
+        nodeId: minter.mint("touchKey"),
+        id: sentinelId,
+        // Materialized explicitly, matching what parsing this key back out
+        // of a `.keyman-touch-layout` file would always produce for an
+        // absent wire value (FR-009) — the same reason `add` sets it above.
+        provenance: DEFAULT_TOUCH_PROVENANCE,
+        sp: spClass,
+        // No `text`: a spacer renders nothing, and the parser leaves `text`
+        // undefined when the wire value is absent — so Case B's raw-JSON twin
+        // (which writes no `text` either) re-parses to the same key.
+        // `pad: 0` is explicit, not absent: the spacer must contribute
+        // exactly `modifierSpacer` to the row total, and an absent pad
+        // would add the 15 default (see modifierReflowSpacerWidth).
+        width: modifierSpacer,
+        pad: 0,
+      };
+      row.keys.push(spacer);
+    }
+    return;
+  }
+  const spacer: TouchKeyIR = {
+    nodeId: minter.mint("touchKey"),
+    id: sentinelId,
+    // Materialized explicitly, matching what parsing this key back out of
+    // a `.keyman-touch-layout` file would always produce for an absent
+    // wire value (FR-009) — the same reason `add` sets it above.
+    provenance: DEFAULT_TOUCH_PROVENANCE,
+    sp: spClass,
+    // No `text`: a spacer renders nothing, and the parser leaves `text`
+    // undefined when the wire value is absent — so Case B's raw-JSON twin
+    // (which writes no `text` either) re-parses to the same key.
+    ...(removedKey.width !== undefined ? { width: removedKey.width } : {}),
+    ...(removedKey.pad !== undefined ? { pad: removedKey.pad } : {}),
+  };
+  row.keys.push(spacer);
 }
 
 // ---------------------------------------------------------------------------

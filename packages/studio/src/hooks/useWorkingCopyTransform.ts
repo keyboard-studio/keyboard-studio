@@ -77,7 +77,12 @@ import type { KeyEditOperation } from "@keyboard-studio/engine";
 import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
-import { marksGuardsFromValue, projectionInputFromState, selectKmnEdits } from "../lib/projectionInput.ts";
+import {
+  capsHandlingFromDecisions,
+  marksGuardsFromValue,
+  projectionInputFromState,
+  selectKmnEdits,
+} from "../lib/projectionInput.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { physicalAssignmentsOf } from "../lib/physicalAssignments.ts";
@@ -194,6 +199,13 @@ export interface UseWorkingCopyTransformOptions {
     touchLayoutJson: string | null;
     keyEditOps: readonly KeyEditOperation[];
   };
+
+  /**
+   * The CSS step's in-progress stylesheet, used INSTEAD OF the store's
+   * `customCss` (a string; null = untouched, "" = cleared). Omit to read the
+   * store's committed value. A primitive, so it keys the memo directly.
+   */
+  liveCss?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -222,6 +234,21 @@ export function useWorkingCopyTransform(
   // the store's own touchLayoutJson field and an empty key-edit overlay. See
   // the option's doc comment (UseWorkingCopyTransformOptions.liveLayoutOverride).
   const liveLayoutOverride = opts?.liveLayoutOverride;
+  const liveCss = opts?.liveCss;
+  const storeCustomCss = useWorkingCopyStore((s) => s.customCss);
+  const customCss = liveCss !== undefined ? liveCss : storeCustomCss;
+  // Documentation-step overrides (specs/html-editor): the authored doc files
+  // are store fields like customCss, read through the hook's own selectors
+  // so the memo keys below stay the single trigger for rebuilding this closure.
+  const authoredWelcomeHtm = useWorkingCopyStore((s) => s.authoredWelcomeHtm);
+  const authoredReadmeHtm = useWorkingCopyStore((s) => s.authoredReadmeHtm);
+  const authoredReadmeMd = useWorkingCopyStore((s) => s.authoredReadmeMd);
+  const authoredHelpPhp = useWorkingCopyStore((s) => s.authoredHelpPhp);
+  // Where an authored welcome edit lands (welcomePagePath): the flat path
+  // only on an Open walk over a flat-convention base, as in the download.
+  const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
+  const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  const startWelcomeConvention = useWorkingCopyStore((s) => s.startWelcomeConvention);
 
   // P1 fix (bug F4 footgun): omitting previewedStartId is legitimate for
   // post-commit call sites (MechanismGallery, TouchGallery) but is a silent
@@ -294,6 +321,12 @@ export function useWorkingCopyTransform(
   // projection closure rebuilds (and the one compile cycle re-runs) when it changes.
   const kmnEdits = useDecisionStore((s) => selectKmnEdits(s.decisions));
   const kmnEditsKey = useMemo(() => JSON.stringify(kmnEdits?.entries ?? []), [kmnEdits]);
+  // spec 112: the caps-handling decision step 2.8 applies. Read through the
+  // same gate the download uses (a caseless alphabet is not asked), keyed on
+  // the mode so an unrelated re-record never rebuilds the projection.
+  const capsHandlingMode = useDecisionStore(
+    (s) => capsHandlingFromDecisions(s.decisions)?.mode ?? null,
+  );
   const marksGuardsKey = useMemo(
     () => JSON.stringify(marksGuardsFromValue(marksTreatment)),
     [marksTreatment],
@@ -517,6 +550,14 @@ export function useWorkingCopyTransform(
             deadkeyOverlay: { ops: deadkeyOps },
             contextToleranceOverlay: storeContextToleranceOverlay,
             touchLayoutJson: storeTouchLayoutJson,
+            customCss,
+            authoredWelcomeHtm,
+            authoredReadmeHtm,
+            authoredReadmeMd,
+            authoredHelpPhp,
+            instantiationMode,
+            startVfs,
+            startWelcomeConvention,
           },
           {
             vfs,
@@ -527,7 +568,9 @@ export function useWorkingCopyTransform(
             identity: identityArg,
             marksTreatment,
             kmnEdits,
+            capsHandling: capsHandlingMode === null ? undefined : { mode: capsHandlingMode },
             ...(storeStartDisplayName !== null ? { baseDisplayName: storeStartDisplayName } : {}),
+            ...(storeStartKeyboardId !== null ? { startKeyboardId: storeStartKeyboardId } : {}),
             ...(liveLayoutOverride !== undefined ? { liveLayoutOverride } : {}),
           },
         ),
@@ -561,5 +604,14 @@ export function useWorkingCopyTransform(
     storeContextToleranceOverlay,
     marksGuardsKey,
     kmnEditsKey,
+    capsHandlingMode,
+    customCss,
+    authoredWelcomeHtm,
+    authoredReadmeHtm,
+    authoredReadmeMd,
+    authoredHelpPhp,
+    instantiationMode,
+    startVfs,
+    startWelcomeConvention,
   ]);
 }

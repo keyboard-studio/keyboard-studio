@@ -411,6 +411,57 @@ describe("useKeyboardArtifact — open-base proxyBase pass-through (regression g
 });
 
 // ---------------------------------------------------------------------------
+// Open (spec 111 US4): the open-base fetch reads the repository copy chosen at
+// Open, pinned at its commit. LOCAL_PROXY_BASE serves keyboard-studio's copy,
+// so an upstream choice used to load the fork's copy under an upstream label.
+// ---------------------------------------------------------------------------
+
+describe("useKeyboardArtifact — Open loads the chosen repository copy", () => {
+  const COMMIT = "0123456789abcdef0123456789abcdef01234567";
+
+  async function proxyBaseForOpen(sourcePath: string): Promise<string | undefined> {
+    const { useDecisionStore } = await import("../stores/decisionStore.ts");
+    const { useWorkingCopyStore } = await import("../stores/workingCopyStore.ts");
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+    useDecisionStore
+      .getState()
+      .recordAll([{ id: "authoring-track", value: "adapt", provenance: "asked", step: "open" }]);
+    useWorkingCopyStore.getState().setStartSource({
+      owner: "keymanapp",
+      repo: "keyboards",
+      commit: COMMIT,
+      path: sourcePath,
+      alternative: null,
+    });
+    try {
+      renderHook(() => useKeyboardArtifact(baseKb, null, null, null));
+      await act(async () => {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      });
+      expect(mockEngine.fetchKeyboardSourceToVfs).toHaveBeenCalled();
+      const [, , opts] = mockEngine.fetchKeyboardSourceToVfs.mock.calls[0] as [
+        unknown,
+        unknown,
+        { proxyBase?: string } | undefined,
+      ];
+      return opts?.proxyBase;
+    } finally {
+      useDecisionStore.getState().reset();
+      useWorkingCopyStore.getState().setStartSource(null);
+    }
+  }
+
+  it("fetches through the pinned review proxy for the chosen owner and commit", async () => {
+    expect(await proxyBaseForOpen(baseKb.path)).toBe(`/review-proxy/keymanapp/keyboards/${COMMIT}`);
+  });
+
+  it("ignores a source recorded for a different keyboard", async () => {
+    const { LOCAL_PROXY_BASE } = await import("./useKeyboardArtifact");
+    expect(await proxyBaseForOpen("release/o/other_kb")).toBe(LOCAL_PROXY_BASE);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Regression guard: unbacked &BITMAP on the open-base (Track 2) path.
 //
 // scaffold() (Track 1) has always dropped a store(&BITMAP) reference whose
@@ -730,6 +781,51 @@ describe("useKeyboardArtifact — vfsTransform effectiveKeyboardId (reapply effe
     expect(mockEngine.compile).toHaveBeenCalledWith(expect.anything(), baseKb.id);
     if (result.current.stage.kind === "ready") {
       expect(result.current.stage.keyboardId).toBe(baseKb.id);
+    }
+  });
+
+  it("(d) reapply rebuilds the OSK stylesheet blob URLs from the projected VFS (the CSS step's Apply)", async () => {
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const made: Blob[] = [];
+    const realCreate = URL.createObjectURL;
+    const realRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = (obj: Blob | MediaSource) => {
+      made.push(obj as Blob);
+      return `blob:css-${made.length}`;
+    };
+    URL.revokeObjectURL = () => undefined;
+    try {
+      const css = ".kmw-key { color: red; }";
+      const cssTransform: VfsTransform = (vfs) => {
+        vfs.set("source/kb.css", css, false);
+        return { warnings: [] };
+      };
+      const { result, rerender } = renderHook(
+        ({ transform }: { transform: VfsTransform | null }) =>
+          useKeyboardArtifact(baseKb, null, transform, null),
+        { initialProps: { transform: noopTransform } },
+      );
+      await act(async () => {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      });
+      expect(result.current.stage.kind).toBe("ready");
+      made.length = 0;
+
+      rerender({ transform: cssTransform });
+      await act(async () => {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      });
+
+      const cssBlobs = made.filter((b) => b.type === "text/css");
+      expect(cssBlobs).toHaveLength(1);
+      expect(cssBlobs[0]?.size).toBe(css.length);
+      if (result.current.stage.kind === "ready") {
+        expect(result.current.stage.keyboardCssUrls).toHaveLength(1);
+      }
+    } finally {
+      URL.createObjectURL = realCreate;
+      URL.revokeObjectURL = realRevoke;
     }
   });
 });

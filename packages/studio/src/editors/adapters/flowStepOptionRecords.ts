@@ -4,9 +4,12 @@
 // and the headless author completes a flow with the very record the UI uses.)
 //
 // Each record replaces the bespoke logic of the corresponding survey wrapper:
-//   trackOptions        ← TrackStepAdapter / PhaseTrack
 //   projectNameOptions  ← ProjectNameStepAdapter / PhaseProjectName
 //   phaseFOptions       ← PhaseFAdapter / PhaseF
+//
+// (trackOptions is gone with the track step: the start screen records the
+// track, and a walk without one defaults to copy — see StudioShell's
+// single-instantiation effect.)
 //
 // Parity table (contract §3): every store effect, every extraction guard, and
 // every context shape exactly reproduces the pre-Stage-6 wrapper behaviour.
@@ -17,8 +20,6 @@
 
 import { slugifyKeyboardId } from "@keyboard-studio/contracts";
 import type { DecisionProposalSource, SurveyPhaseResult } from "@keyboard-studio/contracts";
-import { i18n, type MessageDescriptor } from "@lingui/core";
-import { msg } from "@lingui/core/macro";
 import { historyEntryHeading, resolvePublishVersion } from "@keyboard-studio/engine";
 import type { FlowStepOptions, FlowStepDeps } from "./flowStepDeps.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -30,15 +31,20 @@ import {
   type AdaptiveDescriptionContext,
 } from "../../lib/adaptiveDescription.ts";
 import { deriveHistoryEntryState } from "../../lib/historyEntryState.ts";
-import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts";
+import { buildHistoryProposalSeed, historyModelFacts } from "../../decisions/historyProposalSeed.ts";
 import { hasTestBuilds } from "../../stores/testingStore.ts";
-import { proposeTrack, type TrackProposalBasis } from "../../lib/proposeTrack.ts";
 import { deriveIdentityResult } from "../../decisions/identitySelectors.ts";
 import type { DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
 import type { ExtractContext } from "../../decisions/extractContext.ts";
 import type { QuestionModule } from "../../survey/types.ts";
 import ilAuthorNameModule from "../../survey/questions/a/il_author_name.ts";
 import ilAuthorEmailModule from "../../survey/questions/a/il_author_email.ts";
+import { startCopyrightHolders } from "../../lib/startCopyrightHolders.ts";
+import {
+  bodyParitySnippets,
+  isBodyParityLive,
+  type BodyParityInputs,
+} from "../../lib/bodyParity.ts";
 import ilCopyrightHolderModule from "../../survey/questions/a/il_copyright_holder.ts";
 
 /** A recorded decision's string value, or undefined when absent/non-string. */
@@ -46,111 +52,6 @@ function decisionString(decisions: DecisionSet, id: DecisionId): string | undefi
   const value = decisions[id]?.value;
   return typeof value === "string" ? value : undefined;
 }
-
-// ---------------------------------------------------------------------------
-// track options — reproduces TrackStepAdapter + PhaseTrack behaviour exactly.
-//
-// Context: { base_name: localStart.displayName }
-// Guard: localStart must be non-null (adapter rendered null if null; factory
-//   will produce a null return to match).
-// Seeds: track_choice from the session's currently-recorded selectedTrack, so
-//   arriving at this step by deep link or by walking Back shows the recorded
-//   answer instead of an empty radio group (spec 057 FR-031). A recorded
-//   track always wins and is never re-proposed over. Before any choice has
-//   ever been recorded, the seed is proposeTrack's proposal (lib/proposeTrack.ts):
-//   adapt only when the base's single declared language matches the target
-//   tag's language and script, copy otherwise. SurveyRunner's "seed once,
-//   then the user owns it" contract makes that seed a proposal — the saved
-//   answer records origin "proposed" when the author keeps it and
-//   "overturned" when they change it, with getSeedSource naming where the
-//   proposal came from and getSeedCaption showing its one-line reason under
-//   the radio group.
-// Extract: track_choice answer → "copy" | "adapt" only; else undefined (stay).
-// Effects: none here (spec 089) — the recorded authoring-track decision IS
-//   the effect; routing reads it via selectTrack and the scaffold
-//   consequence via deriveScaffoldSpec. track_choice's own apply is
-//   deliberately empty (see the module).
-// Payload: { track }.
-// ---------------------------------------------------------------------------
-
-export type TrackPayload = { track: "copy" | "adapt" };
-
-/**
- * The catalogue message for each proposeTrack basis arm. The caption is
- * catalogue copy resolved through i18n at seed time (the active UI locale),
- * never a string composed by the proposer — one msg() descriptor per arm,
- * so the catalogue extractor sees every key.
- */
-const TRACK_PROPOSAL_REASONS: Record<TrackProposalBasis, MessageDescriptor> = {
-  "no-target": msg({
-    id: "track.proposal.reason.no-target",
-    message:
-      "Suggested because no target language is recorded yet, so starting a new keyboard is the safe choice.",
-  }),
-  "no-base-languages": msg({
-    id: "track.proposal.reason.no-base-languages",
-    message:
-      "Suggested because this base does not declare which languages it serves, so it cannot be shown to be a {target} keyboard.",
-  }),
-  "multiple-languages": msg({
-    id: "track.proposal.reason.multiple-languages",
-    message: "Suggested because this base serves {count} languages, not just {target}.",
-  }),
-  "different-language": msg({
-    id: "track.proposal.reason.different-language",
-    message: "Suggested because this base is for {base}, not your target language {target}.",
-  }),
-  "different-script": msg({
-    id: "track.proposal.reason.different-script",
-    message:
-      "Suggested because this base writes {base} in a different script from your target {target}.",
-  }),
-  "same-language": msg({
-    id: "track.proposal.reason.same-language",
-    message:
-      "Suggested because this base is a {target} keyboard — the same single language and script as your target.",
-  }),
-};
-
-export const trackOptions: FlowStepOptions<TrackPayload> = {
-  flowRef: "track",
-  title: "Authoring Track",
-
-  buildContext(deps: FlowStepDeps) {
-    // Match TrackStepAdapter: base_name from localStart.displayName.
-    return { base_name: deps.localStart?.displayName ?? "" };
-  },
-
-  seeds: {
-    getSeedValue(questionId: string, deps: FlowStepDeps): string | string[] | undefined {
-      if (questionId !== "track_choice") return undefined;
-      if (deps.selectedTrack !== null) return deps.selectedTrack;
-      return proposeTrack(deps.surveyContext.bcp47_tag, deps.localStart?.languages).track;
-    },
-    getSeedSource(questionId: string, deps: FlowStepDeps): DecisionProposalSource | undefined {
-      if (questionId !== "track_choice") return undefined;
-      // A recorded track is the author's own — it names no proposal source.
-      // The first-arrival proposal is the studio's analysis of the target
-      // tag against the base's declared languages.
-      return deps.selectedTrack !== null ? undefined : "analysis";
-    },
-    getSeedCaption(questionId: string, deps: FlowStepDeps): string | undefined {
-      if (questionId !== "track_choice") return undefined;
-      if (deps.selectedTrack !== null) return undefined;
-      const proposal = proposeTrack(deps.surveyContext.bcp47_tag, deps.localStart?.languages);
-      return i18n._(TRACK_PROPOSAL_REASONS[proposal.basis].id, proposal.params);
-    },
-  },
-
-  extract(result: SurveyPhaseResult): TrackPayload | undefined {
-    const answer = result.answers.find((a) => a.questionId === "track_choice");
-    if (!answer || (answer.answerType !== "select" && answer.answerType !== "text")) {
-      return undefined;
-    }
-    const v = String(answer.value);
-    return v === "copy" || v === "adapt" ? { track: v } : undefined;
-  },
-};
 
 // ---------------------------------------------------------------------------
 // projectNameOptions — reproduces ProjectNameStepAdapter + PhaseProjectName.
@@ -208,8 +109,8 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
           ? identity.autonym || identity.english
           : "";
       // FR-031 (spec 057): the recorded project-display-name decision is the
-      // durable record of this step's own completion — the same role
-      // `selectedTrack` plays for the track step. Once it exists the
+      // durable record of this step's own completion — the same role the
+      // recorded authoring-track decision plays for the walk. Once it exists the
       // author has committed a name/id at least once, so a fresh arrival at
       // this step (deep link, or Back after an earlier visit unmounted it)
       // must show THAT, not re-propose the identity-derived default it
@@ -317,7 +218,9 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
 //     and read the declared default back. A profile with no name seeds
 //     nothing — ASK rather than substitute the login handle, which is
 //     not a copyright holder.
-//   - Copyright holder: NO caller seed on either track. On the update
+//   - Copyright holder: the starting point's parsed holder(s) are offered
+//     as a selector under the text box (getSeedOptions) on both tracks.
+//     NO caller seed on either track. On the update
 //     track the live extraction pass has already seeded the decision
 //     from the base keyboard (il_copyright_holder's `seedWhen`), and
 //     SurveyRunner's record-first seeding renders it pre-filled with
@@ -397,6 +300,15 @@ export const attributionOptions: FlowStepOptions<AttributionPayload> = {
       const source = profileDefault(deps, questionId)?.source;
       return source !== undefined ? (source as DecisionProposalSource) : undefined;
     },
+    // il_copyright_holder's selector: the starting point's parsed holder(s),
+    // on BOTH tracks (adapt preselects via the seeded decision; copy leaves
+    // it unselected). Hidden when the starting point has no parseable holder.
+    getSeedOptions(questionId: string) {
+      if (questionId !== ilCopyrightHolderModule.definition.id) return undefined;
+      const wc = useWorkingCopyStore.getState();
+      const holders = startCopyrightHolders(wc.startLicenseText, wc.startHolderOverride, wc.startIr);
+      return holders.map((name) => ({ value: name, label: name }));
+    },
   },
 
   extract(result: SurveyPhaseResult): AttributionPayload | undefined {
@@ -456,6 +368,26 @@ function readAdaptiveDescriptionContext(): AdaptiveDescriptionContext {
  */
 
 /**
+ * Reads the working-copy slices `pf_body_parity`'s routing token and
+ * snippet tokens need (issue #2530), straight off `getState()` — the
+ * same on-demand pattern as `readAdaptiveDescriptionContext` above.
+ * The recorded `help-body-parity` decision comes from the deps' live
+ * decision set, so a re-entry after answering still routes to the
+ * question (the finding having cleared once the bodies sync).
+ */
+function readBodyParityInputs(decisions: DecisionSet): BodyParityInputs {
+  const state = useWorkingCopyStore.getState();
+  const recorded = decisions["help-body-parity"]?.value;
+  return {
+    instantiationMode: state.instantiationMode,
+    startWelcomeHtmText: state.startWelcomeHtmText,
+    startHelpPhpText: state.startHelpPhpText,
+    docFixProposals: state.docFixProposals,
+    ...(typeof recorded === "string" ? { bodyParityDecision: recorded } : {}),
+  };
+}
+
+/**
  * The version HISTORY's proposed heading is stamped with (spec 079 FR-010),
  * mirroring `serializeWorkingCopy.ts`'s own `rawVersion`/`resolvePublishVersion`
  * derivation exactly (`startIr.header.version?.trim() || "1.0"`, bumped only
@@ -486,12 +418,22 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
     const bullets = historyState !== null
       ? (historyState.editedBullets ?? historyState.proposal.bullets)
       : [];
+    // Issue #2530: the body-parity routing token and first-difference
+    // snippets for pf_body_parity's `{{body_parity_*}}` tokens. The live
+    // token is always present ("true"/"false") so the conditional `next`
+    // on pf_welcome_paragraph is deterministic; the snippets resolve to
+    // "" when the question is not live.
+    const bodyParityInputs = readBodyParityInputs(deps.decisions);
+    const bodyParity = bodyParitySnippets(bodyParityInputs);
     return {
       ...deps.surveyContext,
       history_heading: historyState !== null
         ? historyEntryHeading(historyState.proposal.version, historyState.proposal.dateIso)
         : "",
       history_bullets: bullets.map((bullet) => `- ${bullet}`).join("\n"),
+      body_parity_live: isBodyParityLive(bodyParityInputs) ? "true" : "false",
+      body_parity_welcome: bodyParity.welcome,
+      body_parity_help: bodyParity.help,
     };
   },
 
@@ -499,15 +441,18 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
 
   // spec 079 US5: derive the HISTORY-entry proposal once per mount (entering
   // the Phase F step), from the decision record no new journal was needed for
-  // (buildHistoryProposalSeed) and the same version `serializeWorkingCopy.ts`
+  // (buildHistoryProposalSeed, with the working copy's historyModelFacts) and the same version `serializeWorkingCopy.ts`
   // will independently recompute at output time (deriveHistoryVersion).
   // Identity-guarded: deriveHistoryEntryState returns `previous` UNCHANGED
   // when the version has not moved, so a re-mount (Back then forward into
   // this step again) never re-stamps `dateIso` (research R12) and never
   // fires a redundant store write.
   onMount(deps: FlowStepDeps): void {
+    const wc = useWorkingCopyStore.getState();
     const next = deriveHistoryEntryState({
-      seed: buildHistoryProposalSeed(),
+      seed: buildHistoryProposalSeed(
+        historyModelFacts({ startIr: wc.startIr, phaseResults: wc.phaseResults, carveChars: wc.carveChars }),
+      ),
       version: deriveHistoryVersion(),
       dateIso: new Date().toISOString().slice(0, 10),
       previous: deps.historyEntryState,

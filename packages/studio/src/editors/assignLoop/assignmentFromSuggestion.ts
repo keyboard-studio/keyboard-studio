@@ -18,6 +18,8 @@ import {
   canonicalizeCombo,
   comboToKeySpec,
   planShiftAssignment,
+  collectLayerCombosInUse,
+  collectModifierTokensInUse,
   type ModifierToken,
 } from "@keyboard-studio/engine";
 import {
@@ -307,11 +309,11 @@ export function assignmentFromSuggestion(params: {
   }
 
   if (entry.strategyId === "S-08") {
-    // Build from the candidate's OWN modifiers — never hardcode RALT. Falls
-    // back to bare RALT when the candidate carries none.
+    // Build from the candidate's OWN modifiers. Falls back to the keyboard's
+    // existing Alt form (RALT when it has none) when the candidate carries none.
     const candidateModifiers = entry.topCandidate.modifiers;
     const tokens = (
-      candidateModifiers.length > 0 ? candidateModifiers : ["RALT"]
+      candidateModifiers.length > 0 ? candidateModifiers : altgrTokensFor(workingIr)
     ) as ModifierToken[];
     let altgrKeyList: string;
     try {
@@ -390,6 +392,22 @@ export function assignmentFromSuggestion(params: {
 }
 
 /**
+ * The AltGr modifier list for a new placement: the Alt form the keyboard
+ * already uses (`RALT`/`LALT`, `CTRL ALT`, or `ALT`), and `RALT` when it has
+ * none. Never raw Ctrl on its own.
+ */
+export function altgrTokensFor(ir: KeyboardIR | null): ModifierToken[] {
+  if (ir === null) return ["RALT"];
+  const inUse = collectModifierTokensInUse(ir);
+  if (inUse.has("RALT") || inUse.has("LALT")) return ["RALT"];
+  if (collectLayerCombosInUse(ir).some((c) => c.includes("CTRL") && c.includes("ALT"))) {
+    return ["CTRL", "ALT"];
+  }
+  if (inUse.has("ALT")) return ["ALT"];
+  return ["RALT"];
+}
+
+/**
  * The demotion assignment for `targetChar` under a displacement proposal: an
  * S-08 RAlt assignment on the SAME key (rank 1), or — only when the RAlt
  * slot was taken/unavailable at propose time — an S-02 deadkey assignment
@@ -408,7 +426,7 @@ export function demotionAssignmentFor(params: {
   if (demotionMethod === "ralt") {
     let altgrKeyList: string;
     try {
-      altgrKeyList = comboToKeySpec(canonicalizeCombo(["RALT"]), vkey);
+      altgrKeyList = comboToKeySpec(canonicalizeCombo(altgrTokensFor(workingIr)), vkey);
     } catch {
       return null;
     }

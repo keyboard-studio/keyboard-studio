@@ -31,7 +31,16 @@
     "stepId": "choose_base",
     "applyStepCompletion": [],
     "storeMutations": [
-      "setLocalStart",
+      "setLocalStart"
+    ],
+    "workingCopyMutations": [],
+    "decisionMutations": [],
+    "navigateTo": []
+  },
+  {
+    "stepId": "choose_base",
+    "applyStepCompletion": [],
+    "storeMutations": [
       "record",
       "advance"
     ],
@@ -42,27 +51,11 @@
     "navigateTo": []
   },
   {
-    "stepId": "track",
-    "applyStepCompletion": [],
-    "storeMutations": [
-      "recordAll",
-      "advance"
-    ],
-    "workingCopyMutations": [
-      "recordPhase"
-    ],
-    "decisionMutations": [
-      "recordAll"
-    ],
-    "navigateTo": []
-  },
-  {
     "stepId": "attribution",
     "applyStepCompletion": [],
     "storeMutations": [
       "recordAll",
-      "advance",
-      "setCharactersSubStage"
+      "advance"
     ],
     "workingCopyMutations": [
       "recordPhase",
@@ -74,83 +67,7 @@
     "navigateTo": []
   },
   {
-    "stepId": "characters/prefill",
-    "applyStepCompletion": [],
-    "storeMutations": [
-      "record",
-      "record",
-      "setCharactersSubStage"
-    ],
-    "workingCopyMutations": [],
-    "decisionMutations": [
-      "record",
-      "record"
-    ],
-    "navigateTo": []
-  },
-  {
-    "stepId": "characters/B",
-    "applyStepCompletion": [
-      "characters",
-      "marks"
-    ],
-    "storeMutations": [
-      "advance",
-      "record",
-      "advance"
-    ],
-    "workingCopyMutations": [
-      "recordPhase",
-      "recordPhase"
-    ],
-    "decisionMutations": [
-      "record"
-    ],
-    "navigateTo": []
-  },
-  {
-    "stepId": "punctuation",
-    "applyStepCompletion": [],
-    "storeMutations": [
-      "advance"
-    ],
-    "workingCopyMutations": [
-      "recordPhase"
-    ],
-    "decisionMutations": [],
-    "navigateTo": []
-  },
-  {
-    "stepId": "invisibles",
-    "applyStepCompletion": [],
-    "storeMutations": [
-      "advance",
-      "advance"
-    ],
-    "workingCopyMutations": [
-      "recordPhase",
-      "recordPhase"
-    ],
-    "decisionMutations": [],
-    "navigateTo": []
-  },
-  {
-    "stepId": "carve",
-    "applyStepCompletion": [
-      "carve"
-    ],
-    "storeMutations": [
-      "record",
-      "advance"
-    ],
-    "workingCopyMutations": [],
-    "decisionMutations": [
-      "record"
-    ],
-    "navigateTo": []
-  },
-  {
-    "stepId": "deadkeys",
+    "stepId": "open_languages",
     "applyStepCompletion": [],
     "storeMutations": [
       "advance"
@@ -160,16 +77,13 @@
     "navigateTo": []
   },
   {
-    "stepId": "rules",
+    "stepId": "open_missing_letters",
     "applyStepCompletion": [],
     "storeMutations": [
-      "record",
       "advance"
     ],
     "workingCopyMutations": [],
-    "decisionMutations": [
-      "record"
-    ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -188,7 +102,7 @@
     "navigateTo": []
   },
   {
-    "stepId": "osk",
+    "stepId": "fallback_policy",
     "applyStepCompletion": [],
     "storeMutations": [
       "advance"
@@ -198,16 +112,13 @@
     "navigateTo": []
   },
   {
-    "stepId": "touch_seed_source",
+    "stepId": "osk",
     "applyStepCompletion": [],
     "storeMutations": [
-      "record",
       "advance"
     ],
     "workingCopyMutations": [],
-    "decisionMutations": [
-      "record"
-    ],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {
@@ -231,39 +142,8 @@
     "storeMutations": [
       "advance"
     ],
-    "workingCopyMutations": [
-      "setHistoryEntryState"
-    ],
-    "decisionMutations": [],
-    "navigateTo": []
-  },
-  {
-    "stepId": "help",
-    "applyStepCompletion": [
-      "help"
-    ],
-    "storeMutations": [
-      "record",
-      "advance"
-    ],
-    "workingCopyMutations": [
-      "recordPhase"
-    ],
-    "decisionMutations": [
-      "record"
-    ],
-    "navigateTo": []
-  },
-  {
-    "stepId": "html",
-    "applyStepCompletion": [],
-    "storeMutations": [
-      "advance"
-    ],
     "workingCopyMutations": [],
     "decisionMutations": [],
-    "navigateTo": [
-      "output"
-    ]
+    "navigateTo": []
   }
 ]

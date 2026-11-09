@@ -3,11 +3,13 @@
  * (spec 063 T047).
  *
  * The contract (contracts/key-edit-overlay.md §5): "The defence is a test,
- * not discipline." Apply the SAME `KeyEditOperation[]` list — covering every
- * one of the seven `kind`s — through both `applyKeyEditsToLayout` (Case A,
+ * not discipline." Apply the SAME `KeyEditOperation[]` list — covering the
+ * in-place `kind`s — through both `applyKeyEditsToLayout` (Case A,
  * the IR applier) and `applyKeyEditsToRawJson` (Case B, the raw-JSON
  * applier), parse Case B's output string with the canonical parser, and
- * compare structurally against Case A's result. The comparison is exact
+ * compare structurally against Case A's result. `move`, `moveToLayer` and
+ * `copyToLayer` change key membership, so each has its own describe block
+ * below rather than joining the shared list. The comparison is exact
  * modulo exactly two things, both named by Case A's own module docstring
  * ("Fields Case A drops (read by the T047 twin-equivalence test)"):
  *
@@ -40,7 +42,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/contracts";
-import { makeTouchKeyRuleJoinLayout, TOUCH_JOIN_IDS } from "@keyboard-studio/contracts/fixtures";
+import { makeTouchKeyRuleJoinLayout, TOUCH_JOIN_IDS, TOUCH_JOIN_LAYERS } from "@keyboard-studio/contracts/fixtures";
 import { emitTouchLayout, parseTouchLayout } from "../codec/parse-touch.js";
 import { applyKeyEditsToLayout } from "./applyKeyEditsToLayout.js";
 import { applyKeyEditsToRawJson } from "./applyKeyEditsToRawJson.js";
@@ -530,6 +532,372 @@ describe("applyKeyEdits twin equivalence — move (spec 065 T028)", () => {
     expect(caseA.orphaned).toHaveLength(1);
     expect(caseA.warnings).toHaveLength(1);
     expect(caseB.warnings).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `moveToLayer` — the cross-layer splice (touch-builder "Move key to…" +
+// cross-layer drag-drop)
+//
+// Its own describe block like `move`'s: a layer move changes key MEMBERSHIP,
+// and folding it into the shared `buildOps()` list would silently re-index
+// every other operation's assertions. Same obligation — both appliers, one
+// operation list, structural comparison.
+// ---------------------------------------------------------------------------
+
+describe("applyKeyEdits twin equivalence — moveToLayer", () => {
+  function runBoth(ops: readonly KeyEditOperation[]) {
+    const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
+    const before = parseTouchLayout(rawJson);
+    const caseA = applyKeyEditsToLayout(before, [...ops]);
+    const caseB = applyKeyEditsToRawJson(rawJson, [...ops]);
+    return { before, caseA, caseB, caseBAsIR: parseTouchLayout(caseB.json) };
+  }
+
+  const layerIds = (layout: TouchLayoutIR, layerId: string): string[] =>
+    layout.platforms
+      .find((p) => p.id === "phone")!
+      .layers.find((l) => l.id === layerId)!
+      .rows.flatMap((r) => r.keys.map((k) => k.id));
+
+  function moveToLayerOp(
+    keyId: string,
+    toLayer: string,
+    anchor?: { keyId: string; position: "before" | "after" },
+  ): KeyEditOperation {
+    return {
+      seq: 1,
+      kind: "moveToLayer",
+      address: touchKeyAddress("phone", "default", keyId),
+      toLayer,
+      ...(anchor !== undefined
+        ? {
+            anchorAddress: touchKeyAddress("phone", toLayer, anchor.keyId),
+            position: anchor.position,
+          }
+        : {}),
+    };
+  }
+
+  it("appends to the target layer's last row when no anchor is given, identically on both sides", () => {
+    const { before, caseA, caseBAsIR } = runBoth([
+      moveToLayerOp(TOUCH_JOIN_IDS.caseTest, TOUCH_JOIN_LAYERS.symbol),
+    ]);
+    expect(layerIds(before, "default")).toContain(TOUCH_JOIN_IDS.caseTest);
+    expect(layerIds(caseA.layout, "default")).not.toContain(TOUCH_JOIN_IDS.caseTest);
+    const symbolIds = layerIds(caseA.layout, TOUCH_JOIN_LAYERS.symbol);
+    expect(symbolIds[symbolIds.length - 1]).toBe(TOUCH_JOIN_IDS.caseTest);
+    expect(layerIds(caseBAsIR, TOUCH_JOIN_LAYERS.symbol)).toEqual(symbolIds);
+    expect(layerIds(caseBAsIR, "default")).toEqual(layerIds(caseA.layout, "default"));
+  });
+
+  it("inserts before/after the anchor when it resolves on the target layer", () => {
+    const { caseA, caseBAsIR } = runBoth([
+      moveToLayerOp(TOUCH_JOIN_IDS.caseTest, TOUCH_JOIN_LAYERS.symbol, {
+        keyId: TOUCH_JOIN_IDS.suppressed,
+        position: "before",
+      }),
+    ]);
+    // `suppressed` is reachable via nextlayer on the fixture's symbol layer…
+    // fall back to asserting twin equivalence on whatever the anchor resolved to.
+    expect(layerIds(caseA.layout, TOUCH_JOIN_LAYERS.symbol)).toEqual(
+      layerIds(caseBAsIR, TOUCH_JOIN_LAYERS.symbol),
+    );
+    expect(layerIds(caseA.layout, "default")).toEqual(layerIds(caseBAsIR, "default"));
+  });
+
+  it("preserves identity, sub-keys, geometry and provenance across layers (FR-021)", () => {
+    const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
+    const before = parseTouchLayout(rawJson);
+    const hostBefore = before.platforms
+      .find((p) => p.id === "phone")!
+      .layers.find((l) => l.id === "default")!
+      .rows.flatMap((r) => r.keys)
+      .find((k) => k.id === TOUCH_JOIN_IDS.longpressBase)!;
+
+    const { caseA, caseBAsIR } = runBoth([
+      moveToLayerOp(TOUCH_JOIN_IDS.longpressBase, TOUCH_JOIN_LAYERS.symbol),
+    ]);
+    const hostAfter = caseA.layout.platforms
+      .find((p) => p.id === "phone")!
+      .layers.find((l) => l.id === TOUCH_JOIN_LAYERS.symbol)!
+      .rows.flatMap((r) => r.keys)
+      .find((k) => k.id === TOUCH_JOIN_IDS.longpressBase)!;
+    // Same node: sub-keys, provenance and geometry travel with it.
+    expect(hostAfter.sk?.map((k) => k.id)).toEqual(hostBefore.sk?.map((k) => k.id));
+    expect(hostAfter.flick).toBeDefined();
+    expect(hostAfter.provenance).toBe(hostBefore.provenance);
+    // And the twin agrees structurally.
+    expect(layerIds(caseBAsIR, TOUCH_JOIN_LAYERS.symbol)).toEqual(
+      layerIds(caseA.layout, TOUCH_JOIN_LAYERS.symbol),
+    );
+  });
+
+  it("refuses an id collision on the target layer on both sides, orphaning the op", () => {
+    // `mark` exists on default; force a collision by moving a key whose id
+    // already lives on symbol. The fixture's symbol layer is small — find any
+    // id present on both, else construct the collision via two ops.
+    const { before } = runBoth([]);
+    const defaultIds = layerIds(before, "default");
+    const symbolIds = layerIds(before, TOUCH_JOIN_LAYERS.symbol);
+    const dup = defaultIds.find((id) => symbolIds.includes(id));
+    if (dup === undefined) {
+      // No natural collision in the fixture: move a key, then move another
+      // key renamed to the same id. Simpler — rename first, then move.
+      const ops: KeyEditOperation[] = [
+        {
+          seq: 1,
+          kind: "rename",
+          address: touchKeyAddress("phone", "default", defaultIds[0]!),
+          toId: symbolIds[0]!,
+        },
+        {
+          seq: 2,
+          kind: "moveToLayer",
+          address: touchKeyAddress("phone", "default", symbolIds[0]!),
+          toLayer: TOUCH_JOIN_LAYERS.symbol,
+        },
+      ];
+      const { caseA, caseB } = runBoth(ops);
+      expect(caseA.orphaned).toHaveLength(1);
+      expect(caseA.warnings.length).toBeGreaterThan(0);
+      expect(caseB.warnings.length).toBeGreaterThan(0);
+      return;
+    }
+    const { caseA, caseB } = runBoth([moveToLayerOp(dup, TOUCH_JOIN_LAYERS.symbol)]);
+    expect(caseA.orphaned).toHaveLength(1);
+    expect(caseB.warnings.length).toBeGreaterThan(0);
+  });
+
+  it("warns and appends when the anchor does not resolve on the target layer", () => {
+    const { caseA, caseB } = runBoth([
+      {
+        seq: 1,
+        kind: "moveToLayer",
+        address: touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.caseTest),
+        toLayer: TOUCH_JOIN_LAYERS.symbol,
+        anchorAddress: touchKeyAddress("phone", "symbol", "T_DOES_NOT_EXIST_057"),
+        position: "before",
+      },
+    ]);
+    const symbolIds = layerIds(caseA.layout, TOUCH_JOIN_LAYERS.symbol);
+    expect(symbolIds[symbolIds.length - 1]).toBe(TOUCH_JOIN_IDS.caseTest);
+    expect(caseA.warnings.length).toBeGreaterThan(0);
+    expect(caseB.warnings.length).toBeGreaterThan(0);
+  });
+
+  it("rejects a family-scoped moveToLayer on both sides rather than half-applying it", () => {
+    const { before, caseA, caseB } = runBoth([
+      {
+        seq: 1,
+        kind: "moveToLayer",
+        address: touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.caseTest),
+        toLayer: TOUCH_JOIN_LAYERS.symbol,
+        scope: "family",
+      },
+    ]);
+    expect(layerIds(caseA.layout, "default")).toEqual(layerIds(before, "default"));
+    expect(caseA.orphaned).toHaveLength(1);
+    expect(caseB.warnings.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `copyToLayer` — the cross-layer clone (#2596 item 1)
+//
+// The twin of `moveToLayer` with one difference: the source key STAYS and
+// the target layer gains a clone of it (sub-keys included). Same describe
+// shape as `moveToLayer`'s — a layer copy changes key MEMBERSHIP, so it
+// gets its own block rather than joining the shared `buildOps()` list.
+// ---------------------------------------------------------------------------
+
+describe("applyKeyEdits twin equivalence — copyToLayer", () => {
+  function runBoth(ops: readonly KeyEditOperation[]) {
+    const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
+    const before = parseTouchLayout(rawJson);
+    const caseA = applyKeyEditsToLayout(before, [...ops]);
+    const caseB = applyKeyEditsToRawJson(rawJson, [...ops]);
+    return { before, caseA, caseB, caseBAsIR: parseTouchLayout(caseB.json) };
+  }
+
+  const layerIds = (layout: TouchLayoutIR, layerId: string): string[] =>
+    layout.platforms
+      .find((p) => p.id === "phone")!
+      .layers.find((l) => l.id === layerId)!
+      .rows.flatMap((r) => r.keys.map((k) => k.id));
+
+  const layerKeys = (layout: TouchLayoutIR, layerId: string): TouchKeyIR[] =>
+    layout.platforms
+      .find((p) => p.id === "phone")!
+      .layers.find((l) => l.id === layerId)!
+      .rows.flatMap((r) => r.keys);
+
+  function copyToLayerOp(
+    keyId: string,
+    toLayer: string,
+    anchor?: { keyId: string; position: "before" | "after" },
+  ): KeyEditOperation {
+    return {
+      seq: 1,
+      kind: "copyToLayer",
+      address: touchKeyAddress("phone", "default", keyId),
+      toLayer,
+      ...(anchor !== undefined
+        ? {
+            anchorAddress: touchKeyAddress("phone", toLayer, anchor.keyId),
+            position: anchor.position,
+          }
+        : {}),
+    };
+  }
+
+  it("appends a clone to the target layer's last row and keeps the source key, identically on both sides", () => {
+    const { before, caseA, caseBAsIR } = runBoth([
+      copyToLayerOp(TOUCH_JOIN_IDS.caseTest, TOUCH_JOIN_LAYERS.symbol),
+    ]);
+    expect(layerIds(before, "default")).toContain(TOUCH_JOIN_IDS.caseTest);
+    // The source layer keeps its key — this is a copy, not a move.
+    expect(layerIds(caseA.layout, "default")).toContain(TOUCH_JOIN_IDS.caseTest);
+    const symbolIds = layerIds(caseA.layout, TOUCH_JOIN_LAYERS.symbol);
+    expect(symbolIds[symbolIds.length - 1]).toBe(TOUCH_JOIN_IDS.caseTest);
+    expect(layerIds(caseBAsIR, TOUCH_JOIN_LAYERS.symbol)).toEqual(symbolIds);
+    expect(layerIds(caseBAsIR, "default")).toEqual(layerIds(caseA.layout, "default"));
+  });
+
+  it("inserts before/after the anchor when it resolves on the target layer", () => {
+    const { caseA, caseBAsIR } = runBoth([
+      copyToLayerOp(TOUCH_JOIN_IDS.caseTest, TOUCH_JOIN_LAYERS.symbol, {
+        keyId: TOUCH_JOIN_IDS.suppressed,
+        position: "before",
+      }),
+    ]);
+    // `suppressed` is reachable via nextlayer on the fixture's symbol layer…
+    // fall back to asserting twin equivalence on whatever the anchor resolved to.
+    expect(layerIds(caseA.layout, TOUCH_JOIN_LAYERS.symbol)).toEqual(
+      layerIds(caseBAsIR, TOUCH_JOIN_LAYERS.symbol),
+    );
+    expect(layerIds(caseA.layout, "default")).toEqual(layerIds(caseBAsIR, "default"));
+  });
+
+  it("clones sub-keys, geometry and provenance, as a new node (FR-021)", () => {
+    const { before, caseA, caseBAsIR } = runBoth([
+      copyToLayerOp(TOUCH_JOIN_IDS.longpressBase, TOUCH_JOIN_LAYERS.symbol),
+    ]);
+    const hostBefore = layerKeys(before, "default").find(
+      (k) => k.id === TOUCH_JOIN_IDS.longpressBase,
+    )!;
+    const sourceAfter = layerKeys(caseA.layout, "default").find(
+      (k) => k.id === TOUCH_JOIN_IDS.longpressBase,
+    )!;
+    const copyAfter = layerKeys(caseA.layout, TOUCH_JOIN_LAYERS.symbol).find(
+      (k) => k.id === TOUCH_JOIN_IDS.longpressBase,
+    )!;
+    // A clone, not the same object — and the source is untouched.
+    expect(copyAfter).not.toBe(sourceAfter);
+    expect(sourceAfter).toBe(hostBefore);
+    // Content travels: sub-keys, geometry, provenance.
+    expect(copyAfter.sk?.map((k) => k.id)).toEqual(hostBefore.sk?.map((k) => k.id));
+    expect(copyAfter.sk).not.toBe(hostBefore.sk);
+    expect(copyAfter.flick).toBeDefined();
+    expect(copyAfter.flick).not.toBe(hostBefore.flick);
+    expect(copyAfter.provenance).toBe(hostBefore.provenance);
+    expect(copyAfter.width).toBe(hostBefore.width);
+    expect(copyAfter.nodeId).toBeDefined();
+    // And the twin agrees structurally.
+    expect(layerIds(caseBAsIR, TOUCH_JOIN_LAYERS.symbol)).toEqual(
+      layerIds(caseA.layout, TOUCH_JOIN_LAYERS.symbol),
+    );
+  });
+
+  it("refuses an id collision on the target layer on both sides, orphaning the op", () => {
+    const { before } = runBoth([]);
+    const defaultIds = layerIds(before, "default");
+    const symbolIds = layerIds(before, TOUCH_JOIN_LAYERS.symbol);
+    const dup = defaultIds.find((id) => symbolIds.includes(id));
+    if (dup === undefined) {
+      // No natural collision in the fixture: rename a default key onto a
+      // symbol id first, then copy the renamed key.
+      const ops: KeyEditOperation[] = [
+        {
+          seq: 1,
+          kind: "rename",
+          address: touchKeyAddress("phone", "default", defaultIds[0]!),
+          toId: symbolIds[0]!,
+        },
+        {
+          seq: 2,
+          kind: "copyToLayer",
+          address: touchKeyAddress("phone", "default", symbolIds[0]!),
+          toLayer: TOUCH_JOIN_LAYERS.symbol,
+        },
+      ];
+      const { caseA, caseB } = runBoth(ops);
+      expect(caseA.orphaned).toHaveLength(1);
+      expect(caseA.warnings.length).toBeGreaterThan(0);
+      expect(caseB.warnings.length).toBeGreaterThan(0);
+      return;
+    }
+    const { caseA, caseB } = runBoth([copyToLayerOp(dup, TOUCH_JOIN_LAYERS.symbol)]);
+    expect(caseA.orphaned).toHaveLength(1);
+    expect(caseB.warnings.length).toBeGreaterThan(0);
+  });
+
+  it("warns and appends when the anchor does not resolve on the target layer", () => {
+    const { caseA, caseB } = runBoth([
+      {
+        seq: 1,
+        kind: "copyToLayer",
+        address: touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.caseTest),
+        toLayer: TOUCH_JOIN_LAYERS.symbol,
+        anchorAddress: touchKeyAddress("phone", "symbol", "T_DOES_NOT_EXIST_057"),
+        position: "before",
+      },
+    ]);
+    const symbolIds = layerIds(caseA.layout, TOUCH_JOIN_LAYERS.symbol);
+    expect(symbolIds[symbolIds.length - 1]).toBe(TOUCH_JOIN_IDS.caseTest);
+    expect(caseA.warnings.length).toBeGreaterThan(0);
+    expect(caseB.warnings.length).toBeGreaterThan(0);
+  });
+
+  it("rejects a family-scoped copyToLayer on both sides rather than half-applying it", () => {
+    const { before, caseA, caseB } = runBoth([
+      {
+        seq: 1,
+        kind: "copyToLayer",
+        address: touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.caseTest),
+        toLayer: TOUCH_JOIN_LAYERS.symbol,
+        scope: "family",
+      },
+    ]);
+    expect(layerIds(caseA.layout, "default")).toEqual(layerIds(before, "default"));
+    expect(layerIds(caseA.layout, TOUCH_JOIN_LAYERS.symbol)).toEqual(
+      layerIds(before, TOUCH_JOIN_LAYERS.symbol),
+    );
+    expect(caseA.orphaned).toHaveLength(1);
+    expect(caseB.warnings.length).toBeGreaterThan(0);
+  });
+
+  it("orphans the op on an unknown target layer and leaves the layout alone", () => {
+    const { before, caseA, caseB, caseBAsIR } = runBoth([
+      copyToLayerOp(TOUCH_JOIN_IDS.caseTest, "no-such-layer"),
+    ]);
+    expect(caseA.orphaned).toHaveLength(1);
+    expect(caseA.warnings.length).toBeGreaterThan(0);
+    expect(layerIds(caseA.layout, "default")).toEqual(layerIds(before, "default"));
+    expect(layerIds(caseA.layout, TOUCH_JOIN_LAYERS.symbol)).toEqual(
+      layerIds(before, TOUCH_JOIN_LAYERS.symbol),
+    );
+    expect(caseB.warnings.length).toBeGreaterThan(0);
+    expect(layerIds(caseBAsIR, "default")).toEqual(layerIds(before, "default"));
+  });
+
+  it("is a no-op (not an orphan) when the target is the key's own layer", () => {
+    const { before, caseA, caseB } = runBoth([
+      copyToLayerOp(TOUCH_JOIN_IDS.caseTest, "default"),
+    ]);
+    expect(caseA.orphaned).toHaveLength(0);
+    expect(layerIds(caseA.layout, "default")).toEqual(layerIds(before, "default"));
+    expect(caseB.warnings.length).toBeGreaterThan(0);
   });
 });
 

@@ -1,6 +1,4 @@
-// Starting keyboard and track: the case names both; proposeTrack is recorded for comparison.
-//
-// choose_base: the case names the copied keyboard, so the walk policy's choice is
+// Starting keyboard: the case names the copied keyboard, so the walk policy's choice is
 // that override, applied through the functions "Choose this keyboard" runs: the
 // preview write (setLocalStart), then confirmStartKeyboard (the rebase gate,
 // the `base-keyboard` decision through the gallery host's onChange, and the
@@ -13,11 +11,9 @@
 // (commitStartKeyboard below), so identity and choose_base run with no start
 // keyboard, and live extraction sees the starting point only after the track.
 //
-// track: the track flow (`trackOptions`) walks with the case's track as the
-// override. proposeTrack is the flow's own seed (options.seeds.getSeedValue), so
-// the proposal the run reports and the record's `analysis` source come from the
-// product; a case track equal to the proposal is recorded as the kept proposal,
-// a different one as overturned, by the product's own answer origin.
+// The track step is gone: the case's track is recorded at the walk's start
+// (runAuthorCase's walk, mirroring the start screen), so a case track is
+// always recorded before the base is confirmed.
 
 import { dirname } from "node:path";
 import type { StartKeyboard } from "@keyboard-studio/contracts";
@@ -30,12 +26,10 @@ import { applyStepCompletion, type ReducerDeps } from "../../../steps/reducer.ts
 import type { DecisionRecorder } from "../../../decisions/createDecisionRecorder.ts";
 import startKeyboardModule from "../../../survey/questions/gallery/baseKeyboard.ts";
 import { confirmStartKeyboard } from "../../../survey/chooseStart/confirmStartKeyboard.ts";
-import { trackOptions } from "../../../editors/adapters/flowStepOptionRecords.ts";
 import { readCatalogEntry } from "../../../../vite-plugins/keyboardCatalog.ts";
 import type { StartingPoint } from "../../decisionPointFixture.ts";
 import { CORPUS } from "../../sc004Harness.ts";
 import { chooseByPolicy } from "../walkPolicy.ts";
-import { completeFlowStep } from "./flowStep.ts";
 import type { StepDrivers } from "./types.ts";
 
 /** The catalog record the start-keyboard browser lists for a corpus keyboard. */
@@ -101,7 +95,4 @@ export const trackDrivers: StepDrivers = {
     if (result === null) throw new Error("choose_base: the rebase confirm was declined");
     return result;
   },
-
-  track: (ctx) =>
-    completeFlowStep(trackOptions, { overrides: { track_choice: ctx.case.track } }, ctx),
 };

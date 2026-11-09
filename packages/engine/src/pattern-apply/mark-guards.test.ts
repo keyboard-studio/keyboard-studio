@@ -237,6 +237,45 @@ describe("applyMarkGuards — compiled behaviour", () => {
     expect(run(["K_5"])).toBe("");
   }, 60_000);
 
+  // Cameroon QWERTY's shape: the entry group's match already hands off to a
+  // deadkey group. The guard used to be emitted but never entered there (an
+  // Ewondo hand test shipped a dead generated_marks_guard group).
+  it("still blocks when the entry group's match already hands off to a deadkey group, and the deadkeys still compose", async () => {
+    const chained = [
+      'store(&NAME) "Guard fixture"',
+      "store(&TARGETS) 'any'",
+      "begin Unicode > use(main)",
+      "group(main) using keys",
+      '+ [K_A] > "a"',
+      '+ [K_K] > "k"',
+      "+ [K_5] > U+0301",
+      "+ [K_Q] > dk(q)",
+      "match > use(deadkeys)",
+      "",
+      "group(deadkeys)",
+      'dk(q) "a" > U+00E2',
+      "",
+    ].join("\n");
+    const { ir } = parse(chained, "guards");
+    const guarded = applyMarkGuards(
+      ir,
+      worklist({
+        ownLetterUnits: ["a", "k"],
+        markUnits: [{ mark: ACUTE, inputOrder: "postfix" }],
+        blockedCombinations: [{ base: "k", mark: ACUTE }],
+      }),
+      "base-plus-mark",
+    );
+    expect(guarded.guardHopSkipped).toBeUndefined();
+    const vfs = createVirtualFS([{ path: "source/guards.kmn", content: emit(guarded.ir), isBinary: false }]);
+    const compiled = await compile(vfs, "guards");
+    expect(compiled.diagnostics.filter((d) => d.severity === "error" || d.severity === "fatal")).toEqual([]);
+    const run = (vkeys: string[]): string => simulate(compiled, type(vkeys)).finalOutput;
+    expect(run(["K_A", "K_5"])).toBe(`a${ACUTE}`);
+    expect(run(["K_K", "K_5"])).toBe("k");
+    expect(run(["K_Q", "K_A"])).toBe("â");
+  }, 60_000);
+
   it("allows the mark after a ticked space, and at buffer start when the start-of-line box is ticked", async () => {
     const run = await build(true, true);
     expect(run(["K_SPACE", "K_5"])).toBe(` ${ACUTE}`);
@@ -554,6 +593,27 @@ describe("applyMarkGuards — guard-hop purity, idempotency, ordering", () => {
       "base-plus-mark",
     );
     expect(JSON.parse(JSON.stringify(ir))).toEqual(before);
+  });
+
+  it("places one match and one nomatch hop at the end of a foreign use() chain, stable across emit/parse re-runs", () => {
+    const chained = [
+      'store(&NAME) "Guard fixture"',
+      "begin Unicode > use(main)",
+      "group(main) using keys",
+      '+ "a" > "a"',
+      "match > use(deadkeys)",
+      "",
+      "group(deadkeys)",
+      'dk(q) "a" > "b"',
+      "",
+    ].join("\n");
+    const wl = worklist({ blockedCombinations: [{ base: "k", mark: ACUTE }] });
+    const once = emit(applyMarkGuards(parse(chained, "guards").ir, wl, "base-plus-mark").ir);
+    const twice = emit(applyMarkGuards(parse(once, "guards").ir, wl, "base-plus-mark").ir);
+    expect(twice).toBe(once);
+    expect(once).toContain("match > use(deadkeys)");
+    expect(once.match(new RegExp(`^match > use\\(${MARKS_GUARD_GROUP}\\)`, "gm"))).toHaveLength(1);
+    expect(once.match(new RegExp(`^nomatch > use\\(${MARKS_GUARD_GROUP}\\)`, "gm"))).toHaveLength(1);
   });
 
   it("skips the guard hop (and leaves the rule untouched) when an existing match rule already ends with a foreign use()", () => {

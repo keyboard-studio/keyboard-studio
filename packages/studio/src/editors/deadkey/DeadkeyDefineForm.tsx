@@ -548,6 +548,7 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
           <Trans id="deadkey.define.defineButton">Define deadkey</Trans>
         </button>
         <button type="button" style={ghostBtnStyle} onClick={onCancel}>
+          {/* eslint-disable-next-line no-restricted-syntax -- not step nav: "Back to inventory" returns to this form's inventory list, not to the previous step. */}
           <Trans id="deadkey.define.backButton">Back to inventory</Trans>
         </button>
       </div>

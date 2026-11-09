@@ -24,7 +24,7 @@
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { IRPath, KeyboardIR, VirtualFS, SurveyPhaseResult } from "@keyboard-studio/contracts";
-import type { StartKeyboard, RemovalCapability, SurveyAnswer, HistoryEntryState } from "@keyboard-studio/contracts";
+import type { StartKeyboard, RemovalCapability, SurveyAnswer, HistoryEntryState, DocFixProposals } from "@keyboard-studio/contracts";
 import type { ApplyContext, QuestionModule, WorkingCopyPatch } from "../survey/types.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import type { Decision, DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
@@ -185,6 +185,12 @@ export interface ReducerDeps {
   getDecisions?: () => DecisionSet;
   /** Read the working copy's current HISTORY-entry state (apply context). */
   getHistoryEntryState?: () => HistoryEntryState | null;
+  /**
+   * Read the working copy's current documentation-fix proposals (apply
+   * context, issue #2530) — lets the `help-body-parity` apply preserve
+   * the sibling proposals it does not own.
+   */
+  getDocFixProposals?: () => DocFixProposals | null;
 
   // --- decision store (spec 088 FR-003, contract C-2) ---
   /**
@@ -479,6 +485,7 @@ export function applyDecisionEffects(
       writes,
       decisions,
       currentHistoryEntryState: deps.getHistoryEntryState?.() ?? null,
+      currentDocFixProposals: deps.getDocFixProposals?.() ?? null,
     };
     const patch = apply(value, ctx);
     if (!assertPatchChannelsAuthorized(questionId, mod, patch)) return;

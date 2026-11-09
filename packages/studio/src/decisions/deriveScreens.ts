@@ -60,6 +60,14 @@ type Gate = (decisions: DecisionSet) => boolean;
 
 const isCustom = (m: QuestionModule): boolean => typeof m.renderer === "function";
 
+/**
+ * A custom module that owns its screen. A custom module that also declares a
+ * `group` names a screen another custom module owns and joins it as an
+ * intra-step member (spec 112: caps handling sits on the layout screen beside
+ * the layout pick); it still settles its own decision through its renderer.
+ */
+const isScreenOwner = (m: QuestionModule): boolean => isCustom(m) && m.group === undefined;
+
 interface ScreenRecord {
   readonly id: string;
   readonly kind: "question" | "custom";
@@ -98,7 +106,7 @@ export function deriveScreens(
   // wherever the sort places it relative to its enclosing singleton.
   const singletonOwner = new Map<string, QuestionModule>();
   for (const m of modules) {
-    if (!isCustom(m)) continue;
+    if (!isScreenOwner(m)) continue;
     if (m.screen === undefined) {
       throw new Error(
         `deriveScreens: custom module "${m.definition.id}" declares no screen key`,
@@ -128,7 +136,7 @@ export function deriveScreens(
   let openRun: ScreenRecord | null = null;
 
   for (const m of ordered) {
-    if (isCustom(m)) {
+    if (isScreenOwner(m)) {
       openRun = null;
       const rec: ScreenRecord = {
         id: m.screen!,

@@ -2,7 +2,9 @@
 // Re-instrumented in spec 029 (full convergence, Option A): mock seam moved
 // from survey/index.ts (PhaseTrack/PhaseProjectName/PhaseF) to
 // survey/FlowStepHost.tsx (used directly by makeFlowStepComponent factory).
-// Fixtures copy.json and adapt.json are BYTE-IDENTICAL — the store-mutation
+// Fixtures copy.json and adapt.json were BYTE-IDENTICAL until spec 111 added the
+// Open-only open_languages step to the adapt walk (copy.json is unchanged,
+// SC-004). Originally: the store-mutation
 // sequence is unchanged; only the test's mock wiring changes.
 //
 // SEAM CHOICE: This harness renders SurveyView with the same shallow mock
@@ -88,11 +90,20 @@ import { useDecisionStore } from "../../src/stores/decisionStore.ts";
 // ---------------------------------------------------------------------------
 // Mock child survey components — the shared StudioShell harness
 // (src/test/studioShellMocks/), the same stubs StudioShell.test.tsx mounts.
-// The track, project_name and phase_f_helpdocs flows go through the
+// The project_name and phase_f_helpdocs flows go through the
 // FlowStepHost stub (spec 029); see that module for what each emits.
 // ---------------------------------------------------------------------------
 
 vi.mock("../../src/survey/FlowStepHost.tsx", () => import("../../src/test/studioShellMocks/FlowStepHost.tsx"));
+vi.mock("../../src/survey/languageList/LanguageListHost.tsx", () =>
+  import("../../src/test/studioShellMocks/LanguageListHost.tsx"),
+);
+vi.mock("../../src/survey/openWalk/MissingLettersHost.tsx", () =>
+  import("../../src/test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ MissingLettersHost: m.MissingLettersHost })),
+);
+vi.mock("../../src/survey/openWalk/UpgradesHost.tsx", () =>
+  import("../../src/test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ UpgradesHost: m.UpgradesHost })),
+);
 vi.mock("../../src/survey/index.ts", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
 // CharactersStep imports Prefill/PhaseB by file since spec 090 T021 (not via
 // the barrel), so the shallow stubs must be registered for the files too.
@@ -112,6 +123,9 @@ vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () =>
 );
 vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () =>
   import("../../src/test/studioShellMocks/TouchGallery.tsx"),
+);
+vi.mock("../../src/editors/adapters/fallbackPolicyAdapter.tsx", () =>
+  import("../../src/test/studioShellMocks/FallbackPolicyAdapter.tsx"),
 );
 vi.mock("../../src/editors/adapters/oskAdapter.tsx", async () => {
   const { usePublishStepNav } = await import("../../src/hooks/usePublishStepNav.ts");
@@ -182,6 +196,30 @@ vi.mock("../../src/editors/assignLoop/HtmlEditor.tsx", async () => {
         },
       });
       return <div data-testid="stage-html" />;
+    },
+  };
+});
+vi.mock("../../src/editors/assignLoop/IconEditor.tsx", async () => {
+  const { usePublishStepNav } = await import("../../src/hooks/usePublishStepNav.ts");
+  return {
+    IconEditor: ({
+      onComplete,
+      onBack,
+    }: {
+      onComplete: (result: { iconIcoBase64: string; iconPngDataUrl: string }) => void;
+      onBack?: () => void;
+    }) => {
+      usePublishStepNav({
+        ...(onBack !== undefined
+          ? { back: { label: "icon-back", onClick: onBack, testId: "icon-back" } }
+          : {}),
+        forward: {
+          label: "icon-continue",
+          onClick: () => onComplete({ iconIcoBase64: "", iconPngDataUrl: "" }),
+          testId: "icon-continue",
+        },
+      });
+      return <div data-testid="stage-icon" />;
     },
   };
 });
@@ -296,9 +334,9 @@ interface WalkEntry {
   workingCopyMutations: string[];
   /**
    * Decision-store mutator names in call order (spec 088). The completion
-   * writer (recordAll via StudioShell's injected deps) and the flow
-   * onCommit record for the track step land here — this is where the track
-   * choice is visible now that the session store no longer carries it.
+   * writer (recordAll via StudioShell's injected deps) and the
+   * authoring-track record land here — this is where the track choice is
+   * visible now that the session store no longer carries it.
    */
   decisionMutations: string[];
   navigateTo: string[];
@@ -535,11 +573,11 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
 
 /**
  * Drive the full copy-track walk.
- * identity -> layout -> choose_base -> track(copy) -> attribution ->
+ * identity -> layout -> choose_base -> attribution (copy is the default) ->
  * project_name ->
  * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
  * rules ->
- * mechanisms -> touch_seed_source -> touch -> help -> done
+ * mechanisms -> fallback_policy -> osk -> touch_seed_source -> touch -> help -> done
  *
  * S-03 sequences build inline in the Mechanism Gallery's method chooser (the
  * right-hand preview pane swaps for a one-character sequence builder while
@@ -550,8 +588,9 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
  * "deadkeys-continue" testid — before the real "mechanisms" step (still the
  * MechanismGallery mock, "mechanisms-continue").
  *
- * touch_seed_source (spec 035 R4/R12) is inserted between mechanisms and touch
- * on a FRESH walk because touchSeedSource starts null — advance("mechanisms")
+ * fallback_policy (#2539) and osk sit after mechanisms; touch_seed_source
+ * (spec 035 R4/R12) is inserted between osk and touch on a FRESH walk because
+ * touchSeedSource starts null — advance("osk")
  * routes into the fork instead of straight to "touch". The fork step renders
  * the mocked TouchSeedSourcePanel stub (T014, registerEditorSteps.ts) — driven
  * via its own "seed-source-confirm" testid — before the real "touch" step
@@ -562,7 +601,6 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "identity", testId: "survey-advance" },
     { stepId: "layout", testId: "layout-continue" },
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
-    { stepId: "track", testId: "track-copy" },
     // #1901: author/copyright are asked here now (FlowStepHost stub emits
     // the same answers the identity stub used to).
     { stepId: "attribution", testId: "survey-advance" },
@@ -583,52 +621,67 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "deadkeys", testId: "deadkeys-continue" },
     { stepId: "rules", testId: "rules-continue" },
     { stepId: "mechanisms", testId: "mechanisms-continue" },
+    { stepId: "fallback_policy", testId: "fallback-policy-continue", async: true },
     { stepId: "osk", testId: "osk-continue", async: true },
     { stepId: "touch_seed_source", testId: "seed-source-confirm", async: true },
     { stepId: "touch", testId: "touch-continue", async: true },
     { stepId: "css", testId: "css-continue", async: true },
     { stepId: "help", testId: "survey-advance", async: true },
     { stepId: "html", testId: "html-continue", async: true },
+    { stepId: "icon", testId: "icon-continue", async: true },
   ]);
 }
 
 /**
  * Drive the full adapt-track walk.
- * identity -> layout -> choose_base -> track(adapt) -> attribution ->
+ * identity -> layout -> choose_base -> attribution (adapt, recorded up
+ * front the way the start screen's Open entry records it) ->
  * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
  * rules ->
- * mechanisms -> touch_seed_source -> touch -> help -> done
+ * mechanisms -> fallback_policy -> osk -> touch_seed_source -> touch -> help -> done
  * project_name MUST NOT appear. See driveCopyTrack's docstring for why
  * touch_seed_source appears (spec 035 R4/R12 fork memory) and why there is no
  * separate "sequences" step.
  */
 async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
+  // The track question is gone: adapt is recorded between the base preview
+  // and the base confirm. It must be known by the time the base is
+  // confirmed (so StudioShell's instantiation effect does not default it
+  // to copy), but recording it before the walk starts would gate the
+  // identity-first screens off (spec 111 hides them on Open) and the walk
+  // would skip straight to attribution. The split choose_base window below
+  // is the price: the recorder opens one window for the preview and a
+  // second for the confirm, so the fixture shows choose_base twice — and
+  // the adapt record itself falls between the two windows, so it is in
+  // the decision store (the fork reads it) but attributed to neither
+  // window in the ledger.
   await driveSteps(recorder, [
     { stepId: "identity", testId: "survey-advance" },
     { stepId: "layout", testId: "layout-continue" },
-    { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
-    { stepId: "track", testId: "track-adapt" },
+    { stepId: "choose_base", testIds: ["base-preview"] },
+  ]);
+  useDecisionStore.getState().record({
+    id: "authoring-track",
+    value: "adapt",
+    provenance: "asked",
+    step: "start",
+  });
+  await driveSteps(recorder, [
+    { stepId: "choose_base", testIds: ["base-confirm"] },
     { stepId: "attribution", testId: "survey-advance" },
-    { stepId: "characters/prefill", testId: "prefill-continue" },
-    // marks skips transparently inside this window, landing on punctuation.
-    { stepId: "characters/B", testId: "charlist-done", settleFor: "punctuation-done" },
-    // See driveCopyTrack — the ungated punctuation page, accepted empty, whose
-    // window absorbs the async convenience skip.
-    { stepId: "punctuation", testId: "punctuation-done", settleFor: "invisibles-continue" },
-    // The invisible-characters step (spec 075) ALWAYS renders — no skip gate —
-    // so it is a real stop on every walk; accepted empty. The async
-    // convenience skip that follows it is absorbed by this window instead.
-    { stepId: "invisibles", testId: "invisibles-continue", settleFor: "carve-continue" },
-    { stepId: "carve", testId: "carve-continue" },
-    { stepId: "deadkeys", testId: "deadkeys-continue" },
-    { stepId: "rules", testId: "rules-continue" },
-    { stepId: "mechanisms", testId: "mechanisms-continue" },
+    // Open (spec 111): the editable language list rides the adapt track only.
+    // Open (spec 111) hides the character survey, punctuation, invisibles, carve,
+    // deadkeys and rules; Letters and the Mechanisms gallery are walked (a non-basic
+    // keyboard). Upgrades, help and html appear only when the baseline recorded that
+    // problem, which this walk (no baseline) did not.
+    { stepId: "open_languages", testId: "survey-advance" },
+    { stepId: "open_missing_letters", testId: "survey-advance", settleFor: "mechanisms-continue" },
+    { stepId: "mechanisms", testId: "mechanisms-continue", settleFor: "fallback-policy-continue" },
+    { stepId: "fallback_policy", testId: "fallback-policy-continue", settleFor: "osk-continue" },
     { stepId: "osk", testId: "osk-continue", async: true },
-    { stepId: "touch_seed_source", testId: "seed-source-confirm", async: true },
     { stepId: "touch", testId: "touch-continue", async: true },
     { stepId: "css", testId: "css-continue", async: true },
-    { stepId: "help", testId: "survey-advance", async: true },
-    { stepId: "html", testId: "html-continue", async: true },
+
   ]);
 }
 
@@ -778,10 +831,12 @@ async function reviseFromOutput(stepId: string, controlTestId: string) {
   return { newEntries, completedSteps, routes, entriesBefore, movedTo, positionBefore, positionAfter };
 }
 
+// Open (spec 111) hides punctuation and rules, so the adapt track revises the
+// Open-only language list (pane) and the osk step (full layout) instead.
 describe.each([
-  ["copy", driveCopyTrack],
-  ["adapt", driveAdaptTrack],
-] as const)("revise-from-Output loop (spec 094) — %s track", (_name, drive) => {
+  ["copy", driveCopyTrack, "punctuation", "punctuation-done", "rules"],
+  ["adapt", driveAdaptTrack, "open_languages", "survey-advance", "osk"],
+] as const)("revise-from-Output loop (spec 094) — %s track", (_name, drive, paneStep, paneControl, fullStep) => {
   beforeEach(async () => {
     const recorder = createRecorder();
     await act(async () => {
@@ -798,8 +853,8 @@ describe.each([
 
   it("a pane step: confirm returns to Output, touching no other step", async () => {
     const { newEntries, completedSteps, routes, movedTo, positionBefore, positionAfter } = await reviseFromOutput(
-      "punctuation",
-      "punctuation-done",
+      paneStep,
+      paneControl,
     );
     // The step completed (one advance past it), then the walk went back to
     // where it stood before the revision; nothing else ran before the return.
@@ -807,14 +862,14 @@ describe.each([
     // be empty; any that exist belong to this step.
     expect(movedTo).toHaveLength(2);
     expect(positionAfter).toBe(positionBefore);
-    expect(newEntries.every((e) => e.stepId === "punctuation")).toBe(true);
-    expect(completedSteps.every((s) => s === "punctuation")).toBe(true);
+    expect(newEntries.every((e) => e.stepId === paneStep)).toBe(true);
+    expect(completedSteps.every((s) => s === paneStep)).toBe(true);
     expect(routes[routes.length - 1]).toBe("output");
   });
 
   it("a full-layout step: Back to testing completes it and returns to Output", async () => {
     const { newEntries, completedSteps, routes, movedTo, positionBefore, positionAfter } = await reviseFromOutput(
-      "rules",
+      fullStep,
       "step-revision-back-to-testing",
     );
     // The step completed (one advance past it), then the walk went back to
@@ -823,14 +878,14 @@ describe.each([
     // be empty; any that exist belong to this step.
     expect(movedTo).toHaveLength(2);
     expect(positionAfter).toBe(positionBefore);
-    expect(newEntries.every((e) => e.stepId === "rules")).toBe(true);
-    expect(completedSteps.every((s) => s === "rules")).toBe(true);
+    expect(newEntries.every((e) => e.stepId === fullStep)).toBe(true);
+    expect(completedSteps.every((s) => s === fullStep)).toBe(true);
     expect(routes[routes.length - 1]).toBe("output");
   });
 
   it("Discard returns to Output and records nothing", async () => {
     const { newEntries, completedSteps, routes, movedTo, positionBefore } = await reviseFromOutput(
-      "punctuation",
+      paneStep,
       "step-revision-discard",
     );
     // The only move is back to where the walk stood before the revision.

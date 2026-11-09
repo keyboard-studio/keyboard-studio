@@ -41,7 +41,11 @@ describe("review battery drift", () => {
 
   it("covers every catalog criterion exactly once", () => {
     const fresh = regenerate() as { catalogSize: number; criteria: Array<{ id: string }> };
-    expect(fresh.catalogSize).toBe(202);
+    // No pinned census (lists grow): the battery covers the catalog.
+    const catalog = JSON.parse(
+      readFileSync(join(ROOT, "packages/contracts/data/criteria.json"), "utf8"),
+    ) as Array<unknown>;
+    expect(fresh.catalogSize).toBe(catalog.length);
     const ids = fresh.criteria.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
   });

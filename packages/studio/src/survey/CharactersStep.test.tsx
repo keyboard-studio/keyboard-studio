@@ -20,6 +20,8 @@ import type { SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts"
 import { confirmedAlphabetKey } from "@keyboard-studio/contracts";
 import { draftConfirmedAlphabet } from "./phaseBDraftOps.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useStepNavStore, STANDALONE_STEP_ID } from "../stores/stepNavStore.ts";
+import { StepNavCluster } from "../components/StepNavCluster.tsx";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
@@ -172,6 +174,7 @@ function seedSessionStore() {
 
 afterEach(() => {
   cleanup();
+  useStepNavStore.getState().reset();
   // alphabetEvidenceKey / sticky decisions survive store.reset().
   resetInventoryDecisions();
   mockPrefillConfirmRef.current = null;
@@ -654,7 +657,16 @@ describe("CharactersStep — #1784 bare-marks text-sample prompt", () => {
     resetInventoryDraft();
     useSurveyAnswerStore.setState({ steps: {}, recordedScreenOf: {} });
     seedSessionStore();
-    renderWithI18n(<CharactersStepHost onComplete={onComplete} onBack={() => {}} />);
+    renderWithI18n(
+      <>
+        <CharactersStepHost onComplete={onComplete} onBack={() => {}} />
+        {/* The #1784 prompt publishes its Back / Continue to the footer
+            (spec 081 FR-001): the buttons under test live in the cluster,
+            not the body. No StepNavContext is provided, so the publish
+            lands under the standalone id. */}
+        <StepNavCluster stepId={STANDALONE_STEP_ID} />
+      </>,
+    );
     fireEvent.click(screen.getByTestId("prefill-continue"));
     await screen.findByTestId("mock-phase-b");
   }
@@ -670,6 +682,17 @@ describe("CharactersStep — #1784 bare-marks text-sample prompt", () => {
     expect(
       screen.getByTestId("marks-text-sample-prompt").textContent,
     ).toContain("Which letter does this mark go on?");
+    // The nav lives in the footer (spec 081 FR-001): Back then Continue,
+    // in that order — and neither nav button renders inside the prompt
+    // body (the affordance's own buttons are not nav).
+    const cluster = screen.getByTestId("step-nav");
+    expect([...cluster.querySelectorAll("button")].map((b) => b.getAttribute("data-testid"))).toEqual([
+      "marks-text-sample-prompt-back",
+      "marks-text-sample-prompt-skip",
+    ]);
+    const prompt = screen.getByTestId("marks-text-sample-prompt");
+    expect(prompt.querySelector('[data-testid="marks-text-sample-prompt-back"]')).toBeNull();
+    expect(prompt.querySelector('[data-testid="marks-text-sample-prompt-skip"]')).toBeNull();
   });
 
   it("states the skip consequence on the prompt", async () => {

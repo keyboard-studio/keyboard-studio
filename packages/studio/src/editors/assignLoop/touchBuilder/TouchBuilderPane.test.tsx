@@ -278,4 +278,102 @@ describe("TouchBuilderPane", () => {
     fireEvent.click(q.getByTestId("touch-builder-platform-tablet"));
     expect(onSelectPlatform).toHaveBeenCalledWith("tablet");
   });
+
+  // #2596 item 1 — copy a key, with its longpress keys, to another layer.
+  it("copy control commits copyToLayer and the clone carries its subkeys", () => {
+    const { q, selectKey } = setup();
+    selectKey("phone:default:K_B");
+    // Give K_B a longpress subkey first: the copy must carry it.
+    fireEvent.click(q.getByTestId("touch-builder-subkeys-sk").querySelector("button")!);
+    expect(committedOps()[0]).toMatchObject({
+      kind: "setSubKey",
+      sub: { kind: "sk", id: "T_new_1" },
+    });
+    // Copy K_B to shift (shift has no K_B, so no collision).
+    fireEvent.change(q.getByTestId("touch-builder-copy-layer-select"), {
+      target: { value: "shift" },
+    });
+    fireEvent.click(q.getByTestId("touch-builder-copy-layer-apply"));
+    expect(committedOps()).toContainEqual({
+      address: "phone:default:K_B",
+      kind: "copyToLayer",
+      toLayer: "shift",
+    });
+    // The pane switched the display to the target layer; the source key is
+    // still there, and the copy answers on shift with its longpress intact.
+    expect(q.getAllByTestId("touch-builder-key")).toHaveLength(2);
+    selectKey("phone:shift:K_B");
+    expect(q.getByTestId("touch-builder-subkey-sk-T_new_1")).toBeDefined();
+  });
+
+  it("copy control offers only other layers", () => {
+    const { q, selectKey } = setup();
+    selectKey("phone:default:K_A");
+    const select = q.getByTestId("touch-builder-copy-layer-select") as HTMLSelectElement;
+    const options = Array.from(select.options).map((o) => o.value);
+    expect(options).not.toContain("default");
+    expect(options).toContain("shift");
+  });
+
+  // #2596 item 5 — key id suggested from the text typed into a new key.
+  it("suggests the key id from the text of a fresh key", () => {
+    const { q, selectKey, keyEl } = setup();
+    selectKey("phone:default:K_A");
+    fireEvent.click(q.getByTestId("touch-builder-add-right"));
+    selectKey("phone:default:T_new_1");
+    // No text yet — no suggestion.
+    expect(q.queryByTestId("touch-builder-suggest-id")).toBeNull();
+    // Type the text: the suggestion appears.
+    const textInput = q.getByTestId("touch-builder-field-text") as HTMLInputElement;
+    fireEvent.change(textInput, { target: { value: "ä" } });
+    fireEvent.blur(textInput);
+    const suggest = q.getByTestId("touch-builder-suggest-id");
+    expect(suggest).toBeDefined();
+    fireEvent.click(suggest);
+    const ops = committedOps();
+    expect(ops[ops.length - 1]).toEqual({
+      address: "phone:default:T_new_1",
+      kind: "rename",
+      toId: "U_00E4",
+    });
+    expect(keyEl("phone:default:U_00E4")).toBeTruthy();
+  });
+
+  it("offers no id suggestion for an established key or a combining mark", () => {
+    const { q, selectKey } = setup();
+    // Established key: id is not a fresh T_new_N.
+    selectKey("phone:default:K_A");
+    expect(q.queryByTestId("touch-builder-suggest-id")).toBeNull();
+    // Fresh key with a combining mark: guarded T_ per spec 104 FR-005(d),
+    // so no U_ suggestion.
+    fireEvent.click(q.getByTestId("touch-builder-add-right"));
+    selectKey("phone:default:T_new_1");
+    const textInput = q.getByTestId("touch-builder-field-text") as HTMLInputElement;
+    fireEvent.change(textInput, { target: { value: "\u0301" } });
+    fireEvent.blur(textInput);
+    expect(q.queryByTestId("touch-builder-suggest-id")).toBeNull();
+  });
+
+  // #2596 item 4 — snap to grid + right-edge position.
+  it("shows the selected key's right-edge position in its row", () => {
+    const { q, selectKey } = setup();
+    selectKey("phone:default:K_A");
+    // Default width 100 + default pad 15.
+    expect(q.getByTestId("touch-builder-right-edge").textContent).toContain("115");
+    selectKey("phone:default:K_B");
+    expect(q.getByTestId("touch-builder-right-edge").textContent).toContain("230");
+    selectKey("phone:default:K_C");
+    expect(q.getByTestId("touch-builder-right-edge").textContent).toContain("345");
+  });
+
+  it("snaps a typed width to the 10-unit grid on commit", () => {
+    const { q, selectKey } = setup();
+    selectKey("phone:default:K_A");
+    const widthInput = q.getByTestId("touch-builder-field-width") as HTMLInputElement;
+    fireEvent.change(widthInput, { target: { value: "106" } });
+    fireEvent.blur(widthInput);
+    expect(committedOps()).toEqual([
+      { address: "phone:default:K_A", kind: "set", fields: { width: 110 } },
+    ]);
+  });
 });

@@ -31,6 +31,22 @@ export default defineConfig({
   // editor workers via `?worker` imports (see touchBuilder/monacoSetup.ts) —
   // same ES-worker requirement, no CDN workers.
   worker: { format: "es" },
+  build: {
+    rollupOptions: {
+      onwarn(warning, warn) {
+        // tsc's top-level `this && this.__decorate` helper in the vendored Keyman
+        // engine has no sourcemap mapping, so Rollup reports its (already ignored)
+        // THIS_IS_UNDEFINED warning as an unmappable "Error when using sourcemap".
+        if (
+          warning.code === "SOURCEMAP_ERROR" &&
+          warning.id?.includes("/simulator/vendor/keyman/")
+        ) {
+          return;
+        }
+        warn(warning);
+      },
+    },
+  },
   plugins: [
     // The Lingui macro transform runs via Babel; @vitejs/plugin-react only
     // spins up Babel when given plugins, so this is the one place dev-server
@@ -60,6 +76,16 @@ export default defineConfig({
   server: {
     port: 5273,
     strictPort: true,
+    // Pin the loopback to IPv4. Without this Vite binds `localhost`, which
+    // resolves to ::1 first in some environments (notably the
+    // mcr.microsoft.com/playwright container image) — Vite then listens on
+    // IPv6-only, Playwright's webServer port check passes on ::1, but
+    // global-setup's fetch and the browsers hit 127.0.0.1 and get
+    // ECONNREFUSED (#2367: e2e-desktop and e2e-golden failed exactly this
+    // way on the first container-image run while e2e-mobile passed by
+    // address-selection luck). `localhost` still works: it resolves to
+    // 127.0.0.1 for the clients.
+    host: "127.0.0.1",
     // Mirrors the vercel.json prod framing headers so dev/preview/prod stay
     // consistent. Deliberately no script-src here (site-wide, not scoped to
     // osk-frame.html) — it would break Vite's HMR inline scripts.

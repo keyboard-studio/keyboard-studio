@@ -11,7 +11,7 @@ import {
   type KeyboardIR,
   type TouchLayoutIR,
 } from "@keyboard-studio/contracts";
-import { getCategory } from "@keyboard-studio/contracts/unicode";
+import { getCategory, getName } from "@keyboard-studio/contracts/unicode";
 import type { ReadmeCharacterGroup, ReadmeFacts, ReadmeTypingRow } from "@keyboard-studio/engine";
 import {
   GROUP_LABEL,
@@ -64,6 +64,8 @@ interface Candidate extends ReadmeTypingRow {
   steps: readonly string[];
   method: TypingMethod;
   group: CharGroup;
+  /** The character itself, before display formatting. */
+  char: string;
 }
 
 const PHRASES = DOC_FORMS.readmePhrases;
@@ -87,6 +89,33 @@ const LAYOUT_FAMILY_LABEL: Readonly<Partial<Record<LayoutFamilyValue, string>>> 
   azerty: "AZERTY",
 };
 
+/**
+ * A character as the README prints it: a mark on its dotted circle, and a
+ * space or format character by name, since printed bare it is an empty gap
+ * ("Other:  " for a no-break space).
+ */
+function readmeChar(ch: string): string {
+  const cp = ch.codePointAt(0)!;
+  const cat = getCategory(cp) ?? "";
+  if ([...ch].length === 1 && (cat.startsWith("Z") || cat.startsWith("C"))) {
+    const code = `U+${cp.toString(16).toUpperCase().padStart(4, "0")}`;
+    const name = getName(cp);
+    return name !== undefined ? `${name} (${code})` : code;
+  }
+  return displayChar(ch);
+}
+
+/**
+ * The order examples are offered in: letters, then marks, punctuation and
+ * symbols, numbers, other; lowercase before uppercase within a group. In
+ * code-point order alone a Latin-based keyboard's table opened with ©, « and
+ * the no-break space, and the letters the language needs never made the cap.
+ */
+function candidateRank(c: Candidate): number {
+  const cat = getCategory(c.char.codePointAt(0)!);
+  return GROUP_ORDER.indexOf(c.group) * 2 + (cat === "Lu" || cat === "Lt" ? 1 : 0);
+}
+
 /** A keystroke label as a reader sees it: the space bar is named, never left as blank space. */
 function stepLabel(step: string): string {
   return step === " " ? "Space" : step;
@@ -107,7 +136,7 @@ function desktopCandidates(ir: KeyboardIR, extras: readonly string[]): Candidate
   for (const ch of extras) {
     const steps = shortestKeySteps(ir, ch, producers);
     if (steps === undefined) continue;
-    rows.push({ keys: keysOf(steps), steps, output: displayChar(ch), method: methodOfSteps(steps), group: groupOf(ch.codePointAt(0)!) });
+    rows.push({ keys: keysOf(steps), steps, output: readmeChar(ch), method: methodOfSteps(steps), group: groupOf(ch.codePointAt(0)!), char: ch });
   }
   return rows;
 }
@@ -120,7 +149,7 @@ function touchCandidates(layout: TouchLayoutIR | null): Candidate[] {
   const add = (keys: string, text: string) => {
     if (text === "" || [...text].every(isBaseCharacter) || seen.has(text)) return;
     seen.add(text);
-    rows.push({ keys, steps: [keys], output: displayChar(text), method: "touch", group: groupOf(text.codePointAt(0)!) });
+    rows.push({ keys, steps: [keys], output: readmeChar(text), method: "touch", group: groupOf(text.codePointAt(0)!), char: text });
   };
   for (const platform of layout.platforms) {
     for (const layer of platform.layers) {
@@ -189,7 +218,7 @@ function characterGroupsOf(extras: readonly string[]): ReadmeCharacterGroup[] {
   const groups = new Map<CharGroup, string[]>();
   for (const ch of extras) {
     const g = groupOf(ch.codePointAt(0)!);
-    groups.set(g, [...(groups.get(g) ?? []), displayChar(ch)]);
+    groups.set(g, [...(groups.get(g) ?? []), readmeChar(ch)]);
   }
   return GROUP_ORDER.filter((g) => groups.has(g)).map((g) => ({ kind: g, label: GROUP_LABEL[g], chars: groups.get(g)! }));
 }
@@ -238,7 +267,10 @@ export function buildReadmeFacts(input: ReadmeFactsInput): ReadmeFacts {
   const candidates = [
     ...(input.ir !== null ? desktopCandidates(input.ir, extras) : []),
     ...touchCandidates(input.touchLayout),
-  ];
+  ]
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => candidateRank(a.c) - candidateRank(b.c) || a.i - b.i)
+    .map(({ c }) => c);
   const typing = pickTypingRows(candidates);
   const family = input.layoutFamily !== undefined ? LAYOUT_FAMILY_LABEL[input.layoutFamily] : undefined;
   const useCase = input.useCase !== undefined ? USE_CASE_PHRASE[input.useCase] : undefined;
@@ -256,7 +288,7 @@ export function buildReadmeFacts(input: ReadmeFactsInput): ReadmeFacts {
       : {}),
     ...(useCase !== undefined ? { useCase } : {}),
     characterGroups: characterGroupsOf(extras),
-    removed: [...input.carveChars].sort(compareCodePoints).map(displayChar),
+    removed: [...input.carveChars].sort(compareCodePoints).map(readmeChar),
     ...(composition !== undefined ? { composition } : {}),
     typingRows: typing.map(({ keys, output }) => ({ keys, output })),
     literalRows: input.ir !== null ? literalRows(input.ir, candidates) : [],

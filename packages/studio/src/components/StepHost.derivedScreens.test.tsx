@@ -44,21 +44,25 @@ const { trivialStep } = vi.hoisted(() => {
 
 vi.mock("../steps/registerEditorSteps.ts", () => ({
   identityStep: trivialStep("identity"),
+  languageListStep: trivialStep("open_languages"),
+  missingLettersStep: trivialStep("open_missing_letters"),
+  upgradesStep: trivialStep("open_upgrades"),
   layoutStep: trivialStep("layout"),
   chooseStartStep: trivialStep("choose_base"),
-  trackStep: trivialStep("track"),
   attributionStep: trivialStep("attribution"),
   projectNameStep: trivialStep("project_name"),
   carveStep: trivialStep("carve"),
   deadkeysStep: trivialStep("deadkeys"),
   rulesStep: trivialStep("rules"),
   mechanismsStep: trivialStep("mechanisms"),
+  fallbackPolicyStep: trivialStep("fallback_policy"),
   oskStep: trivialStep("osk"),
   touchSeedSourceStep: trivialStep("touch_seed_source"),
   touchStep: trivialStep("touch"),
   cssStep: trivialStep("css"),
   helpStep: trivialStep("help"),
   htmlStep: trivialStep("html"),
+  iconStep: trivialStep("icon"),
   packageStep: trivialStep("package"),
 }));
 

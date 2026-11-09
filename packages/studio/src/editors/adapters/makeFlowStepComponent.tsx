@@ -17,7 +17,7 @@
 //           recordStepCompletion's isSurveyPhaseResult check
 //           (createDecisionRecorder.ts) keys on to record a question's decision
 //           entry, and forwarding x there instead of result silently drops the
-//           entry (spec 057 US3 regression: the "track" step's decision never
+//           entry (spec 057 US3 regression: an extracted step's decision never
 //           made it into the trail).
 //     C2.5  ALL store / hook access confined here (FlowStepHost is pure).
 //     C2.6  New editors → steps/flowSources runtime edge is acyclic (R1 verified).
@@ -219,6 +219,14 @@ export function makeFlowStepComponent<Extracted>(
       [],
     );
 
+    const getSeedOptions = useCallback(
+      options.seeds?.getSeedOptions
+        ? (questionId: string) => options.seeds!.getSeedOptions!(questionId, depsRef.current)
+        : (_questionId: string) => undefined,
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [],
+    );
+
     // C2.4 — completion wrapper: extract → guard → onComplete. The factory
     // performs NO store writes on completion (spec 089): the completion's
     // effects are the question modules' applies, run by StepHost's
@@ -253,6 +261,7 @@ export function makeFlowStepComponent<Extracted>(
         {...(options.seeds?.getSeedCaption ? { getSeedProvenance } : {})}
         {...(options.seeds?.onAnswerCommit ? { onAnswerCommit } : {})}
         {...(options.seeds?.getRequiredOverride ? { getRequiredOverride } : {})}
+        {...(options.seeds?.getSeedOptions ? { getSeedOptions } : {})}
         {...(options.usesFindings ? { findingsByQuestionId } : {})}
       />
     );

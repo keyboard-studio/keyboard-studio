@@ -4,11 +4,6 @@
     "value": "Walk Author",
     "provenance": "asked"
   },
-  "authoring-track": {
-    "id": "authoring-track",
-    "value": "copy",
-    "provenance": "asked"
-  },
   "base-keyboard": {
     "id": "base-keyboard",
     "value": {
@@ -16,6 +11,13 @@
       "name": "US Basic"
     },
     "provenance": "asked"
+  },
+  "caps-handling": {
+    "id": "caps-handling",
+    "value": {
+      "mode": "cased-keys"
+    },
+    "provenance": "default"
   },
   "carved-layout": {
     "id": "carved-layout",
@@ -1759,7 +1761,13 @@
         "migrationNeeded": false,
         "guardReevaluation": []
       },
-      "contextTolerance": null
+      "contextTolerance": {
+        "decision": "accept",
+        "acceptedSiteIds": [],
+        "proposedSiteIds": [],
+        "fingerprint": "",
+        "origin": "default"
+      }
     },
     "provenance": "asked"
   },

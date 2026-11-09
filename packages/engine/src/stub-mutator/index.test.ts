@@ -255,3 +255,37 @@ describe("applyTargetsAnyMutation", () => {
     expect(() => applyTargetsAnyMutation(createVirtualFS([]), "k")).toThrow(/not found/);
   });
 });
+
+describe("applyIdentityStubMutation: open mode", () => {
+  const NO_KBV = [
+    "store(&VERSION) '10.0'\r",
+    "store(&NAME) 'Old'\r",
+    "begin Unicode > use(main)\r",
+    "group(main) using keys\r",
+    "+ [K_A] > 'a'\r",
+  ].join("\n");
+
+  it("inserts &KEYBOARDVERSION after &VERSION and never touches &VERSION", () => {
+    const vfs = textVfs({ [`source/${KEYBOARD_ID}.kmn`]: NO_KBV });
+    applyIdentityStubMutation(vfs, KEYBOARD_ID, { version: "1.1" }, { open: true });
+    const out = getText(vfs);
+    expect(out.split("\n").slice(0, 3)).toEqual([
+      "store(&VERSION) '10.0'\r",
+      "store(&KEYBOARDVERSION) '1.1'\r",
+      "store(&NAME) 'Old'\r",
+    ]);
+    expect(out.endsWith("+ [K_A] > 'a'\r")).toBe(true);
+  });
+
+  it("keeps CRLF when it rewrites an existing &KEYBOARDVERSION line", () => {
+    const vfs = textVfs({ [`source/${KEYBOARD_ID}.kmn`]: "store(&KEYBOARDVERSION) '1.0'\r\nbegin Unicode > use(main)\r\n" });
+    applyIdentityStubMutation(vfs, KEYBOARD_ID, { version: "1.1" }, { open: true });
+    expect(getText(vfs)).toBe("store(&KEYBOARDVERSION) '1.1'\r\nbegin Unicode > use(main)\r\n");
+  });
+
+  it("Copy mode does not insert &KEYBOARDVERSION", () => {
+    const vfs = textVfs({ [`source/${KEYBOARD_ID}.kmn`]: NO_KBV });
+    applyIdentityStubMutation(vfs, KEYBOARD_ID, { version: "1.1" });
+    expect(getText(vfs)).toBe(NO_KBV);
+  });
+});

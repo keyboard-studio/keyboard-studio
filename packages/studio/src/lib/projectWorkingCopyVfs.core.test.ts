@@ -591,6 +591,27 @@ describe("projectWorkingCopyVfs — id rename (step 4)", () => {
     expect(renamedKvks?.content).toContain("<kbdname>ewondo</kbdname>");
   });
 
+  it("relinks the author's start-id CSS when the VFS is already scaffolded under the new id", async () => {
+    // The Track 1 preview: the scaffolder already renamed everything, so step 4 has nothing to do and step 0b must relink.
+    const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
+    const vfs = createVirtualFS([
+      { path: "source/ewondo.kmn", content: "c stub\n", isBinary: false },
+      { path: "source/ewondo.css", content: ".kmw-keyboard-ewondo .x{}", isBinary: false },
+    ]);
+    projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "ewondo",
+      startKeyboardId: "sil_akebu",
+      customCss: ".kmw-keyboard-sil_akebu .kmw-key { color: red; }",
+      startIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+    expect(vfs.get("source/ewondo.css")?.content).toBe(".kmw-keyboard-ewondo .kmw-key { color: red; }");
+  });
+
   it("is a no-op when targetKeyboardId is omitted", async () => {
     const { projectWorkingCopyVfs } = await import("./projectWorkingCopyVfs.ts");
     const vfs = createVirtualFS([

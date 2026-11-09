@@ -16,9 +16,14 @@ vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMo
 vi.mock("./editors/adapters/deadkeyAdapter.tsx", () => import("./test/studioShellMocks/deadkeyAdapter.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
+vi.mock("./editors/adapters/fallbackPolicyAdapter.tsx", () => import("./test/studioShellMocks/FallbackPolicyAdapter.tsx"));
 vi.mock("./editors/adapters/oskAdapter.tsx", () => import("./test/studioShellMocks/OskEditorAdapter.tsx"));
 vi.mock("./editors/assignLoop/CssEditor.tsx", () => import("./test/studioShellMocks/CssEditor.tsx"));
 vi.mock("./editors/assignLoop/HtmlEditor.tsx", () => import("./test/studioShellMocks/HtmlEditor.tsx"));
+vi.mock("./survey/languageList/LanguageListHost.tsx", () => import("./test/studioShellMocks/LanguageListHost.tsx"));
+vi.mock("./survey/openWalk/MissingLettersHost.tsx", () => import("./test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ MissingLettersHost: m.MissingLettersHost })));
+vi.mock("./survey/openWalk/UpgradesHost.tsx", () => import("./test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ UpgradesHost: m.UpgradesHost })));
+vi.mock("./editors/assignLoop/IconEditor.tsx", () => import("./test/studioShellMocks/IconEditor.tsx"));
 vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
   import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
@@ -49,7 +54,7 @@ import { SurveyView } from "./StudioShell.tsx";
 import { navigateTo } from "./lib/navigate.ts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { advanceToTrack, completeInvisibles, advanceToTouchSeedSource, advanceToF, installShellHooks } from "./StudioShell.testkit.tsx";
+import { advanceToAttribution, advanceToAttributionAdapt, advanceToTouchSeedSource, advanceToF, installShellHooks } from "./StudioShell.testkit.tsx";
 
 installShellHooks({ warmLazySteps: true });
 
@@ -74,9 +79,15 @@ describe("SurveyView — PhaseF done navigates to #output", () => {
     });
     expect(screen.getByTestId("stage-html")).toBeTruthy();
 
-    // Complete the html step → done → navigateTo('output').
+    // Complete the html step → icon.
     await act(async () => {
       fireEvent.click(screen.getByTestId("html-continue"));
+    });
+    expect(screen.getByTestId("stage-icon")).toBeTruthy();
+
+    // Complete the icon step → done → navigateTo('output').
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("icon-continue"));
     });
 
     // navigateTo should have been called with 'output'.
@@ -123,7 +134,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
 
     // The chooser's own Back (not TouchGallery's) pops the walked-history —
     // which reaches "osk" (the step genuinely visited immediately before
-    // touch_seed_source; the osk editor sits between mechanisms and touch).
+    // touch_seed_source; fallback_policy sits before osk on the spine).
     fireEvent.click(screen.getByTestId("seed-source-back"));
 
     expect(screen.getByTestId("stage-osk")).toBeTruthy();
@@ -155,8 +166,9 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
 // Track 2 (Adapt) routing — issue #388
 // ---------------------------------------------------------------------------
 //
-// The Track 2 path clicks "track-adapt" instead of "track-copy", which skips
-// the project-name step and calls instantiateFromExisting (not instantiateFromStart).
+// The Track 2 path records "adapt" on the start screen (the Open entry),
+// which skips the project-name step and calls instantiateFromExisting
+// (not instantiateFromStart).
 //
 // useKeyboardArtifact is mocked to return { stage: { kind: "idle" } } which means
 // onInstantiate never fires in this shallow test. We can still verify the ROUTING
@@ -165,45 +177,52 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
 // require a real VFS/IR compile cycle — that belongs in a separate integration test.
 //
 // What this test covers:
-//   - Clicking "track-adapt" advances to "attribution" (#1901: author/
-//     copyright are asked after the track choice, on both tracks), and
-//     from there to "prefill" (skips project-name).
+//   - Recording "adapt" advances to "attribution" (#1901: author/
+//     copyright are asked on both tracks), and from there to the Open
+//     language list (skips project-name).
 //   - The project-name stage is NOT rendered on the adapt path.
-//   - After clicking track-adapt, instantiationMode remains null (onInstantiate
+//   - After recording adapt, instantiationMode remains null (onInstantiate
 //     never fires in this mock — the routing test confirms stage progression, not
 //     store instantiation, which is covered exhaustively in workingCopyStore.test.ts).
 
 describe("SurveyView — Track 2 (adapt) routing", () => {
-  it("clicking track-adapt advances through attribution to prefill, skipping project-name", async () => {
+  it("recording adapt advances through attribution and the language list to fallback policy then the on-screen keyboard, skipping project-name", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
-    // Drive to the track stage.
-    advanceToTrack();
-    expect(screen.getByTestId("stage-track")).toBeTruthy();
-
-    // Click adapt (Track 2).
-    fireEvent.click(screen.getByTestId("track-adapt"));
+    // The adapt track is recorded by the start screen's Open entry, before
+    // the walk reaches the attribution fork (see advanceToAttributionAdapt:
+    // recorded between the base preview and confirm, so the identity-first
+    // screens are already walked and the Open gates don't skip them).
+    advanceToAttributionAdapt();
 
     // Should be at attribution (#1901), not project-name.
     expect(screen.getByTestId("stage-attribution")).toBeTruthy();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
-    expect(screen.queryByTestId("stage-track")).toBeNull();
 
-    // Advance through attribution to prefill.
+    // Advance through attribution and the Open language list (spec 111) to
+    // fallback policy then the OSK: Open hides the character survey.
     fireEvent.click(screen.getByTestId("survey-advance"));
-    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    expect(screen.getByTestId("stage-open-languages")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    // Letters and the Mechanisms gallery (a non-basic keyboard) come before the OSK.
+    expect(screen.getByTestId("stage-open-missing-letters")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    expect(screen.getByTestId("stage-fallback_policy")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("fallback-policy-continue"));
+    expect(screen.getByTestId("stage-osk")).toBeTruthy();
+    expect(screen.queryByTestId("stage-prefill")).toBeNull();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
   });
 
-  it("track-copy still advances through attribution and project-name to prefill (regression guard)", async () => {
+  it("copy (the default) still advances through attribution and project-name to prefill (regression guard)", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
-    advanceToTrack();
-    fireEvent.click(screen.getByTestId("track-copy"));
+    advanceToAttribution();
 
     // Should be at attribution first (#1901), not project-name yet.
     expect(screen.getByTestId("stage-attribution")).toBeTruthy();
@@ -228,50 +247,32 @@ describe("SurveyView — Track 2 (adapt) routing", () => {
 // landing on PhaseB. This test proves the adapt-track path (which skips
 // project_name) converges on the same carve-back behavior as the copy-track path.
 
-describe("SurveyView — adapt-track carve → B back-navigation (SC-002 parity)", () => {
-  it("adapt-track: selects adapt → skips project_name → prefill-continue → stage-B → charlist-done → punctuation → carve → back-backs land on stage-B (not prefill)", async () => {
+describe("SurveyView — Open walk back-navigation (spec 111)", () => {
+  it("adapt-track: after the language list, Letters and Mechanisms precede fallback policy and the osk, and osk's back returns to fallback policy", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
-    // Drive to track stage, then select adapt (skips project_name).
-    advanceToTrack();
-    fireEvent.click(screen.getByTestId("track-adapt"));
-
-    // Adapt-track lands on attribution (#1901), then prefill (no
-    // project-name).
+    advanceToAttributionAdapt();
     expect(screen.getByTestId("stage-attribution")).toBeTruthy();
     fireEvent.click(screen.getByTestId("survey-advance"));
-    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
-    expect(screen.queryByTestId("stage-project-name")).toBeNull();
-
-    // Confirm prefill → PhaseB visible.
-    fireEvent.click(screen.getByTestId("prefill-continue"));
-    expect(screen.getByTestId("stage-B")).toBeTruthy();
-
-    // Advance through PhaseB (and the ungated punctuation and invisibles
-    // pages) to carve — the landing is async (see advanceToCarve).
-    fireEvent.click(screen.getByTestId("charlist-done"));
-    fireEvent.click(screen.getByTestId("punctuation-done"));
-    completeInvisibles();
-    expect(await screen.findByTestId("stage-carve")).toBeTruthy();
-
-    // carve-back lands on the invisible-characters page (spec 075, the last
-    // real page before carve — convenience pops through, having auto-skipped
-    // forward).
-    fireEvent.click(screen.getByTestId("carve-back"));
-    expect(screen.getByTestId("invisibles-step")).toBeTruthy();
-
-    // invisibles-back re-enters the punctuation page.
-    fireEvent.click(screen.getByTestId("invisibles-back"));
-    expect(screen.getByTestId("punctuation-step")).toBeTruthy();
-
-    // punctuation-back must re-enter PhaseB (not prefill) — marks pops through.
-    fireEvent.click(screen.getByTestId("punctuation-back"));
-
-    expect(screen.getByTestId("stage-B")).toBeTruthy();
+    expect(screen.getByTestId("stage-open-languages")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    // Open hides the character survey, marks, punctuation, invisibles, carve and the
+    // other opt-in galleries; the walk goes on through Letters and Mechanisms.
+    expect(await screen.findByTestId("stage-open-missing-letters")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    fireEvent.click(await screen.findByTestId("mechanisms-continue"));
+    expect(await screen.findByTestId("stage-fallback_policy")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("fallback-policy-continue"));
+    expect(await screen.findByTestId("stage-osk")).toBeTruthy();
     expect(screen.queryByTestId("stage-carve")).toBeNull();
     expect(screen.queryByTestId("stage-prefill")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("osk-back"));
+    expect(screen.getByTestId("stage-fallback_policy")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("fallback-policy-back"));
+    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
   });
 });
 

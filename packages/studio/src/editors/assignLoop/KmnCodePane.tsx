@@ -29,8 +29,16 @@ import { compileCandidateKmn } from "../../lib/compileCandidateKmn.ts";
 import { loadAssignedKeys } from "../../lib/assignedKeys.ts";
 import { anchorAssignedKeys } from "../../lib/claimedInputs.ts";
 import { ConfirmDialog } from "./parts/ConfirmDialog.tsx";
+import { findRawCtrlRules } from "@keymanapp/keyboard-lint";
+import { isOpenMode } from "../../lib/openMode.ts";
+import { readVfsText } from "../../lib/vfsText.ts";
+import {
+  replaceStartingPointAndReplay,
+  startingPointPath,
+} from "../../lib/replaceStartingPoint.ts";
 import {
   lintKmnCodeText,
+  rawCtrlRuleKey,
   type KmnCodeMarker,
   type KmnCodeMarkerSeverity,
 } from "./kmnCodeLint.ts";
@@ -106,8 +114,22 @@ export interface KmnCodePaneProps {
 export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
   const { t } = useLingui();
   const ir = useWorkingCopyStore((s) => s.ir);
+  const mode = useWorkingCopyStore((s) => s.instantiationMode);
+  const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  // Open mode (spec 111 FR-009): the pane shows the file's own text and Apply
+  // replaces the starting point with it.
+  const openPath =
+    isOpenMode(mode) && startKeyboard !== null
+      ? startingPointPath(startKeyboard.id, "kmn")
+      : null;
+  const openText =
+    openPath !== null && startVfs !== null ? readVfsText(startVfs, openPath) : undefined;
   // parseKmn needs a keyboard id; the IR header name is the stable choice.
-  const keyboardId = ir?.header.name ?? "keyboard";
+  const keyboardId =
+    openText !== undefined && startKeyboard !== null
+      ? startKeyboard.id
+      : (ir?.header.name ?? "keyboard");
 
   // The canonical text for the current IR, with the node-to-line map the
   // reveal uses.
@@ -115,7 +137,18 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
     () => (ir === null ? null : emitKmn(ir, { lineMap: true })),
     [ir],
   );
-  const canonical = emitted === null ? null : emitted.text;
+  const canonical = ir === null ? null : (openText ?? emitted?.text ?? null);
+
+  // Raw-Ctrl baseline (issue #2359): the rules already in the working copy
+  // never block Apply — only rules the edited text ADDS do. Content-keyed,
+  // so editing an unrelated rule never reclassifies one as new.
+  const baselineRawCtrl = useMemo(
+    () =>
+      ir === null
+        ? new Set<string>()
+        : new Set(findRawCtrlRules(ir, keyboardId).map(rawCtrlRuleKey)),
+    [ir, keyboardId],
+  );
 
   // Editor text. `null` until the first canonical text arrives.
   const [text, setText] = useState<string | null>(null);
@@ -166,7 +199,10 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
 
   const runLint = (nextText: string) => {
     const id = keyboardIdRef.current;
-    const result = lintKmnCodeText(nextText, (t) => parseKmn(t, id));
+    const result = lintKmnCodeText(nextText, (t) => parseKmn(t, id), {
+      keyboardId: id,
+      baselineRawCtrl,
+    });
     setMarkers(result.markers);
     setParsed(result.parsed);
     applyMarkersToModel(result.markers);
@@ -329,7 +365,10 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
     if (irAtClick === null) return;
     const id = keyboardIdRef.current;
     // 1a. Parse and lint (synchronous: the debounced lint state may lag behind the text).
-    const lint = lintKmnCodeText(current, (src) => parseKmn(src, id));
+    const lint = lintKmnCodeText(current, (src) => parseKmn(src, id), {
+      keyboardId: id,
+      baselineRawCtrl,
+    });
     if (!lint.parsed) {
       showBlocked(lint.markers.filter((m) => m.severity === "error"));
       return;
@@ -347,6 +386,22 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
     );
     if (layerA.length > 0) {
       showBlocked(layerA.map(findingMarker));
+      return;
+    }
+    if (openText !== undefined && openPath !== null) {
+      // Open: a formatting-only change is still a change to the file.
+      if (current === canonical) return;
+      const result = replaceStartingPointAndReplay(openPath, current);
+      if (!result.ok) {
+        setApplyError(result.error);
+        return;
+      }
+      justAppliedRef.current = true;
+      setApplyError(null);
+      return;
+    }
+    if (current === canonical) {
+      // Formatting-only change: nothing to commit.
       return;
     }
     // 2. The structural diff; empty means formatting-only, which records nothing.

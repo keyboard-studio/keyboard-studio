@@ -29,6 +29,7 @@ import type { Step } from "./types.ts";
 import {
   decisionModules,
   declaredScreenGates,
+  openScreenGates,
 } from "../survey/questions/registry.ts";
 import { deriveScreens, type DerivedScreen } from "../decisions/deriveScreens.ts";
 import type { DecisionSet } from "../decisions/decisionTypes.ts";
@@ -45,19 +46,23 @@ import {
   identityStep,
   layoutStep,
   chooseStartStep,
-  trackStep,
   attributionStep,
   projectNameStep,
+  languageListStep,
+  missingLettersStep,
+  upgradesStep,
   carveStep,
   deadkeysStep,
   rulesStep,
   mechanismsStep,
+  fallbackPolicyStep,
   oskStep,
   touchSeedSourceStep,
   touchStep,
   cssStep,
   helpStep,
   htmlStep,
+  iconStep,
   packageStep,
 } from "./registerEditorSteps.ts";
 
@@ -137,11 +142,8 @@ const stepPool: readonly Step[] = [
   // --- Base selection (base picker only) ---
   chooseStartStep,
 
-  // --- Track selection (copy vs adapt) ---
-  trackStep,
-
   // --- Attribution (author / copyright, #1901) ---
-  // Both tracks walk it, immediately after the track choice: the
+  // Both tracks walk it, immediately after the base choice: the
   // questions' proposals are track-shaped (profile confirmation on
   // copy; the base's copyright holder seeded on update).
   attributionStep,
@@ -151,6 +153,14 @@ const stepPool: readonly Step[] = [
   // this step, adapt-track bypasses it, and both reconverge at the next
   // ungated step.
   projectNameStep,
+
+  // --- Open: the editable language list (gated side trail, spec 111) ---
+  languageListStep,
+
+  // --- Open: Missing letters and Upgrades (gated side trails, spec 111) ---
+  // Each shows only when the baseline recorded that kind of problem.
+  missingLettersStep,
+  upgradesStep,
 
   // --- Character inventory (Phase A / Phase B question battery) ---
   charactersStep,
@@ -287,6 +297,9 @@ const stepPool: readonly Step[] = [
     lock: "physical",
   } satisfies Step,
 
+  // --- Fallback policy (spec 109) — after mechanisms, before OSK (#2539) ---
+  fallbackPolicyStep,
+
   // --- OSK (on-screen keyboard customization) ---
   // Runs after the Mechanical gallery: the underlying OSK is generated from
   // the physical layout, and this step lets the author customize key labels.
@@ -313,10 +326,16 @@ const stepPool: readonly Step[] = [
   // --- Help (Phase F: usage tips and credits) ---
   helpStep,
 
-  // --- Documentation (welcome.htm, Markdown) ---
-  // Monaco editor for the keyboard's user manual. readme.htm, README.md,
+  // --- Documentation (welcome.htm, HTML) ---
+  // Editor for the keyboard's user manual. readme.htm, README.md,
   // and .php versions are generated exports from this source.
   htmlStep,
+
+  // --- Keyboard icon (after Documentation) ---
+  // Modern reimagining of TIKE's bitmap editor: import-first (SVG/PNG/ICO),
+  // 256px pixel editing, low-res-friendly text tool, live 16/32/48 previews.
+  // Unskippable — unchanged means the template keyboard's icon.
+  iconStep,
 
   // --- Package (reserved, out of scope for v1) ---
   packageStep,
@@ -380,11 +399,13 @@ export const derivedScreens: readonly DerivedScreen[] = deriveScreens(
  * via its ResolveContext) come from here.
  */
 export const screenGates: ReadonlyMap<string, (decisions: DecisionSet) => boolean> =
-  new Map(
-    derivedScreens.flatMap((s) =>
+  new Map([
+    ...derivedScreens.flatMap((s) =>
       s.gatedBy !== undefined ? [[s.id, s.gatedBy] as const] : [],
     ),
-  );
+    // Spec 111: the screens Open hides gate the walk without leaving the spine.
+    ...openScreenGates,
+  ]);
 
 // The author's current route for the lint fallback (spec 108 FR-015): a screen is on the route
 // while its derived gate passes, and a screen with no gate always is. Registered here, not
@@ -474,7 +495,7 @@ export function validateManifestShape(): void {
 
   // Layout guard (spec 028 Stage 5, T016): layout:"full" is LOAD-BEARING —
   // StepHost reads step.layout to select full-screen vs two-pane chrome (R4).
-  // EXACTLY {carve, deadkeys, rules, mechanisms, osk, touch, touch_seed_source,
+  // EXACTLY {carve, deadkeys, rules, mechanisms, fallback_policy, osk, touch, touch_seed_source,
   // css, html} must declare layout:"full"; all others must be "pane" or omit
   // layout. A
   // mismatched layout would silently change the chrome. touch_seed_source
@@ -490,17 +511,19 @@ export function validateManifestShape(): void {
     "deadkeys",
     "rules",
     "mechanisms",
+    "fallback_policy",
     "osk",
     "touch",
     "touch_seed_source",
     "css",
     "html",
+    "icon",
   ]);
   for (const step of manifest) {
     if (step.layout === "full") {
       if (!FULL_LAYOUT_IDS.has(step.id)) {
         throw new Error(
-          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/deadkeys/rules/mechanisms/touch/touch_seed_source/css/html may be full-screen (spec 024 Stage 0)`,
+          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/deadkeys/rules/mechanisms/fallback_policy/osk/touch/touch_seed_source/css/html/icon may be full-screen (spec 024 Stage 0)`,
         );
       }
     }

@@ -9,9 +9,8 @@
 // of a 10–15 line body duplicating it.
 //
 // Deliberately NOT here: project_keyboard_id (validateKeyboardId is real
-// domain logic), track_choice (any non-option answer reports `required`,
-// not `invalid_option`), and project_display_name (its array handling
-// differs from the shared text check). Those three keep their own bodies.
+// domain logic) and project_display_name (its array handling
+// differs from the shared text check). Those two keep their own bodies.
 //
 // A validator is only exercised by the question-module contract suite;
 // SurveyRunner gates on `required` + `format` directly, so these functions

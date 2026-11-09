@@ -44,8 +44,10 @@ import {
 } from "@keymanapp/keyboard-lint";
 
 import {
+  applyInventoryOutcome,
   assembleLintContext,
   sharedFontRefsMissingFromVfs,
+  type InventoryOutcome,
 } from "./assembleLintContext.ts";
 import { deriveCriteriaFacts } from "./deriveCriteriaFacts.ts";
 import { licenseTextHints } from "./fontLicense.ts";
@@ -60,14 +62,19 @@ import { buildFileTree } from "../review/fileTree.ts";
 import { mergeLintFindings } from "./mergeFindings.ts";
 import {
   buildReviewerSource,
-  type LangtagsLookup,
 } from "./reviewerSource.ts";
+import {
+  loadConlangLookup,
+  loadLangtagsLookup,
+} from "./langtagsLookup.ts";
+
+// Re-exported so existing importers keep working: the constant lives in
+// langtagsLookup.ts with the loaders.
+export { ARTIFICIAL_LANGUAGE_FAMILY } from "./langtagsLookup.ts";
 import {
   analyzeLanguageTags,
   languageTagFacts,
   languageTagVerdicts,
-  type ConlangLookup,
-  type LangtagsTagLookup,
 } from "./languageTags.ts";
 
 /** Options the host supplies (Compare artifact, /review target). */
@@ -100,6 +107,13 @@ export interface JudgeForeignOptions {
     | { kind: "text"; text: string }
     | { kind: "absent" }
     | { kind: "failed" };
+  /**
+   * Supplies the expected-characters inventory for the package's listed
+   * languages (spec 111 FR-032: an opened keyboard's baseline needs it to
+   * know whether letters are missing). Omitted everywhere else, so 18.6 stays
+   * Not yet checkable as before. Called with the .kps language tags and script.
+   */
+  inventoryFor?: (languageTags: readonly string[], script: string) => Promise<InventoryOutcome | undefined>;
 }
 
 const HISTORY_TRUNCATED_CODE = "KM_LINT_HISTORY_TRUNCATED";
@@ -152,56 +166,6 @@ export function stampPrDelta(
     if (present.has(key)) return { ...f, prDelta: "unchanged" as const };
     return f;
   });
-}
-
-/**
- * The langtags lookups — bare-subtag name/script/region and the full-tag
- * resolution — or undefined when unavailable.
- */
-async function loadLangtagsLookup(): Promise<
-  { defaults: LangtagsLookup; tags: LangtagsTagLookup } | undefined
-> {
-  try {
-    const mod = await import("@keyboard-studio/engine/langtags");
-    return {
-      defaults: (subtag) => {
-        const d = mod.getLanguageDefaults(subtag);
-        if (d === null) return null;
-        return {
-          ...(d.englishName !== undefined ? { name: d.englishName } : {}),
-          ...(d.defaultScript !== undefined ? { script: d.defaultScript } : {}),
-          ...(d.defaultRegion !== undefined ? { region: d.defaultRegion } : {}),
-        };
-      },
-      tags: {
-        resolve: mod.resolveLangtag,
-        scripts: mod.langtagsScripts,
-        iso639_3: (lang) => mod.getLanguageDefaults(lang)?.iso639_3,
-        members: mod.macrolanguageMembers,
-      },
-    };
-  } catch {
-    return undefined;
-  }
-}
-
-/** Glottolog's "Artificial Language" pseudo-family. */
-export const ARTIFICIAL_LANGUAGE_FAMILY = "arti1236";
-
-/** Glottolog's constructed/natural answer per ISO 639-3, or undefined. */
-async function loadConlangLookup(): Promise<ConlangLookup | undefined> {
-  try {
-    const mod = await import("@keyboard-studio/glottolog");
-    return (iso) => {
-      const hits = mod.byIso639p3(iso);
-      if (hits.length === 0) return null;
-      return hits.some((l) => l.familyId === ARTIFICIAL_LANGUAGE_FAMILY)
-        ? "constructed"
-        : "natural";
-    };
-  } catch {
-    return undefined;
-  }
 }
 
 /**
@@ -293,7 +257,7 @@ export async function judgeForeignKeyboard(
     placement,
     options.reviewContext,
   );
-  const assembled = assembleLintContext({
+  const assembledBase = assembleLintContext({
     vfs,
     keyboardId,
     placement,
@@ -303,6 +267,17 @@ export async function judgeForeignKeyboard(
       ? { reviewContext: options.reviewContext }
       : {}),
   });
+  const inventoryTags = [
+    ...new Set(
+      (assembledBase.ctx.criteriaInput?.kpsLanguages ?? []).map((t) => t.trim()).filter((t) => t.length > 0),
+    ),
+  ];
+  const inventoryOutcome =
+    options.inventoryFor !== undefined && inventoryTags.length > 0
+      ? await options.inventoryFor(inventoryTags, assembledBase.script)
+      : undefined;
+  const assembled =
+    inventoryOutcome !== undefined ? applyInventoryOutcome(assembledBase, inventoryOutcome) : assembledBase;
   const { ctx } = assembled;
   const contextMissing: Record<string, string> = {
     ...assembled.contextMissing,

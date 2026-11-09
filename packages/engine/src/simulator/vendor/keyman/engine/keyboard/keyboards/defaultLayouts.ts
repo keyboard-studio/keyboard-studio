@@ -7,11 +7,11 @@
 import { Version, deepCopy } from "../../../common/web-utils/index.js";
 import { KeymanWebKeyboard, ModifierKeyConstants, TouchLayout } from "../../../common/types/main.js";
 
-import EncodedVisualKeyboard = KeymanWebKeyboard.EncodedVisualKeyboard;
-import LayoutSpec = KeymanWebKeyboard.LayoutSpec;
+type EncodedVisualKeyboard = KeymanWebKeyboard.EncodedVisualKeyboard;
+type LayoutSpec = KeymanWebKeyboard.LayoutSpec;
 
-import LayoutFormFactorSpec = TouchLayout.TouchLayoutPlatform;
-import LayoutLayerBase = TouchLayout.TouchLayoutLayer;
+type LayoutFormFactorSpec = TouchLayout.TouchLayoutPlatform;
+type LayoutLayerBase = TouchLayout.TouchLayoutLayer;
 export type LayoutRow = TouchLayout.TouchLayoutRow;
 export type LayoutKey = TouchLayout.TouchLayoutKey;
 export type LayoutSubKey = TouchLayout.TouchLayoutSubKey;

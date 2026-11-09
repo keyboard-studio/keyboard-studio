@@ -1,7 +1,7 @@
 // Component tests for the Mechanical Gallery's Code tab (KmnCodePane.tsx).
 //
 // Monaco itself is mocked (a textarea stand-in): these tests pin the pane's
-// wiring — dirty tracking, Apply → setWorkingIR, the null-ir disabled
+// wiring — dirty tracking, Apply, and the null-ir disabled
 // state — not Monaco's rendering. The lint pipeline has its own
 // pure-module suite.
 
@@ -456,4 +456,43 @@ describe("KmnCodePane Apply (spec 113 US8)", () => {
       expect((entry.changes[0] as { at: { keystroke?: unknown } }).at.keystroke).toBeUndefined();
     });
   });
+
+  it("Apply is blocked when the edit adds a raw-Ctrl rule (issue #2359)", () => {
+    const ir = makeIR();
+    useWorkingCopyStore.setState({ ir });
+    render(<KmnCodePane />);
+    act(() => {
+      fireEvent.change(screen.getByTestId("mock-editor"), {
+        target: {
+          value: `store(&VERSION) '10.0'\nstore(&NAME) 'testkbd'\n\nbegin Unicode > use(main)\n\ngroup(main) using keys\n\n+ [K_A] > 'a'\n+ [CTRL K_A] > 'é'\n`,
+        },
+      });
+    });
+    expect(screen.getByTestId("kmn-code-dirty")).toBeTruthy();
+    const before = useWorkingCopyStore.getState().ir;
+    act(() => {
+      fireEvent.click(applyButton());
+    });
+    // The synchronous lint gate blocks the Apply; the store IR is untouched.
+    expect(useWorkingCopyStore.getState().ir).toBe(before);
+  });
+
+ it("Apply still goes through for an edit that keeps a grandfathered raw-Ctrl rule", async () => {
+   const ir = parseKmn(
+     `store(&VERSION) '10.0'\nstore(&NAME) 'testkbd'\n\nbegin Unicode > use(main)\n\ngroup(main) using keys\n\n+ [CTRL K_A] > 'é'\n+ [K_B] > 'b'\n`,
+     "testkbd",
+   ).ir;
+   seed(ir, ir);
+   render(<KmnCodePane />);
+   edit(editorText().replace("+ [K_B] > U+0062", "+ [K_B] > U+0063"));
+   await clickApply();
+   if (screen.queryByTestId("kmn-code-owner-confirm")) {
+     await act(async () => {
+       fireEvent.click(screen.getByText("Apply anyway"));
+     });
+   }
+   await waitFor(() => expect(recorded()?.entries).toHaveLength(1));
+   expect(screen.queryByTestId("kmn-code-apply-error")).toBeNull();
+   expect(useWorkingCopyStore.getState().ir).not.toBe(ir);
+ });
 });

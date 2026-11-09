@@ -2,9 +2,13 @@
 
 import { describe, expect, it } from "vitest";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { buildSlotOccupancy } from "../../survey/slotOccupancy.ts";
 import {
+  baseOnlyProducedSetFor,
   buildNeedSets,
   canGoNextFor,
+  displacementProposalFor,
   companionConfirmAssignments,
   dismissedSuggestionEntryKey,
   displacementConfirmAssignments,
@@ -210,6 +214,83 @@ describe("displacementOutcomeFor", () => {
   });
 });
 
+describe("displacementProposalFor — host pass-through incumbent (#2525)", () => {
+  // No IR rule and no session assignment anywhere: the ledger is empty, so
+  // the only incumbent a taken slot can have is the host layout's letter.
+  const emptyOccupancy = new Map();
+  const incoming = swap("ə", "+ [K_QUOTE] > U+0259");
+
+  it("raises a demote-incumbent proposal when the host letter is still needed", () => {
+    const proposal = displacementProposalFor({
+      assignment: incoming,
+      currentChar: "ə",
+      slotOccupancy: emptyOccupancy,
+      needSets: buildNeedSets(["ə"], new Set(["'"])),
+      sessionAssignments: [],
+      hostCharFor: (vkey, modifiers) => (vkey === "K_QUOTE" && modifiers.length === 0 ? "'" : null),
+    });
+    expect(proposal).not.toBeNull();
+    expect(proposal?.displacedChar).toBe("'");
+    expect(proposal?.direction).toBe("demote-incumbent");
+    expect(proposal?.demotionMethod).toBe("ralt");
+  });
+
+  it("raises a both-core proposal when the host letter is in the inventory", () => {
+    const proposal = displacementProposalFor({
+      assignment: swap("ŋ", "+ [K_X] > U+014B"),
+      currentChar: "ŋ",
+      slotOccupancy: emptyOccupancy,
+      needSets: buildNeedSets(["ŋ", "x"], new Set()),
+      sessionAssignments: [],
+      hostCharFor: (vkey, modifiers) => (vkey === "K_X" && modifiers.length === 0 ? "x" : null),
+    });
+    expect(proposal).not.toBeNull();
+    expect(proposal?.displacedChar).toBe("x");
+    expect(proposal?.direction).toBe("both-core");
+  });
+
+  it("raises nothing when the host lookup knows nothing for the slot", () => {
+    expect(
+      displacementProposalFor({
+        assignment: incoming,
+        currentChar: "ə",
+        slotOccupancy: emptyOccupancy,
+        needSets: buildNeedSets(["ə"], new Set(["'"])),
+        sessionAssignments: [],
+        hostCharFor: () => null,
+      }),
+    ).toBeNull();
+  });
+
+  it("raises nothing when the host letter is not still needed", () => {
+    expect(
+      displacementProposalFor({
+        assignment: incoming,
+        currentChar: "ə",
+        slotOccupancy: emptyOccupancy,
+        needSets: buildNeedSets(["ə"], new Set()),
+        sessionAssignments: [],
+        hostCharFor: (vkey, modifiers) => (vkey === "K_QUOTE" && modifiers.length === 0 ? "'" : null),
+      }),
+    ).toBeNull();
+  });
+
+  it("falls back to a deadkey demotion when the host occupies the RAlt slot", () => {
+    const proposal = displacementProposalFor({
+      assignment: incoming,
+      currentChar: "ə",
+      slotOccupancy: emptyOccupancy,
+      needSets: buildNeedSets(["ə"], new Set(["'"])),
+      sessionAssignments: [],
+      hostCharFor: (vkey, modifiers) => {
+        if (vkey !== "K_QUOTE") return null;
+        return modifiers.includes("RALT") ? "€" : "'";
+      },
+    });
+    expect(proposal?.demotionMethod).toBe("deadkey");
+  });
+});
+
 describe("placementSequence", () => {
   const assignment = swap("a", "+ [K_A] > 'a'");
   const existing = swap("b", "+ [K_B] > 'b'");
@@ -252,5 +333,36 @@ describe("placementSequence", () => {
     const steps = placementSequence(plan({ displacement }), current);
     expect(steps.map((s) => s.kind)).toEqual(["record", "propose-displacement"]);
     expect(current).toEqual([existing]);
+  });
+});
+
+describe("displacementProposalFor", () => {
+  // The Ewondo hand test: Cameroon QWERTY types the acute (high tone) on [
+  // and also has a touch-only T_0301 key. Putting ‐ on [ must propose a new
+  // home for the acute — the touch key does not keep it typeable on desktop.
+  it("proposes re-homing a needed mark displaced from [, despite a touch-only key for it", () => {
+    const startIr = makeTestIR([
+      {
+        nodeId: "g-main",
+        name: "main",
+        usingKeys: true,
+        readonly: false,
+        rules: [
+          { nodeId: "r-acute", context: [{ kind: "vkey", name: "K_LBRKT", modifiers: [] }], output: [{ kind: "char", value: "́" }] },
+          { nodeId: "r-touch", context: [{ kind: "vkey", name: "T_0301", modifiers: [] }], output: [{ kind: "char", value: "́" }] },
+        ],
+      },
+    ]);
+    const hyphen = swap("‐", "+ [K_LBRKT] > U+2010");
+    const proposal = displacementProposalFor({
+      assignment: hyphen,
+      currentChar: "‐",
+      slotOccupancy: buildSlotOccupancy(startIr, []),
+      needSets: buildNeedSets(["́", "‐"], baseOnlyProducedSetFor(startIr)),
+      sessionAssignments: [],
+    });
+    expect(proposal).not.toBeNull();
+    expect(proposal!.displacedChar).toBe("́");
+    expect(proposal!.vkey).toBe("K_LBRKT");
   });
 });

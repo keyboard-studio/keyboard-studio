@@ -3046,6 +3046,19 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         if (parts !== undefined) {
           setSelectedKeyAddress(touchKeyAddress(parts.platform, parts.layerId, op.key.id));
         }
+      } else if (op.kind === "moveToLayer") {
+        // The moved key keeps its id — follow it to the target layer.
+        const parts = parseTouchKeyAddress(op.address);
+        if (parts !== undefined) {
+          setSelectedKeyAddress(touchKeyAddress(parts.platform, op.toLayer, parts.keyId));
+        }
+      } else if (op.kind === "copyToLayer") {
+        // The copied key keeps its id — follow it to the target layer, like
+        // a move (#2596 item 1). The pane switches the displayed layer.
+        const parts = parseTouchKeyAddress(op.address);
+        if (parts !== undefined) {
+          setSelectedKeyAddress(touchKeyAddress(parts.platform, op.toLayer, parts.keyId));
+        }
       }
 
       if ((options?.offerFamilyApply ?? true) && isFamilyApplicableOp(op)) {
@@ -5472,7 +5485,15 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const validLayerCombos = useMemo<ModifierToken[][]>(
     () =>
       workingIrForLayers !== null
-        ? collectLayerCombosInUse(workingIrForLayers)
+        ? // No raw Ctrl plane (unsided CTRL without Alt) is offered as new
+          // touch content; sided Ctrl and Ctrl+Alt (AltGr) stay.
+          collectLayerCombosInUse(workingIrForLayers).filter(
+            (combo) =>
+              !(
+                combo.includes("CTRL") &&
+                !combo.some((t) => t === "ALT" || t === "RALT" || t === "LALT")
+              ),
+          )
         : [],
     [workingIrForLayers],
   );
@@ -6815,7 +6836,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           <PublishStepNav
             spec={{
               back: {
-                label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+                label: t({ id: "editor.assignLoop.backButton", message: "Back" }),
                 onClick: onBack,
                 testId: "touch-back",
                 ariaLabel: t({
@@ -6880,7 +6901,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               ...(currentChar !== null && touchLettersToAdd.includes(currentChar)
                 ? {
                     back: {
-                      label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+                      label: t({ id: "editor.assignLoop.backButton", message: "Back" }),
                       onClick: handleBack,
                       testId: "touch-back",
                       ariaLabel:
@@ -7522,7 +7543,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       <PublishStepNav
         spec={{
           back: {
-            label: t({ id: "editor.assignLoop.touch.keyMode.backButton", message: "← Back" }),
+            label: t({ id: "editor.assignLoop.touch.keyMode.backButton", message: "Back" }),
             onClick: onBack,
             testId: "touch-key-mode-back",
             ariaLabel: t({
@@ -7783,7 +7804,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         <PublishStepNav
           spec={{
             back: {
-              label: t({ id: "editor.assignLoop.touch.keyMode.backButton", message: "← Back" }),
+              label: t({ id: "editor.assignLoop.touch.keyMode.backButton", message: "Back" }),
               onClick: onBack,
               testId: "touch-code-back",
               ariaLabel: t({
@@ -7833,14 +7854,14 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         id: "character",
         label: t({
           id: "editor.assignLoop.touch.mode.characterTab",
-          message: "By character",
+          message: "Place Letters",
         }),
       },
       {
         id: "key",
         label: t({
           id: "editor.assignLoop.touch.mode.keyTab",
-          message: "By key",
+          message: "Manage Layout",
         }),
       },
       {

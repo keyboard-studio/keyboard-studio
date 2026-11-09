@@ -106,6 +106,7 @@ import {
   canonicalizeCombo,
   comboToKeySpec,
   collectModifierTokensInUse,
+  collectLayerCombosInUse,
   collectCharContributors,
   sliceContributorDescriptors,
   collectCompositionMethod,
@@ -125,6 +126,8 @@ import {
   useTreatmentFilteredChars,
 } from "../../hooks/usePlacementInventory.ts";
 import { useLoanwordSet } from "../../hooks/useLoanwordSet.ts";
+import { useRemovalWarning } from "../../hooks/useRemovalWarning.ts";
+import { RemovalWarningNotice } from "../../components/RemovalWarningNotice.tsx";
 import type { PlacementSeedEntry } from "../../survey/placementSeeds.ts";
 import {
 } from "../../survey/placementSeeds.ts";
@@ -142,10 +145,12 @@ import {
   isLoneCombiningMark,
   reflectCharInput,
 } from "../../lib/charInput.ts";
-import { useCasePairCompanion } from "./casePairCompanion.ts";
+import { useCasePairCompanion, type CasePairProposal } from "./casePairCompanion.ts";
 import { CasePairProposalBanner } from "./CasePairProposalBanner.tsx";
 import { useDisplacementProposal } from "./useDisplacementProposal.ts";
-import { DisplacementProposalBanner } from "./DisplacementProposalBanner.tsx";
+import { DisplacementModal } from "./DisplacementModal.tsx";
+import { useLikelyBaseLayouts } from "../../lib/layoutFamily.ts";
+import { hostCharForHosts } from "../../survey/hostOccupancy.ts";
 import {
   buildSlotOccupancy,
   displacementActions,
@@ -503,14 +508,27 @@ const AUTO_DEFAULT_EXCLUDED: ReadonlySet<ModifierToken> = new Set(["CAPS"]);
  */
 function computeModifierPool(
   inUse: ReadonlySet<ModifierToken>,
+  ctrlAltInUse: boolean,
 ): ModifierToken[] {
   // Alt: generic ALT only until the keyboard already uses a chiral alt
   // token; once RALT or LALT is in use, offer both chiral options.
+  // A keyboard with no Alt-family rule yet is offered the sided pair (RALT
+  // first, so a new AltGr placement defaults to RALT); one that already uses
+  // generic ALT (or CTRL ALT) keeps that form.
   const altFamily: ModifierToken[] =
-    inUse.has("RALT") || inUse.has("LALT") ? ["RALT", "LALT"] : ["ALT"];
+    inUse.has("RALT") || inUse.has("LALT") || !inUse.has("ALT")
+      ? ["RALT", "LALT"]
+      : ["ALT"];
   // Ctrl mirrors Alt.
+  // Raw (unsided) Ctrl is never offered as new content; generic CTRL stays
+  // only when the keyboard already writes AltGr as `CTRL ALT`, so the author
+  // can rebuild that form (the combo then carries Alt).
   const ctrlFamily: ModifierToken[] =
-    inUse.has("RCTRL") || inUse.has("LCTRL") ? ["LCTRL", "RCTRL"] : ["CTRL"];
+    inUse.has("RCTRL") || inUse.has("LCTRL")
+      ? ["LCTRL", "RCTRL"]
+      : ctrlAltInUse
+        ? ["CTRL"]
+        : [];
   return ["SHIFT", ...ctrlFamily, ...altFamily, "CAPS"];
 }
 
@@ -1943,6 +1961,21 @@ export function MechanismGallery({
   // that orders the chips; the producer order in contracts is untouched)
   // and the displacement check on the apply paths below. Memoized on the
   // same inputs the ledger is built from.
+  //
+  // -- #2525 host pass-through --------------------------------------------
+  // A slot the ledger does not cover still types the host layout's letter
+  // (the keystroke falls through to the OS layout). The likely hosts
+  // (FR-023 order: picked layout → layout_family → bcp47 region → all
+  // five) feed a unanimous host lookup — only a letter every likely host
+  // agrees on names a pass-through incumbent — which the displacement
+  // check consults for exactly those uncovered slots. The ledger itself
+  // (and the rationale's spare-hole factor) keeps reading IR + session
+  // occupancy only.
+  const likelyBases = useLikelyBaseLayouts(identity?.bcp47);
+  const hostCharFor = useMemo(
+    () => hostCharForHosts(likelyBases.hosts.map((h) => h.id)),
+    [likelyBases],
+  );
   const slotOccupancy = useMemo(
     () => buildSlotOccupancy(workingIr, sessionAssignments),
     [workingIr, sessionAssignments],
@@ -2020,9 +2053,20 @@ export function MechanismGallery({
         : new Set<ModifierToken>(),
     [workingIr],
   );
+  // True when the keyboard already writes AltGr as unsided `CTRL ALT`.
+  const ctrlAltInUse = useMemo<boolean>(
+    () =>
+      workingIr !== null &&
+      collectLayerCombosInUse(workingIr).some(
+        (c) =>
+          c.includes("CTRL") &&
+          c.some((t) => t === "ALT" || t === "RALT" || t === "LALT"),
+      ),
+    [workingIr],
+  );
   const modifierPool = useMemo<ModifierToken[]>(
-    () => computeModifierPool(modifierTokensInUse),
-    [modifierTokensInUse],
+    () => computeModifierPool(modifierTokensInUse, ctrlAltInUse),
+    [modifierTokensInUse, ctrlAltInUse],
   );
   // First-slot default — the alt-family entry the pool leads with: generic
   // ALT until the keyboard already uses a chiral alt token, at which point
@@ -2367,6 +2411,7 @@ export function MechanismGallery({
       triggerKey,
       triggerKeyCustomChar,
       proposedTriggerKey: proposedTriggerKeyRef.current,
+      hostCharFor,
     });
     if (plan.kind === "dismiss") {
       // Dismisses THIS chip only — a sibling chip stays offered.
@@ -2390,7 +2435,8 @@ export function MechanismGallery({
       return;
     }
     // A shadowed still-needed glyph raises a demotion proposal inside the
-    // sequence (never blocks the accept — it already happened).
+    // sequence — as a blocking modal (#2525), so the author must decide
+    // before doing anything else (or Cancel, which undoes this accept).
     runPlacement(plan);
     // The successful accept's own mechanism is now recorded with this
     // strategyId — placementOffer filters this ONE chip out of the visible
@@ -2410,6 +2456,7 @@ export function MechanismGallery({
     needSets,
     markSuggestionEntryDismissed,
     runPlacement,
+    hostCharFor,
   ]);
 
   // Change: dismiss the suggestion row; pickers stay blank for manual selection.
@@ -2537,14 +2584,19 @@ export function MechanismGallery({
       // helps — it stays a selectable dropdown option, just never the default.
       // If no eligible option is in use, the slot falls back to unselected ("")
       // until the author picks one (canApply blocks Apply meanwhile).
-      if (prev.length === 0) return [...prev, raltDefaultToken];
+      if (prev.length === 0) {
+        // The keyboard's AltGr form is `CTRL ALT`: the first layer is both.
+        return ctrlAltInUse && modifierPool.includes("CTRL") && modifierPool.includes("ALT")
+          ? ["CTRL", "ALT"]
+          : [...prev, raltDefaultToken];
+      }
       const available = optionsForRaltSlot(modifierPool, prev, prev.length);
       const inUseDefault = available.find(
         (tok) => !AUTO_DEFAULT_EXCLUDED.has(tok) && modifierTokensInUse.has(tok),
       );
       return [...prev, inUseDefault ?? ""];
     });
-  }, [raltDefaultToken, modifierPool, modifierTokensInUse]);
+  }, [raltDefaultToken, modifierPool, modifierTokensInUse, ctrlAltInUse]);
 
   const handleRemoveRaltSlot = useCallback((index: number) => {
     // No minimum — the combined card's zero-layer state is valid (a plain
@@ -2574,6 +2626,7 @@ export function MechanismGallery({
             sessionAssignments,
             slotOccupancy,
             needSets,
+            hostCharFor,
           })
         : planSwapApply({
             currentChar,
@@ -2586,13 +2639,15 @@ export function MechanismGallery({
             sessionAssignments,
             slotOccupancy,
             needSets,
+            hostCharFor,
           });
     // Null when a pick does not resolve (or, for the swap card, a
     // mutually-exclusive combo the dropdown's own exclusion already
     // prevents) — skip recording rather than crash.
     if (plan === null) return;
     // A shadowed still-needed glyph raises a demotion proposal inside the
-    // sequence (never blocks the apply — it already happened).
+    // sequence — as a blocking modal (#2525), so the author must decide
+    // before doing anything else (or Cancel, which undoes this apply).
     runPlacement(plan);
     resetMethodState();
   }, [
@@ -2612,6 +2667,7 @@ export function MechanismGallery({
     deadkeyBaseLetterResolveOptions,
     slotOccupancy,
     needSets,
+    hostCharFor,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -2632,8 +2688,49 @@ export function MechanismGallery({
     [resetMethodState, currentChar, proposeCompanion, sessionAssignments],
   );
 
+  // Spec 112: a pre-accepted companion (the key is a cased key) is recorded
+  // with the placement. The banner stays up; Undo restores the assignments as
+  // they were before the companion went in. `acceptedCompanion` remembers
+  // which proposal was recorded so the effect runs once per proposal.
+  const [acceptedCompanion, setAcceptedCompanion] = useState<{
+    proposal: CasePairProposal;
+    before: MechanismAssignment[];
+    after: MechanismAssignment[];
+  } | null>(null);
+  const acceptedProposalRef = useRef<CasePairProposal | null>(null);
+  useEffect(() => {
+    if (pendingCompanion === null || pendingCompanion.preAccepted !== true) return;
+    if (acceptedProposalRef.current === pendingCompanion) return;
+    const next = companionConfirmAssignments(pendingCompanion, sessionAssignments);
+    if (next === null) return;
+    // Marked before the write: the store update re-renders synchronously, ahead
+    // of the state update below, and must not find this proposal unhandled.
+    acceptedProposalRef.current = pendingCompanion;
+    recordAssignments(next);
+    setAcceptedCompanion({ proposal: pendingCompanion, before: sessionAssignments, after: next });
+  }, [pendingCompanion, sessionAssignments, recordAssignments]);
+  const isCompanionAccepted = acceptedCompanion !== null && acceptedCompanion.proposal === pendingCompanion;
+
+  const handleCompanionUndo = useCallback(() => {
+    if (acceptedCompanion === null) return;
+    const { before, after } = acceptedCompanion;
+    const unchanged =
+      sessionAssignments.length === after.length && sessionAssignments.every((a, i) => a === after[i]);
+    // Nothing else moved since: put the assignments back exactly. Otherwise
+    // drop only what the companion added.
+    recordAssignments(unchanged ? before : sessionAssignments.filter((a) => !after.includes(a) || before.includes(a)));
+    setAcceptedCompanion(null);
+    clearCompanion();
+  }, [acceptedCompanion, sessionAssignments, recordAssignments, clearCompanion]);
+
   const handleCompanionConfirm = useCallback(() => {
     if (pendingCompanion === null) return;
+    // Already recorded with the placement: Keep it just closes the banner.
+    if (isCompanionAccepted) {
+      setAcceptedCompanion(null);
+      clearCompanion();
+      return;
+    }
     // The touch mechanism confirms in its own gallery.
     if (pendingCompanion.mechanism === "touch") return;
     // What confirming records — the parallel combo, the RAlt / shift
@@ -2643,7 +2740,7 @@ export function MechanismGallery({
     const next = companionConfirmAssignments(pendingCompanion, sessionAssignments);
     if (next !== null) recordAssignments(next);
     clearCompanion();
-  }, [pendingCompanion, sessionAssignments, recordAssignments, clearCompanion]);
+  }, [pendingCompanion, isCompanionAccepted, sessionAssignments, recordAssignments, clearCompanion]);
 
   // ---------------------------------------------------------------------------
   // Displacement (demotion) — confirm handler (#2300, gate G3)
@@ -2682,6 +2779,49 @@ export function MechanismGallery({
     },
     [pendingDisplacement, sessionAssignments, workingIr, recordAssignments, clearDisplacement, dismissDisplacement],
   );
+
+  /**
+   * Cancel the displacement modal (#2525): undo the placement that raised
+   * it. The assignment is removed, a companion raised for that same base
+   * is cleared (a pre-accepted companion already recorded with the
+   * placement is undone first, restoring the assignments as they were
+   * before it went in — the same restore as handleCompanionUndo), and the
+   * proposal is cleared WITHOUT recording a dismissal: nothing was
+   * displaced — the placement never happened — so a later re-apply
+   * proposes afresh. A companion from an earlier apply (a different base)
+   * is untouched.
+   */
+  const handleDisplacementCancel = useCallback(() => {
+    if (pendingDisplacement === null) return;
+    const base = pendingDisplacement.baseAssignment;
+    let next = sessionAssignments;
+    if (isCompanionAccepted && acceptedCompanion !== null) {
+      const { before, after } = acceptedCompanion;
+      const unchanged =
+        next.length === after.length && next.every((a, i) => a === after[i]);
+      next = unchanged ? before : next.filter((a) => !after.includes(a) || before.includes(a));
+      setAcceptedCompanion(null);
+    }
+    next = next.filter((a) => a !== base);
+    recordAssignments(next);
+    if (
+      pendingCompanion !== null &&
+      pendingCompanion.mechanism !== "touch" &&
+      pendingCompanion.baseAssignment === base
+    ) {
+      clearCompanion();
+    }
+    clearDisplacement();
+  }, [
+    pendingDisplacement,
+    sessionAssignments,
+    isCompanionAccepted,
+    acceptedCompanion,
+    recordAssignments,
+    pendingCompanion,
+    clearCompanion,
+    clearDisplacement,
+  ]);
 
   // How many NON-sequence methods have already been applied to the current
   // character (mechanismAssignments already excludes the sequence-owned
@@ -3039,6 +3179,11 @@ export function MechanismGallery({
     currentCharBadge,
   ]);
 
+  // Characters whose last existing method was removed here (FR-006 warning).
+  const [removedCharsForWarning, setRemovedCharsForWarning] = useState<string[]>([]);
+  const { warnings: removalWarnings, dismiss: dismissRemovalWarning } =
+    useRemovalWarning(removedCharsForWarning);
+
   const handleRemoveExistingMethod = useCallback(
     (row: ExistingMethodRow) => {
       if (!row.deletable) return;
@@ -3052,8 +3197,18 @@ export function MechanismGallery({
       } else if (row.kind === "slot") {
         cascadeDelete([], [row.id]);
       }
+      // FR-006: the character is gone from the keyboard only when no other
+      // method still produces it; then a needed letter warns (dismissably).
+      if (
+        currentChar !== null &&
+        !existingMethods.some((m) => m.id !== row.id && !m.isUsed)
+      ) {
+        setRemovedCharsForWarning((prev) =>
+          prev.includes(currentChar) ? prev : [...prev, currentChar],
+        );
+      }
     },
-    [cascadeDelete],
+    [cascadeDelete, currentChar, existingMethods],
   );
 
   // Edit-after-Done: unlocks the desktop layout so a completed Mechanism
@@ -3381,7 +3536,7 @@ export function MechanismGallery({
     ...(onBack !== undefined || currentIdx > 0
       ? {
           back: {
-            label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+            label: t({ id: "editor.assignLoop.backButton", message: "Back" }),
             onClick: handleBack,
             testId: "mechanisms-back",
           },
@@ -3963,28 +4118,29 @@ export function MechanismGallery({
               <CasePairProposalBanner
                 proposal={pendingCompanion}
                 onConfirm={handleCompanionConfirm}
-                onDismiss={dismissCompanion}
+                onDismiss={isCompanionAccepted ? handleCompanionUndo : dismissCompanion}
+                accepted={isCompanionAccepted}
               />
             )}
 
-            {/* Displacement (demotion) proposal — propose-then-confirm,
-                  never a silent loss (#2300, gate G3). Its own state slot:
-                  it can co-render with the case-pair companion above when
-                  one Apply raised both. */}
+            {/* Displacement (demotion) proposal — a BLOCKING modal (#2525,
+                  gate G3). The #2300 banner showed after the apply and
+                  could be scrolled past; the modal forces the choice
+                  before the author does anything else. Move / Leave are
+                  the banner's two actions (both-core: the DEFAULT keeps
+                  both primaries — a recorded dismissal — and demoting the
+                  displaced glyph is the explicit override). Cancel undoes
+                  the placement that raised it and records nothing. */}
             {pendingDisplacement !== null && (
-              <DisplacementProposalBanner
+              <DisplacementModal
                 proposal={pendingDisplacement}
-                // Both-core: the DEFAULT action keeps both primaries (a
-                // recorded dismissal — no demotion is picked without
-                // frequency data); demoting the displaced glyph is the
-                // explicit override on the other button. Every other
-                // direction confirms the demotion / dismisses as usual.
                 onConfirm={() =>
                   resolveDisplacementAction(displacementActions(pendingDisplacement.direction)[0])
                 }
                 onDismiss={() =>
                   resolveDisplacementAction(displacementActions(pendingDisplacement.direction)[1])
                 }
+                onCancel={handleDisplacementCancel}
               />
             )}
 
@@ -4130,6 +4286,9 @@ export function MechanismGallery({
                   rows are built and removed, and NonDeletableMethodChip
                   (parts/RemovableChipRow.tsx) for the shared static-chip
                   palette. */}
+            {removalWarnings.length > 0 && (
+              <RemovalWarningNotice warnings={removalWarnings} onDismiss={dismissRemovalWarning} />
+            )}
             {currentChar !== null && existingMethods.length > 0 && (
               <div>
                 <p

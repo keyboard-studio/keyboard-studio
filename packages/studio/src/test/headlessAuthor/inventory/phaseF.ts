@@ -9,4 +9,17 @@ export const phaseFInventory: readonly InventoryEntry[] = [
   { fn: "phaseFOptions", module: "editors/adapters/flowStepOptionRecords.ts", callers: ["editors/adapters/flowStepOptions.tsx"] },
   // The per-question findings projection the component hands the flow.
   { fn: "buildFindingsByQuestionId", module: "lint/lintToQuestion.ts", callers: ["hooks/useValidatorFindings.ts"] },
+  // The live phase_f_helpdocs walk's question ids, derived from flowModules
+  // in flowModules.ts and published through the question registry — the help
+  // driver scopes its findings projection to exactly these (#2469).
+  { fn: "PHASE_F_HELPDOCS_QUESTION_IDS", module: "survey/questions/flowModules.ts", callers: ["survey/questions/registry.ts"] },
+  // The icon codec the IconEditor's load + Continue path calls, lifted by the icon step driver.
+  // (decodeIco / resample are lifted too: the driver mirrors the UI's Keep
+  // path, which decodes the source .ico and resamples it to 48px.)
+  { fn: "decodeIco", module: "editors/assignLoop/icoCodec.ts", callers: ["editors/assignLoop/IconEditor.tsx"] },
+  { fn: "resample", module: "editors/assignLoop/icoCodec.ts", callers: ["editors/assignLoop/IconEditor.tsx"] },
+  { fn: "encodeIco", module: "editors/assignLoop/icoCodec.ts", callers: ["editors/assignLoop/IconEditor.tsx"] },
+  { fn: "icoToBase64", module: "editors/assignLoop/icoCodec.ts", callers: ["editors/assignLoop/IconEditor.tsx"] },
+  { fn: "createBlankIcon", module: "editors/assignLoop/iconTools.ts", callers: ["editors/assignLoop/IconEditor.tsx"] },
+  { fn: "ICON_SIZE", module: "editors/assignLoop/iconTools.ts", callers: ["editors/assignLoop/IconEditor.tsx"] },
 ];

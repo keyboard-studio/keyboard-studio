@@ -186,3 +186,47 @@ describe("design notes", () => {
     expect(facts.designNotes.join(" ")).not.toMatch(/S-\d\d/);
   });
 });
+
+// The Ewondo hand test (a copy of Cameroon QWERTY with the cedilla removed):
+// the How to type table led with ©, « and Ctrl+Space and never showed ɛ;
+// fractions were listed as "Digits"; the no-break space was an invisible
+// blank; and `= then ◌̧ → ¸` was offered though nothing types the cedilla.
+describe("README facts for a copied keyboard with marks removed", () => {
+  const { ir } = parseKmn(
+    [
+      "store(&VERSION) '10.0'",
+      "begin Unicode > use(main)",
+      "group(main) using keys",
+      "+ [LCTRL K_SPACE] > U+00A0",
+      "+ [SHIFT RALT K_C] > '©'",
+      "+ [RALT K_1] > '¼'",
+      "+ [SHIFT RALT K_E] > 'Ɛ'",
+      "+ [RALT K_E] > 'ɛ'",
+      "+ [K_EQUAL] > dk(003d)",
+      "match > use(deadkeys)",
+      "group(deadkeys)",
+      "store(dkf003d) U+0327",
+      "store(dkt003d) '¸'",
+      "dk(003d) any(dkf003d) > index(dkt003d, 2)",
+    ].join("\n"),
+    "ewo",
+  );
+  const facts = buildReadmeFacts(input({ ir, touchLayout: null } as unknown as DocFixture));
+
+  it("leads the How to type table with letters, lowercase first", () => {
+    expect(facts.typingRows.map((r) => r.output).slice(0, 2)).toEqual(["ɛ", "Ɛ"]);
+  });
+
+  it("offers no path through a character the keyboard cannot type", () => {
+    expect(facts.typingRows.map((r) => r.output)).not.toContain("¸");
+  });
+
+  it("calls fractions numbers, not digits", () => {
+    expect(facts.characterGroups.find((g) => g.kind === "digits")).toMatchObject({ label: "Numbers", chars: ["¼"] });
+  });
+
+  it("names an invisible character instead of printing it blank", () => {
+    expect(facts.characterGroups.find((g) => g.kind === "other")?.chars).toEqual(["NO-BREAK SPACE (U+00A0)"]);
+    expect(facts.typingRows.find((r) => r.keys.includes("Space"))?.output).toBe("NO-BREAK SPACE (U+00A0)");
+  });
+});

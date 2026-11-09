@@ -8,8 +8,13 @@
 # ci.yml) — so breakage integrated into dev is found overnight,
 # before a dev -> main merge is proposed, instead of on main.
 #
-# It reuses ci.yml as a callable workflow with checkout_ref=dev;
-# inside the called run the event is `schedule`, so every full-gate
+# It reuses ci.yml as a callable workflow. The ref to check out is `dev`
+# when that branch exists on the remote; if the repo has no `dev` branch
+# (this fork dropped the integration branch), the soak falls back to
+# `main` so the scheduled job still runs the full gate instead of failing
+# at checkout.
+#
+# Inside the called run the event is `schedule`, so every full-gate
 # step runs (the `changes` job turns all gates on for non-PR events).
 # Note: scheduled workflows only fire once this file is on the default
 # branch (main).
@@ -26,7 +31,22 @@ permissions:
   issues: write
 
 jobs:
+  resolve-ref:
+    runs-on: ubuntu-latest
+    outputs:
+      checkout_ref: ${{ steps.pick.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: pick
+        run: |
+          if git ls-remote --heads origin refs/heads/dev | grep -q .; then
+            echo "ref=dev" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+
   ci:
+    needs: resolve-ref
     uses: ./.github/workflows/ci.yml
     with:
-      checkout_ref: dev
+      checkout_ref: ${{ needs.resolve-ref.outputs.checkout_ref }}

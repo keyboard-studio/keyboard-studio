@@ -54,7 +54,12 @@ import {
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { useReproposalNoticeStore } from "../stores/reproposalNoticeStore.ts";
-import { useStepNavStore, hasSlots } from "../stores/stepNavStore.ts";
+import {
+  CRITERIA_ROUTE_NAV_STEP_ID,
+  START_ROUTE_NAV_STEP_ID,
+  useStepNavStore,
+  hasSlots,
+} from "../stores/stepNavStore.ts";
 import { useWorkToDo } from "../hooks/useWorkToDo.ts";
 import { stepPositionIds } from "../lib/stepWalk.ts";
 import { manifest } from "../steps/manifest.ts";
@@ -73,8 +78,9 @@ import { useJourneyContentsStore } from "../stores/journeyContentsStore.ts";
 import { useIsNarrow } from "../hooks/useViewport.ts";
 import { StepNavCluster } from "./StepNavCluster.tsx";
 import { CSS_BORDER, CSS_TEXT, CSS_TEXT_MUTED } from "../ui/theme.ts";
+import type { RouteId } from "../lib/navigate.ts";
 
-export function StudioFooter() {
+export function StudioFooter({ activeRoute = "survey" }: { activeRoute?: RouteId }) {
   const { t, i18n } = useLingui();
   // Narrow viewports: the dot row gives way to a "Contents" button that opens
   // the same marks as a labelled, scrollable list (JourneyContents) — a
@@ -282,9 +288,20 @@ export function StudioFooter() {
   // working copy is open there.
   // Spec 081 FR-021: a step that publishes Back / forward buttons needs the
   // footer up to reach them, whatever else is true.
-  const activeHasNav = useStepNavStore((s) => hasSlots(s.entries[activeStepId]?.spec));
+  const stepIdForFooterNav =
+    activeRoute === "start"
+      ? START_ROUTE_NAV_STEP_ID
+      : activeRoute === "criteria"
+        ? CRITERIA_ROUTE_NAV_STEP_ID
+        : activeStepId;
+  const activeHasNav = useStepNavStore((s) =>
+    hasSlots(s.entries[stepIdForFooterNav]?.spec),
+  );
   const journeyStarted =
-    Object.keys(walks).length > 0 || projectLabel !== null || activeHasNav;
+    Object.keys(walks).length > 0 ||
+    projectLabel !== null ||
+    activeHasNav ||
+    (activeRoute === "criteria" && hasProject);
   // Tell NavBar's menu whether there is a contents list to open.
   const contentsAvailable = journeyStarted && isNarrow;
   useEffect(() => {
@@ -330,7 +347,7 @@ export function StudioFooter() {
           buttons never shrink, wrap or clip; at constrained widths the cluster
           itself scrolls horizontally (StepNavCluster) while the project label
           and then the dot row give way first. */}
-      <StepNavCluster key={`nav-${activeStepId}`} stepId={activeStepId} />
+      <StepNavCluster key={`nav-${stepIdForFooterNav}`} stepId={stepIdForFooterNav} />
 
       {/* Omitted entirely, not placeholdered, while the project has no name —
           see the module header. The dot row simply takes the full width. */}

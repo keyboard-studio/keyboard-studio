@@ -247,3 +247,15 @@ export const DESKTOP_ISO_GEOMETRY: readonly DesktopIsoGeometryKey[] = [
   // The modifier keys either side of the spacebar are not modelled; the bar sits at its physical offset.
   { id: "K_SPACE", row: DESKTOP_ISO_ROW_SPACE, x: 3.75, width: 6.25, frame: false },
 ];
+
+/**
+ * ISO variant of {@link DESKTOP_GEOMETRY}: the bottom row gains the 102nd key
+ * (`K_oE2`) between Left Shift and `K_Z`, and Left Shift narrows to make room.
+ * Opt-in for the OSK editor; the ANSI table above (and every consumer of it,
+ * such as the layout chart) is untouched. Every row still sums to
+ * {@link DESKTOP_GEOMETRY_WIDTH}.
+ */
+export const DESKTOP_GEOMETRY_ISO: readonly DesktopGeometryKey[] = [
+  ...DESKTOP_GEOMETRY.map((k) => (k.id === "K_SHIFT" ? { ...k, width: 1.25 } : k)),
+  { id: "K_oE2", row: DESKTOP_ROW_BOTTOM, x: 1.25, width: 1 },
+];

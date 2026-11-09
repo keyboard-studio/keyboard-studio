@@ -27,6 +27,7 @@ function makeHarness(): {
     getDecisions: () => current,
     getWorkingIR: () => null,
     getHistoryEntryState: () => null,
+    getDocFixProposals: () => null,
     applyWorkingCopyPatch: (patch, writes) => {
       sinkCalls.push({ patch, writes });
     },

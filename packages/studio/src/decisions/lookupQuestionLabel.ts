@@ -46,7 +46,7 @@ function defaultGetQuestionLabelSource(questionId: string): QuestionLabelSource 
 // The station and the question it records read the same way to the author.
 const MARKS_CONTEXT_TOLERANCE_LABEL = msg({
   id: "trail.question.marksContextTolerance",
-  message: "Diacritics typed as separate characters",
+  message: "Should your keys also work on letters stored the other way?",
 });
 
 /**
@@ -78,7 +78,7 @@ const EDITOR_QUESTION_LABELS: Readonly<Record<string, MessageDescriptor>> = {
   "marks.context_tolerance": MARKS_CONTEXT_TOLERANCE_LABEL,
   "marks.context_tolerance.sites": msg({
     id: "trail.question.marksContextToleranceSites",
-    message: "Rules fixed for diacritics typed as separate characters",
+    message: "Rules fixed to also work on letters stored the other way",
   }),
 };
 
@@ -132,8 +132,8 @@ export function createLookupQuestionLabel(
  * `decisionIndex` (decisionId -> providing module) and then resolves that
  * module's label through the same source seam as a question's: audit
  * label, then prompt, localized identically. Returns `undefined` when no
- * module provides the decision or the module names neither field — the
- * caller renders the FR-014 prose fallback, never the raw decisionId
+ * module provides the decision and no retired-decision label covers it —
+ * the caller renders the FR-014 prose fallback, never the raw decisionId
  * (`recordGalleryDecisions.summarizeGalleryDecision`'s record-time
  * fallback to the raw id is exactly what this lookup exists to avoid at
  * render time).
@@ -145,7 +145,27 @@ export function createLookupDecisionLabel(
   const lookupQuestionLabel = createLookupQuestionLabel(i18n, getQuestionLabelSource);
   return (decisionId: string): string | undefined => {
     const mod = decisionIndex[decisionId as DecisionId];
-    if (mod === undefined) return undefined;
+    if (mod === undefined) {
+      // A decision still recorded but no longer asked by any flow-question
+      // module: the authoring track is recorded by the start screen
+      // (New = copy, Open = adapt) and the track question itself is
+      // removed, so the registry has no provider for it — but the
+      // decision is on every walk's trail, and its label must survive.
+      const retired = RETIRED_DECISION_LABELS[decisionId];
+      if (retired === undefined) return undefined;
+      return i18n !== undefined ? i18n._(retired) : (retired.message ?? retired.id);
+    }
     return lookupQuestionLabel(mod.definition.id);
   };
 }
+
+/**
+ * Labels for decisions that are still recorded but no longer asked by any
+ * flow-question module — see createLookupDecisionLabel above.
+ */
+const RETIRED_DECISION_LABELS: Readonly<Record<string, MessageDescriptor>> = {
+  "authoring-track": msg({
+    id: "trail.decision.authoringTrack",
+    message: "Authoring approach",
+  }),
+};

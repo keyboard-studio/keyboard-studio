@@ -60,6 +60,7 @@ export type DecisionId =
   | "syllabic-finals-wanted"
   // Phase F help-doc answers (spec 087 US4)
   | "help-welcome-paragraph"
+  | "help-body-parity"
   | "help-usage-tip-1"
   | "help-usage-tip-2"
   | "help-history-bullets"
@@ -144,6 +145,7 @@ export type DecisionId =
   // modules (spec 090) and ordered by the same orderByDependencies as the
   // questions.
   | "windows-layout"
+  | "caps-handling"
   | "base-keyboard"
   | "marks-treatment"
   | "punctuation-inventory"
@@ -153,15 +155,31 @@ export type DecisionId =
   | "deadkeys-defined"
   | "rule-set"
   | "physical-layout"
+  | "fallback-policy"
   | "osk-layout"
   | "touch-seed-source"
+  | "language-list"
+  | "open-issues"
+  | "open-basic-keyboard"
+  | "missing-letters-review"
+  | "upgrades-review"
   | "touch-layout"
   | "custom-css"
   | "help-docs"
   | "welcome-htm"
   // Spec 113: the Layout tab's replayable edit log. Recorded at each confirm (edit time),
   // not at a step completion; registered outside the wizard's gallery modules.
-  | "kmn-edits";
+  | "kmn-edits"
+  | "icon";
+
+/**
+ * The `caps-handling` decision value (spec 112): how the copied keyboard
+ * treats Caps Lock. The derived key set is never stored; projection step 2.8
+ * recomputes it from the working copy.
+ */
+export interface CapsHandlingValue {
+  mode: "cased-keys" | "explicit-rules" | "none";
+}
 
 /**
  * Where a decision's value came from.
@@ -316,6 +334,9 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "syllabic-finals-wanted": [],
   // Phase F help-doc answers: package-descriptor / help output, no IR writes.
   "help-welcome-paragraph": [],
+  // Issue #2530: the body-parity answer writes the doc-fix-proposals
+  // working-copy slice via its apply, not the IR.
+  "help-body-parity": [],
   "help-usage-tip-1": [],
   "help-usage-tip-2": [],
   "help-history-bullets": [],
@@ -400,6 +421,9 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   // Wizard-step decisions: editor steps write through their own declared
   // `writes` (steps/editorMutate.ts), not through a decision -> IR mapping.
   "windows-layout": [],
+  // spec 112: caps handling is derived at projection step 2.8, never
+  // written into the working IR.
+  "caps-handling": [],
   "base-keyboard": [],
   "punctuation-inventory": [],
   "invisibles-inventory": [],
@@ -412,8 +436,16 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   // additions into the groups/stores subtrees.
   "rule-set": [["groups"], ["stores"]],
   "physical-layout": [],
+  "fallback-policy": [],
   "osk-layout": [],
   "touch-seed-source": [],
+  "language-list": [],
+  // spec 111 Open walk: the baseline's problem kinds (derived) and the two
+  // reviewed marks; none of them reach the IR.
+  "open-issues": [],
+  "open-basic-keyboard": [],
+  "missing-letters-review": [],
+  "upgrades-review": [],
   "touch-layout": [],
   "custom-css": [],
   "help-docs": [],
@@ -422,4 +454,5 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   // (LAYOUT_WRITES; an array is one patch leaf, so the declared path is the whole array). A
   // Code-tab entry (US8) also reaches stores, raw fragments, and the header (CODE_WRITES).
   "kmn-edits": [["groups"], ["stores"], ["comments"], ["raw"], ["header"]],
+  "icon": [],
 };

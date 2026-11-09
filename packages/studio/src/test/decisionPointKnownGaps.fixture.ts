@@ -7,7 +7,7 @@ import { DECISION_POINTS, type DecisionPoint } from "./decisionPointBases.ts";
 import type { GateId } from "./consistencyGates.ts";
 
 /** What each gap is waiting on. */
-export type Owner = "US5" | "US6" | "#2361" | "#2400";
+export type Owner = "US6" | "#2361";
 
 export interface Gap {
   gate: GateId;
@@ -23,38 +23,21 @@ export interface Gap {
 }
 
 // Measured, not assumed: a gate that already passes on a fixture has no row,
-// even where the spec names a story for it (G2 on basic_kbdus / basic_kbdfr and
-// G5 passes on the harness walk records; copy-track keyboards whose starting
-// rules carry case pairs outside the layout-family &CasedKeys floor fail until
-// US5 derives the store in projection (chechen_latin: ç/Ç on K_COLON).
+// even where the spec names a story for it (G2 on basic_kbdus / basic_kbdfr).
+// G5 passes on every base, chechen_latin included (ç/Ç on K_COLON), since the
+// store is derived in projection (spec 112).
 export const KNOWN_GAPS: readonly Gap[] = [
-  {
-    gate: "G5",
-    owner: "US5",
-    bases: ["chechen_latin"],
-    points: ["tolerance"],
-  },
-  // E5: contexts are not tolerant (camqwerty has one gap).
-  { gate: "G2", owner: "US6", bases: ["sil_cameroon_qwerty"], points: ["tolerance"] },
-  // E5: contexts are not tolerant (camazerty has 17 measured gaps). #2363's
+  // E5: contexts are not tolerant (camazerty has 16 measured gaps after US6,
+  // down from 17: the default-accepted normalization step fixed one). #2363's
   // crash is fixed -- the analysis runs and skips the 13 touch-only T_ rules
   // with a not-analysed reason -- but the remaining gaps are genuine
-  // canonical-equivalence gaps the pre-US6 walk never normalised, so the row
-  // moves from the engine bug to the story that fixes them.
+  // canonical-equivalence gaps the pre-US6 walk never normalised. The step
+  // the default accepts does not cover them: every remaining finding is a
+  // rule matching precomposed `è` followed by a second mark, a
+  // normalization-coverage follow-up, not a default-accept gap.
   { gate: "G2", owner: "US6", bases: ["sil_cameroon_azerty"], points: ["tolerance"] },
   // nul/beep inside starting stores is deferred to keymanapp/keyboards#4181.
   { gate: "G8-start", owner: "#2361", bases: ["sil_cameroon_qwerty", "sil_cameroon_azerty"], points: DECISION_POINTS },
-  // G6 reads only default-layer key labels, with no starting-content split and
-  // no credit for keys that reach a letter through the .kmn rules. The listed
-  // bases are the ones whose measured G6 gap is recorded; a keyboard with a
-  // usable touch layout can show it.
-  {
-    gate: "G6",
-    owner: "#2400",
-    bases: ["basic_kbdus", "basic_kbdfr", "sil_cameroon_qwerty", "sil_cameroon_azerty", "chechen_latin"],
-    points: ["tolerance"],
-    walkOnly: true,
-  },
 ];
 
 /** `walked: false` for a replay that did not walk the touch step (walk-only rows do not apply). */

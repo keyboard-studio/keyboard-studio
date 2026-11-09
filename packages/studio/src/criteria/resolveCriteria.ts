@@ -21,6 +21,7 @@
 
 import type { Criterion, LintFinding } from "@keyboard-studio/contracts";
 
+import { ADVISORY_LINT_CODES } from "./advisoryChecks.ts";
 import { applicabilityFor } from "./applicability.ts";
 import type {
   CriteriaInput,
@@ -459,6 +460,7 @@ function resolveRow(
           criterion,
           status: "not-met",
           controls: null,
+          ...(ADVISORY_LINT_CODES.has(lintRuleId) ? { advisory: true as const } : {}),
           evidence: (): EvidenceModel => ({
             kind: "lint-finding",
             lines: findings.flatMap((finding) => {

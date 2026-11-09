@@ -21,6 +21,15 @@
   "project_name": [
     "§8"
   ],
+  "open_languages": [
+    "specs/111-open-existing-keyboard"
+  ],
+  "open_missing_letters": [
+    "specs/111-open-existing-keyboard"
+  ],
+  "open_upgrades": [
+    "specs/111-open-existing-keyboard"
+  ],
   "characters": [
     "§8",
     "specs/027-qu-characters-step"
@@ -55,6 +64,10 @@
   "mechanisms": [
     "§8",
     "specs/007-strategy-selection"
+  ],
+  "fallback_policy": [
+    "specs/076-rule-behaviours",
+    "specs/109-base-keyboard-fallback"
   ],
   "osk": [
     "specs/osk-editor"
@@ -102,6 +115,9 @@
   ],
   "pb_use_case": [
     "§8"
+  ],
+  "pf_body_parity": [
+    "specs/080-documentation-completeness"
   ],
   "pf_history_entry": [
     "specs/080-documentation-completeness"

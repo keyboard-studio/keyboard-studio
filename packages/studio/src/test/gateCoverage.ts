@@ -122,6 +122,10 @@ const GAP_SPECS: readonly GapSpec[] = [
   { id: "12.2-iso-639-5-lang-code", code: "KM_LINT_ISO_639_5_LANG_CODE", criteria: "BCP47 tags do not use ISO 639-5 language codes.", why: "language-tag hygiene; no DecisionId" },
   { id: "12.3-numeric-region-non-contrastive", code: "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE", criteria: "A language tag does not include a numerical region code, unless it is explicitly contrastive.", why: "language-tag hygiene; no DecisionId" },
   { id: "18.7-mandated-currency-char", code: "KM_LINT_MANDATED_CHAR_MISSING", criteria: "The keyboard can produce the mandated characters for currency (if applicable).", why: "character coverage; no DecisionId" },
+  // Criterion 18.13 (issue #2593, PR #2622): same status as the Batch 1–3
+  // entries — the criteria resolver is its consumer, and no DecisionId
+  // captures packaged-font cmap coverage.
+  { id: "18.13-font-glyph-coverage", code: "KM_LINT_FONT_GLYPH_COVERAGE", criteria: "Every character the keyboard types has a glyph in each packaged font it ships (cmap coverage check).", why: "packaged-font glyph coverage; no DecisionId" },
   // Spec 084 KPJ pair (checks in keyboard-lint's checks/criteria/
   // check-kpj): same status as the Batch 1–3 entries — the criteria
   // resolver is their consumer, and no DecisionId captures what they
@@ -191,7 +195,13 @@ const GAP_SPECS: readonly GapSpec[] = [
   { id: "7.25-no-deprecated-numeric-formats", code: "KM_LINT_DEPRECATED_NUMERIC_FORMAT", criteria: "All character literals in the .kmn use U+NNNN notation; deprecated decimal/octal/hex formats do not appear.", why: "source syntax hygiene; no DecisionId" },
   { id: "7.26-caps-ncaps-consistent-per-key", code: "KM_LINT_CAPS_NCAPS_INCONSISTENT", criteria: "Every rule referencing a given key is consistent in CAPS/NCAPS handling.", why: "rule modifier hygiene; no DecisionId" },
   { id: "7.27-no-deprecated-headers-or-unused-stores", code: "KM_LINT_DEPRECATED_HEADER_OR_UNUSED_STORE", criteria: "No deprecated header statements or system stores remain; unused stores are removed.", why: "source syntax hygiene; no DecisionId" },
+  { id: "7.28-cased-script-declares-casedkeys", code: "KM_LINT_CASEDKEYS_MISSING", criteria: "A keyboard that produces cased letters declares store(&CasedKeys); mnemonic layouts are exempt.", why: "rule modifier hygiene; no DecisionId" },
+  { id: "7.29-no-raw-ctrl-content", code: "KM_LINT_RAW_CTRL", criteria: "No rule uses Ctrl without Alt to type content; Ctrl+Space and basic_* keyboards are exempt.", why: "rule modifier hygiene; no DecisionId" },
+  { id: "7.30-sided-ctrl-advisory", code: "KM_LINT_SIDED_CTRL_ADVISORY", criteria: "A rule on a left- or right-sided Ctrl modifier is advised to move to an Alt-based placement; advisory only.", why: "rule modifier hygiene; no DecisionId" },
   { id: "18.14-touch-layers-carry-bksp-enter", code: "KM_LINT_TOUCH_LAYER_MISSING_CONTROL_KEYS", criteria: "Every touch layer includes the required control keys (K_LOPT, K_BKSP, K_ENTER).", why: "touch layout structure; no DecisionId" },
+  { id: "18.16-touch-caps-layer-complete", code: "KM_LINT_TOUCH_CAPS_LAYER", criteria: "A keyboard that produces cased letters has a touch caps layer reached by double-tapping Shift, carrying every uppercase letter, whose character keys do not switch layers.", why: "touch layout structure; no DecisionId" },
+  { id: "18.17-touch-modifier-keys-consistent", code: "KM_LINT_TOUCH_MODIFIER_KEYS", criteria: "Ctrl and RAlt keys on touch layers use id K_RALT, the labels *Ctrl* / *RAlt*, and open the right layer.", why: "touch layout structure; no DecisionId" },
+  { id: "18.18-touch-symbols-layer-linked", code: "KM_LINT_TOUCH_SYMBOLS_LAYER", criteria: "A touch layout has a symbol layer reached from every other layer by a K_SYMBOLS link key.", why: "touch layout structure; no DecisionId" },
 ];
 
 function gaps(): GateTrace[] {

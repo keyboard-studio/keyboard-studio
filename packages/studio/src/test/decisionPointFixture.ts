@@ -7,9 +7,10 @@
 // VFS the author downloads. It never calls projectWorkingCopyVfs with
 // hand-built options, so a fixture cannot drift from the product.
 //
-// `fallbackPolicy` is in no decision value (survey/carve/carveValue.ts), so a
-// spec carries it separately. A spec that omits it runs with the store default,
-// which is what every recorded walk before this field ran with.
+// The keyboard-wide `fallbackPolicy` is its own decision (`fallback-policy`), so a
+// replay restores it from the DecisionSet like any other. A record without that
+// decision (every walk before it existed) replays with DEFAULT_FALLBACK_POLICY.
+// `spec.fallbackPolicy` is an explicit override for tests that vary the policy.
 
 import { makeStartKeyboard, type StartKeyboard } from "@keyboard-studio/contracts";
 import type {
@@ -42,8 +43,10 @@ import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
 import { analyseWorkingCopyContextTolerance } from "../lib/contextToleranceRun.ts";
 import { applyContextToleranceDecision } from "../lib/contextToleranceApply.ts";
 import { loadContextToleranceEngine } from "../lib/contextToleranceEngine.ts";
+import { decisionFromProposal, defaultToleranceDecision, NORMALIZATION_STEP_SITE, toleranceProposalFor } from "../survey/marks/contextToleranceProposal.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
 import { readVfsText } from "../lib/vfsText.ts";
+import { migrateFallbackPolicy } from "../survey/carve/fallbackPolicyMigration.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { checkConsistencyGates, type GateResult } from "./consistencyGates.ts";
 import type { DecisionPoint } from "./decisionPointBases.ts";
@@ -69,7 +72,10 @@ export interface DecisionPointFixtureSpec {
    * G6 is evaluated on the bundle; absent, G6 stays walk-only.
    */
   touchLayoutJson?: string | null;
-  /** The keyboard-wide carve fallback policy the walk ended with. Default: the store's. */
+  /**
+   * Overrides the replayed `fallback-policy` decision. Default: the decision's value,
+   * else DEFAULT_FALLBACK_POLICY.
+   */
   fallbackPolicy?: FallbackPolicy;
 }
 
@@ -154,7 +160,7 @@ export function instantiate(spec: DecisionPointFixtureSpec): KeyboardIR {
  * Install the slices the replay does not put where the projection reads them.
  * The carve slice is not one of them: replay installs it from `carved-layout`.
  */
-function installUnreplayedSlices(decisions: DecisionSet): void {
+function installUnreplayedSlices(decisions: DecisionSet, override: FallbackPolicy | undefined): void {
   const store = useWorkingCopyStore.getState();
 
   // The replay applies the deadkey ops to the IR, but the projection replays the
@@ -169,6 +175,23 @@ function installUnreplayedSlices(decisions: DecisionSet): void {
   const assignments = (decisions["physical-layout"]?.value as { assignments?: MechanismAssignment[] } | undefined)
     ?.assignments;
   if (assignments !== undefined) store.recordAssignments(assignments);
+
+  // The fallback policy lives in the store only; a record without the decision
+  // (or with a value this build does not know) means the default.
+  store.setFallbackPolicy(
+    override ?? migrateFallbackPolicy({ fallbackPolicy: decisions["fallback-policy"]?.value }),
+  );
+}
+
+/**
+ * A step decision's fingerprint is `site|gap-rules|step-content`. The accept
+ * still covers the same gaps when the site and gap-rules components match,
+ * even if the step content moved with the repertoire.
+ */
+function stepGapFingerprintMatches(decisionFingerprint: string, analysisFingerprint: string): boolean {
+  const d = decisionFingerprint.split("|");
+  const a = analysisFingerprint.split("|");
+  return d.length === 3 && a.length === 3 && d[0] === a[0] && d[1] === a[1];
 }
 
 /**
@@ -188,10 +211,40 @@ async function installToleranceOverlay(decisions: DecisionSet): Promise<string[]
 
   const analysed = await analyseWorkingCopyContextTolerance(ir, () => true);
   if (analysed === null) return undefined;
+  const analysis = { status: "ready" as const, runId: 0, ...analysed };
+  // A pre-US6 record carries no decision, so the cut records the deferred
+  // default (spec 106 FR-060: `origin: "default"`, empty sites/fingerprint).
+  // Derive the concrete decision from this analysis — the same derivation the
+  // station performs on Continue — instead of applying a decision with no
+  // sites. No fixable rules means no proposal and nothing to apply.
+  //
+  // A mid-walk step accept needs the same treatment when only the step
+  // content moved: the fingerprint is `site|gap-rules|step-content`, and
+  // later decisions that grow the repertoire change the step content even
+  // though the gap rules the accept covers are unchanged — so the accept
+  // goes stale at replay while the author's intent (accept the step) still
+  // stands. When the site and gap-rule components still match and this
+  // analysis offers the step, re-derive the step for the current keyboard
+  // instead of dropping it. A gap-rule change is genuinely stale and is not
+  // re-derived.
+  let effectiveDecision = decision;
+  if (decision.origin === "default" && decision.fingerprint === "") {
+    const proposal = toleranceProposalFor(analysis);
+    if (proposal === null) return undefined;
+    effectiveDecision = defaultToleranceDecision(proposal, analysis.fingerprint);
+  } else if (
+    decision.decision === "accept" &&
+    decision.acceptedSiteIds.includes(NORMALIZATION_STEP_SITE) &&
+    analysis.normalizationStep !== undefined &&
+    stepGapFingerprintMatches(decision.fingerprint, analysis.fingerprint)
+  ) {
+    const proposal = toleranceProposalFor(analysis);
+    if (proposal !== null) effectiveDecision = decisionFromProposal(proposal, analysis.fingerprint);
+  }
   const engine = await loadContextToleranceEngine();
   const outcome = await applyContextToleranceDecision(
-    decision,
-    { status: "ready", runId: 0, ...analysed },
+    effectiveDecision,
+    analysis,
     { engine, applyFacetTransform },
   );
   // The product drops a decision whose fingerprint no longer matches the keyboard
@@ -220,9 +273,8 @@ export async function buildDecisionPointFixture(spec: DecisionPointFixtureSpec):
   rebuildWorkingCopyFromStores(Object.keys(spec.decisions) as DecisionId[]);
 
   // 5. install what replay leaves elsewhere.
-  installUnreplayedSlices(spec.decisions);
+  installUnreplayedSlices(spec.decisions, spec.fallbackPolicy);
   if (spec.touchLayoutJson !== undefined) useWorkingCopyStore.getState().setTouchLayoutJson(spec.touchLayoutJson);
-  if (spec.fallbackPolicy !== undefined) useWorkingCopyStore.getState().setFallbackPolicy(spec.fallbackPolicy);
   const toleranceStaleSiteIds = spec.point === "tolerance" ? await installToleranceOverlay(spec.decisions) : undefined;
 
   // 6. the real download path.
@@ -251,6 +303,7 @@ export async function buildDecisionPointFixture(spec: DecisionPointFixtureSpec):
     decisions: spec.decisions,
     point: spec.point,
     startIr,
+    ...(startIr.touchLayout !== undefined ? { startTouchIr: startIr.touchLayout } : {}),
     ...(spec.touchLayoutJson !== undefined ? { includeTouch: true } : {}),
     ...(again !== null ? { repeatVfs: again.vfs } : {}),
   });

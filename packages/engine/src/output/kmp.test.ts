@@ -206,6 +206,10 @@ describe("diagnostic mapping — severity is bit-packed in `code`, not a field",
       expect(d.severity).toBe(severity);
       expect(d.code).toBe(expectedCode);
       expect(d.layer).toBe("A");
+      // Package-compiler findings are unowned: the platform tag is a
+      // kmc-kmn boundary concern (#2378), and an untagged diagnostic stays
+      // visible in every panel.
+      expect(d).not.toHaveProperty("platform");
     }
   });
 

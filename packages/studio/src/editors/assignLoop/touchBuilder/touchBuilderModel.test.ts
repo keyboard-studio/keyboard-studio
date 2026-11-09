@@ -40,7 +40,10 @@ import {
   parseBuilderTemplate,
   predefinedLayerOf,
   resolveBuilderKey,
+  rightEdgeUnits,
+  snapBuilderWidth,
   subKeyEntriesOf,
+  suggestKeyIdFromText,
   synthesizeDropKeyId,
   buildCharmapDropOps,
   FLICK_DIRECTIONS,
@@ -209,13 +212,30 @@ describe("operation parity (gesture → KeyEditOperation → replay)", () => {
     expect(added.pad).toBe(15);
   });
 
-  it("remove {reflow}: key gone, row kept", () => {
+  it("remove {reflow}: trailing modifier absorbs freed width, no spacer (#2360 follow-up)", () => {
     const ops: PendingKeyEditOperation[] = [
       { address: "phone:default:K_B", kind: "remove", outcome: "reflow" },
     ];
     const out = replay(parityLayout(), ops);
     const row = keyAt(out, "phone", "default", "K_A").row;
+    // K_C opens the "shift" layer, so it is a modifier key under
+    // isTouchModifierKey (PR #2583 follow-up to #2360): the freed width is
+    // absorbed by the trailing modifier instead of being left as a
+    // trailing T_SPACER. This test was written before that follow-up and
+    // still asserted the pre-follow-up spacer — the follow-up updated the
+    // engine reflow tests but not this one, and #2583's PR build never ran
+    // this file, so the stale expectation shipped and failed on main.
+    // The row is the layer maximum, so K_C renders at its declared width.
     expect(row.keys.map((k) => k.id)).toEqual(["K_A", "K_C"]);
+    const last = row.keys[1]!;
+    // The modifier carries no explicit geometry — the absorption is at
+    // render time (ADR 0002 / FR-012 stretch), not written onto the key.
+    expect(last.width).toBeUndefined();
+    expect(last.pad).toBeUndefined();
+    // Row total drops by the freed 115 (K_B's default 100 + 15).
+    expect(
+      row.keys.reduce((sum, k) => sum + (k.width ?? 100) + (k.pad ?? 15), 0),
+    ).toBe(230);
   });
 
   it("move: direction steps, never no-ops", () => {
@@ -548,5 +568,90 @@ describe("round-trip (parse → emit)", () => {
     expect(emitted.phone.layer[0].row[0].key[0].sp).toBe("1");
     expect(emitted.phone.layer[0].row[0].key[0]).not.toHaveProperty("sk");
     expect(emitted.phone.layer[0].row[0].key[0]).not.toHaveProperty("hint");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// No Ctrl layer the keyboard lacks (spec 114 FR-003)
+// ---------------------------------------------------------------------------
+
+describe("template apply never adds a Ctrl layer", () => {
+  const layout = (layers: string[]): TouchLayoutIR =>
+    parseTouchLayoutString(
+      JSON.stringify({
+        phone: {
+          layer: layers.map((id) => ({
+            id,
+            row: [{ id: 1, key: [{ id: "K_A", text: id === "default" ? "a" : id }] }],
+          })),
+        },
+      }),
+    );
+
+  it("emits ops only for layers the keyboard already has, even when the template carries a ctrl layer", () => {
+    const ops = buildTemplateApplyOps(layout(["default"]), layout(["default", "ctrl", "ctrl-alt"]));
+    for (const op of ops) expect(op.address).not.toMatch(/:ctrl/);
+    expect(ops.every((op) => op.address.startsWith("phone:default:"))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #2596 item 4 — snap to grid + right-edge position
+// ---------------------------------------------------------------------------
+
+describe("snapBuilderWidth", () => {
+  it("snaps to the nearest 10 units", () => {
+    expect(snapBuilderWidth(100)).toBe(100);
+    expect(snapBuilderWidth(104)).toBe(100);
+    expect(snapBuilderWidth(105)).toBe(110);
+    expect(snapBuilderWidth(106)).toBe(110);
+    expect(snapBuilderWidth(153)).toBe(150);
+  });
+  it("clamps to TIKE's 10–500 range", () => {
+    expect(snapBuilderWidth(4)).toBe(10);
+    expect(snapBuilderWidth(0)).toBe(10);
+    expect(snapBuilderWidth(504)).toBe(500);
+    expect(snapBuilderWidth(999)).toBe(500);
+  });
+});
+
+describe("rightEdgeUnits", () => {
+  const row = [
+    { width: 100, pad: 15 },
+    { width: 100, pad: 15 },
+    { width: 50, pad: 0 },
+  ];
+  it("sums width + pad up to and including the key", () => {
+    expect(rightEdgeUnits(row, 0)).toBe(115);
+    expect(rightEdgeUnits(row, 1)).toBe(230);
+    expect(rightEdgeUnits(row, 2)).toBe(280);
+  });
+  it("is empty for an empty row and caps at the last key", () => {
+    expect(rightEdgeUnits([], 0)).toBe(0);
+    expect(rightEdgeUnits(row, 9)).toBe(280);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #2596 item 5 — key id suggested from text (spec 104 FR-005 arm (c))
+// ---------------------------------------------------------------------------
+
+describe("suggestKeyIdFromText", () => {
+  it("suggests U_<HEX> for a single plain character", () => {
+    expect(suggestKeyIdFromText("a")).toBe("U_0061");
+    expect(suggestKeyIdFromText("é")).toBe("U_00E9");
+    expect(suggestKeyIdFromText("ɓ")).toBe("U_0253");
+  });
+  it("suggests nothing for a combining mark (guarded T_ per FR-005(d))", () => {
+    expect(suggestKeyIdFromText("\u0301")).toBeNull();
+    expect(suggestKeyIdFromText("\u0303")).toBeNull();
+  });
+  it("suggests nothing for multi-character strings (version floor unseen)", () => {
+    expect(suggestKeyIdFromText("ae")).toBeNull();
+    expect(suggestKeyIdFromText("ch")).toBeNull();
+  });
+  it("suggests nothing for empty text or whitespace", () => {
+    expect(suggestKeyIdFromText("")).toBeNull();
+    expect(suggestKeyIdFromText(" ")).toBeNull();
   });
 });

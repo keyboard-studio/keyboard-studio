@@ -32,9 +32,14 @@ interface HtmlCodePaneProps {
   onApply: (html: string) => void;
   /** Whether Apply is currently disabled (e.g., lint errors). */
   applyDisabled?: boolean;
+  /**
+   * Monaco language. "html" (default) lints as HTML; "markdown" (the
+   * README.md code mode) skips the HTML lint, which does not apply.
+   */
+  language?: "html" | "markdown";
 }
 
-export function HtmlCodePane({ initialText, onApply, applyDisabled }: HtmlCodePaneProps) {
+export function HtmlCodePane({ initialText, onApply, applyDisabled, language = "html" }: HtmlCodePaneProps) {
   const { t } = useLingui();
   const [text, setText] = useState(initialText);
   const [markers, setMarkers] = useState<readonly HtmlCodeMarker[]>([]);
@@ -73,7 +78,7 @@ export function HtmlCodePane({ initialText, onApply, applyDisabled }: HtmlCodePa
       clearTimeout(lintTimerRef.current);
     }
     lintTimerRef.current = setTimeout(() => {
-      const next = lintHtmlText(text);
+      const next = language === "markdown" ? [] : lintHtmlText(text);
       setMarkers(next);
       setHasErrors(next.some((m) => m.severity === "error"));
       applyMarkersToModel(next);
@@ -84,7 +89,7 @@ export function HtmlCodePane({ initialText, onApply, applyDisabled }: HtmlCodePa
         clearTimeout(lintTimerRef.current);
       }
     };
-  }, [text]);
+  }, [text, language]);
 
   const handleMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
@@ -97,7 +102,7 @@ export function HtmlCodePane({ initialText, onApply, applyDisabled }: HtmlCodePa
 
   const handleApply = () => {
     // Synchronous lint gate: don't apply with errors
-    const next = lintHtmlText(text);
+    const next = language === "markdown" ? [] : lintHtmlText(text);
     if (next.some((m) => m.severity === "error")) {
       setMarkers(next);
       setHasErrors(true);
@@ -116,7 +121,7 @@ export function HtmlCodePane({ initialText, onApply, applyDisabled }: HtmlCodePa
       <div style={{ flex: 1, minHeight: 200, border: "1px solid var(--app-border)", borderRadius: 6, overflow: "hidden" }}>
         <Editor
           height="100%"
-          defaultLanguage="html"
+          defaultLanguage={language}
           value={text}
           onChange={(value) => setText(value ?? "")}
           onMount={handleMount}

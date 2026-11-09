@@ -25,7 +25,8 @@ import { test, expect } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseAdaptTrack,
+  confirmCopyTrack,
+  acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
   seedReturningVisitor,
@@ -90,16 +91,17 @@ test.describe("tab round trip preserves the author's position (spec 057 US1)", (
     page,
   }) => {
     // ---- Walk to a mid-flow step -------------------------------------------
-    // identity -> choose_base -> track -> characters (the adapt track skips
-    // project_name; see steps/manifest.ts's track-routing docstring).
+    // identity -> choose_base -> track -> attribution ->
+    // project_name -> characters.
     await driveIdentityLite(page, {
       english: FIXTURE.english,
       autonym: FIXTURE.autonym,
       script: FIXTURE.targetScript,
     });
     await pickStartKeyboard(page, FIXTURE.startKeyboardId);
-    await chooseAdaptTrack(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
+    await acceptProjectName(page);
 
     const prefillConfirm = page.getByTestId("prefill-continue");
     await expect(prefillConfirm).toBeVisible({ timeout: 30_000 });
@@ -142,11 +144,11 @@ test.describe("tab round trip preserves the author's position (spec 057 US1)", (
       timeout: 10_000,
     });
     await backButton.click();
-    await expect(page.getByTestId("track-adapt")).toBeVisible({ timeout: 20_000 });
+    await expect(prefillConfirm).toBeHidden({ timeout: 20_000 });
+    await expect(page.getByTestId("survey-advance")).toBeVisible({ timeout: 20_000 });
 
     // Forward again, so the alphabet half of the test starts from characters.
-    await chooseAdaptTrack(page);
-    await driveAttributionStep(page);
+    await acceptProjectName(page);
     await expect(prefillConfirm).toBeVisible({ timeout: 20_000 });
 
     // ---- The Phase B draft alphabet survives a round trip (D-4) ------------

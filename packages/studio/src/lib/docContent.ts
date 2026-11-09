@@ -65,7 +65,7 @@ export const GROUP_LABEL: Readonly<Record<CharGroup, string>> = {
   letters: "Letters",
   marks: "Marks",
   punctuation: "Punctuation and symbols",
-  digits: "Digits",
+  digits: "Numbers",
   other: "Other",
 };
 
@@ -132,10 +132,34 @@ function shortestKeys(ir: KeyboardIR, ch: string, candidates: CharProducerCandid
  * README facts. Pass `candidates` (one `charProducerCandidates(ir)`) when asking about many characters.
  */
 export function shortestKeySteps(ir: KeyboardIR, ch: string, candidates?: CharProducerCandidates): string[] | undefined {
+const producedSetCache = new WeakMap<KeyboardIR, ReadonlySet<string>>();
+
+function producedSetOf(ir: KeyboardIR): ReadonlySet<string> {
+  let set = producedSetCache.get(ir);
+  if (set === undefined) {
+    set = buildProducedSet(ir);
+    producedSetCache.set(ir, set);
+  }
+  return set;
+}
+
+/**
+ * A step that is a single character (a mark shown on its dotted circle) means
+ * "type that character", which is only a way in when something types it: the
+ * base layout's printable ASCII, or this keyboard. A copy with the cedilla
+ * removed keeps the deadkey entry `= then ◌̧ → ¸`, and nothing reaches it.
+ * Multi-character steps are key labels ("AltGr + n") and always count.
+ */
+function stepIsTypeable(ir: KeyboardIR, step: string): boolean {
+  const ch = step.length > 1 && step.startsWith("◌") ? step.slice(1) : step;
+  if ([...ch].length !== 1 || isBaseCharacter(ch)) return true;
+  return producedSetOf(ir).has(ch.normalize("NFC"));
+}
+
   let best: { steps: number; label: string; parts: string[] } | undefined;
   for (const producer of charProducers(ir, ch, candidates)) {
     const parts = producer.steps.length > 0 ? producer.steps : producer.triggerFloor !== undefined ? [producer.triggerFloor] : [];
-    if (parts.length === 0) continue;
+    if (parts.length === 0 || !parts.every((p) => stepIsTypeable(ir, p))) continue;
     const label = parts.join(" ");
     if (
       best === undefined ||

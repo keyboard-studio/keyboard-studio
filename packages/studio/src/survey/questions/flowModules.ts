@@ -74,6 +74,7 @@ import pfDocLanguageOtherMod from "./f/pf_doc_language_other.ts";
 import pfDocLanguageSecondMod from "./f/pf_doc_language_second.ts";
 import pfDocLanguageSecondOtherMod from "./f/pf_doc_language_second_other.ts";
 import pfWelcomeParagraphMod from "./f/pf_welcome_paragraph.ts";
+import pfBodyParityMod from "./f/pf_body_parity.ts";
 import pfFontGuidanceMod from "./f/pf_font_guidance.ts";
 import pfHistoryEntryMod from "./f/pf_history_entry.ts";
 import pfHistoryEntryBulletsMod from "./f/pf_history_entry_bullets.ts";
@@ -96,7 +97,6 @@ import pfFurtherReadingMod from "./f/pf_further_reading.ts";
 import pfProjectUrlMod from "./f/pf_project_url.ts";
 import pfCreditsMod from "./f/pf_credits.ts";
 import pfContactInfoMod from "./f/pf_contact_info.ts";
-import trackChoiceMod from "./g/track_choice.ts";
 import projectDisplayNameMod from "./g/project_display_name.ts";
 import projectKeyboardIdMod from "./g/project_keyboard_id.ts";
 import desktop_first_notice from "./reserve/desktop_first_notice.ts";
@@ -149,12 +149,14 @@ export const flowModules = {
     il_script_not_supported,
   ],
 
-  track: [
-    trackChoiceMod,
-  ],
+  // The track question is gone: the start screen records the track
+  // (New = copy, Open = adapt), and a walk that reaches the base choice
+  // without one defaults to copy when the base is confirmed (StudioShell's
+  // single-instantiation effect records it, provenance "default") — so
+  // there is no track flow left to walk.
 
   // Attribution capture (spec 064 US1's questions, re-homed by #1901): the
-  // author name / email / copyright holder are asked AFTER the track
+  // author name / email / copyright holder are asked AFTER the base
   // choice, in their own flow, because what they should propose depends
   // on the track (confirm-from-profile on copy; the base's holder seeded
   // on update — see il_copyright_holder's seedWhen). Separate ids from
@@ -232,6 +234,9 @@ export const flowModules = {
 
     // --- Default path ---
     pfWelcomeParagraphMod,
+    // Issue #2530: the welcome/help body-parity choice, asked only when
+    // the 11.9 finding is live (routed from pf_welcome_paragraph's `next`).
+    pfBodyParityMod,
     pfUsageTip1Mod,
     // HISTORY proposal (spec 079 US5): confirm / edit / dismiss, spliced in
     // via pf_usage_tip_1's `next` (last default-path screen before the gate).
@@ -299,6 +304,14 @@ export const flowModules = {
     provenance_additional_notes,
   ],
 } as const satisfies Record<string, readonly QuestionModule[]>;
+
+/**
+ * Question ids on the live `phase_f_helpdocs` walk (spec 087). Kept in sync
+ * with `flowModules.phase_f_helpdocs` — do not hand-maintain a second list.
+ */
+export const PHASE_F_HELPDOCS_QUESTION_IDS: ReadonlySet<string> = new Set(
+  flowModules.phase_f_helpdocs.map((m) => m.definition.id),
+);
 
 /**
  * Demoted Phase F tip slots: registered + on disk + test-covered but

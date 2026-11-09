@@ -43,6 +43,7 @@ import { layoutChartFilename } from "./filename.js";
 export { layoutChartFilename, LAYOUT_CHART_PREFIX, isLayoutChartFilename, layoutChartPlatformFromFilename, sanitizeLayerIdForFilename } from "./filename.js";
 export {
   DESKTOP_GEOMETRY,
+  DESKTOP_GEOMETRY_ISO,
   DESKTOP_GEOMETRY_WIDTH,
   DESKTOP_ISO_GEOMETRY,
   DESKTOP_ISO_ROW_COUNT,

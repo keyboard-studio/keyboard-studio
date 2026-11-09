@@ -14,6 +14,8 @@ import type { CharacterInventoryValue } from "../survey/phaseBDraftOps.ts";
 import type { QuestionModule } from "../survey/types.ts";
 import { buildExtractContext } from "./extractContext.ts";
 import { runDecisionFlow } from "./decisionFlow.ts";
+import { authoringTrackProviderModule } from "../survey/questions/authoringTrackProvider.ts";
+import { baseKeyboardProviderModule } from "../test/baseKeyboardProvider.ts";
 
 // A realistic minimal keyboard source, parsed by the real codec — exactly
 // what the import pipeline hands the studio for a catalog keyboard.
@@ -46,7 +48,6 @@ const modules = [
   // Providers of the character-inventory module's declared requires
   // (authoring-track, project-keyboard-id) — runDecisionFlow orders by
   // requires and throws when one is unprovided (spec 090 T021).
-  "track_choice",
   "project_keyboard_id",
   "project_display_name",
 ].map((id) => {
@@ -54,6 +55,9 @@ const modules = [
   if (!mod) throw new Error(`question "${id}" not in registry`);
   return mod;
 });
+// authoring-track has no question module any more (the track question is
+// gone); the start screen provides it — see survey/questions/authoringTrackProvider.ts.
+const modulesWithTrack = [...modules, authoringTrackProviderModule, baseKeyboardProviderModule];
 
 describe("real catalog keyboard extraction (T020)", () => {
   it("pre-fills identity, script, copyright, and inventory from the import bundle", () => {
@@ -62,7 +66,7 @@ describe("real catalog keyboard extraction (T020)", () => {
     expect(ir.header.bcp47).toEqual([]);
 
     const decisions = runDecisionFlow({
-      modules: [...modules, characterInventoryModule as unknown as QuestionModule],
+      modules: [...modulesWithTrack, characterInventoryModule as unknown as QuestionModule],
       context: buildExtractContext(ir, cameroonCatalog),
       answers: { il_language_english: "Ewondo", il_author_name: "Test Author" },
     });

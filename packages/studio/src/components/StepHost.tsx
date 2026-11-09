@@ -46,6 +46,7 @@ import {
 } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
+import { useHasTestBuilds } from "../stores/testingStore.ts";
 import { deriveIdentityResult } from "../decisions/identitySelectors.ts";
 import { manifest as defaultManifest } from "../steps/manifest.ts";
 import type { EditorStep, Step } from "../steps/types.ts";
@@ -215,6 +216,14 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
   const setCharactersSubStage = useSurveySessionStore((s) => s.setCharactersSubStage);
 
   const recordPhase = useWorkingCopyStore((s) => s.recordPhase);
+
+  // Test-build presence for the publish version (spec 094): passed down to
+  // steps as a prop because a step must not import testingStore itself —
+  // HtmlEditor sits downstream of decisionLogStore (via the welcomeHtm
+  // decision renderer), so that import is a depcruise `no-circular`
+  // violation. StepHost is outside that chain (nothing HtmlEditor reaches
+  // imports StepHost back).
+  const hasTestBuilds = useHasTestBuilds();
 
   // spec 079 R-04: each Next inside the active step records that screen's
   // answers. Bound to the active step id here so a step never names itself.
@@ -543,8 +552,8 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
     // records "help" (or wherever `advance` left it), so returning to Studio
     // resumes the walk rather than restarting it. No extra state is stashed
     // here: the position is already the store's job (FR-001).
-    if (outcome.navigate === "output") {
-      navigateTo("output");
+    if (outcome.navigate !== undefined) {
+      navigateTo(outcome.navigate);
     }
   }
 
@@ -561,7 +570,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
   // resolvedStep.id is StepBase.id (string), guaranteed a valid ActiveStepId
   // by the manifest — same cast idiom as handleComplete's advance() call above.
   function handleBack(): void {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+     
     performManifestBack(resolvedStep.id as ActiveStepId);
   }
 
@@ -572,7 +581,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
   // touch_seed_source re-entry). At activeStepId "identity" with history []
   // (first step, or right after Start-over) this is null, so `onBack` is
   // omitted below rather than handed down as an inert callback.
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+   
   const canGoBack = expectedBackTarget(resolvedStep.id as ActiveStepId, history) !== null;
 
   // ---------------------------------------------------------------------------
@@ -596,6 +605,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
             onComplete={handleComplete}
             {...(canGoBack ? { onBack: handleBack } : {})}
             {...(ctx !== undefined ? { ctx } : {})}
+            hasTestBuilds={hasTestBuilds}
           />
         </StepNavContext.Provider>
       </JumpContext.Provider>
@@ -647,6 +657,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
             <Trans id="step.revision.discard">Discard changes and go back</Trans>
           </button>
         )}
+        {/* eslint-disable no-restricted-syntax -- not step nav: the host's deep-link banner action — it resumes the walk from here instead of following the deep link; the step's own nav stays in the footer. */}
         <button
           type="button"
           data-testid="step-deep-link-continue-instead"
@@ -655,6 +666,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
         >
           <Trans id="step.deepLinkReturn.continueButton">Continue from here instead</Trans>
         </button>
+        {/* eslint-enable no-restricted-syntax */}
       </div>
     ) : offTargetRevision ? (
       <div role="note" data-testid="step-deep-link-return-banner" style={DEEP_LINK_BANNER_STYLE}>

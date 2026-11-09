@@ -93,8 +93,10 @@ import type { OskMode } from "./components/OskModeToggle.tsx";
 import { SurveyPreviewPane } from "./components/SurveyPreviewPane.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
 import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
+import { useOpenInventorySeed } from "./hooks/useOpenInventorySeed.ts";
 import { useOe2SoleSourceFindings } from "./hooks/useOe2SoleSourceFindings.ts";
 import { useLdmlFindings } from "./hooks/useLdmlFindings.ts";
+import { useFontGlyphCoverageFindings } from "./hooks/useFontGlyphCoverageFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
 import { readVfsText } from "./lib/vfsText.ts";
 import { useContextToleranceApply } from "./hooks/useContextToleranceApply.ts";
@@ -107,9 +109,11 @@ import { CompareScreen } from "./components/CompareScreen.tsx";
 import { StudioFooter } from "./components/StudioFooter.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
 import { CriteriaScreen } from "./components/CriteriaScreen.tsx";
+import { AfterApplySuggestions } from "./components/AfterApplySuggestions.tsx";
 import { useLingui } from "@lingui/react/macro";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
+import { StartScreen } from "./components/StartScreen.tsx";
 import { ReviewScreen } from "./review/ReviewScreen.tsx";
 import { NavBar } from "./components/NavBar.tsx";
 import { PhaseStepper } from "./components/PhaseStepper.tsx";
@@ -173,6 +177,7 @@ const VALID_ROUTES = new Set<RouteId>(
   (
     [
       "welcome",
+      "start",
       "survey",
       "preview",
       "output",
@@ -202,8 +207,9 @@ function isRouteId(v: string): v is RouteId {
 // hash, so beyond that this only governs the initial landing and stale-hash
 // cases.
 function defaultLandingRoute(): RouteId {
-  if (hasVisited()) return "survey";
+  // A resumable draft resumes; a returning author without one chooses New or Open.
   if (loadDraftMeta() !== null) return "survey";
+  if (hasVisited()) return "start";
   return "welcome";
 }
 
@@ -271,7 +277,7 @@ function useRoute(): RouteId {
 // by the SurveyRunner, legitimately not promoted to manifest steps).
 //
 // Derived main line (FR-012; pinned by steps/stepOrder.parity.test.ts):
-//   identity → layout → choose_base → track → characters → marks →
+//   identity → layout → choose_base → attribution → characters → marks →
 //   punctuation → invisibles → convenience → carve → deadkeys → rules →
 //   mechanisms[lock:physical] → touch[lock:touch] → help → package[reserved]
 //   (sequences build inline in the mechanism gallery — no spine step)
@@ -281,9 +287,11 @@ function useRoute(): RouteId {
 //   touch_seed_source — touch-seed fork; rejoins at "touch"
 //
 // Track/project_name routing (#1901: the attribution step sits between
-// track and the fork — author/copyright are asked after the track choice):
-//   copy-track:  choose_base → track → attribution → project_name → characters
-//   adapt-track: choose_base → track → attribution → (skip project_name) → characters
+// choose_base and the fork — author/copyright are asked after the base
+// choice, and the track is recorded on the start screen, defaulting to
+// copy when a walk reaches the base choice without one):
+//   copy-track:  choose_base → attribution → project_name → characters
+//   adapt-track: choose_base → attribution → (skip project_name) → characters
 //
 // Characters internal flow (intra-phase — not manifest steps):
 //   prefill → B-questions
@@ -578,6 +586,16 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // localStart lives in the session store; we update it when the working-copy's startKeyboard
   // prop changes so the wizard stays in sync with the pipeline-settled base.
   useEffect(() => {
+    // Open records the starting keyboard before this view mounts; the working copy
+    // is not instantiated until the pipeline below compiles it, so a null prop
+    // must not erase that pending start.
+    if (
+      startKeyboard === null &&
+      useSurveySessionStore.getState().localStart !== null &&
+      useDecisionStore.getState().decisions["authoring-track"]?.value === "adapt"
+    ) {
+      return;
+    }
     setLocalStart(startKeyboard);
   }, [startKeyboard, setLocalStart]);
 
@@ -717,9 +735,6 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
       return;
     }
     autosaveTeardownRef.current = installDraftAutosave(PENDING_PROJECT_KEY);
-    // Runs once on mount; deriveProjectKeyFromWorkingCopy/installDraftAutosave
-    // are stable module-level imports, and the refs are stable by construction.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
@@ -1144,6 +1159,9 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   //     through the gallery host, which has already synchronously resolved
   //     any rebase-confirm question via confirmRebaseTo BEFORE recording —
   //     F1 fix)
+  //   - the authoring track is recorded — the start screen records it
+  //     (New = copy, Open = adapt); a walk without one defaults to copy,
+  //     recorded here with provenance "default" (see the effect body).
   //   - the compile pipeline has actually settled for THAT SAME base
   //     (`pendingArtifactRef`, filled by `onInstantiate` above).
   //
@@ -1171,10 +1189,20 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
     if (decisionId === undefined) return;
     // Spec 092 FR-004: the setup decision requires the authoring track as
     // well as the base — do not instantiate until both are recorded. The
-    // track step follows choose_base in the flow, so on a fresh walk this
-    // gate is what moves instantiation from the base confirmation (track
-    // still null — the G7 hazard) to the track's completion.
-    if (authoringTrackDecision === undefined) return;
+    // start screen records the track (New = copy, Open = adapt), so on a
+    // fresh walk it is already there. A walk that reaches here without one
+    // (a legacy draft, a deep link) defaults to copy — the track question
+    // is gone, and copy is the only track the walk itself can start.
+    // Recorded with provenance "default", so the trail shows it was the
+    // studio's default, not the author's choice.
+    if (authoringTrackDecision === undefined) {
+      useDecisionStore.getState().record({
+        id: "authoring-track",
+        value: "copy",
+        provenance: "default",
+        step: "choose_base",
+      });
+    }
     const art = pendingArtifactRef.current;
     const lb = useSurveySessionStore.getState().localStart;
     if (art && lb && art.base.id === lb.id && lb.id === decisionId) {
@@ -1207,6 +1235,8 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // so they render, publish, and classify exactly like every other finding.
   // Warning-severity by the Layer C ceiling, so they can never block (FR-018).
   const documentationFindings = useDocumentationFindings();
+  // Spec 111: an opened keyboard's Touch step walks an inventory the skipped character survey would have built.
+  useOpenInventorySeed();
   // The sole-source oe2 Layer C warning rides the same findings array on
   // the same terms (memoised synchronous hook, no second timer): it is
   // owned by the mechanisms step via the lintToQuestion mapping for its
@@ -1215,12 +1245,32 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // The LDML export's A/N warnings and hints ride the same array on the same terms (spec 108):
   // a memoised synchronous hook over the published preview projection. They never gate an output.
   const ldmlFindings = useLdmlFindings();
+  // Issue #2593: the packaged-font glyph-coverage warning (18.13) rides
+  // the same array on the same terms — a memoised synchronous hook over
+  // the working copy's VFS + IR. It has no owning question, so it renders
+  // as an unmapped finding on the Output screen.
+  const fontGlyphCoverageFindings = useFontGlyphCoverageFindings();
   const findings = useMemo(
     () =>
-      documentationFindings.length === 0 && oe2Findings.length === 0 && ldmlFindings.length === 0
+      documentationFindings.length === 0 &&
+      oe2Findings.length === 0 &&
+      ldmlFindings.length === 0 &&
+      fontGlyphCoverageFindings.length === 0
         ? validatorFindingsOnly
-        : [...validatorFindingsOnly, ...documentationFindings, ...oe2Findings, ...ldmlFindings],
-    [validatorFindingsOnly, documentationFindings, oe2Findings, ldmlFindings],
+        : [
+            ...validatorFindingsOnly,
+            ...documentationFindings,
+            ...oe2Findings,
+            ...ldmlFindings,
+            ...fontGlyphCoverageFindings,
+          ],
+    [
+      validatorFindingsOnly,
+      documentationFindings,
+      oe2Findings,
+      ldmlFindings,
+      fontGlyphCoverageFindings,
+    ],
   );
   // spec-014 US5/T034 — publish the SINGLE debounced `useValidator` findings to
   // the store so the sibling `StudioShell` can feed C4 spine-prefix shippability
@@ -1941,6 +1991,9 @@ function StudioShellContent() {
     case "welcome":
       content = <WelcomeScreen />;
       break;
+    case "start":
+      content = <StartScreen />;
+      break;
     case "survey":
       content = (
         <SurveyView
@@ -2093,6 +2146,16 @@ function StudioShellContent() {
       {route === "survey" && !isNarrow && (
         <PhaseStepper activeStepId={surveyActiveStepId} />
       )}
+      {/* Spec 111 US5: consistency suggestions raised by an applied change.
+          Always mounted (it watches the working copy); the list shows only
+          off the criteria page, which lists them itself. #2528: on the
+          survey route the panel withholds fixes owned by a later step. */}
+      <AfterApplySuggestions
+        showPanel={route !== "criteria"}
+        route={route}
+        activeStepId={surveyActiveStepId}
+        stepOrder={manifest.map((s) => s.id)}
+      />
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{content}</div>
       {/* Spec 057 US4/US6 (T052, FR-040): the narrow journey footer. Mounted
           unconditionally rather than per-route because `StudioFooter` returns
@@ -2100,7 +2163,7 @@ function StudioShellContent() {
           ABSENT, not an empty shell, on Welcome and wherever there is no
           project yet (Q6). A route-by-route conditional here would be a second
           place to keep that rule, and the two would drift. */}
-      <StudioFooter />
+      <StudioFooter activeRoute={route} />
     </div>
   );
 }

@@ -40,9 +40,12 @@ import type {
   ProjectWorkingCopyVfsInput,
 } from "./projectWorkingCopyVfs.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
-import type { DecisionSet } from "../decisions/decisionTypes.ts";
+import type { CapsHandlingValue, DecisionSet } from "../decisions/decisionTypes.ts";
+import { alphabetOf, isCasedAlphabet } from "../survey/caps/capsLogic.ts";
 import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.ts";
 import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
+import { welcomePagePath } from "./welcomeFolder.ts";
+import { isOpenedWithDescriptor } from "./openMode.ts";
 
 /** The store fields the projection reads. `startIr` must already be set. */
 export type ProjectionState = Pick<
@@ -58,6 +61,14 @@ export type ProjectionState = Pick<
   | "deadkeyOverlay"
   | "contextToleranceOverlay"
   | "touchLayoutJson"
+  | "customCss"
+  | "authoredWelcomeHtm"
+  | "authoredReadmeHtm"
+  | "authoredReadmeMd"
+  | "authoredHelpPhp"
+  | "instantiationMode"
+  | "startVfs"
+  | "startWelcomeConvention"
 > & { startIr: KeyboardIR };
 
 /** The call-site inputs the store cannot supply. */
@@ -75,14 +86,24 @@ export interface ProjectionExtras {
    * the same reason as `marksTreatment`: the preview and the download must both pass it.
    */
   kmnEdits: KmnEditsValue | undefined;
+  /**
+   * The recorded caps-handling decision for step 2.8 (spec 112), already
+   * gated through {@link capsHandlingFromDecisions}; undefined when not asked.
+   */
+  capsHandling: CapsHandlingValue | undefined;
   baseDisplayName?: string;
+  startKeyboardId?: string;
   welcomeFolderFiles?: readonly string[];
   packageFonts?: PackageFontSet;
+  /** Open mode only (spec 111); see ProjectWorkingCopyVfsInput.openMode. */
+  openMode?: NonNullable<ProjectWorkingCopyVfsInput["openMode"]>;
   /** A live touch layout and its uncommitted-to-JSON key edits (TouchGallery's preview). */
   liveLayoutOverride?: {
     touchLayoutJson: string | null;
     keyEditOps: readonly KeyEditOperation[];
   };
+  /** The CSS step's in-progress text, ahead of the commit that writes the store (undefined = use the store's). */
+  liveCssOverride?: string | null;
 }
 
 /** The `kmn-edits` value out of a decision set (undefined when none is recorded). */
@@ -106,11 +127,23 @@ export function marksGuardsFromValue(value: MarksTreatmentValue | undefined): Ma
   };
 }
 
+/**
+ * Step 2.8's input from the decision set: the recorded caps-handling value,
+ * or undefined when it was not asked. A caseless alphabet is never asked, so
+ * a value left over from an earlier alphabet is ignored rather than writing a
+ * store nothing needs.
+ */
+export function capsHandlingFromDecisions(decisions: DecisionSet): CapsHandlingValue | undefined {
+  const value = decisions["caps-handling"]?.value as CapsHandlingValue | undefined;
+  if (value === undefined) return undefined;
+  return isCasedAlphabet(alphabetOf(decisions["character-inventory"]?.value)) ? value : undefined;
+}
+
 export function projectionInputFromState(
   state: ProjectionState,
   extras: ProjectionExtras,
 ): ProjectWorkingCopyVfsInput {
-  const { liveLayoutOverride, marksTreatment, kmnEdits, ...callSite } = extras;
+  const { liveLayoutOverride, liveCssOverride, marksTreatment, kmnEdits, capsHandling, ...callSite } = extras;
   // spec 082 FR-018: disabled families' member rules are removed outright.
   // They join the deletion set and are exempt from the fallback-policy
   // expansion, which would otherwise carve them instead.
@@ -136,8 +169,22 @@ export function projectionInputFromState(
     keyEditOps: liveLayoutOverride?.keyEditOps ?? [],
     deadkeyOps: state.deadkeyOverlay.ops,
     touchLayoutJson,
+    customCss: liveCssOverride !== undefined ? liveCssOverride : state.customCss,
+    authoredDocs: {
+      authoredWelcomeHtm: state.authoredWelcomeHtm,
+      authoredReadmeHtm: state.authoredReadmeHtm,
+      authoredReadmeMd: state.authoredReadmeMd,
+      authoredHelpPhp: state.authoredHelpPhp,
+    },
+    // Open is read from the store, not from `openMode`: the preview passes no
+    // openMode, and the authored welcome page must land at the same path on both.
+    welcomePath: welcomePagePath(
+      isOpenedWithDescriptor(state.instantiationMode, state.startVfs, callSite.keyboardId),
+      state.startWelcomeConvention,
+    ),
     marksGuards: marksGuardsFromValue(marksTreatment),
     contextToleranceOverlay: state.contextToleranceOverlay?.overlay ?? null,
+    capsHandling: capsHandling ?? null,
     ruleAdditions: deriveRuleAdditions(state.ir, state.startIr),
     ...(kmnEdits !== undefined ? { kmnEdits } : {}),
   };

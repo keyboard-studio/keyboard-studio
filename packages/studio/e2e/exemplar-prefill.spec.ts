@@ -21,7 +21,8 @@ import { test, expect, type Page } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseAdaptTrack,
+  confirmCopyTrack,
+  acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
   seedReturningVisitor,
@@ -42,8 +43,9 @@ async function reachPhaseBChooser(page: Page): Promise<void> {
   await page.goto("/");
   await driveIdentityLite(page, EWONDO);
   await pickStartKeyboard(page, START_KEYBOARD_ID);
-  await chooseAdaptTrack(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page);
+  await acceptProjectName(page);
   await confirmPrefill(page);
   await page.waitForSelector('[data-testid="charlist-continue"]', { timeout: 30_000 });
 }

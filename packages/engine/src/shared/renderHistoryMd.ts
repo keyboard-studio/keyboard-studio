@@ -47,9 +47,18 @@ export function createdFromBullet(id: string, version: string): string {
   return `Created from ${id} v${version} via keyboard-studio.`;
 }
 
-/** Where the keyboard came from: Copy (`created`, Track 1) or Adapt (`adapted`, Track 2). */
+/** The Open (update in place) bullet's exact text: no "Adapted from <self>" attribution. */
+export function updatedBullet(): string {
+  return "Updated via keyboard-studio.";
+}
+
+/**
+ * Where the keyboard came from: Copy (`created`, Track 1), Adapt (`adapted`,
+ * Track 2), or Open (`updated`, spec 111: the keyboard is updated in place, so
+ * there is no source to attribute).
+ */
 export interface HistoryLineage {
-  kind: "created" | "adapted";
+  kind: "created" | "adapted" | "updated";
   /** The start keyboard's id. */
   id: string;
   /** The start keyboard's raw version, not the resolved one. */
@@ -57,6 +66,7 @@ export interface HistoryLineage {
 }
 
 function lineageBullet(lineage: HistoryLineage): string {
+  if (lineage.kind === "updated") return updatedBullet();
   return lineage.kind === "created"
     ? createdFromBullet(lineage.id, lineage.version)
     : adaptedFromBullet(lineage.id, lineage.version);
@@ -183,13 +193,23 @@ export function renderHistoryMd(
   entry: HistoryEntryState | null,
   opts: RenderHistoryMdOptions,
 ): string {
+  // Open (spec 111 FR-010): the keyboard's own history keeps its line endings,
+  // so the new entry takes the file's convention and nothing else in it moves.
+  if (
+    opts.lineage?.kind === "updated" &&
+    opts.startHistoryText !== null &&
+    opts.startHistoryText.includes("\r\n")
+  ) {
+    const lf = renderHistoryMd(entry, { ...opts, startHistoryText: opts.startHistoryText.replace(/\r\n/g, "\n") });
+    return lf.replace(/\r?\n/g, "\r\n");
+  }
   const { version, dateIso, lineage, startHistoryText } = opts;
   const decided = entry !== null && (entry.status === "confirmed" || entry.status === "edited");
   const attribution = lineage !== null ? lineageBullet(lineage) : "";
 
   if (!decided) {
     // Today's Adapt stub is the attribution alone; Copy and no-lineage keep "Initial release.".
-    const bullets = lineage?.kind === "adapted" ? [] : [HISTORY_INITIAL_RELEASE_BULLET];
+    const bullets = lineage?.kind === "adapted" || lineage?.kind === "updated" ? [] : [HISTORY_INITIAL_RELEASE_BULLET];
     return withStartText(renderEntry(version, dateIso, attribution, bullets), startHistoryText);
   }
 

@@ -335,9 +335,17 @@ export function DecisionTrailView({
       case "choose_base":
         return t({ id: "trail.stage.name.chooseStarting", message: "Choosing a starting keyboard" });
       case "track":
+        // Retired step (the track question is gone) — kept so trail
+        // entries recorded on it by older drafts still name their stage.
         return t({ id: "trail.stage.name.track", message: "Authoring track" });
       case "project_name":
         return t({ id: "trail.stage.name.projectName", message: "Project name" });
+      case "open_languages":
+        return t({ id: "trail.stage.name.openLanguages", message: "Keyboard languages" });
+      case "open_missing_letters":
+        return t({ id: "trail.stage.name.openMissingLetters", message: "Letters" });
+      case "open_upgrades":
+        return t({ id: "trail.stage.name.openUpgrades", message: "Upgrades" });
       case "characters":
         return t({ id: "trail.stage.name.characters", message: "Character inventory" });
       case "marks":

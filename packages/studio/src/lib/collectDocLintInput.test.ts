@@ -4,6 +4,7 @@
 import { describe, it, expect } from "vitest";
 import { runDocChecks } from "@keymanapp/keyboard-lint";
 import {
+  attributionSeedFromPackageSources,
   collectDocLintInput,
   computeBaselineDocFindings,
   copyrightNoticeLine,
@@ -11,6 +12,7 @@ import {
   holderFromNotice,
   keyboardVersionFromKmn,
   kmnSystemStore,
+  kpsAuthor,
   kpsCopyright,
   kvksLayerId,
   collectLayerIds,
@@ -57,6 +59,36 @@ describe("holder / notice parsing", () => {
     expect(keyboardVersionFromKmn("store(&VERSION) '10.0'\n")).toBe("1.0");
     expect(kpsCopyright(KPS)).toBe("Copyright (c) 2024 Jane Doe");
     expect(kpsCopyright("<Package/>")).toBeUndefined();
+  });
+
+  it("reads .kps <Author> text", () => {
+    expect(
+      kpsAuthor('<Package><Info><Author URL="">Jo Author</Author></Info></Package>'),
+    ).toBe("Jo Author");
+    expect(kpsAuthor("<Package/>")).toBeUndefined();
+  });
+
+  it("attributionSeedFromPackageSources merges .kps author and copyright holders", () => {
+    expect(
+      attributionSeedFromPackageSources({
+        kmnText: null,
+        kpsText:
+          '<Info><Author URL="">Ada Lovelace</Author><Copyright>(c) 2020 Example Org</Copyright></Info>',
+      }),
+    ).toEqual({
+      authorName: "Ada Lovelace",
+      copyrightHolder: "Example Org",
+    });
+    expect(
+      attributionSeedFromPackageSources({
+        kmnText: `store(&COPYRIGHT) 'Copyright © 2019 Jane Doe'`,
+        kpsText: undefined,
+      }),
+    ).toEqual({
+      authorName: "Jane Doe",
+      copyrightHolder: "Jane Doe",
+    });
+    expect(attributionSeedFromPackageSources({ kmnText: null, kpsText: null })).toBeNull();
   });
 });
 

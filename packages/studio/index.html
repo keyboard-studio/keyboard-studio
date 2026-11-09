@@ -11,7 +11,16 @@
 <html lang="en" class="sil-app" data-theme="navy">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- interactive-widget=resizes-content: when the virtual keyboard opens,
+         the browser resizes the LAYOUT viewport (not just the visual one), so
+         the 100dvh shell — and the journey footer at its bottom — shrink to
+         sit just above the keyboard instead of hiding under it (#2570).
+         Without this, Android Chrome/Brave (Chrome 108+ default
+         resizes-visual) leave the layout viewport full-height and the footer
+         unreachable until the keyboard is dismissed. 100dvh alone is
+         URL-bar-aware, never keyboard-aware. iOS Safari silently ignores
+         this property: no behaviour change there. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
     <title>Keyboard Studio</title>
     <!-- Fonts are self-hosted (spec 095 FR-005): the studio discloses
          nothing to Google Fonts on page load. The vendored set in

@@ -45,6 +45,11 @@ function derivedSettles(): Map<DecisionId, string> {
  */
 const BASELINE_STEP_REQUIRES: Readonly<Record<string, readonly string[]>> = {
   layout: ["language-code"],
+  // spec 111: the Open language list orders by its screenRequires, not requires.
+  open_languages: [],
+  // spec 111 Open walk: the two conditional pages order by screenRequires too.
+  open_missing_letters: [],
+  open_upgrades: [],
   choose_base: ["language-code", "target-script"],
   characters: ["target-script", "authoring-track", "project-keyboard-id"],
   marks: ["character-inventory"],
@@ -55,28 +60,47 @@ const BASELINE_STEP_REQUIRES: Readonly<Record<string, readonly string[]>> = {
   deadkeys: ["carved-layout"],
   rules: ["deadkeys-defined", "windows-layout"],
   mechanisms: ["carved-layout", "deadkeys-defined", "rule-set", "marks-treatment", "windows-layout"],
-  osk: ["physical-layout"],
+  fallback_policy: ["physical-layout"],
+  osk: ["physical-layout", "fallback-policy"],
   touch_seed_source: ["osk-layout"],
   touch: ["osk-layout", "touch-seed-source"],
   css: ["touch-layout"],
-  help: ["physical-layout", "touch-layout", "custom-css"],
+  help: ["physical-layout", "fallback-policy", "touch-layout", "custom-css"],
   html: ["help-docs"],
+  // #2485: the icon step follows the html step and needs its welcome-htm
+  // decision recorded first (mirrors the icon gallery module's requires).
+  icon: ["welcome-htm"],
+};
+
+/**
+ * Gallery decisions that sit on another module's screen (spec 112: caps
+ * handling joins the layout screen as an intra-step member). Their requires
+ * are their own, not the screen's baseline.
+ */
+const INTRA_STEP_REQUIRES: Readonly<Partial<Record<DecisionId, readonly string[]>>> = {
+  "caps-handling": ["character-inventory", "windows-layout"],
 };
 
 const SETTLES = derivedSettles();
 
 describe("gallery module coverage (FR-002)", () => {
-  it("the derived settles set is exactly the seventeen gallery decisions", () => {
-    expect(SETTLES.size).toBe(17);
+  it("the derived settles set is exactly the twenty-three gallery decisions (spec 111 adds language-list, missing-letters-review and upgrades-review, spec 112 caps-handling, issue #2539 fallback-policy and #2485 icon)", () => {
+    expect(SETTLES.size).toBe(23);
     expect([...SETTLES.keys()].sort()).toEqual([
       "base-keyboard",
+      "caps-handling",
       "carved-layout",
       "character-inventory",
       "custom-css",
       "deadkeys-defined",
+      "fallback-policy",
       "help-docs",
+      // #2485: the icon editor step settles the keyboard icon.
+      "icon",
       "invisibles-inventory",
+      "language-list",
       "marks-treatment",
+      "missing-letters-review",
       "osk-layout",
       "physical-layout",
       "punctuation-inventory",
@@ -84,6 +108,7 @@ describe("gallery module coverage (FR-002)", () => {
       "rule-set",
       "touch-layout",
       "touch-seed-source",
+      "upgrades-review",
       "welcome-htm",
       "windows-layout",
     ]);
@@ -114,7 +139,7 @@ describe("gallery module coverage (FR-002)", () => {
     });
 
     it("declares requires EQUAL to its step's declared requires (the 091 parity)", () => {
-      const stepRequires = BASELINE_STEP_REQUIRES[stepId];
+      const stepRequires = INTRA_STEP_REQUIRES[decisionId] ?? BASELINE_STEP_REQUIRES[stepId];
       expect(stepRequires, `baseline requires recorded for step ${stepId}`).toBeDefined();
       expect([...(mod?.requires ?? [])]).toEqual([...(stepRequires ?? [])]);
     });
@@ -128,7 +153,7 @@ describe("gallery module coverage (FR-002)", () => {
   });
 
   it("question-only screens settle nothing (the recorder's negative case)", () => {
-    for (const id of ["identity", "track", "project_name", "package", "no-such-step"]) {
+    for (const id of ["identity", "project_name", "package", "no-such-step"]) {
       expect(settlesForStep(id), id).toEqual([]);
       expect(stepHasSettles(id), id).toBe(false);
     }

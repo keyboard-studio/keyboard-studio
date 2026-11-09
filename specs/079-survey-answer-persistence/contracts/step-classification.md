@@ -12,9 +12,11 @@ Part I). The "After 079" column is the target this feature must reach.
 | identity | non-compliant: survives leaving, not reload (D-5) | F-5 | `answer-store` | compliant |
 | layout | new step (spec 076 A4); every pick saved per question | spec 076 A4 | `answer-store` | compliant |
 | choose_base | believed compliant (working copy) | spec Assumptions | `working-copy` | compliant — revisit test `StepHost.test.tsx` "an unmount/remount at choose_base with the same evidence leaves baseKeyboard/baseIr unchanged" |
-| track | non-compliant (D-5) | F-5 | `answer-store` | compliant |
 | attribution | new step (#1901: author/copyright questions moved post-track); answers recorded as decisions keyed by question id, as they were under identity | #1901 | `answer-store` | compliant |
 | project_name | non-compliant (D-5) | F-5 | `answer-store` | compliant |
+| open_languages | new step (spec 111, Open only); the author's edited language list is written to the working copy on every change | spec 111 | `working-copy` | compliant |
+| open_missing_letters | new step (spec 111, Open only); each language removal is written to the working copy as it is made; the page records only that it was reviewed | spec 111 | `working-copy` | compliant |
+| open_upgrades | new step (spec 111, Open only); an applied upgrade is written to the working copy file as it is applied; a skip is recorded in the decision log | spec 111 | `working-copy` | compliant |
 | characters | non-compliant: the prefill wipes the alphabet (D-3); the manual path is D-5 | F-3, F-5 | `decision-store` (alphabet) + `answer-store` (sub-screen position, manual-path answers) | compliant |
 | marks | non-compliant: component state only (D-1); stacking discarded; guards not stripped (D-6) | F-1 | `decision-store` (composite) + `answer-store` (per-toggle evidence answers, step-status slot) | compliant |
 | punctuation | compliant for picks and removals; the `alreadyConfirmed` guard ignores evidence (FR-022) | F-3, F-6 | `decision-store` (picks) + `answer-store` (one evidence answer) | compliant |
@@ -24,12 +26,14 @@ Part I). The "After 079" column is the target this feature must reach.
 | deadkeys | compliant: every action saved immediately | F-10 | `working-copy` | compliant |
 | rules | compliant: the demo pane is a read-only view of the compiled working copy (spec 082 Track A); the step records no answers — Continue carries `undefined` like the galleries | F-10 | `working-copy` | compliant |
 | mechanisms | compliant: every action saved immediately | F-10 | `working-copy` | compliant |
+| fallback_policy | new step (#2539: fallback policy for keys the template does not define, asked after mechanisms, before OSK); the author-set policy is written to the working copy on Continue | #2539 | `working-copy` | compliant |
 | osk | believed compliant (working copy); the OSK editor step records `osk-layout` via `completeOskStep` on Continue | F-10 | `working-copy` | compliant |
 | touch_seed_source | believed compliant (session slot `touchSeedSource`) | agent sweep | `working-copy` | compliant — revisit test `TouchSeedSourcePanel.test.tsx` "a NON-default recorded choice survives an unmount/remount with the same evidence" |
 | touch | compliant: every action saved immediately | F-10 | `working-copy` | compliant |
 | css | believed compliant (working copy); the CSS editor step records optional embed CSS on Continue, empty means no file | F-10 | `working-copy` | compliant |
 | help | non-compliant (D-5) | F-5 | `answer-store` | compliant |
 | html | believed compliant (working copy); the HTML editor step records the authored welcome.htm on Continue | F-10 | `working-copy` | compliant |
+| icon | believed compliant (working copy); the icon editor step records the designed icon (.ico + .png) on Continue, unchanged means template icon | F-10 | `working-copy` | compliant |
 | package | no author answers; output step | — | `{ exempt: "Output screen: records no decision; its only state is the chosen download, re-derived on entry." }` | justified-exempt |
 
 Every "verify by revisit test" row is now closed: each names the FR-051 test that passed. A row is closed only when its FR-051 test passes. If the test finds a gap,

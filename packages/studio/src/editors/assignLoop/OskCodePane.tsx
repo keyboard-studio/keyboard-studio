@@ -20,6 +20,9 @@ import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { emitKvks, parseKvks } from "@keyboard-studio/engine";
 import type { KvksIR } from "@keyboard-studio/contracts";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { isOpenMode } from "../../lib/openMode.ts";
+import { readVfsText } from "../../lib/vfsText.ts";
 import {
   lintOskCodeText,
   type OskCodeMarker,
@@ -55,8 +58,20 @@ export function OskCodePane({
 }) {
   const { t } = useLingui();
 
-  // The canonical text for the current KvksIR.
-  const canonical = kvks === null ? null : emitKvks(kvks);
+  const mode = useWorkingCopyStore((s) => s.instantiationMode);
+  const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  // Open mode (spec 111 FR-009): show the file's own text; Apply writes it back
+  // verbatim. A keyboard with no `.kvks` keeps the generated text.
+  const openPath =
+    isOpenMode(mode) && startKeyboard !== null
+      ? `source/${startKeyboard.id}.kvks`
+      : null;
+  const openText =
+    openPath !== null && startVfs !== null ? readVfsText(startVfs, openPath) : undefined;
+
+  // The canonical text for the current KvksIR (Open: the file's text).
+  const canonical = kvks === null ? null : (openText ?? emitKvks(kvks));
 
   // Editor text. `null` until the first canonical text arrives.
   const [text, setText] = useState<string | null>(null);
@@ -186,10 +201,20 @@ export function OskCodePane({
       return;
     }
     if (current === canonical) {
-      // Formatting-only change: nothing to commit.
+      // Formatting-only change: nothing to commit (Open: a formatting-only
+      // change is a change, and the file text below differs from `canonical`
+      // whenever it is).
       return;
     }
     onApply(after);
+    if (openText !== undefined && openPath !== null) {
+      // After onApply so the author's text, not a re-emit, is what the file holds.
+      const result = useWorkingCopyStore.getState().replaceStartingPointFromText(openPath, current);
+      if (!result.ok) {
+        setApplyError(result.error);
+        return;
+      }
+    }
     justAppliedRef.current = true;
     setApplyError(null);
   };

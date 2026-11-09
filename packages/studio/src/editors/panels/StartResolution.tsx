@@ -222,7 +222,7 @@ export function StartResolution({
     ...(onBack !== undefined
       ? {
           back: {
-            label: t({ id: "editor.baseResolution.backButton", message: "← Back" }),
+            label: t({ id: "editor.baseResolution.backButton", message: "Back" }),
             onClick: onBack,
             testId: "base-back",
           },

@@ -1,7 +1,7 @@
 // Spec 017 — per-step declared-contract unit tests (US1 / US3, FR-012/-013/-014).
 //
 // Asserts the populated inputs/writes on the existing editor-steps (carve /
-// mechanisms / touch / track / project_name) and the DEC-D1 charactersStep
+// mechanisms / touch / project_name) and the DEC-D1 charactersStep
 // subsumption write are well-formed (resolve via irPath() to existing KeyboardIR
 // locations), that no declaration references the forbidden irPath('header','script'),
 // that writes-before-inputs keeps C5 green at every intermediate step, and that
@@ -17,7 +17,6 @@ import {
   carveStep,
   mechanismsStep,
   touchStep,
-  trackStep,
   projectNameStep,
 } from "../../../../src/steps/registerEditorSteps.ts";
 import { CARVE_WRITES, ADD_GALLERY_WRITES, TOUCH_WRITES } from "../../../../src/steps/editorMutate.ts";
@@ -61,7 +60,6 @@ describe("spec 017 — editor-step declared contracts are well-formed (FR-002, F
     { name: "carve", step: carveStep },
     { name: "mechanisms", step: mechanismsStep },
     { name: "touch", step: touchStep },
-    { name: "track", step: trackStep },
     { name: "project_name", step: projectNameStep },
   ];
 
@@ -92,14 +90,6 @@ describe("spec 017 — editor-step declared contracts are well-formed (FR-002, F
     expect(touchStep.inputs).toEqual([]);
   });
 
-  it("track.writes is [] (DEC-D2 — branch selection only, no IR leaf in P1)", () => {
-    expect(trackStep.writes).toEqual([]);
-  });
-
-  it("track.inputs are header.bcp47 (array, session-derived) + resolved base display name (header.name)", () => {
-    expect(trackStep.inputs.map(formatIRPath)).toEqual(["header.bcp47", "header.name"]);
-  });
-
   it("project_name declares its scaffold writes (header.name / header.keyboardId) against existing locations", () => {
     expect(projectNameStep.writes.map(formatIRPath)).toEqual(["header.name", "header.keyboardId"]);
     expect(projectNameStep.inputs.map(formatIRPath)).toEqual(["header.bcp47"]);
@@ -123,7 +113,7 @@ describe("spec 017 — FR-013 forbidden-path guard: no declaration references he
   });
 
   it("no editor-step declaration references header.script", () => {
-    const all = [carveStep, mechanismsStep, touchStep, trackStep, projectNameStep];
+    const all = [carveStep, mechanismsStep, touchStep, projectNameStep];
     for (const step of all) {
       for (const p of [...step.inputs, ...step.writes]) {
         expect(formatIRPath(p)).not.toBe("header.script");

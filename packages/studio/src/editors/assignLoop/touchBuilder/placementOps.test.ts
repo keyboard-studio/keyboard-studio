@@ -320,6 +320,7 @@ describe("buildSubkeyMoveOps", () => {
       subkeyKey(),
       { kind: "sk", id: "T_2" },
       { area: "lp", beforeId: "T_1" },
+      "T_new",
     );
     const order = plan.ops
       .filter((o) => o.kind === "setSubKey")
@@ -328,7 +329,7 @@ describe("buildSubkeyMoveOps", () => {
     expect(plan.ops.filter((o) => o.kind === "removeSubKey")).toHaveLength(2);
   });
   it("moves a longpress to the end on area drop", () => {
-    const plan = buildSubkeyMoveOps(ADDR, subkeyKey(), { kind: "sk", id: "T_1" }, { area: "lp" });
+    const plan = buildSubkeyMoveOps(ADDR, subkeyKey(), { kind: "sk", id: "T_1" }, { area: "lp" }, "T_new");
     const order = plan.ops
       .filter((o) => o.kind === "setSubKey")
       .map((o) => (o as { fields: { id: string } }).fields.id);
@@ -340,6 +341,7 @@ describe("buildSubkeyMoveOps", () => {
       subkeyKey(),
       { kind: "flick", direction: "n" },
       { area: "flick", direction: "ne" },
+      "T_new",
     );
     expect(plan.ops).toMatchObject([
       { kind: "removeSubKey", sub: { kind: "flick", id: "n" } },
@@ -354,6 +356,7 @@ describe("buildSubkeyMoveOps", () => {
       k,
       { kind: "flick", direction: "n" },
       { area: "flick", direction: "ne" },
+      "T_new",
     );
     const sets = plan.ops.filter((o) => o.kind === "setSubKey");
     expect(sets).toMatchObject([
@@ -372,21 +375,157 @@ describe("buildSubkeyMoveOps", () => {
       k,
       { kind: "multitap", index: 1 },
       { area: "mt", index: 0 },
+      "T_new",
     );
     const order = plan.ops
       .filter((o) => o.kind === "setSubKey")
       .map((o) => (o as { fields: { id: string } }).fields.id);
     expect(order).toEqual(["T_m2", "T_m1"]);
   });
-  it("ignores cross-kind drops", () => {
+});
+
+// Cross-kind subkey moves (#2596 item 3): a chip dragged to a different
+// family moves there, text/sp/output preserved, the displaced occupant
+// (if any) back to the tray.
+describe("buildSubkeyMoveOps cross-kind", () => {
+  it("moves a longpress into an empty flick direction", () => {
+    const plan = buildSubkeyMoveOps(
+      ADDR,
+      subkeyKey(),
+      { kind: "sk", id: "T_1" },
+      { area: "flick", direction: "ne" },
+      "T_new",
+    );
+    expect(plan.ops).toMatchObject([
+      { kind: "removeSubKey", sub: { kind: "sk", id: "T_1" } },
+      { kind: "setSubKey", sub: { kind: "flick", id: "ne" }, fields: { text: "a" } },
+    ]);
+    expect(plan.displacedBackToTray).toBeNull();
+  });
+  it("moves a longpress into an occupied flick direction, displacing its glyph to the tray", () => {
+    const plan = buildSubkeyMoveOps(
+      ADDR,
+      subkeyKey(),
+      { kind: "sk", id: "T_1" },
+      { area: "flick", direction: "n" },
+      "T_new",
+    );
+    expect(plan.ops).toMatchObject([
+      { kind: "removeSubKey", sub: { kind: "sk", id: "T_1" } },
+      { kind: "setSubKey", sub: { kind: "flick", id: "n" }, fields: { text: "a" } },
+    ]);
+    expect(plan.displacedBackToTray).toBe("x");
+  });
+  it("moves a longpress into multitap, keeping its id while a tap is free", () => {
+    const plan = buildSubkeyMoveOps(
+      ADDR,
+      subkeyKey(),
+      { kind: "sk", id: "T_1" },
+      { area: "mt" },
+      "T_new",
+    );
+    expect(plan.ops).toMatchObject([
+      { kind: "removeSubKey", sub: { kind: "sk", id: "T_1" } },
+      { kind: "setSubKey", sub: { kind: "multitap", id: "T_1" }, fields: { text: "a" } },
+    ]);
+    expect(plan.displacedBackToTray).toBeNull();
+  });
+  it("moves a longpress into a full multitap, replacing the 3x entry", () => {
+    const k = subkeyKey();
+    k.multitap = [
+      { id: "T_m1", text: "c", sp: 0 },
+      { id: "T_m2", text: "d", sp: 0 },
+    ];
+    const plan = buildSubkeyMoveOps(ADDR, k, { kind: "sk", id: "T_1" }, { area: "mt" }, "T_new");
+    expect(plan.displacedBackToTray).toBe("d");
+    const texts = plan.ops
+      .filter((o) => o.kind === "setSubKey")
+      .map((o) => (o as { fields: { text: string } }).fields.text);
+    expect(texts).toEqual(["c", "a"]);
+  });
+  it("moves a flick into longpress under a fresh id", () => {
+    const plan = buildSubkeyMoveOps(
+      ADDR,
+      subkeyKey(),
+      { kind: "flick", direction: "n" },
+      { area: "lp" },
+      "T_new",
+    );
+    expect(plan.ops).toMatchObject([
+      { kind: "removeSubKey", sub: { kind: "flick", id: "n" } },
+      { kind: "setSubKey", sub: { kind: "sk", id: "T_new" }, fields: { text: "x" } },
+    ]);
+    expect(plan.displacedBackToTray).toBeNull();
+  });
+  it("moves a flick into multitap under a fresh id", () => {
+    const plan = buildSubkeyMoveOps(
+      ADDR,
+      subkeyKey(),
+      { kind: "flick", direction: "n" },
+      { area: "mt" },
+      "T_new",
+    );
+    expect(plan.ops).toMatchObject([
+      { kind: "removeSubKey", sub: { kind: "flick", id: "n" } },
+      { kind: "setSubKey", sub: { kind: "multitap", id: "T_new" }, fields: { text: "x" } },
+    ]);
+    expect(plan.displacedBackToTray).toBeNull();
+  });
+  it("moves a multitap entry into longpress, keeping its id", () => {
+    const plan = buildSubkeyMoveOps(
+      ADDR,
+      subkeyKey(),
+      { kind: "multitap", index: 0 },
+      { area: "lp" },
+      "T_new",
+    );
+    expect(plan.ops).toMatchObject([
+      { kind: "removeSubKey", sub: { kind: "multitap", id: "T_m1" } },
+      { kind: "setSubKey", sub: { kind: "sk", id: "T_m1" }, fields: { text: "c" } },
+    ]);
+    expect(plan.displacedBackToTray).toBeNull();
+  });
+  it("moves a multitap entry into a flick direction, displacing its glyph to the tray", () => {
+    const plan = buildSubkeyMoveOps(
+      ADDR,
+      subkeyKey(),
+      { kind: "multitap", index: 0 },
+      { area: "flick", direction: "n" },
+      "T_new",
+    );
+    expect(plan.ops).toMatchObject([
+      { kind: "removeSubKey", sub: { kind: "multitap", id: "T_m1" } },
+      { kind: "setSubKey", sub: { kind: "flick", id: "n" }, fields: { text: "c" } },
+    ]);
+    expect(plan.displacedBackToTray).toBe("x");
+  });
+  it("leaves the key untouched on an out-of-range multitap landing index", () => {
     expect(
-      buildSubkeyMoveOps(ADDR, subkeyKey(), { kind: "sk", id: "T_1" }, { area: "flick", direction: "n" }).ops,
+      buildSubkeyMoveOps(ADDR, subkeyKey(), { kind: "sk", id: "T_1" }, { area: "mt", index: 5 }, "T_new")
+        .ops,
     ).toHaveLength(0);
     expect(
-      buildSubkeyMoveOps(ADDR, subkeyKey(), { kind: "flick", direction: "n" }, { area: "lp" }).ops,
+      buildSubkeyMoveOps(
+        ADDR,
+        subkeyKey(),
+        { kind: "flick", direction: "n" },
+        { area: "mt", index: 5 },
+        "T_new",
+      ).ops,
     ).toHaveLength(0);
     expect(
-      buildSubkeyMoveOps(ADDR, subkeyKey(), { kind: "multitap", index: 0 }, { area: "lp" }).ops,
+      buildSubkeyMoveOps(ADDR, subkeyKey(), { kind: "multitap", index: 5 }, { area: "lp" }, "T_new")
+        .ops,
+    ).toHaveLength(0);
+  });
+  it("leaves the key untouched when the dragged entry does not exist", () => {
+    expect(
+      buildSubkeyMoveOps(ADDR, subkeyKey(), { kind: "sk", id: "T_nope" }, { area: "flick", direction: "ne" }, "T_new")
+        .ops,
+    ).toHaveLength(0);
+    expect(
+      buildSubkeyMoveOps(ADDR, subkeyKey(), { kind: "flick", direction: "sw" }, { area: "lp" }, "T_new")
+        .ops,
     ).toHaveLength(0);
   });
 });

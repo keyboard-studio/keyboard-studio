@@ -99,9 +99,19 @@ export function welcomeHtm(displayName: string): string {
   });
 }
 
-/** `source/readme.htm` — shown by Keyman in the package details. */
+/**
+ * `source/readme.htm` — shown by Keyman in the package details. Rendered
+ * through the same `readmeHtm` form the output projection renders (as
+ * `welcomeHtm` is), so the scaffolder stub and the shipped page share one
+ * shell: doctype, charset, title and the shared inline style.
+ */
 export function readmeHtm(displayName: string): string {
-  return `<html><body><p>${escapeHtml(displayName)} keyboard</p></body></html>`;
+  const name = escapeHtml(displayName);
+  return renderDocForm(DOC_FORMS.forms.readmeHtm, {
+    displayName: name,
+    pageStyle: DOC_PAGE_STYLE,
+    noDescription: "1",
+  });
 }
 
 /**

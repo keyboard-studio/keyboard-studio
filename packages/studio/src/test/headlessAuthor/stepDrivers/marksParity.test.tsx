@@ -88,7 +88,7 @@ async function expectParity(seed: () => void = () => {}): Promise<MarksTreatment
   const result = await marksDrivers["marks"]!({
     case: c,
     startIr: useWorkingCopyStore.getState().startIr as never,
-    report: createRunReport("store-default"),
+    report: createRunReport(),
   });
 
   expect(withoutClock(getMarksTreatmentValue())).toEqual(withoutClock(uiValue));

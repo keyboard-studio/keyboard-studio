@@ -17,15 +17,14 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
+import { usePublishStepNav } from "../hooks/usePublishStepNav.ts";
 import { TextSampleAffordance } from "./TextSampleAffordance.tsx";
 import { textSampleMarksLabel } from "./marksTextSample.ts";
 import {
-  TEXT_MAIN,
   surveyPageColumn,
   phaseHeading,
   leadParagraph,
   mutedParaFlush,
-  secondaryButton,
 } from "./surveyStyles.ts";
 
 export interface MarksTextSamplePromptProps {
@@ -46,6 +45,29 @@ export function MarksTextSamplePrompt({
   onSkip,
 }: MarksTextSamplePromptProps) {
   const { t } = useLingui();
+  // Back / Continue render in the footer (spec 081): this prompt replaces
+  // PhaseB while it is shown, so PhaseB's publisher is unmounted and the
+  // footer would otherwise go empty while in-body buttons appear mid-page.
+  // The skip is the forward action — it completes the step, with the
+  // consequence stated in the body copy below.
+  usePublishStepNav({
+    back: {
+      label: t({
+        id: "survey.phaseB.buildList.marksTextSamplePrompt.backButton",
+        message: "Back",
+      }),
+      onClick: onBack,
+      testId: "marks-text-sample-prompt-back",
+    },
+    forward: {
+      label: t({
+        id: "survey.phaseB.buildList.marksTextSamplePrompt.skipButton",
+        message: "Continue without a text sample",
+      }),
+      onClick: onSkip,
+      testId: "marks-text-sample-prompt-skip",
+    },
+  });
   // Rendered on dotted-circle carriers so bare combining marks are visible
   // (the same displayChar the build list uses for lone marks; the rule lives
   // in marksTextSample.ts beside the prompt's other decisions).
@@ -91,30 +113,6 @@ export function MarksTextSamplePrompt({
             "If you continue without a text sample, the attachment rows will start unchecked. An unchecked letter+mark pair won't be reachable by ordinary typing.",
         })}
       </p>
-      <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
-        <button
-          type="button"
-          data-testid="marks-text-sample-prompt-back"
-          onClick={onBack}
-          style={{ ...secondaryButton, color: TEXT_MAIN }}
-        >
-          {t({
-            id: "survey.phaseB.buildList.marksTextSamplePrompt.backButton",
-            message: "Back",
-          })}
-        </button>
-        <button
-          type="button"
-          data-testid="marks-text-sample-prompt-skip"
-          onClick={onSkip}
-          style={{ ...secondaryButton, color: TEXT_MAIN }}
-        >
-          {t({
-            id: "survey.phaseB.buildList.marksTextSamplePrompt.skipButton",
-            message: "Continue without a text sample",
-          })}
-        </button>
-      </div>
     </section>
   );
 }

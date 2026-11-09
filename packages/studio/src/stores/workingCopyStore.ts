@@ -21,7 +21,12 @@
 //   - Worker boundary upheld: WASM is not imported here.
 
 import { create } from "zustand";
-import { DEFAULT_FALLBACK_POLICY, isLayoutOperation, listDeadkeys } from "@keyboard-studio/contracts";
+import {
+  DEFAULT_FALLBACK_POLICY,
+  createVirtualFS,
+  isLayoutOperation,
+  listDeadkeys,
+} from "@keyboard-studio/contracts";
 import type {
   Attribution,
   AxisFill,
@@ -49,6 +54,7 @@ import type {
   RepairProposal,
   KmnEdit,
   KmnEditsValue,
+  SourceRef,
 } from "@keyboard-studio/contracts";
 import {
   detectMarkInputOrderFromImport,
@@ -61,6 +67,8 @@ import {
   invertEffect,
   applyIRChanges,
   invertChanges,
+  parseKpsLanguages,
+  parseKmn,
 } from "@keyboard-studio/engine";
 import type { KmnEditEffect } from "@keyboard-studio/engine";
 import type { IRChange } from "@keyboard-studio/contracts";
@@ -71,6 +79,7 @@ import type {
   LdmlProfileId,
   StartDocCssText,
 } from "@keyboard-studio/engine";
+import { readVfsText } from "../lib/vfsText.ts";
 import type { PreviewProjection } from "../lib/previewProjection.ts";
 import type { BaseLayoutId as LdmlBaseLayoutChoice } from "../lib/referenceBaseLayouts.ts";
 import type { DeadkeyOperation, DeadkeyOverlay } from "../lib/deadkeyOps.ts";
@@ -396,6 +405,10 @@ export interface AppliedContextTolerance {
  * "New keyboard" in a future header bar) and will be promoted to a contracts
  * field in a future joint session when the output layer needs it.
  */
+export type ReplaceStartingPointResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
 export type InstantiationMode = "new-from-base" | "adapt-existing" | null;
 
 // Identity patch lives in a leaf module (see identityPatch.ts); re-exported
@@ -692,6 +705,12 @@ export interface WorkingCopyState {
    * empty array means "computed, nothing found". Persisted.
    */
   baselineDocFindings: LintFinding[] | null;
+  /**
+   * Which repository's copy an opened keyboard came from, and the commit it was
+   * pinned at (spec 111 US4). Null when not opened for update or not yet
+   * resolved. Persisted; feeds the PR source block.
+   */
+  startSource: SourceRef | null;
 
   // -- Carve working IR (irStore slots) ----------------------------------------
   /**
@@ -839,6 +858,26 @@ export interface WorkingCopyState {
    * Null until Phase E completes.
    */
   touchLayoutJson: string | null;
+  /**
+   * The keyboard's OSK stylesheet (`&KMW_EMBEDCSS`) as the author left it in
+   * the CSS step. Null = untouched (the start keyboard's own file, if any,
+   * ships as-is); "" = the author cleared it (the file and its store line are
+   * dropped). Projected into the VFS by projectWorkingCopyVfs step 0b, so the
+   * OSK preview and the zip read the same text.
+   */
+  customCss: string | null;
+  /**
+   * The Documentation step's authored overrides (specs/html-editor), one
+   * nullable string per editable doc member, mirroring `customCss`:
+   * null = untouched (the generated/carried text ships as-is);
+   * "" = the author cleared it. Projected into the VFS by
+   * projectWorkingCopyVfs step 0b and applied again at serialize step 5c
+   * so regeneration cannot overwrite them.
+   */
+  authoredWelcomeHtm: string | null;
+  authoredReadmeHtm: string | null;
+  authoredReadmeMd: string | null;
+  authoredHelpPhp: string | null;
   /**
    * In-progress Phase E (touch gallery) draft state — persisted across
    * unmount/remount when the user navigates back to Phase C and returns.
@@ -1153,6 +1192,16 @@ export interface WorkingCopyState {
    * and KMW renders its own native default (or the keyboard's shipped file).
    */
   setTouchLayoutJson: (json: string | null) => void;
+  /** Record the CSS step's result (null = untouched, "" = cleared). */
+  setCustomCss: (css: string | null) => void;
+  /** Record the Documentation step's authored welcome.htm (null = untouched, "" = cleared). */
+  setAuthoredWelcomeHtm: (text: string | null) => void;
+  /** Record the Documentation step's authored readme.htm (null = untouched, "" = cleared). */
+  setAuthoredReadmeHtm: (text: string | null) => void;
+  /** Record the Documentation step's authored README.md (null = untouched, "" = cleared). */
+  setAuthoredReadmeMd: (text: string | null) => void;
+  /** Record the Documentation step's authored help .php (null = untouched, "" = cleared). */
+  setAuthoredHelpPhp: (text: string | null) => void;
   /**
    * Persist the in-progress Phase E draft so it survives an unmount/remount
    * caused by back-navigation to Phase C. Call from TouchGallery whenever
@@ -1386,6 +1435,17 @@ export interface WorkingCopyState {
   ) => void;
 
   /**
+   * Open mode (spec 111 FR-009): replace one starting-point file with
+   * author-edited text. The VFS text and, for a `.kmn`, the re-parsed `startIr`
+   * are written in ONE update so the VFS and `startIr` never disagree. A `.kmn`
+   * that does not parse changes nothing and returns `{ ok: false }` (FR-015).
+   * Replay over the new `startIr` is the caller's next step
+   * (`replaceStartingPointAndReplay`); this action never imports the decisions
+   * layer.
+   */
+  replaceStartingPointFromText: (path: string, text: string) => ReplaceStartingPointResult;
+
+  /**
    * Apply an identity patch (language name, BCP47 tag, display name) over
    * the base keyboard identity. Replaces any prior patch (last-wins).
    */
@@ -1463,6 +1523,9 @@ export interface WorkingCopyState {
 
   /** Record the base's own documentation findings at instantiation (spec 079 FR-020). */
   setBaselineDocFindings: (findings: LintFinding[] | null) => void;
+
+  /** Record where an opened keyboard came from (spec 111 US4). */
+  setStartSource: (source: SourceRef | null) => void;
 
   /**
    * Returns true once instantiateFromStart or instantiateFromExisting has been
@@ -1628,6 +1691,24 @@ function reconcileRemapPosture(
 }
 
 /**
+ * Open mode (spec 111): the language list the author starts from, read from the
+ * keyboard's own `.kps` in the VFS. Returns `{}` when the descriptor is absent
+ * or lists no language, or when the caller's identity seed already carries a
+ * list, so the identity falls back to what it was before.
+ */
+function openLanguagesFromVfs(
+  vfs: VirtualFS,
+  keyboardId: string,
+  seed: IdentityPatch | undefined,
+): Pick<IdentityPatch, "languages"> {
+  if (seed?.languages !== undefined) return {};
+  const kps = readVfsText(vfs, `source/${keyboardId}.kps`);
+  if (kps === undefined) return {};
+  const languages = parseKpsLanguages(kps).map((l) => ({ tag: l.tag, name: l.name }));
+  return languages.length > 0 ? { languages } : {};
+}
+
+/**
  * Shared three-case resolution for instantiateFromStart / instantiateFromExisting.
  *
  * Three cases, in order:
@@ -1719,6 +1800,11 @@ function freshInstantiationTail() {
     // settles), so no in-flight value can be lost here.
     sequenceFlaggedChars: [],
     touchLayoutJson: null,
+    customCss: null,
+    authoredWelcomeHtm: null,
+    authoredReadmeHtm: null,
+    authoredReadmeMd: null,
+    authoredHelpPhp: null,
     touchDraft: null,
     galleryIntrosSeen: { mechanism: false, touch: false },
     // Fresh instance, not carried from any preceding working copy — see
@@ -1815,6 +1901,7 @@ export type WorkingCopyData = Omit<
   WorkingCopyState,
   // actions are excluded from the data snapshot
   | "setIR"
+  | "replaceStartingPointFromText"
   | "setWorkingIR"
   | "clearIR"
   | "deleteNode"
@@ -1843,6 +1930,11 @@ export type WorkingCopyData = Omit<
   | "lockDesktop"
   | "unlockDesktop"
   | "setTouchLayoutJson"
+  | "setCustomCss"
+  | "setAuthoredWelcomeHtm"
+  | "setAuthoredReadmeHtm"
+  | "setAuthoredReadmeMd"
+  | "setAuthoredHelpPhp"
   | "setTouchDraft"
   | "markGalleryIntroSeen"
   | "reset"
@@ -1875,6 +1967,7 @@ export type WorkingCopyData = Omit<
   | "setTouchKeyIdentity"
   | "setStartDocProfile"
   | "setBaselineDocFindings"
+  | "setStartSource"
   | "markStale"
   | "clearStale"
   | "setValidatorFindings"
@@ -1929,6 +2022,7 @@ const INITIAL_STATE: WorkingCopyData = {
   touchKeyIdentity: null,
   startDocProfile: null,
   baselineDocFindings: null,
+  startSource: null,
   // carve IR slots
   ir: null,
   removalCapabilities: new Map(),
@@ -1948,6 +2042,11 @@ const INITIAL_STATE: WorkingCopyData = {
   desktopLocked: false,
   sequenceFlaggedChars: [],
   touchLayoutJson: null,
+  customCss: null,
+  authoredWelcomeHtm: null,
+  authoredReadmeHtm: null,
+  authoredReadmeMd: null,
+  authoredHelpPhp: null,
   touchDraft: null,
   galleryIntrosSeen: { mechanism: false, touch: false },
   // key edit overlay + touch editor mode (spec 063) — empty log, character
@@ -2572,11 +2671,48 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     }
   },
 
+  replaceStartingPointFromText: (path, text) => {
+    const { startVfs, startKeyboard } = get();
+    if (startVfs === null || startKeyboard === null) {
+      return { ok: false, error: "No keyboard is open." };
+    }
+    let nextIr: KeyboardIR | null = null;
+    if (path.endsWith(".kmn")) {
+      try {
+        nextIr = deriveFacets(parseKmn(text, startKeyboard.id).ir);
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    }
+    // A fresh VFS object so subscribers see the change; the file text is the
+    // author's own, verbatim.
+    const nextVfs = createVirtualFS(startVfs.entries());
+    nextVfs.set(path, text, false);
+    set({
+      startVfs: nextVfs,
+      ...(nextIr !== null ? { startIr: nextIr, ir: nextIr } : {}),
+      // The touch layout the projection compares against the file: keep them
+      // identical so the author's text is not re-serialized.
+      ...(path.endsWith(".keyman-touch-layout") ? { touchLayoutJson: text } : {}),
+    });
+    return { ok: true };
+  },
+
   lockDesktop: () => set({ desktopLocked: true }),
 
   unlockDesktop: () => set({ desktopLocked: false }),
 
   setTouchLayoutJson: (json) => set({ touchLayoutJson: json }),
+
+  setCustomCss: (css) => set({ customCss: css }),
+
+  setAuthoredWelcomeHtm: (text) => set({ authoredWelcomeHtm: text }),
+
+  setAuthoredReadmeHtm: (text) => set({ authoredReadmeHtm: text }),
+
+  setAuthoredReadmeMd: (text) => set({ authoredReadmeMd: text }),
+
+  setAuthoredHelpPhp: (text) => set({ authoredHelpPhp: text }),
 
   setTouchDraft: (draft) => set({ touchDraft: draft }),
 
@@ -2910,6 +3046,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         // when no seed was composed. The seed never carries `keyboardId`,
         // so the preserved id above is never overridden.
         ...(identitySeed ?? {}),
+        // Open (spec 111): the language list comes from the keyboard's own
+        // descriptor, not from the single-tag seed.
+        ...openLanguagesFromVfs(vfs, keyboard.id, identitySeed),
       },
       // Seed the carve working IR from the existing keyboard's IR.
       ir,
@@ -2984,6 +3123,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         ? s
         : { baselineDocFindings: findings },
     ),
+
+  setStartSource: (source) => set({ startSource: source }),
 
   isInstantiated: () => get().startKeyboard !== null,
 

@@ -77,6 +77,8 @@ import {
 import { makeTestIR, basicKbdus, makeStartKeyboard, irGroup, charRule } from "@keyboard-studio/contracts/fixtures";
 import { selectStrategy, deriveCarveNeededSet, generateKvksFromIR, oskContinueResult } from "@keyboard-studio/engine";
 import { completeOskStep } from "../lib/oskStepCompletion.ts";
+import { completeHtmlStep } from "../lib/htmlStepCompletion.ts";
+import { completeFallbackPolicyStep } from "../lib/fallbackPolicyStepCompletion.ts";
 import { computeConvenienceGate } from "../survey/convenience/convenienceGate.ts";
 import { recommendedRemovalChars } from "../lib/irToCarveNodes.ts";
 import { manifest } from "../steps/manifest.ts";
@@ -123,7 +125,6 @@ export type { ReplayResult } from "../survey/journeyFixture.ts";
 
 const STEP_FLOW_IDS: Readonly<Record<string, string>> = {
   identity: "identity_lite",
-  track: "track",
   attribution: "attribution",
   project_name: "project_name",
   characters: "phase_b_characters",
@@ -519,6 +520,14 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
 
   const deps = buildReplayReducerDeps();
 
+  // The fixture declares its track up front (fixture.track, default
+  // "copy"), but the routing context must not see it until choose_base
+  // records it: the Open-hidden screens (layout, choose_base, characters,
+  // ...) are gated on the track being "adapt", and reporting it early
+  // would hide the very steps the fixture walks to reach the recording
+  // point. The old track step set it mid-walk; choose_base is that point
+  // now, so selectedTrack stays null until its case runs.
+  const declaredTrack: "copy" | "adapt" = fixture.track ?? "copy";
   let selectedTrack: "copy" | "adapt" | null = null;
   let touchSeedSource: "import-adapt" | "reseed-from-desktop" | null = null;
   let surveyContext: SurveyContext =
@@ -562,34 +571,21 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           const answers = answerMapFromGroup(group, "choose_base");
           const startId = requireStringAnswer(answers, "base_keyboard_id", "choose_base");
           pendingStart = resolveStartFixture(startId);
-          result = undefined;
-          break;
-        }
-
-        case "track": {
-          const answers = answerMapFromGroup(group, "track");
-          const walked = walkFlowFromAnswers(STEP_FLOW_IDS["track"]!, surveyContext, answers);
-          const trackValue = requireStringAnswer(answers, "track_choice", "track");
-          if (trackValue !== "copy" && trackValue !== "adapt") {
-            throw new Error(`journey-runner: track_choice must be "copy" or "adapt", got "${trackValue}"`);
-          }
-          selectedTrack = trackValue;
-          const phaseResult: SurveyPhaseResult = { phase: walked.phase, answers: walked.answers };
-          useWorkingCopyStore.getState().recordPhase(phaseResult);
-          // R3 (steps/reducer.ts): the real onInstantiate callback fires once
-          // track is known — mirrored here rather than at "choose_base"
-          // itself, matching reducer.ts's own comment on where this fires today.
-          if (pendingStart === null) {
-            throw new Error(`journey-runner: "track" completed with no base chosen at "choose_base"`);
-          }
+          // The track question is gone: the fixture declares its track up
+          // front (fixture.track, default "copy"), and the base is
+          // instantiated here at choose_base — the same point StudioShell's
+          // single-instantiation effect fires once the base and the track
+          // are both recorded. Recording the track here (not before) keeps
+          // the Open-hidden gates open for the steps walked to reach it.
           const instantiateResult: InstantiateResult = {
             base: pendingStart.base,
             vfs: pendingStart.vfs,
             ir: pendingStart.ir,
-            track: trackValue,
+            track: declaredTrack,
           };
           applyStepCompletion(CHOOSE_START_STEP_ID, instantiateResult, deps);
-          result = phaseResult;
+          selectedTrack = declaredTrack;
+          result = undefined;
           break;
         }
 
@@ -788,6 +784,12 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           break;
         }
 
+        case "fallback_policy": {
+          completeFallbackPolicyStep();
+          result = undefined;
+          break;
+        }
+
         case "osk": {
           // Mirror OskEditorAdapter: record osk-layout from generated kvks.
           const ir = useWorkingCopyStore.getState().ir;
@@ -840,6 +842,15 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           break;
         }
 
+        case "open_languages":
+        case "open_missing_letters":
+        case "open_upgrades": {
+          // Open-only gallery steps (spec 111): journeys keep the keyboard's own
+          // language list and apply no upgrade, so each step advances with no edit.
+          result = undefined;
+          break;
+        }
+
         case "css": {
           // Optional embed CSS — corpus fixtures carry none; advance with empty css.
           result = { css: "" };
@@ -847,8 +858,24 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
         }
 
         case "html": {
-          // welcome.htm editor — fixtures carry none; advance with empty source.
-          result = { html: "" };
+          // Documentation editor (specs/html-editor): seed from the
+          // authored text, else the base's start prose, else a stub
+          // paragraph, append one edited paragraph, and record the
+          // completion the way HtmlEditor does on Continue.
+          const htmlState = useWorkingCopyStore.getState();
+          const seed =
+            htmlState.authoredWelcomeHtm ?? htmlState.startWelcomeHtmText ?? "<p>Documentation.</p>";
+          const edited = `${seed}\n<p>Edited in the Documentation step.</p>`;
+          completeHtmlStep({ welcomeHtm: edited });
+          result = { welcomeHtm: edited };
+          break;
+        }
+
+        case "icon": {
+          // Keyboard icon — fixtures carry no icon edits; advance with the
+          // template icon unchanged (the default option is Keep, so an
+          // untouched walk ships the template's icon as-is).
+          result = undefined;
           break;
         }
 
@@ -870,7 +897,10 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
         // Spec 088 FR-004: gates read a DecisionSet. This harness tracks the
         // two routing facts as locals (see the header), so it assembles the
         // equivalent set from them — it replays fixtures, it does not read
-        // the live decision store.
+        // the live decision store. The track joins the set only once
+        // choose_base has recorded it (null before that, as on main when
+        // the track step did the recording) — reporting "adapt" early
+        // would hide the Open-hidden steps the walk still has to reach.
         decisions: {
           ...(selectedTrack !== null
             ? { "authoring-track": { id: "authoring-track" as const, value: selectedTrack, provenance: "asked" as const } }

@@ -54,6 +54,8 @@ import { questionRegistry } from "../survey/questions/registry.ts";
 import { extractCharacterInventory } from "../survey/questions/gallery/characterInventory.ts";
 import { runDecisionFlow } from "./decisionFlow.ts";
 import { buildExtractContext } from "./extractContext.ts";
+import { authoringTrackProviderModule } from "../survey/questions/authoringTrackProvider.ts";
+import { baseKeyboardProviderModule } from "../test/baseKeyboardProvider.ts";
 import type { Decision, DecisionId, DecisionSet } from "./decisionTypes.ts";
 import {
   applyDecisionSnapshot,
@@ -162,9 +164,11 @@ const ADAPT_MODULES = [
   "il_target_script",
   "il_author_name",
   "il_copyright_holder",
-  "track_choice",
   "pb_standard_letters",
 ].map(mod);
+// The track question is gone: authoring-track has no question module any
+// more — the start screen provides it (see survey/questions/authoringTrackProvider.ts).
+const ADAPT_MODULES_WITH_TRACK = [...ADAPT_MODULES, authoringTrackProviderModule, baseKeyboardProviderModule];
 
 function median(xs: number[]): number {
   const s = [...xs].sort((a, b) => a - b);
@@ -230,12 +234,12 @@ describe("rebuildPerf.measure — spec 093 SC-004 replay path (T021)", () => {
 
       const extractCtx = buildExtractContext(ir, base);
       const flowDecisions = runDecisionFlow({
-        modules: ADAPT_MODULES,
+        modules: ADAPT_MODULES_WITH_TRACK,
         context: extractCtx,
         answers: {
           il_language_english: "Test Language",
           il_author_name: "Test Author",
-          track_choice: "adapt",
+          "authoring-track": "adapt",
           pb_standard_letters: "basic-az",
         },
       });

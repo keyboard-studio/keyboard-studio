@@ -5,6 +5,7 @@ import {
   DOC_SLOT_IDS,
   escapeDocHtml,
   escapeDocMarkdown,
+  replaceGeneratedBlock,
   stripGeneratedBlocks,
 } from "./docSlots.js";
 
@@ -59,5 +60,26 @@ describe("DOC_SLOT_IDS", () => {
     expect(new Set(DOC_SLOT_IDS).size).toBe(DOC_SLOT_IDS.length);
     expect(DOC_SLOT_IDS).toContain("typingGuide");
     expect(DOC_SLOT_IDS).toContain("version");
+  });
+});
+
+describe("replaceGeneratedBlock", () => {
+  it("replaces only the marked section and keeps the rest byte-identical", () => {
+    const page = `<body>A\n${DOC_GENERATED_START}\nold\n${DOC_GENERATED_END}\nB</body>`;
+    expect(replaceGeneratedBlock(page, "new")).toBe(
+      `<body>A\n${DOC_GENERATED_START}\nnew\n${DOC_GENERATED_END}\nB</body>`,
+    );
+  });
+
+  it("appends a marked block before </body>, or at the end without a body", () => {
+    expect(replaceGeneratedBlock("<body>A</body>", "g")).toBe(
+      `<body>A${DOC_GENERATED_START}\ng\n${DOC_GENERATED_END}\n</body>`,
+    );
+    expect(replaceGeneratedBlock("# A\n", "g")).toBe(`# A\n${DOC_GENERATED_START}\ng\n${DOC_GENERATED_END}\n`);
+  });
+
+  it("is stable when applied twice", () => {
+    const once = replaceGeneratedBlock("<body>A</body>", "g");
+    expect(replaceGeneratedBlock(once, "g")).toBe(once);
   });
 });

@@ -29,14 +29,18 @@ import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
 import { TouchSeedSourceHost } from "../survey/touchSeedSource/TouchSeedSourceHost.tsx";
 import { OskEditorAdapter } from "../editors/adapters/oskAdapter.tsx";
+import { FallbackPolicyAdapter } from "../editors/adapters/fallbackPolicyAdapter.tsx";
 import { CssEditor } from "../editors/assignLoop/CssEditor.tsx";
 import { HtmlEditor } from "../editors/assignLoop/HtmlEditor.tsx";
+import { LanguageListHost } from "../survey/languageList/LanguageListHost.tsx";
+import { MissingLettersHost } from "../survey/openWalk/MissingLettersHost.tsx";
+import { UpgradesHost } from "../survey/openWalk/UpgradesHost.tsx";
+import { IconEditor } from "../editors/assignLoop/IconEditor.tsx";
 import {
   StartResolutionAdapter,
   IdentityLiteAdapter,
 } from "../editors/adapters/panelAdapters.tsx";
 import {
-  TrackStepFactoryComponent,
   AttributionStepFactoryComponent,
   ProjectNameStepFactoryComponent,
   PhaseFStepFactoryComponent,
@@ -102,7 +106,9 @@ export const layoutStep: EditorStep = step({
 
 /**
  * Choose-base step: StartResolution (keyboard base picker ONLY).
- * Track selection is a separate manifest step (trackStep).
+ * There is no track step anymore: the start screen records the track
+ * (New = copy, Open = adapt), and a walk that reaches the base choice
+ * without one defaults to copy when the base is confirmed.
  *
  * spec 080: this step also surfaces the documentation-completeness badge on
  * suggestion cards / MetadataCard (FR-008) — a DISPLAY-ONLY addition; it adds
@@ -117,23 +123,8 @@ export const chooseStartStep: EditorStep = step({
 });
 
 /**
- * Track step: TrackStepFactoryComponent (copy vs adapt choice).
- * Every author chooses a track.
- * Reads session-derived header.bcp47 + resolved base display name (header.name).
- * DEC-D2: branch selection only — no IR leaf in Phase 1, so writes is [].
- */
-export const trackStep: EditorStep = step({
-  id: "track",
-  title: "Authoring Track",
-  component: TrackStepFactoryComponent,
-  inputs: [irPath("header", "bcp47"), irPath("header", "name")],
-  specRef: ["§8", "specs/018-qu-wire-track"],
-  persistence: "answer-store",
-});
-
-/**
  * Attribution step: author name / email / copyright holder (#1901).
- * Asked AFTER the track choice, on both tracks — what the questions
+ * Asked AFTER the base choice, on both tracks — what the questions
  * propose is track-shaped (profile confirmation on copy; the base's
  * copyright holder seeded by the extraction pass on update). The
  * questions were the identity step's tail until #1901; their decisions
@@ -233,6 +224,20 @@ export const mechanismsStep: EditorStep = step({
 });
 
 /**
+ * Fallback policy step (issue #2539): keys the template keyboard does not define
+ * may fall through to the typist's computer layout or be blocked — asked after
+ * Assign Mechanisms, before the OSK step.
+ */
+export const fallbackPolicyStep: EditorStep = step({
+  id: "fallback_policy",
+  title: "Fallback policy",
+  layout: "full",
+  component: FallbackPolicyAdapter,
+  specRef: ["specs/076-rule-behaviours", "specs/109-base-keyboard-fallback"],
+  persistence: "working-copy",
+});
+
+/**
  * OSK step: OskEditor (on-screen keyboard customization).
  * Runs after the Mechanical gallery (mechanisms): the underlying OSK is
  * generated from the physical layout (generateKvksFromIR), and this step
@@ -247,6 +252,45 @@ export const oskStep: EditorStep = step({
   layout: "full",
   component: OskEditorAdapter,
   specRef: ["specs/osk-editor"],
+  persistence: "working-copy",
+});
+
+/**
+ * Open: the keyboard's editable language list (spec 111). Gated to Open by the
+ * declared screen gate in registry.ts; rejoins at characters.
+ */
+export const languageListStep: EditorStep = step({
+  id: "open_languages",
+  title: "Languages",
+  layout: "pane",
+  component: LanguageListHost,
+  specRef: "specs/111-open-existing-keyboard",
+  persistence: "working-copy",
+});
+
+/**
+ * Open: the Missing letters page (spec 111 FR-033). Gated to Open, and to a
+ * baseline that found missing letters, by the declared screen gate in registry.ts.
+ */
+export const missingLettersStep: EditorStep = step({
+  id: "open_missing_letters",
+  title: "Letters",
+  layout: "pane",
+  component: MissingLettersHost,
+  specRef: "specs/111-open-existing-keyboard",
+  persistence: "working-copy",
+});
+
+/**
+ * Open: the Upgrades page (spec 111 FR-034). Gated to Open, and to a baseline
+ * with a failing upgrade criterion, by the declared screen gate in registry.ts.
+ */
+export const upgradesStep: EditorStep = step({
+  id: "open_upgrades",
+  title: "Upgrades",
+  layout: "pane",
+  component: UpgradesHost,
+  specRef: "specs/111-open-existing-keyboard",
   persistence: "working-copy",
 });
 
@@ -349,11 +393,10 @@ export const helpStep: EditorStep = step({
 // ---------------------------------------------------------------------------
 
 /**
- * HTML/Markdown editor step: edits the keyboard's `welcome.htm` documentation
- * file (Markdown despite the extension). This is the full user manual.
- *
- * `readme.htm`, `README.md`, and `.php` versions are generated exports from
- * this source — the output pipeline handles them, not this editor.
+ * HTML/Markdown editor step: edits the keyboard's documentation files
+ * (welcome.htm, readme.htm, README.md, and the help .php — all HTML except
+ * README.md, which is Markdown). This is the full user manual; author edits
+ * override the generated renders downstream (specs/html-editor).
  */
 export const htmlStep: EditorStep = step({
   id: "html",
@@ -361,6 +404,26 @@ export const htmlStep: EditorStep = step({
   layout: "full",
   component: HtmlEditor,
   specRef: ["specs/html-editor"],
+  persistence: "working-copy",
+});
+
+/**
+ * Icon editor step: design the keyboard's icon (after Documentation).
+ *
+ * A modern reimagining of TIKE's bitmap editor (not a port): import-first
+ * (SVG/PNG/ICO), pixel editing at 256×256, low-res-friendly text tool,
+ * live 16/32/48px previews, hand-rolled ICO codec.
+ *
+ * Unskippable per Matthew's ruling (2026-11-03): the author must pass
+ * through, but changing nothing keeps the template keyboard's icon, which
+ * is loaded as the starting point from the base VFS snapshot.
+ */
+export const iconStep: EditorStep = step({
+  id: "icon",
+  title: "Keyboard icon",
+  layout: "full",
+  component: IconEditor,
+  specRef: ["specs/icon-editor"],
   persistence: "working-copy",
 });
 

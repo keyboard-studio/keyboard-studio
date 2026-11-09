@@ -1,16 +1,16 @@
 // Tests for the Assign | Code | Layout tab bar in addPhysicalAdapter.
-//
-// The gallery, the Monaco code pane and the fallback section are mocked: these
-// tests pin the tablist's accessible model and which panel is mounted, not the
-// panels' own behaviour.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { AddPhysicalAdapter } from "./addPhysicalAdapter.tsx";
 
 vi.mock("../assignLoop/MechanismGallery.tsx", () => ({
-  MechanismGallery: () => <div data-testid="mock-gallery" />,
+  MechanismGallery: (props: { onBack?: () => void }) => (
+    <div data-testid="mock-gallery">
+      <button type="button" onClick={props.onBack}>Back</button>
+    </div>
+  ),
 }));
 vi.mock("../assignLoop/KmnCodePane.tsx", () => ({
   KmnCodePane: (props: { revealNodeId?: string }) => (
@@ -25,9 +25,6 @@ vi.mock("../layout/LayoutPane.tsx", () => ({
       </button>
     </div>
   ),
-}));
-vi.mock("../fallback/FallbackPolicySection.tsx", () => ({
-  FallbackPolicySection: () => null,
 }));
 vi.mock("../../hooks/usePlacementPriors.ts", () => ({
   usePlacementPriors: () => undefined,
@@ -95,12 +92,24 @@ describe("AddPhysicalAdapter tab bar", () => {
     expect(tab("assign").getAttribute("aria-selected")).toBe("true");
   });
 
-  it("mounts the Code pane without a reveal id when the tab is picked by hand", async () => {
+  it("keeps the Assign gallery mounted and Back available on the Code tab", async () => {
     renderAdapter();
+    const gallery = screen.getByTestId("mock-gallery");
     fireEvent.click(tab("code"));
     const pane = await waitFor(() => screen.getByTestId("mock-code-pane"));
     expect(pane.getAttribute("data-reveal")).toBe("");
-    expect(screen.queryByTestId("mock-gallery")).toBeNull();
+    expect(screen.getByTestId("mock-gallery")).toBe(gallery);
+  });
+
+  it("passes Back through to the editor step while Code is active", async () => {
+    const onBack = vi.fn();
+    render(<AddPhysicalAdapter onComplete={vi.fn()} onBack={onBack} />);
+    fireEvent.click(tab("code"));
+    fireEvent.click(within(screen.getByTestId("mock-gallery")).getByRole("button", {
+      name: "Back",
+      hidden: true,
+    }));
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the Layout panel mounted, hidden, after leaving it", async () => {

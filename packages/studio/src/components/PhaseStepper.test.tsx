@@ -47,7 +47,7 @@ describe("PhaseStepper", () => {
   it.each([
     ["identity", "a"],
     ["choose_base", "b"],
-    ["track", "b"],
+    ["attribution", "b"],
     ["project_name", "b"],
     ["characters", "c"],
     ["marks", "c"],

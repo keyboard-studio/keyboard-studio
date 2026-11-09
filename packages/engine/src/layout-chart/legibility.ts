@@ -43,9 +43,12 @@ export interface ScriptCoverageRange {
 
 /**
  * Script blocks the chart font stack is assumed to cover (FR-016's testable
- * contract): Latin (Basic + Latin-1 Supplement + Extended-A/B), Greek,
- * Cyrillic (+ Supplement), and common punctuation/currency symbols. A code
- * point outside every range renders as its `U+XXXX` scalar name instead.
+ * contract): every Latin block Noto Sans covers (Basic, Latin-1, Extended
+ * A/B/C/D/Additional, IPA Extensions — the letters of most African and
+ * Americas orthographies live there), Greek, Cyrillic (+ Supplement), and
+ * common punctuation, currency, letterlike and geometric symbols (◌ is the
+ * mark carrier). A code point outside every range renders as its `U+XXXX`
+ * scalar name instead.
  *
  * Deliberately a small block table rather than a query against the generated
  * per-code-point script lookup (`facets/generated/scriptLookup.ts`): the
@@ -60,12 +63,19 @@ export const SCRIPT_COVERAGE_RANGES: readonly ScriptCoverageRange[] = [
   { name: "Latin-1 Supplement", from: 0x00a0, to: 0x00ff },
   { name: "Latin Extended-A", from: 0x0100, to: 0x017f },
   { name: "Latin Extended-B", from: 0x0180, to: 0x024f },
+  { name: "IPA Extensions", from: 0x0250, to: 0x02af },
   { name: "Spacing Modifier Letters", from: 0x02b0, to: 0x02ff },
   { name: "Greek and Coptic", from: 0x0370, to: 0x03ff },
   { name: "Cyrillic", from: 0x0400, to: 0x04ff },
   { name: "Cyrillic Supplement", from: 0x0500, to: 0x052f },
+  { name: "Latin Extended Additional", from: 0x1e00, to: 0x1eff },
   { name: "General Punctuation", from: 0x2000, to: 0x206f },
   { name: "Currency Symbols", from: 0x20a0, to: 0x20cf },
+  { name: "Letterlike Symbols", from: 0x2100, to: 0x214f },
+  { name: "Geometric Shapes", from: 0x25a0, to: 0x25ff },
+  { name: "Latin Extended-C", from: 0x2c60, to: 0x2c7f },
+  { name: "Latin Extended-D", from: 0xa720, to: 0xa7ff },
+  { name: "Alphabetic Presentation Forms", from: 0xfb00, to: 0xfb4f },
 ];
 
 /** True when `codePoint` falls in one of {@link SCRIPT_COVERAGE_RANGES}. */

@@ -49,7 +49,7 @@
 // | language-region-pick | survey/SurveyRunner.tsx (il_language_region, routed by identityResolution) | asked only for a region-ambiguous language, as a free pick among its regions; a case names no region, so the author leaves it blank |
 // | debug-pin-chip | survey/SurveyRunner.tsx (debugPinsStore) | a debug-only affordance that pins a question's value, not part of an author's decisions |
 // | help-docs-dialog | editors/adapters/PhaseFGate.tsx (ConfirmDialog) | a blocking dialog over the help-docs content; dismissing it records nothing |
-// | documentation-fix-proposals | components/DocumentationFixProposals.tsx | per-finding fix proposals applied by button; no walk policy accepts them |
+// | documentation-fix-proposals | components/DocumentationFixProposals.tsx (pagename + image-width rows) | per-finding fix proposals applied by button; no walk policy accepts them — the body-parity choice left this list for the pf_body_parity flow question (issue #2530) |
 // | more-detail-gate-yes | survey/questions/f (pf_more_detail_gate) | answering Yes opens extra Phase F questions; the author keeps the lookup default (No) |
 
 import type { DecisionPoint } from "../decisionPointBases.ts";
@@ -57,6 +57,7 @@ import { manifest } from "../../steps/manifest.ts";
 import { bindManifest, useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { getDecisionSnapshot } from "../../stores/decisionStore.ts";
+import { recordAuthoringTrack } from "../../lib/recordAuthoringTrack.ts";
 import { completeStep } from "../../lib/completeStep.ts";
 import { deriveInventoryCoverageGate } from "../../lib/inventoryDiff.ts";
 import {
@@ -88,11 +89,13 @@ import { marksDrivers } from "./stepDrivers/marks.ts";
 import { convenienceDrivers } from "./stepDrivers/convenience.ts";
 import { carveDrivers } from "./stepDrivers/carve.ts";
 import { mechanismDrivers } from "./stepDrivers/mechanism.ts";
+import { fallbackPolicyDrivers } from "./stepDrivers/fallbackPolicy.ts";
 import { startShipsUsableTouch, touchSeedDrivers } from "./stepDrivers/touchSeed.ts";
 import { oskDrivers } from "./stepDrivers/osk.ts";
 import { capsDrivers } from "./stepDrivers/caps.ts";
 import { customCssDrivers } from "./stepDrivers/customCss.ts";
 import { welcomeHtmDrivers } from "./stepDrivers/welcomeHtm.ts";
+import { iconDrivers } from "./stepDrivers/icon.ts";
 
 export interface AuthorRunOptions {
   /** Eligibility slice for sweeps. Default: no slice filter (US1). */
@@ -121,11 +124,13 @@ const DRIVERS: StepDrivers = {
   ...convenienceDrivers,
   ...carveDrivers,
   ...mechanismDrivers,
+  ...fallbackPolicyDrivers,
   ...oskDrivers,
   ...touchSeedDrivers,
   ...customCssDrivers,
   ...capsDrivers,
   ...welcomeHtmDrivers,
+  ...iconDrivers,
 };
 
 const TERMINALS = new Set(["done", "unsupported"]);
@@ -146,6 +151,14 @@ async function walk(base: DriverContext, point: StartingPoint, onStep?: (step: s
     recordDecision: recorder,
   });
   const ctx: DriverContext = { ...base, recorder };
+
+  // The track question is gone: the start screen records the track before
+  // the walk (New = copy, Open = adapt), so the headless walk records the
+  // case's track the same way, before the first step — via the shared
+  // start-screen helper (FR-040), never a direct store write — and
+  // commitStartKeyboard below waits for it, exactly as StudioShell's
+  // instantiation effect does.
+  recordAuthoringTrack(base.case.track, "start");
 
   let committed = false;
   let step: string = useSurveySessionStore.getState().activeStepId;
@@ -206,7 +219,7 @@ function withTouchApplicability(g: GateResult, hasShippedTouch: boolean): GateRe
 
 export async function runAuthorCase(c: Case, opts: AuthorRunOptions = {}): Promise<AuthorRun> {
   resetAuthorStores();
-  const report = createRunReport(useWorkingCopyStore.getState().fallbackPolicy);
+  const report = createRunReport();
   const base = { caseId: c.id, gates: [], report: report.report };
 
   try {

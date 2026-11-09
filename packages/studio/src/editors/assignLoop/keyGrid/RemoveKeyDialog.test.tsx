@@ -134,7 +134,8 @@ describe("RemoveKeyDialog — the three co-equal options", () => {
     // Each option's OWN trade-off, in its own words (FR-029f "Each option
     // MUST state its trade-off") — not a shared, generic caption.
     expect(screen.getByText(/positions stay identical/i)).toBeTruthy();
-    expect(screen.getByText(/absorbs the freed width unevenly/i)).toBeTruthy();
+    expect(screen.getByText(/freed space stays as padding/i)).toBeTruthy();
+    expect(screen.getByText(/trailing modifier key is the exception/i)).toBeTruthy();
     expect(screen.getByText(/genuinely larger touch target/i)).toBeTruthy();
   });
 

@@ -73,7 +73,7 @@ function seedWalkedSession(): void {
   });
   const s = useSurveySessionStore.getState();
   s.advance("choose_base");
-  useSurveySessionStore.getState().advance("track");
+  useSurveySessionStore.getState().advance("attribution");
   useSurveySessionStore.getState().advance("characters");
   useSurveySessionStore.getState().advance("carve");
   useSurveySessionStore.getState().advance("mechanisms");
@@ -153,7 +153,7 @@ describe("entry point 4 — Resume from the My-keyboards list", () => {
     const snapshot = {
       ...useSurveySessionStore.getState(),
       activeStepId: "carve" as const,
-      history: ["identity", "choose_base", "track", "characters"] as const,
+      history: ["identity", "choose_base", "attribution", "characters"] as const,
     };
     useSurveySessionStore.getState().hydrate(snapshot as never);
 
@@ -163,7 +163,7 @@ describe("entry point 4 — Resume from the My-keyboards list", () => {
     expect([...useSurveySessionStore.getState().history]).toEqual([
       "identity",
       "choose_base",
-      "track",
+      "attribution",
       "characters",
     ]);
   });

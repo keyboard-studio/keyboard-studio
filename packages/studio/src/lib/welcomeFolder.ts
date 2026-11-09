@@ -7,7 +7,7 @@
 // the pattern library, zip, and compiler services, which component tests mock
 // wholesale, and a mocked barrel would leave these pure helpers undefined.
 
-import type { ChartPreference, WelcomeFolderImage } from "@keyboard-studio/contracts";
+import type { ChartPreference, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
 import { extractWelcomeImageRefs } from "@keyboard-studio/engine";
 
 /**
@@ -33,6 +33,17 @@ export const WELCOME_FOLDER = "welcome";
 export const WELCOME_PAGE_PATH = `source/${WELCOME_FOLDER}/welcome.htm`;
 /** The pre-076 flat path, which output must never carry (FR-002). */
 export const FLAT_WELCOME_PATH = "source/welcome.htm";
+
+/**
+ * Where this production's welcome page lives: the folder path, except an Open
+ * walk on a flat-convention base, which carries the opened keyboard's own flat
+ * page unchanged (spec 111 FR-010). Every other track regenerates the page at
+ * the folder path and removes the flat copy (FR-002), so a write to the flat
+ * path there would resurrect a file output must never carry.
+ */
+export function welcomePagePath(isOpen: boolean, convention: WelcomeConvention | null): string {
+  return isOpen && convention === "flat" ? FLAT_WELCOME_PATH : WELCOME_PAGE_PATH;
+}
 
 /** File types a copy carries from the base's welcome folder. */
 const WELCOME_IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|svg|webp|bmp)$/i;
