@@ -26,18 +26,38 @@ export const dialectRows: readonly GlottologDialectRow[];
 
 ```ts
 // packages/studio/src/survey/languageChooser/dialectSearch.ts
-export function makeDialectSearcher(rows: readonly GlottologDialectRow[]): LanguageSearcher; // EthnoLib class
+export function makeDialectSearcher(
+  glottologRows: readonly GlottologDialectRow[] | null,  // null until the lazy chunk loads
+  langtagsDialects: readonly DialectTagset[],            // engine dialectTagsetsFor data (R3)
+): LanguageSearcher;                                     // EthnoLib class over both sources
 export function dialectResultModifier(
-  searcher: LanguageSearcher | null,
+  searcher: LanguageSearcher,
   parentFor: (iso: string) => ILanguage | undefined,  // find-language getLanguageBySubtag + macrolanguage mapping
 ): (results: ILanguage[], searchString: string) => ILanguage[];
 ```
 
-The modifier:
-1. Starts from EthnoLib's `defaultSearchResultModifier`.
-2. Appends the dialect hits ranked by the same tiers. Each hit becomes its parent's `ILanguage` with `match: SearchMatch` attached, using `ILanguage`'s open index signature.
-3. Drops a dialect hit whose parent is already listed at a stronger tier.
-4. Adds a fallback row for an unresolvable parent: Glottolog's language name and the ISO code.
+The dialect searcher indexes two sources:
+- **Glottolog dialects**: `match` = `{relation: "dialect", source: "glottolog", glottocode, countries}`.
+- **langtags variant and `-x-` tagsets**: `match` = `{relation: "variety"` for a registered variant, `"dialect"` for `-x-`; `source: "langtags"`; `dialectTag` set to the tagset's `tag`, e.g. `acr-x-rabinal`, `ca-valencia`}. EthnoLib's own search finds the parent language for these names, but not which tagset matched, so the dialect searcher supplies it.
+
+### Merge rule
+
+EthnoLib's `searchResultModifier` receives a flat, already-ranked list with **no tier information**. So the rule uses only the query `q` (folded) and each result's names (folded):
+
+1. Start from EthnoLib's `defaultSearchResultModifier(results, q)`.
+2. Split the chooser results into a **close** list and a **fuzzy** list.
+   - A result is close if `q` is a prefix of a word in its exonym, autonym, alternate names or region names, or if its code equals `q`.
+   - All other results are fuzzy.
+   - Order within each list is kept.
+3. Run the dialect searcher. Keep its hits whose dialect name contains `q` as a word prefix; the others are its own fuzzy hits.
+4. Output: close chooser results, then the dialect hits from step 3, then fuzzy chooser results, then fuzzy dialect hits.
+5. **Same name, own ISO code first (FR-003)**: when a dialect hit's name equals a close chooser result's exonym or alternate name, the chooser result comes first ("Gheg" → `aln`).
+6. **De-duplicate by parent**: if the parent language is already in the output, attach the `match` to its existing row (it moves into the close group if it was fuzzy) and drop the dialect row.
+7. Map each dialect hit to its parent's `ILanguage` through `parentFor`, after macrolanguage mapping (`cmn` → `zh`, `arb` → `ar`). An unresolvable parent becomes a fallback row: Glottolog's language name and the ISO code.
+
+**Lazy load**: the Glottolog rows load on the first query of 3 or more characters. Until then the searcher uses only the langtags rows, which are already in the engine chunk.
+
+**Measured case**: for "Rabinal", EthnoLib returns `acr, tcf, zoc, sdl, xna, ard`. Only Achi is close; the other five are fuzzy. So Achi stays first with the `acr-x-rabinal` match, and any Glottolog dialect hit would precede the five fuzzy rows. SC-001's top-5 target holds.
 
 ## Studio: code-or-tag layer and fallback rows (R12)
 
@@ -127,7 +147,7 @@ It is registered in `flowModules.identity_lite`, `IDENTITY_QUESTIONS`, and the p
 
 Routing:
 - Routed automatically, as today, when langtags lists more than one region.
-- For any other language, routed when the author uses "Specify a region…" (the chooser's **Customize**). That sets `ctx.ilRegionRequested`; existing walks are unchanged.
+- For any other language, routed when the author uses the "Specify a region…" field in the chooser's **Customize** panel. That sets `ctx.ilRegionRequested`; existing walks are unchanged.
 
 Options: the default region first (marked "default"), the other langtags regions, then "Other region…" (any ISO 3166-1 code). A region equal to the default is omitted from the tag.
 

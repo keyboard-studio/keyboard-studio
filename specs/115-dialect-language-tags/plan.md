@@ -40,7 +40,7 @@ The existing tag readers that misread private use and extensions are moved onto 
 
 **Performance Goals**:
 - No change to the first page load: the chooser chunk (about 770 KB gzipped; EthnoLib embeds its data, and it is not tree-shakeable) loads with the language step (FR-037).
-- The dialect index (about 165 KB gzipped) loads only when the search has fewer than 5 results above the fuzzy tier, or when the dialect question opens.
+- The dialect index (about 165 KB gzipped) loads on the first query of 3 or more characters, or when the dialect question opens, never on first page load.
 - Suggestions keep pace with typing: EthnoLib's `asyncSearchForLanguage` streams results.
 
 **Constraints**:

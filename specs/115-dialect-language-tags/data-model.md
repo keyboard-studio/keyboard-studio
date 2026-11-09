@@ -48,8 +48,9 @@ Attached to a chooser result (EthnoLib `ILanguage`, through its open index signa
 | `source` | `langtags` \| `glottolog` \| `iana` \| `typed` | `glottolog` |
 | `glottocode` | string? | `gasc1240` |
 | `dialectTag` | string? | `oc-gascon` (set when langtags or the registry already gives one) |
-| `countries` | string[]? | `["FR","ES"]`, from the parent when the dialect has none |
-| `tier` | 0-4 | rank tier (exact code, exact name, language prefix, dialect prefix, substring) |
+| `countries` | string[]? | `["ES","FR"]`, from the parent when the dialect has none |
+
+There is no tier field. EthnoLib orders the language results. Dialect hits are placed by the query-and-names merge rule ([contract § merge rule](contracts/dialect-search-and-question.md#merge-rule)), which needs no stored tier.
 
 `relation` is `variety` for registered variants and langtags variant tagsets, `dialect` for Glottolog dialects and langtags `-x-` tagsets, `alias` for a langtags alternate name of the language itself.
 

@@ -62,8 +62,10 @@ Each section records a decision, why, and what was rejected. Line references are
 
 **Decision**:
 - `scripts/codegen-glottolog.mjs` keeps `Countries` for languages and dialects, and emits a separate module, `generated/dialects.ts`. Each row is `[name, foldedName, glottocode, parentIso639_3, parentCountries]`. Only dialects whose `Language_ID` parent has an ISO code are kept: 13,392 rows, about 470 KB raw or 165 KB gzipped.
-- Expose it as a new subpath export, `@keyboard-studio/glottolog/dialects`, with the rows only. Search is a second EthnoLib `LanguageSearcher` built over those rows, so dialect names rank by exactly the same tiers as language names (R7). It plugs in through the chooser's `searchResultModifier`, which appends each dialect hit as its parent's `ILanguage` with the match attached.
-- The studio loads it with a dynamic `import()` when the chooser's search has fewer than five results above the fuzzy tier, or when the dialect question opens.
+- Expose it as a new subpath export, `@keyboard-studio/glottolog/dialects`, with the rows only.
+- Search is a second EthnoLib `LanguageSearcher` built over those rows and the langtags dialect tagsets (R3). It plugs in through the chooser's `searchResultModifier`.
+- The modifier gets no tier information from EthnoLib, so placement uses a query-and-names rule. Close dialect hits go before EthnoLib's fuzzy results ([contract § merge rule](contracts/dialect-search-and-question.md#merge-rule)).
+- The studio loads the rows with a dynamic `import()` on the first query of 3 or more characters, or when the dialect question opens.
 
 **Measured at the pinned commit**:
 - Every dialect's `Language_ID` points to a `language`-level languoid, so there is no nested-dialect walk.

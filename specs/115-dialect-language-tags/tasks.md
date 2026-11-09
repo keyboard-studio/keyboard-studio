@@ -30,7 +30,11 @@
 
 The parser, the shared types and the generated data. Nothing here changes what an author sees, except T009's bug fix.
 
-**Wave 1 — independent:**
+**Wave 0 — first, own commit (shipped defect, research R13):**
+
+- [ ] T009 Fix the shipped defect R13: key `defaultsIndex` on the language subtag, taking the shortest-`tag` tagset per language, so `zh`, `isv`, `con`, `aux`, `nul`, `ocm`, `prn`, `sgn`, `spx`, `tpo`, `txr`, `xaq`, `xcc`, `xce` and `xib` resolve. Add tests (`getLanguageDefaults("zh")`, `("isv")` defined; `("ewo")` unchanged). It runs before T006, which edits the same file, so the fix commit applies cleanly on `main`'s code and can be cherry-picked alone. **Own commit:** `fix(engine): langtags index drops languages with no bare tagset` — scripts/codegen-langtags.mjs, packages/engine/src/langtags/generated/index.ts, packages/engine/src/langtags/index.test.ts
+
+**Wave 1 — independent (T006 after T009):**
 
 - [ ] T003 [P] Write failing tests for `parseBcp47`, `formatBcp47`, `isWellFormedBcp47`, `scriptSubtagOf` and `regionSubtagOf`, one per row of the table in contracts/bcp47-parser.md. Replace the `scriptSubtagOf("lif-x-Deva") === "Deva"` assertion with `undefined`, and add `buu-x-koya`, `kqe-x-east` and `en-u-co-phon` → `undefined` (research R1) — packages/contracts/src/utils/bcp47.test.ts
 - [ ] T004 [P] Add the types `Bcp47Parts`, `Bcp47ParseError`, `SearchMatch` (including `source: "typed"`), `DialectTagset`, `VariantEntry` and `RegisteredLanguage` (data-model.md). Additive only; no `Pattern` or `Criterion` change — packages/contracts/src/langtags.ts, packages/contracts/src/utils/bcp47.ts
@@ -52,11 +56,10 @@ The parser, the shared types and the generated data. Nothing here changes what a
 **Wave 2 — after wave 1:**
 
 - [ ] T008 Implement `parseBcp47`, `formatBcp47`, `isWellFormedBcp47` and `regionSubtagOf` (moved from keyboard-lint), and rewrite `scriptSubtagOf` on the parser, until T003 passes. Pure TS, with no JSON or data import (`/api` bundle safety) — packages/contracts/src/utils/bcp47.ts
-- [ ] T009 Fix the shipped defect R13: key `defaultsIndex` on the language subtag, taking the shortest-`tag` tagset per language, so `zh`, `isv`, `con`, `aux`, `nul`, `ocm`, `prn`, `sgn`, `spx`, `tpo`, `txr`, `xaq`, `xcc`, `xce` and `xib` resolve. Add tests (`getLanguageDefaults("zh")`, `("isv")` defined; `("ewo")` unchanged). **Own commit:** `fix(engine): langtags index drops languages with no bare tagset` — scripts/codegen-langtags.mjs, packages/engine/src/langtags/generated/index.ts, packages/engine/src/langtags/index.test.ts
 - [ ] T010 [P] Extend the codegen determinism test to cover `tagsets.ts`, `dialects.ts`, `variants.ts` and `registeredLanguages.ts`: sorted, stable, row counts at the pinned inputs. It skips visibly when inputs are absent — packages/engine/src/langtags/codegen-determinism.test.ts
 - [ ] T011 [P] Add the `./dialects` subpath export (types and import) and a `dialects.ts` entry exporting `dialectRows`. Do not import it from `src/index.ts`, so the main entry's bundle is unchanged — packages/glottolog/package.json, packages/glottolog/src/dialects.ts
 
-**Checkpoint**: `pnpm build` green; the contracts parser tests and T009's tests pass. Commits: `spec 115 T001-T008, T010-T011`, plus the separate T009 fix.
+**Checkpoint**: `pnpm build` green; the contracts parser tests and T009's tests pass. Commits: the T009 fix first, then `spec 115 T001-T008, T010-T011`.
 
 ---
 
@@ -93,13 +96,19 @@ The parser, the shared types and the generated data. Nothing here changes what a
 **Wave 1 — vendoring and tests:**
 
 - [ ] T020 [P] [US1] Vendor `useLanguageChooser.ts` from EthnoLib `components/language-chooser/react/common/language-chooser-react-hook` (the source matching 0.3.7). Keep the MIT header and the source URL and commit, and import from `@ethnolib/find-language`. Add a typecheck-only test that the return keys match the contract (`languageResults`, `onSearchStringChange`, `selectLanguage`, `selectUnlistedLanguage`, `selectManuallyEnteredTagLanguage`, `selectScript`, `saveLanguageDetails`, `readyToSubmit`, `resetTo`) — packages/studio/src/survey/languageChooser/vendor/useLanguageChooser.ts, packages/studio/src/survey/languageChooser/vendor/useLanguageChooser.test.ts
-- [ ] T021 [P] [US1] Write failing tests for `makeDialectSearcher` and `dialectResultModifier`:
+- [ ] T021 [P] [US1] Write failing tests for `makeDialectSearcher` and `dialectResultModifier` (contract § merge rule):
   - "Gascon" → Occitan with `match` `{relation: "dialect", glottocode: "gasc1240", countries: ["ES","FR"]}`;
   - "Sursilvan" → Romansh;
-  - same-tier ordering puts languages before dialects (FR-003);
-  - a parent already listed at a stronger tier is not duplicated;
+  - **langtags dialect names (C2):** "Rabinal" → Achi with `match` `{relation: "dialect", source: "langtags", dialectTag: "acr-x-rabinal"}`; "Valencian" → Catalan with `{relation: "variety", dialectTag: "ca-valencia"}`;
+  - **merge rule (C1):**
+    - a dialect hit whose name matches the query fully or by prefix is placed before every chooser result whose names do not contain the query (Bloom's fuzzy matches);
+    - for "Rabinal" (6 chooser results, 5 of them fuzzy), Achi is first;
+    - for "Gascon", Occitan appears once, with the match line;
+  - a name that is a language with its own ISO code ranks above a dialect of the same name ("Gheg" → `aln` first, FR-003);
+  - a parent already listed is not duplicated; its existing row gains the `match`;
   - macrolanguage parents mapped (`cmn` → `zh`, `arb` → `ar`);
-  - an unresolvable parent becomes a fallback row.
+  - an unresolvable parent becomes a fallback row;
+  - **multi-parent (U2):** a prefix query matching dialects of two different parents lists both, each with its countries (FR-004).
 
   File: packages/studio/src/survey/languageChooser/dialectSearch.test.ts
 - [ ] T022 [P] [US1] Write the failing behaviour-kept tests (FR-038):
@@ -107,7 +116,8 @@ The parser, the shared types and the generated data. Nothing here changes what a
   - `resolveTypedLanguage` over `ILanguage` resolves a unique exonym, else a unique alias, and is null when ambiguous (the existing cases ported);
   - picking or resolving calls `onEntryResolved` with the matching `LanguageDefaults`, and the code, script and autonym seeds are recorded with `default` provenance;
   - `onSelectAdvance` fires;
-  - the headless author resolves "Ewondo" identically.
+  - the headless author resolves "Ewondo" identically;
+  - **accents (U1, FR-005):** "Arbereshe" and "Arbëreshë" both find `aae`; "catala" finds `ca`; "Gascón" finds Occitan via the dialect searcher.
 
   Files: packages/studio/src/survey/resolveTypedLanguage.test.ts, packages/studio/src/survey/languageChooser/LanguageChooser.test.tsx
 - [ ] T023 [P] [US1] Write the measurement tests:
@@ -122,14 +132,22 @@ The parser, the shared types and the generated data. Nothing here changes what a
 
 **Wave 2 — implementation:**
 
-- [ ] T024 [P] [US1] Implement `makeDialectSearcher(rows)`, an EthnoLib `LanguageSearcher` over `GlottologDialectRow`, and `dialectResultModifier(searcher, parentFor)` (contracts/dialect-search-and-question.md) — packages/studio/src/survey/languageChooser/dialectSearch.ts
+- [ ] T024 [P] [US1] Implement:
+  - `makeDialectSearcher(glottologRows, langtagsDialects)`: an EthnoLib `LanguageSearcher` over both Glottolog dialect rows and the langtags variant and `-x-` tagsets (`dialectTagsetsFor` data, carrying `dialectTag`);
+  - `dialectResultModifier(searcher, parentFor)`, applying the contract's merge rule. The rule uses only the query and each result's names, because the modifier receives no tier information.
+
+  Files: packages/studio/src/survey/languageChooser/dialectSearch.ts
 - [ ] T025 [P] [US1] Generalise `resolveTypedLanguage` to `ILanguage` (`exonym`, `names`); keep the rule. Update `languageResultsFor` for the headless path to call EthnoLib's search with the dialect modifier — packages/studio/src/survey/resolveTypedLanguage.ts
-- [ ] T026 [P] [US1] Port the chooser UI with no MUI: `LanguageChooser` (the existing combobox, fed by `languageResults`, capped at 50) and `LanguageCard` as row content (name, autonym, alternate names, regions, code, and the match line per the contract's table); `ScriptCard`; and `CustomizePanel` (region, dialect name). Use studio styles, message ids (spec 046) and accessible names that include the match line (spec 056) — packages/studio/src/survey/languageChooser/{LanguageChooser,LanguageCard,ScriptCard,CustomizePanel}.tsx, packages/studio/src/locales/
+- [ ] T026 [P] [US1] Port the chooser UI with no MUI: `LanguageChooser` (the existing combobox, fed by `languageResults`, capped at 50) and `LanguageCard` as row content (name, autonym, alternate names, regions, code, and the match line per the contract's table); `ScriptCard`; and `CustomizePanel` (its "Specify a region…" field and its dialect name field). Use studio styles, message ids (spec 046) and accessible names that include the match line (spec 056). **The labels and match-line wording are survey text owned by the content team (Article VI): mark them for content review** — packages/studio/src/survey/languageChooser/{LanguageChooser,LanguageCard,ScriptCard,CustomizePanel}.tsx, packages/studio/src/locales/
 
 **Wave 3 — wiring:**
 
-- [ ] T027 [US1] Map chooser state to decisions (research R7 table) through `identityResolution.onEntryResolved` and the answer commit, never directly to IR. Lazy-load the glottolog `./dialects` chunk when the search has fewer than 5 results above the fuzzy tier — packages/studio/src/survey/identityResolution.ts, packages/studio/src/survey/languageChooser/LanguageChooser.tsx
-- [ ] T028 [US1] Render `il_language_english` with `LanguageChooser` in place of `LangtagsComboboxField`'s name mode. Keep `LangtagsComboboxField` for other callers, and drop name mode if it becomes unused. Put the chooser behind a dynamic `import()` so it and EthnoLib's data load with the language step (FR-037) — packages/studio/src/survey/QuestionField.tsx, packages/studio/src/survey/IdentityLite.tsx
+- [ ] T027 [US1] Map chooser state to decisions (research R7 table) through `identityResolution.onEntryResolved` and the answer commit, never directly to IR.
+  - **Create the `language-search-match` DecisionId here** (IR paths `[]`), with its persistence test; T035 and T048 use it.
+  - Lazy-load the glottolog `./dialects` chunk on the first query of 3 or more characters (contract § merge rule).
+
+  Files: packages/studio/src/decisions/decisionTypes.ts, packages/studio/src/survey/identityResolution.ts, packages/studio/src/survey/languageChooser/LanguageChooser.tsx
+- [ ] T028 [US1] Render `il_language_english` with `LanguageChooser` in place of `LangtagsComboboxField`'s name mode. Keep `LangtagsComboboxField` for other callers, and drop name mode if it becomes unused. Put the chooser behind a dynamic `import()` so it and EthnoLib's data load with the language step (FR-037). Add a build test that the entry chunk does not contain `@ethnolib/find-language` (G2) — packages/studio/src/survey/QuestionField.tsx, packages/studio/src/survey/IdentityLite.tsx, packages/studio/src/survey/languageChooser/lazyBoundary.test.ts
 - [ ] T029 [US1] Populate `searchParity.fixture.json` and `ethnolibParity.fixture.json` from a first run, each exception with a reason; then T023 must pass with no unlisted exceptions — packages/studio/src/survey/languageChooser/*.fixture.json
 
 **Checkpoint**:
@@ -161,14 +179,15 @@ Commit: `spec 115 T020-T029`.
   - `zzz` → a proposal with a warning;
   - `qaa` → a private-use proposal;
   - `sq-AL-gheg` → null with the parser's reason;
-  - `fr-u-co-phonebk` → fr, with the extension dropped and a note.
+  - `fr-u-co-phonebk` → fr, with the extension not carried and a note. Together with the absence of any extension input, this is FR-027's coverage (G3).
 
   File: packages/studio/src/survey/languageChooser/resolveTypedTag.test.ts
 - [ ] T032 [P] [US6] Write failing UI tests:
   - the two fallback rows appear when nothing ranks above the fuzzy tier, and always via "Can't find it?";
   - "is a dialect" keeps the text in `language-search-match` (`source: "typed"`) and re-labels the search;
   - the unlisted panel: name pre-filled; code checks per FR-031; no code → `qaa-x-` from the name (FR-011 rule), with the explanation and request link;
-  - `il_language_code` rejects unchecked free text (FR-033).
+  - `il_language_code` rejects unchecked free text (FR-033);
+  - **SC-008 action counts (G4):** each of the eight inputs reaches a confirmed code within four actions, counted in the test.
 
   File: packages/studio/src/survey/languageChooser/fallbacks.test.tsx
 
@@ -176,7 +195,7 @@ Commit: `spec 115 T020-T029`.
 
 - [ ] T033 [P] [US6] Implement `registeredLanguage(subtag)` over `generated/registeredLanguages.ts`; export it from the langtags barrel — packages/engine/src/langtags/registry.ts, packages/engine/src/langtags/index.ts
 - [ ] T034 [P] [US6] Implement `resolveTypedTag(text)` (parser plus `registeredLanguage`); show its proposal first in the list — packages/studio/src/survey/languageChooser/resolveTypedTag.ts
-- [ ] T035 [US6] Add the fallback rows and the "Can't find it?" link. Implement "is a dialect" (writes the `language-search-match` decision with the pending name, re-labels the search) and `UnlistedLanguagePanel`, mirroring EthnoLib's unlisted and manual-tag paths but checking with `parseBcp47` and `registeredLanguage`. Messages per spec 046 — packages/studio/src/survey/languageChooser/{LanguageChooser,UnlistedLanguagePanel}.tsx, packages/studio/src/locales/
+- [ ] T035 [US6] Add the fallback rows and the "Can't find it?" link. Implement "is a dialect" (writes the `language-search-match` decision with the pending name, re-labels the search) and `UnlistedLanguagePanel`, mirroring EthnoLib's unlisted and manual-tag paths but checking with `parseBcp47` and `registeredLanguage`. Messages per spec 046. **The fallback rows, unlisted-panel text and the ISO 639-3 explanation are survey text owned by the content team (Article VI): mark them for content review** — packages/studio/src/survey/languageChooser/{LanguageChooser,UnlistedLanguagePanel}.tsx, packages/studio/src/locales/
 - [ ] T036 [US6] Turn `il_language_code` into a confirmation of the chooser's result. **Change** reopens the chooser or the typed-code check; there is no unchecked free text. Update its fixtures (the `bft` free-text fixture becomes a checked entry) — packages/studio/src/survey/questions/a/il_language_code.ts
 - [ ] T037 [US6] Extend row 10.4's check to flag `qaa`–`qtz` private-use language codes (FR-032); mark the wording for content review — packages/studio/src/criteria/languageTags.ts, packages/contracts/data/criteria.json
 
@@ -209,10 +228,11 @@ Commit: `spec 115 T020-T029`.
   - Export both from the langtags barrel.
 
   Files: packages/engine/src/langtags/minimalTag.ts, packages/engine/src/langtags/index.ts
-- [ ] T041 [US3] Make `buildTargetBcp47` call `minimalTag`, with a new optional `dialectSubtag` parameter (empty until US2). Delete the private `isSuppressedScript`, and keep `fonipa` and `romanization-Latn` as inputs mapped to parts — packages/studio/src/survey/targetBcp47.ts
+- [ ] T041 [US3] Make `buildTargetBcp47` call `minimalTag`, with a new optional `dialectSubtag` parameter (empty until US2). Delete the private `isSuppressedScript`, and keep `fonipa` and `romanization-Latn` as inputs mapped to parts. Add a dependency-cruiser rule (G1, FR-035): only `survey/languageChooser/` may import from `@ethnolib/find-language`, so EthnoLib's tag builders can never reach the output path — packages/studio/src/survey/targetBcp47.ts, .dependency-cruiser.cjs
 - [ ] T042 [US3] Replace `minimalLocale` with `minimalTagOf` at `document.ts:286` and `ldml-export/package.ts:58`; delete T015's interim code — packages/engine/src/ldml-export/lower/document.ts, packages/engine/src/ldml-export/package.ts
 - [ ] T043 [US3] Region on demand (research R9):
-  - The chooser's **Customize** ("Specify a region…") sets the routing input `ctx.ilRegionRequested`.
+  - The "Specify a region…" field in the chooser's **Customize** panel sets the routing input `ctx.ilRegionRequested`.
+  - **The region help text and option labels are survey text owned by the content team (Article VI): mark them for content review.**
   - `il_language_region` routes when `hasRegionVariants` or `ilRegionRequested`.
   - Options: the default region first (marked), the other langtags regions, then "Other region…" (any ISO 3166-1 code).
   - New help text.
@@ -257,7 +277,7 @@ Commit: `spec 115 T038-T043`.
 **Wave 2 — implementation:**
 
 - [ ] T047 [P] [US2] Implement `variantEntry`, `variantsFor`, `variantAllowed` (prefix rule in data-model.md) and `dialectTagsetsFor`; export them from the langtags barrel — packages/engine/src/langtags/variants.ts, packages/engine/src/langtags/dialects.ts, packages/engine/src/langtags/index.ts
-- [ ] T048 [P] [US2] Add the DecisionIds `language-search-match`, `language-dialect`, `language-dialect-source` and `language-glottocode` (IR paths `[]`). Read them in `deriveIdentityResult` into `LanguageChoice`, and add an `IDENTITY_QUESTIONS` row. If T027 or T035 already added `language-search-match`, extend it rather than duplicating it — packages/studio/src/decisions/decisionTypes.ts, packages/studio/src/decisions/identitySelectors.ts, packages/studio/src/survey/identityLiteResult.ts
+- [ ] T048 [P] [US2] Add the DecisionIds `language-dialect`, `language-dialect-source` and `language-glottocode` (IR paths `[]`). `language-search-match` already exists (T027). Read all four in `deriveIdentityResult` into `LanguageChoice`, and add an `IDENTITY_QUESTIONS` row — packages/studio/src/decisions/decisionTypes.ts, packages/studio/src/decisions/identitySelectors.ts, packages/studio/src/survey/identityLiteResult.ts
 - [ ] T049 [P] [US2] Add `glottocode?` to the identity patch, filled from the decision — packages/studio/src/stores/identityPatch.ts, packages/studio/src/lib/identityLanguagePatch.ts
 
 **Wave 3 — after wave 2:**
@@ -275,6 +295,7 @@ Commit: `spec 115 T038-T043`.
   - The chooser's **Customize** dialect field feeds the same proposal.
   - Edit validates on each keystroke.
   - Message ids and accessible names (specs 046, 056).
+  - **The question's prompt, help text and proposal wording are survey text owned by the content team (Article VI): mark them for content review.**
   - Pass `dialectSubtag` into `buildTargetBcp47` from both producers (`IdentityLite.tsx:53`, `identitySelectors.ts:87`).
 
   Files: packages/studio/src/survey/IdentityLite.tsx, packages/studio/src/survey/questions/a/il_language_dialect.ts, packages/studio/src/survey/languageChooser/CustomizePanel.tsx, packages/studio/src/locales/

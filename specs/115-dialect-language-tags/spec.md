@@ -183,7 +183,7 @@ An author types a name the lists do not know. The studio never stops at "no resu
 - **Extensions (`-u-`, `-t-`) in an opened keyboard.** They are preserved and validated for form, but the studio offers no way to author them.
 - **Name matching ignores case and accents.** Spelling variants such as "Lengadocian" for "Languedocien" are left to the fuzzy tier (FR-003).
 - **The chooser's language data and the studio's pinned langtags disagree.** The chooser's data is its own langtags snapshot. If they differ on a code or default script, the studio's pinned langtags decides the emitted tag (FR-014, FR-015), and the difference is listed in a test fixture (FR-034).
-- **The author pastes a tag with extensions** (`fr-u-co-phonebk`). The language, script and region are resolved; the extension is not authored and is dropped from the proposal, with a note (FR-027).
+- **The author pastes a tag with extensions** (`fr-u-co-phonebk`) into the search. The language, script and region are resolved. The extension is not carried into the new keyboard's tag, with a note (FR-027). FR-025 governs the tags of keyboards that are opened, which keep their extensions.
 
 ## Requirements *(mandatory)*
 
@@ -193,7 +193,7 @@ An author types a name the lists do not know. The studio never stops at "no resu
 
 - **FR-001**: The language search MUST use SIL's shared language search (`@ethnolib/find-language`), which matches language names, autonyms, alternate names, codes and countries, and MUST add the names of Glottolog dialects whose parent language has an ISO 639 code.
 - **FR-002**: A result reached through a dialect name MUST show the matched name, its relation to the language ("a dialect of", "a variety of") and the language's code.
-- **FR-003**: Ranking MUST follow the shared search's tiers: complete match, whole-word match, start-of-word match, substring match, then fuzzy match. Glottolog dialect names MUST be ranked by the same tiers and placed after language matches of the same tier. Within a tier, a name that is a language with its own ISO code MUST rank above a dialect classification of the same name.
+- **FR-003**: Language results MUST keep the shared search's order (complete, whole-word, start-of-word, substring, fuzzy). Dialect matches whose name matches the query fully or by word prefix MUST come after the language results that match the query that closely, and before the shared search's looser (fuzzy) results. A name that is a language with its own ISO code MUST rank above a dialect classification of the same name.
 - **FR-004**: A dialect name with more than one parent MUST list each parent with the countries Glottolog gives for the dialect, or for its parent when the dialect has none.
 - **FR-005**: Matching MUST ignore case and diacritics.
 - **FR-006**: For a fixed sample of language-name queries, the top result's language code MUST match today's search. Every exception MUST be listed in a fixture with a reason; the fixture is reviewed when the shared search's data is updated.
