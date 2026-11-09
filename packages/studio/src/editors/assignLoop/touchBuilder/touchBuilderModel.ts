@@ -20,7 +20,7 @@ import {
   type TouchLayoutIR,
   type TouchKeyIR,
 } from "@keyboard-studio/contracts";
-import { isCombiningMark, resolveKeyAddress } from "@keyboard-studio/engine";
+import { isCombiningMark, proposeSuppressFields, resolveKeyAddress } from "@keyboard-studio/engine";
 import type { PendingKeyEditOperation } from "../../../stores/workingCopyStore.ts";
 
 /**
@@ -575,4 +575,141 @@ export function keycapFontFamily(
   }
   families.push("system-ui", "-apple-system", "'Segoe UI'", "sans-serif");
   return families.join(", ");
+}
+
+// ---------------------------------------------------------------------------
+// Multi-select (#2596 item 2, keymanapp/keyman#3611)
+// ---------------------------------------------------------------------------
+
+/**
+ * Toggle one address in a multi-selection: append when absent, remove when
+ * present. Pure; the pane owns the gesture, TouchGallery owns the state.
+ */
+export function toggleKeySelection(
+  selected: readonly string[],
+  address: string,
+): string[] {
+  return selected.includes(address)
+    ? selected.filter((a) => a !== address)
+    : [...selected, address];
+}
+
+/**
+ * Row-major range selection from the anchor to the target, inclusive —
+ * the Shift+click / Shift+Enter half of multi-select (covers the upstream
+ * "select all the keys in a row": click first, Shift+click last). The range
+ * REPLACES the selection (the standard extend-from-anchor convention). An
+ * anchor that is null or not on the current layer degrades to `[target]`
+ * rather than guessing.
+ */
+export function rangeKeySelection(
+  flatAddresses: readonly string[],
+  anchor: string | null,
+  target: string,
+): string[] {
+  if (anchor === null) return [target];
+  const from = flatAddresses.indexOf(anchor);
+  const to = flatAddresses.indexOf(target);
+  if (from === -1 || to === -1) return [target];
+  const lo = Math.min(from, to);
+  const hi = Math.max(from, to);
+  return flatAddresses.slice(lo, hi + 1);
+}
+
+/**
+ * The value a field carries across a multi-selection: the common value when
+ * every key agrees, `mixed: true` when they do not. The multi-inspector
+ * renders a "Mixed" placeholder/option for the mixed case. Empty → not
+ * mixed, no value (nothing selected).
+ */
+export function commonFieldValue<T>(
+  values: readonly T[],
+): { readonly mixed: boolean; readonly value: T | undefined } {
+  if (values.length === 0) return { mixed: false, value: undefined };
+  const first = values[0]!;
+  for (const value of values) {
+    if (value !== first) return { mixed: true, value: undefined };
+  }
+  return { mixed: false, value: first };
+}
+
+/**
+ * The bulk-appliable fields (#2596 item 2): attributes that are meaningful
+ * identical across keys. Text/hint are per-key content (the same value on
+ * every key is almost never wanted, and a bulk text set would silently
+ * destroy distinct keycaps); id is identity; subkeys and structural ops
+ * (add/delete/move/copy) are single-key.
+ */
+export interface BulkKeyEditFields {
+  readonly width?: number;
+  readonly pad?: number;
+  readonly sp?: 0 | 1 | 2 | 8 | 9 | 10;
+  readonly nextlayer?: string;
+  readonly layer?: string;
+}
+
+/**
+ * Build the op sequence for applying `fields` to every entry: one `set`
+ * per key carrying all of that key's differing fields, plus one `suppress`
+ * per key whose `sp` target is 9/10 (Key Type → Blank/Spacer is the
+ * compound `suppress` op — never a `set` half, FR-029c). Keys already at
+ * the target value emit nothing: a `set` that changes nothing is not a
+ * change the overlay should record (same rule as template apply). Width
+ * snaps to the item-4 alignment grid here too, so a bulk Width commit and
+ * a single Width commit can never disagree.
+ *
+ * Comparison is against the STORED value: `width` defaults to
+ * `BUILDER_DEFAULT_KEY_WIDTH`, `sp` to 0, `nextlayer`/`layer` to "" (the
+ * None/clear value). A stored `pad` of `undefined` is the default margin,
+ * so it compares unequal to an explicit target — committing then makes the
+ * value explicit rather than silently skipping a real change.
+ */
+export function buildBulkKeyEditOps(
+  entries: readonly { readonly address: string; readonly key: TouchKeyIR }[],
+  fields: BulkKeyEditFields,
+): PendingKeyEditOperation[] {
+  const ops: PendingKeyEditOperation[] = [];
+  for (const { address, key } of entries) {
+    // `BuilderSetFields` is readonly — assemble, never mutate.
+    const widthTarget =
+      fields.width !== undefined ? snapBuilderWidth(fields.width) : undefined;
+    const setFields: BuilderSetFields = {
+      ...(widthTarget !== undefined &&
+      (key.width ?? BUILDER_DEFAULT_KEY_WIDTH) !== widthTarget
+        ? { width: widthTarget }
+        : {}),
+      ...(fields.pad !== undefined && key.pad !== fields.pad
+        ? { pad: fields.pad }
+        : {}),
+      ...(fields.sp !== undefined &&
+      fields.sp !== 9 &&
+      fields.sp !== 10 &&
+      (key.sp ?? 0) !== fields.sp
+        ? { sp: fields.sp }
+        : {}),
+      ...(fields.nextlayer !== undefined &&
+      (key.nextlayer ?? "") !== fields.nextlayer
+        ? { nextlayer: fields.nextlayer }
+        : {}),
+      ...(fields.layer !== undefined &&
+      (key.layer ?? key.layerAnnotation ?? "") !== fields.layer
+        ? { layer: fields.layer }
+        : {}),
+    };
+    if (Object.keys(setFields).length > 0) {
+      ops.push({ address, kind: "set", fields: setFields });
+    }
+    if (fields.sp === 9 || fields.sp === 10) {
+      if ((key.sp ?? 0) !== fields.sp) {
+        // Shared sentinel ids (`T_BLANK`/`T_SPACER`): duplicates on one
+        // layer are normal and occurrence-addressed — a shipped layout
+        // carries `T_BLANK` twenty-five times.
+        const { spClass, sentinelId } = proposeSuppressFields(
+          fields.sp === 9 ? "keycap-hole" : "spacer",
+        );
+        ops.push({ address, kind: "suppress", spClass, sentinelId });
+      }
+    }
+  }
+  return ops;
 }
