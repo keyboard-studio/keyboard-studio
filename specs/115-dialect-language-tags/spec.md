@@ -225,7 +225,7 @@ An author types a name the lists do not know. The studio never stops at "no resu
 - **FR-009**: When the language was chosen directly, the dialect step MUST be shown only if the author asks for it (Customize), and MUST then list that language's registered variants (filtered by prefix) and langtags variant and `-x-` tagsets, and accept a typed dialect name, from which it proposes a private-use subtag.
 - **FR-010**: Every proposal MUST show its source and the resulting full tag, and MUST take effect only when the author confirms it (Article X). The author MUST be able to remove the dialect part.
 - **FR-011**: A made-from-name private-use subtag MUST be 1 to 8 ASCII letters or digits, lowercase, with accents folded and spaces and punctuation removed. The author MUST be able to edit it; an ill-formed edit MUST block confirmation with a reason.
-- **FR-012**: The studio MUST store the chosen dialect's Glottolog code, when there is one, with the working copy's identity metadata.
+- **FR-012**: The studio MUST store the chosen dialect's Glottolog code, when there is one, with the working copy's identity metadata, in its own field (`dialect-glottocode`), separate from a language's Glottolog code (FR-045).
 - **FR-013**: Changing the language after a dialect is confirmed MUST re-propose the dialect answer against the new language.
 
 **Tag composition**
@@ -264,13 +264,20 @@ An author types a name the lists do not know. The studio never stops at "no resu
 
 - **FR-043**: The search MUST also list the languages Glottolog has with no ISO 639-3 code, and the dialects of those languages. Each is labelled "known to Glottolog, no ISO 639-3 code", with its countries. Picking one opens the unlisted path (FR-031) pre-filled with its name, Glottolog code and countries. The "is a dialect: find its language" search (FR-030) MUST include these languages as possible parents.
 - **FR-044**: For a language with no code, the proposed tag MUST be `qaa`, plus a region when the language is spoken in exactly one country (or the author picks one), plus `-x-` and a subtag made from the language name (FR-011 rule): e.g. `qaa-ID-x-mansim`. For a dialect of such a language, a second private-use subtag is made from the dialect name: e.g. `qaa-PE-x-sechuran-olmos`. The tag MUST stay well-formed: each private-use subtag at most 8 characters, and the region before `-x-`.
-- **FR-045**: The Glottolog code of a language with no ISO code MUST be stored like a dialect's (FR-012). Review MUST show it alongside the row 10.4 flag and the pointer to requesting an ISO 639-3 code.
+- **FR-045**: The Glottolog code of a language with no ISO code MUST be stored in its own field (`language-glottocode`), so a dialect of such a language keeps both codes. Review MUST show it alongside the row 10.4 flag and the pointer to requesting an ISO 639-3 code.
 - **FR-046**: A language with no langtags entry MUST still get a proposed script, never a blank (Article X). In order:
   1. the default script shared by the most of its nearest Glottolog relatives that have codes;
-  2. otherwise, the most common default script among the langtags languages of its country (or the author's chosen country);
+  2. otherwise, the most common default script among the langtags languages of its country (or the author's chosen country), counting each language once if its `regions` include that country;
   3. otherwise, Latin.
 
   The proposal MUST say which rule produced it, and the author confirms or changes it.
+
+**Registry declarations for the new surfaces (Article IX)**
+
+- **FR-047**: The language question (`il_language_english`) MUST declare that it provides `language-search-match` and `language-glottocode`, and the dialect question (`il_language_dialect`) MUST declare that it provides `language-dialect`, `language-dialect-source` and `dialect-glottocode`.
+  - The chooser, readings, remainder chooser and unlisted panel are parts of the language question's renderer.
+  - They may write other questions' decisions (code, script, autonym, region) only as proposals with their source shown, never as answers. The owning question confirms each one (Article X).
+  - A region found in typed text routes the region question so the author confirms it.
 
 **Shared language chooser**
 

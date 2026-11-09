@@ -158,7 +158,7 @@ It joins the prebuild chain after `codegen-langtags`.
 - **provides**: `language-dialect`.
 - **requires**: `language-code`, `target-script`, `language-region`.
 - **Membership**: `flowModules.identity_lite` (`flowModules.ts:143`).
-- **DecisionIds**: `language-dialect` (the subtag), `language-dialect-source`, `language-glottocode`. They are added to `decisionTypes.ts:11` and `decisionIRPaths` (:287, `[]`).
+- **DecisionIds**: `language-dialect` (the subtag), `language-dialect-source`, `dialect-glottocode` (the dialect's Glottolog code; a language's own code is `language-glottocode`, R15). They are added to `decisionTypes.ts:11` and `decisionIRPaths` (:287, `[]`).
 - **Selector**: an `IDENTITY_QUESTIONS` row (`identitySelectors.ts:168`).
 - **Persistence**: the decision snapshot, so drafts persist it automatically (`draftPersistence.ts:855`).
 

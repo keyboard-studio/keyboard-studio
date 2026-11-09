@@ -32,10 +32,11 @@ The author's identity answers that compose the tag. Derived from decisions by `d
 | `region` | `language-region` | now offered for every language (FR-017) |
 | `dialectSubtag` | `language-dialect` (new) | a variant (`gascon`) or private use (`x-rabinal`), or empty |
 | `dialectSource` | `language-dialect-source` (new) | `registered-variant` \| `langtags` \| `from-name` \| `typed` |
-| `glottocode` | `language-glottocode` (new) | e.g. `gasc1240`; empty when the dialect is not from Glottolog |
+| `languageGlottocode` | `language-glottocode` (new) | only for a language with no ISO code, e.g. `mans1260`; else empty (FR-045) |
+| `dialectGlottocode` | `dialect-glottocode` (new) | the chosen dialect's code, e.g. `gasc1240`; empty when the dialect is not from Glottolog (FR-012) |
 | `bcp47` | computed | `minimalTag(LanguageChoice)` (R2) |
 
-`IdentityLiteResult` (`identityLiteResult.ts`) gains `dialectSubtag`, `dialectSource` and `glottocode`. `IdentityPatch` (`stores/identityPatch.ts`) gains `glottocode?` so it travels with the working copy's identity (FR-012).
+`IdentityLiteResult` (`identityLiteResult.ts`) gains `dialectSubtag`, `dialectSource`, `languageGlottocode` and `dialectGlottocode`. `IdentityPatch` (`stores/identityPatch.ts`) gains both glottocodes (optional) so they travel with the working copy's identity.
 
 ## SearchMatch (contracts type, R7)
 
@@ -117,11 +118,11 @@ What `resolveTypedTag` returns when the search text parses as a tag: `{ language
 
 One reading of multi-word typed text as a language part plus a dialect, a region, or an **unresolved** remainder (contract § reading typed text). Picking a resolved reading writes the same decisions as a chooser pick:
 - `language-search-match` holds the dialect;
-- a region reading writes `language-region` as an asked answer, and the region question is not routed again.
+- a region reading writes a **proposal** to `language-region` (`default` provenance, source "from what you typed") and sets the region gate, so `il_language_region` is routed and the author confirms it (FR-047).
 
 Picking an unresolved reading sets the language, then opens the remainder chooser. Its answer writes one of:
 - `language-search-match` with the typed name (`source: "typed"`);
-- `language-region`;
+- a `language-region` proposal plus the region gate, as above;
 - `language-search-match` with a listed dialect;
 - nothing ("leave it out").
 
@@ -132,7 +133,7 @@ Picking an unresolved reading sets the language, then opens the remainder choose
 | `name` | required; pre-filled with the search text, or the Glottolog name; becomes `language-name` |
 | `code` | optional; checked with `parseBcp47` + `registeredLanguage` (FR-031) |
 | `glottocode` | pre-filled from a Glottolog `uncoded-*` row; written to `language-glottocode` (FR-045) |
-| `dialectName`, `dialectGlottocode` | for an `uncoded-dialect` row |
+| `dialectName`, `dialectGlottocode` | for an `uncoded-dialect` row; the code goes to `dialect-glottocode` through the dialect question's proposal |
 | `countries` | from Glottolog; one country proposes a region |
 | proposed tag | `code` if given, else `proposeUncodedTag` (FR-032, FR-044) |
 | proposed script | `proposeScriptForUncoded` with its source (FR-046) |

@@ -12,6 +12,8 @@ Make a dialect expressible end to end:
 - SIL's shared language chooser (EthnoLib, as in Bloom) as the language search: its backend adopted, its hook vendored, its UI ported into the existing combobox;
 - a lazily loaded Glottolog dialect index plugged into that search;
 - a code-or-tag layer and "nothing matches" fallbacks, so no path leaves the code blank;
+- reading dialects typed together with the language ("Gascon Occitan"), with a remainder chooser for words that match nothing (R14);
+- languages with no ISO code, and dialects of them: found from Glottolog, tagged `qaa…-x-…`, script proposed from relatives or country (R15);
 - a new optional dialect question in the decision registry;
 - region available for every language;
 - tag validation that matches Keyman's package compiler.
@@ -50,7 +52,7 @@ The existing tag readers that misread private use and extensions are moved onto 
 - D3 (no new validating timer; tag findings run in the existing cycle).
 
 **Scale/Scope**:
-- data: 9,596 langtags tagsets (229 of them dialect tagsets), 13,392 searchable Glottolog dialects, 134 registered variants;
+- data: 9,596 langtags tagsets (229 of them dialect tagsets), 14,465 searchable Glottolog rows (13,392 dialects of coded languages, 759 languages with no code, 314 dialects of those), 134 registered variants;
 - corpus: 4,691 language IDs.
 
 ## Constitution Check
@@ -66,7 +68,7 @@ The existing tag readers that misread private use and extensions are moved onto 
 | Art. V (VirtualFS only) | PASS: no host writes; codegen runs at prebuild like langtags. |
 | Art. VI (team split) | PASS: engine owns parser, search, question, codegen; content owns the criteria rows' ids and wording and the question's text (marked as proposals in contracts). |
 | Art. VII (out of scope) | PASS: no `-u-`/`-t-` authoring (FR-027); no opaque-fragment editing. |
-| Art. IX (registry) | PASS: `il_language_dialect` is declared in the registry with provides/requires; order derived; parity pins updated (R8). The registry declaration is a functional requirement here (FR-007). The EthnoLib chooser is a renderer for existing decisions, with no surface of its own (FR-036, R7 mapping table). |
+| Art. IX (registry) | PASS: `il_language_dialect` is declared in the registry with provides/requires; order derived; parity pins updated (R8). The registry declaration is a functional requirement here (FR-007). The EthnoLib chooser, readings, remainder chooser and unlisted panel are parts of `il_language_english`'s renderer (FR-036). That question's declaration grows to provide `language-search-match` and `language-glottocode`, and `il_language_dialect` provides `language-dialect`, `language-dialect-source` and `dialect-glottocode`. These declarations are a functional requirement (FR-047). Other questions' decisions (code, script, autonym, region) are written only as proposals and confirmed by their own questions (Article X). |
 | Art. X (proposals) | PASS: the dialect subtag, region default and variant link are `default`-provenance proposals, confirmed by the author; language change re-proposes via `recalculate` (FR-010, FR-013). |
 | Art. XI (done means integrated) | PASS if the manual walk (quickstart §5) passes on both paths; tasks will include it. |
 | D3 single debounce | PASS: no timer added. Search loading is a lazy import, not a validation cycle. |
@@ -126,7 +128,8 @@ packages/keyboard-lint/src/checks/criteria/check-bcp47.ts, check-currency.ts  us
 packages/studio/package.json                   + @ethnolib/find-language@0.4.4
 packages/studio/src/
   survey/languageChooser/ (new)                LanguageChooser, LanguageCard, ScriptCard, CustomizePanel,
-                                               UnlistedLanguagePanel; dialectSearch.ts; resolveTypedTag.ts;
+                                               UnlistedLanguagePanel, RemainderChooser; dialectSearch.ts;
+                                               resolveTypedTag.ts; readTypedText.ts (R14); uncodedLanguage.ts (R15);
                                                vendor/useLanguageChooser.ts (MIT notice); parity tests + fixtures
   survey/resolveTypedLanguage.ts               generalise to ILanguage; same rule for UI and headless (FR-038)
   survey/QuestionField.tsx                     language field renders the chooser inside the existing combobox
@@ -160,7 +163,7 @@ The phase list is [tasks.md](tasks.md); in summary:
    - EthnoLib backend, vendored hook, ported UI inside the existing combobox, with FR-038 behaviours kept;
    - the Glottolog dialect modifier;
    - the parity fixtures FR-006 and FR-034.
-4. **US6 nothing matches**: the code-or-tag layer, fallback rows, the unlisted panel, and `il_language_code` checked.
+4. **US6 nothing matches**: the code-or-tag layer, fallback rows, the unlisted panel, `il_language_code` checked; typed-text readings and the remainder chooser (T065-T068); languages with no code (T069-T072).
 5. **US3 minimal tag**: `minimalTag`, and region on demand.
 6. **US2 dialect question**.
 7. **US4 validation and kmc parity**.

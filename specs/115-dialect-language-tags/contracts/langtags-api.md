@@ -48,6 +48,8 @@ export function getLanguageDefaults(code: string): LanguageDefaults | undefined;
 | ewo + Arab | `ewo-Arab` |
 | en + US + `u-co-phonebk` | `en-u-co-phonebk` (extension kept, region dropped as default) |
 | `cat` (3-letter form) + Latn | `ca` |
+| qaa + ID + `x-mansim` | `qaa-ID-x-mansim` (no langtags tagset for `qaa`, so no default; the region is kept) |
+| qaa + PE + `x-sechuran-olmos` | `qaa-PE-x-sechuran-olmos` |
 
 **Lookup key**: (canonical language, variants, private use) from `parseBcp47`; never `resolveLangtag`'s string match (research R2).
 

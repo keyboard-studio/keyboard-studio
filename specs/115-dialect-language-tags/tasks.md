@@ -147,6 +147,7 @@ The parser, the shared types and the generated data. Nothing here changes what a
 
 - [ ] T027 [US1] Map chooser state to decisions (research R7 table) through `identityResolution.onEntryResolved` and the answer commit, never directly to IR.
   - **Create the `language-search-match` DecisionId here** (IR paths `[]`), with its persistence test; T035 and T048 use it.
+  - **Registry (FR-047, Article IX):** change `il_language_english` to `provides: ["language-name", "language-search-match", "language-glottocode"]`, with `language-glottocode` itself created in T072. Code, script and autonym are written only as `default`-provenance proposals, as `seedFromEntry` does today; never as answers.
   - Lazy-load the glottolog `./dialects` chunk on the first query of 3 or more characters (contract § merge rule).
 
   Files: packages/studio/src/decisions/decisionTypes.ts, packages/studio/src/survey/identityResolution.ts, packages/studio/src/survey/languageChooser/LanguageChooser.tsx
@@ -213,7 +214,7 @@ Commit: `spec 115 T020-T029`.
   File: packages/studio/src/survey/languageChooser/readTypedText.test.ts
 - [ ] T066 [US6] Implement `readTypedText` and `rankPlacesFor` (contract § reading typed text). `dialectsOf(iso)` draws on the Glottolog rows, the registry (`variantsFor`, by description) and `dialectTagsetsFor`, with the language's own name words stripped. `countries` uses English country names and ISO 3166-1 codes from the chooser data (`getAllRegions`) — packages/studio/src/survey/languageChooser/readTypedText.ts
 - [ ] T067 [US6] Show readings first in the list, labelled.
-  - Picking a resolved reading writes the same decisions as a pick (data-model § TypedReading).
+  - Picking a resolved reading writes the same decisions as a pick (data-model § TypedReading). A region reading (or "It's a place" in the remainder chooser) writes a `default`-provenance **proposal** to `language-region` and sets `ctx.ilRegionRequested`, so `il_language_region` is routed and the author confirms it (FR-047). It never writes the region as an answer. Test: "French Switzerland" routes the region question with Switzerland proposed.
   - Picking an unresolved reading opens the new `RemainderChooser`: dialect name, place (country picker ordered by `rankPlacesFor`), listed dialect, or leave it out. Nothing is written until the author chooses.
   - Extend the resolve-without-a-click rule (FR-042) to a unique dialect name or a unique *resolved* reading, in both the UI and the headless author. An unresolved reading never auto-resolves. The headless author answers the remainder chooser from its script, as it does any question.
   - Message ids for all labels. **The reading labels and remainder-chooser text are survey text owned by the content team (Article VI): mark them for content review.**
@@ -238,7 +239,7 @@ Commit: `spec 115 T020-T029`.
   - **The labels and the script-source wording are survey text owned by the content team (Article VI): mark them for content review.**
 
   Files: packages/studio/src/survey/languageChooser/{dialectSearch,LanguageCard,UnlistedLanguagePanel}.tsx, packages/studio/src/survey/identityResolution.ts, packages/studio/src/locales/
-- [ ] T072 [US6] Write `language-glottocode` for no-code languages too (it is first added in T048; if Phase 5 runs before Phase 7, create the DecisionId here, and T048 extends it). Show it at review beside the 10.4 flag and the ISO 639-3 request pointer (FR-045) — packages/studio/src/decisions/decisionTypes.ts, packages/studio/src/criteria/languageTags.ts
+- [ ] T072 [US6] **Create the `language-glottocode` DecisionId here** (IR paths `[]`), provided by `il_language_english` (T027's declaration): the Glottolog code of a language with no ISO code, written from the unlisted panel. Add a persistence test. Show it at review beside the 10.4 flag and the ISO 639-3 request pointer (FR-045). T048 only reads it — packages/studio/src/decisions/decisionTypes.ts, packages/studio/src/criteria/languageTags.ts
 
 **Wave 5:**
 
@@ -256,7 +257,7 @@ Commit: `spec 115 T020-T029`.
 
 **Wave 1 — tests:**
 
-- [ ] T038 [P] [US3] Write failing `minimalTag` and `minimalTagOf` tests: every row of the table in contracts/langtags-api.md (including `ca + Latn + AD + valencia` → `ca-AD-valencia` and `oc + FR + gascon` → `oc-gascon`), plus the SC-003 property test over all 9,596 tagsets — packages/engine/src/langtags/minimalTag.test.ts
+- [ ] T038 [P] [US3] Write failing `minimalTag` and `minimalTagOf` tests: every row of the table in contracts/langtags-api.md (including `ca + Latn + AD + valencia` → `ca-AD-valencia`, `oc + FR + gascon` → `oc-gascon`, and the `qaa` rows that must keep their region), plus the SC-003 property test over all 9,596 tagsets — packages/engine/src/langtags/minimalTag.test.ts
 - [ ] T039 [P] [US3] Write failing studio tests:
   - `buildTargetBcp47` delegates to `minimalTag`, with a region equal to the default omitted;
   - the "Specify a region…" field in the chooser's **Customize** panel routes `il_language_region` for a single-region language;
@@ -322,8 +323,8 @@ Commit: `spec 115 T038-T043`.
 **Wave 2 — implementation:**
 
 - [ ] T047 [P] [US2] Implement `variantEntry`, `variantsFor`, `variantAllowed` (prefix rule in data-model.md) and `dialectTagsetsFor`; export them from the langtags barrel — packages/engine/src/langtags/variants.ts, packages/engine/src/langtags/dialects.ts, packages/engine/src/langtags/index.ts
-- [ ] T048 [P] [US2] Add the DecisionIds `language-dialect`, `language-dialect-source` and `language-glottocode` (IR paths `[]`). `language-search-match` already exists (T027). Read all four in `deriveIdentityResult` into `LanguageChoice`, and add an `IDENTITY_QUESTIONS` row — packages/studio/src/decisions/decisionTypes.ts, packages/studio/src/decisions/identitySelectors.ts, packages/studio/src/survey/identityLiteResult.ts
-- [ ] T049 [P] [US2] Add `glottocode?` to the identity patch, filled from the decision — packages/studio/src/stores/identityPatch.ts, packages/studio/src/lib/identityLanguagePatch.ts
+- [ ] T048 [P] [US2] Add the DecisionIds `language-dialect`, `language-dialect-source` and `dialect-glottocode` (IR paths `[]`), provided by `il_language_dialect` (T051). `language-search-match` (T027) and `language-glottocode` (T072) already exist. Read all five in `deriveIdentityResult` into `LanguageChoice` (data-model § LanguageChoice: `languageGlottocode`, `dialectGlottocode`). Test the Olmos case, which keeps both codes (`sech1236` and `olmo1234`). Add an `IDENTITY_QUESTIONS` row — packages/studio/src/decisions/decisionTypes.ts, packages/studio/src/decisions/identitySelectors.ts, packages/studio/src/survey/identityLiteResult.ts
+- [ ] T049 [P] [US2] Add `languageGlottocode?` and `dialectGlottocode?` to the identity patch, filled from their decisions — packages/studio/src/stores/identityPatch.ts, packages/studio/src/lib/identityLanguagePatch.ts
 
 **Wave 3 — after wave 2:**
 
@@ -356,6 +357,7 @@ Commit: `spec 115 T038-T043`.
   - **With the gate** (e.g. Gascon): `il_language_dialect` is last, and a draft resumed after `il_target_script` lands on it.
   - A draft saved before this change resumes as today.
   - Confirm the golden-walk e2e (Copy from `basic_kbdfr`) and the headless walks gain no question. French has registered variants, but the gate ignores them (T051).
+  - Pin the changed declarations (FR-047): `il_language_english` provides `language-name`, `language-search-match` and `language-glottocode`; `il_language_dialect` provides `language-dialect`, `language-dialect-source` and `dialect-glottocode`.
 
   Files: packages/studio/src/steps/stepOrder.parity.test.ts, packages/studio/src/lib/legacyStepIds.test.ts, packages/studio/src/decisions/orderParity.test.ts, packages/studio/src/steps/manifest.specref.json, packages/studio/src/survey/IdentityLite.resume.test.tsx
 
@@ -425,7 +427,8 @@ Setup (T001-T002)
   └─ Foundational (T003-T011; T009 own commit)
        ├─ US5 Preservation (T012-T019)            ── independent; ship first
        ├─ US1 Chooser + dialect search (T020-T029) ── needs T007, T011, T001
-       │     └─ US6 Nothing matches (T030-T037)    ── needs US1 (chooser), T005, T008
+       │     └─ US6 Nothing matches (T030-T037, T065-T072) ── needs US1 (chooser), T005, T008;
+       │                                              T069-T071 need T007's uncoded rows and glottolog relatedLanguages
        ├─ US3 Minimal tag (T038-T043)              ── needs T006, T008; T043 needs T026
        │     └─ US2 Dialect (T044-T053)            ── needs US1, US3, US6 (typed name), T005
        └─ US4 Validation (T054-T060)               ── needs T008, T040, T047; T059 needs US1, US6
@@ -440,7 +443,7 @@ Polish (T061-T064)                                 ── needs all
 - **Phase 2, wave 1:** T003, T004, T005, T006 and T007 together.
 - **US5, wave 2:** T014 to T019 together (six files across four packages).
 - **US1, wave 1:** T020, T021, T022 and T023 together; then wave 2: T024, T025 and T026 together.
-- **US6, wave 1:** T030, T031 and T032 together; then wave 2: T033 and T034 together.
+- **US6, wave 1:** T030, T031 and T032 together; then wave 2: T033 and T034 together; T065 and T069 (tests) can start alongside wave 1.
 - **US2, wave 2:** T047, T048 and T049 together.
 - **US4, wave 1:** T054, T055 and T056 together.
 

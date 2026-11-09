@@ -212,21 +212,26 @@ Accessible names include the match line (spec 056).
 
 | DecisionId | Value | Written by | IR paths |
 |---|---|---|---|
-| `language-search-match` | `SearchMatch` subset or `null` (includes the pending typed dialect name) | chooser pick, or "is a dialect" | `[]` |
-| `language-dialect` | subtag string, `""` for none | `il_language_dialect` | `[]` |
-| `language-dialect-source` | `registered-variant` \| `langtags` \| `from-name` \| `typed` \| `""` | `il_language_dialect` | `[]` |
-| `language-glottocode` | glottocode or `""` | `il_language_dialect` | `[]` |
+| DecisionId | Value | Provided by (Art. IX) | Created in | IR paths |
+|---|---|---|---|---|
+| `language-search-match` | `SearchMatch` subset or `null` (includes the pending typed dialect name) | `il_language_english` (chooser pick, reading, "is a dialect") | T027 | `[]` |
+| `language-glottocode` | Glottolog code of a language **with no ISO code**, or `""` | `il_language_english` (unlisted panel, FR-045) | T072 | `[]` |
+| `language-dialect` | subtag string, `""` for none | `il_language_dialect` | T048 | `[]` |
+| `language-dialect-source` | `registered-variant` \| `langtags` \| `from-name` \| `typed` \| `""` | `il_language_dialect` | T048 | `[]` |
+| `dialect-glottocode` | Glottolog code of the chosen **dialect**, or `""` (FR-012) | `il_language_dialect` | T048 | `[]` |
 
-All persist via the decision snapshot. `deriveIdentityResult` reads them into `LanguageChoice`.
+All persist via the decision snapshot. `deriveIdentityResult` reads them into `LanguageChoice`. For Olmos (a dialect of Sechuran) both codes are kept: `language-glottocode = sech1236` and `dialect-glottocode = olmo1234`. For Gascon only `dialect-glottocode = gasc1240` is set, because Occitan has an ISO code.
+
+**Writing other questions' decisions (FR-047)**: the chooser writes `language-code`, `target-script`, `language-autonym` and, from a reading or the remainder chooser, `language-region` only as **proposals** (`default` provenance, with source). That is today's `seedFromEntry` pattern. A region proposal sets the region gate (`ctx.ilRegionRequested`), so `il_language_region` is routed and the author confirms it there. The chooser never writes another question's decision as an answer.
 
 ## Question modules (Article IX)
 
-- **`il_language_english`**: unchanged declaration; its renderer becomes `LanguageChooser`.
+- **`il_language_english`**: renderer becomes `LanguageChooser`. Its declaration changes to `provides: ["language-name", "language-search-match", "language-glottocode"]` (FR-047); `requires` is unchanged. The parity pins move with it (T053).
 - **`il_language_code`**: loses free text. Its value comes from the chooser, a typed tag, or the unlisted panel, each checked by FR-028/031. It renders as a confirmation with **Change**.
 - **`il_language_dialect`** (new):
 
 ```ts
-provides: ["language-dialect"],
+provides: ["language-dialect", "language-dialect-source", "dialect-glottocode"],
 requires: ["language-code", "target-script", "language-region"],
 optional: true,
 outputs: [{ target: "package-descriptor", field: "bcp47" }],
