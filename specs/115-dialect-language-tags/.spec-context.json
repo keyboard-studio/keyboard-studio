@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "Language tags that describe dialects and variants",
   "branch": "115-dialect-language-tags",
-  "currentStep": "tasks",
-  "status": "ready-to-implement",
+  "currentStep": "implement",
+  "status": "implementing",
   "history": [
     {
       "step": "specify",
@@ -25,7 +25,50 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-11-09T10:26:27.455Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-09T11:28:10.883Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T11:28:54.725Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T11:28:54.980Z"
     }
   ],
-  "telemetryInstanceId": "43929674-df99-4d12-aeca-bcc0ff06e188"
+  "telemetryInstanceId": "43929674-df99-4d12-aeca-bcc0ff06e188",
+  "unattended": true,
+  "currentTask": "T002",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "pinned registry 0.4.2 and find-language 0.4.4, lockfile refreshed",
+      "files": [
+        "package.json",
+        "packages/studio/package.json",
+        "pnpm-lock.yaml"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "added vendor LICENSE (MIT)",
+      "files": [
+        "packages/studio/src/survey/languageChooser/vendor/LICENSE"
+      ]
+    }
+  }
 }

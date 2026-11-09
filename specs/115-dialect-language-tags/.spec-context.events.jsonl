@@ -1,0 +1,2 @@
+{"step": "implement", "substep": null, "task": "T001", "kind": "complete", "by": "ai", "at": "2026-11-09T11:28:54.725Z", "did": "pinned registry 0.4.2 and find-language 0.4.4, lockfile refreshed", "files": ["package.json", "packages/studio/package.json", "pnpm-lock.yaml"]}
+{"step": "implement", "substep": null, "task": "T002", "kind": "complete", "by": "ai", "at": "2026-11-09T11:28:54.980Z", "did": "added vendor LICENSE (MIT)", "files": ["packages/studio/src/survey/languageChooser/vendor/LICENSE"]}

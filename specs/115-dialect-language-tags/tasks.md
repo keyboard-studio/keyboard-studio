@@ -16,8 +16,8 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Add root devDependency `language-subtag-registry` at exactly `0.4.2`, and studio dependency `@ethnolib/find-language` at exactly `0.4.4` (no ranges). Refresh the lockfile — package.json, packages/studio/package.json, pnpm-lock.yaml
-- [ ] T002 Record licences the way the repo already does for pinned data (`packages/engine/data/langtags/LICENSE` and `SOURCES.json`; there is no repo-wide notice file):
+- [x] T001 Add root devDependency `language-subtag-registry` at exactly `0.4.2`, and studio dependency `@ethnolib/find-language` at exactly `0.4.4` (no ranges). Refresh the lockfile — package.json, packages/studio/package.json, pnpm-lock.yaml
+- [x] T002 Record licences the way the repo already does for pinned data (`packages/engine/data/langtags/LICENSE` and `SOURCES.json`; there is no repo-wide notice file):
   - the registry codegen output carries a CC0-1.0 source header;
   - the vendored hook (T020) carries EthnoLib's MIT notice in its file header, plus a `LICENSE` copy in `vendor/`;
   - both are listed in docs/packages.md (T063).
