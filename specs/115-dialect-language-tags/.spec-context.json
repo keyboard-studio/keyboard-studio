@@ -120,11 +120,75 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-09T11:44:28.859Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T12:03:13.971Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T12:03:14.158Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T12:03:14.313Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T12:03:14.433Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T12:03:14.535Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T12:03:14.638Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T12:03:14.738Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T12:03:14.840Z"
     }
   ],
   "telemetryInstanceId": "43929674-df99-4d12-aeca-bcc0ff06e188",
   "unattended": true,
-  "currentTask": "T011",
+  "currentTask": "T019",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -216,6 +280,67 @@
       "files": [
         "packages/glottolog/package.json",
         "packages/glottolog/src/dialects.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Failing-first tests for tag survival through Open/LDML minimalLocale",
+      "files": [
+        "packages/engine/src/ldml-export/lower/document.test.ts",
+        "packages/engine/src/start-browser/kps-parser.test.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Lint tests for tagUsesRegion001 and regionSubtagOf on x/extlang tags",
+      "files": [
+        "packages/keyboard-lint/src/checks/criteria/check-bcp47.test.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "extractScriptSubtag delegates to scriptSubtagOf",
+      "files": [
+        "packages/engine/src/start-browser/kps-parser.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "minimalLocale keeps singleton tail",
+      "files": [
+        "packages/engine/src/ldml-export/lower/document.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Lint region readers use contracts parser",
+      "files": [
+        "packages/keyboard-lint/src/checks/criteria/check-bcp47.ts",
+        "packages/keyboard-lint/src/checks/criteria/check-currency.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Studio region readers use contracts parser",
+      "files": [
+        "packages/studio/src/criteria/assembleLintContext.ts",
+        "packages/studio/src/components/rules/baseLayouts.ts"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "languageTags and docLanguageTag use parser",
+      "files": [
+        "packages/studio/src/criteria/languageTags.ts",
+        "packages/studio/src/survey/questions/docLanguageTag.ts"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "facet-index uses scriptSubtagOf",
+      "files": [
+        "utilities/facet-index/build-index.ts",
+        "utilities/facet-index/declared-bcp47-tags-classifier.ts"
       ]
     }
   }

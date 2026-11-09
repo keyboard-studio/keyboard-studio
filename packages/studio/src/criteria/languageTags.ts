@@ -14,6 +14,7 @@
 //     script does not show the language is right.
 //   - 10.4, 10.5, 12.5/12.6 Not applicable only, via positive facts.
 
+import { parseBcp47, scriptSubtagOf } from "@keyboard-studio/contracts";
 import type { CriteriaAssemblyVerdict, CriteriaFacts } from "./criteriaTypes.ts";
 
 /** The langtags lookups (engine `@keyboard-studio/engine/langtags`). */
@@ -95,8 +96,6 @@ function covers(script: string): readonly string[] {
   return SCRIPT_COVERS[script] ?? [script];
 }
 
-const isScript = (s: string): boolean => /^[a-z]{4}$/i.test(s);
-const isRegion = (s: string): boolean => /^(?:[a-z]{2}|\d{3})$/i.test(s);
 
 /** The shortest tags formed by dropping the script and/or region that still mean `full`. */
 function shorterEquivalents(
@@ -105,9 +104,17 @@ function shorterEquivalents(
   lookup: LangtagsTagLookup,
 ): string[] {
   const parts = tag.split("-");
-  const droppable = parts
-    .map((p, i) => (i > 0 && (isScript(p) || isRegion(p)) ? i : -1))
-    .filter((i) => i > 0);
+  // Only the grammatical script and region slots are droppable, never a
+  // subtag past a variant, extension or private-use singleton.
+  const parsed = parseBcp47(tag);
+  const droppable: number[] = [];
+  if (parsed.ok) {
+    const slot = 1 + parsed.parts.extlang.length;
+    if (parsed.parts.script !== undefined) droppable.push(slot);
+    if (parsed.parts.region !== undefined) {
+      droppable.push(slot + (parsed.parts.script !== undefined ? 1 : 0));
+    }
+  }
   const found: string[][] = [];
   // Every non-empty subset of the droppable subtags.
   for (let mask = 1; mask < 1 << droppable.length; mask++) {
@@ -161,11 +168,7 @@ export function analyzeLanguageTags(
   const tags = kpsTags.map((tag): LanguageTagFacts => {
     const lang = (tag.split("-")[0] ?? "").toLowerCase();
     const resolved = lookup.resolve(tag);
-    const ownScript = tag.split("-").slice(1).find(isScript);
-    const script =
-      ownScript !== undefined
-        ? ownScript.charAt(0).toUpperCase() + ownScript.slice(1).toLowerCase()
-        : resolved?.script;
+    const script = scriptSubtagOf(tag) ?? resolved?.script;
     const shorter = resolved !== null ? shorterEquivalents(tag, resolved.full, lookup) : [];
     // A deprecated code langtags folds into another (ajp -> apc) records
     // its scripts under the language it resolves to.
@@ -296,7 +299,7 @@ export function languageTagVerdicts(
         `The keyboard's output is ${pct(o.share)} ${o.dominant} (${o.evidence} characters).`,
         ...capped(
           contradicted.map((t) =>
-            t.tag.split("-").slice(1).some(isScript)
+            scriptSubtagOf(t.tag) !== undefined
               ? `${t.tag} names the ${t.script} script, which the output does not use.`
               : `${t.tag} means ${t.script} script to langtags (${t.full}), which the output does not use; a script subtag may be missing.`,
           ),

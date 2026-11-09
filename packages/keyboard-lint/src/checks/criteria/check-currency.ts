@@ -22,7 +22,7 @@ import {
   criteriaFinding,
   kmnPath,
 } from "./_shared.js";
-import { regionSubtagOf } from "./check-bcp47.js";
+import { regionSubtagOf } from "@keyboard-studio/contracts";
 import { producedCharacters } from "./check-produced-set.js";
 
 /** One region's unmet currency mandate. */

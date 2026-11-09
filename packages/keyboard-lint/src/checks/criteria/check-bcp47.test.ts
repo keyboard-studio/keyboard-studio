@@ -3,6 +3,7 @@ import {
   checkNumericRegionTag,
   regionSubtagOf,
   tagUsesNumericRegion,
+  tagUsesRegion001,
 } from "./check-bcp47.js";
 
 describe("regionSubtagOf", () => {
@@ -38,5 +39,16 @@ describe("checkNumericRegionTag (10.6)", () => {
   it("region 001 is a numeric region too (12.4 flags it separately)", () => {
     const { findings } = checkNumericRegionTag(["und-001"], "demo");
     expect(findings).toHaveLength(1);
+  });
+});
+
+describe("tag readers stop at private use and extensions", () => {
+  it("tagUsesRegion001 ignores a 001 after -x-", () => {
+    expect(tagUsesRegion001("en-x-001")).toBe(false);
+    expect(tagUsesRegion001("en-001")).toBe(true);
+  });
+
+  it("regionSubtagOf reads the region after an extlang", () => {
+    expect(regionSubtagOf("zh-yue-HK")).toBe("HK");
   });
 });

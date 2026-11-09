@@ -74,17 +74,17 @@ The parser, the shared types and the generated data. Nothing here changes what a
 
 **Wave 1 — tests:**
 
-- [ ] T012 [P] [US5] Write a failing round-trip test: a fixture `.kps` with `en-US-x-twain` and `fr-u-co-phonebk` goes through Open and comes out in `.kps`, help docs and LDML with both tags unchanged — packages/engine/src/ldml-export/lower/document.test.ts, packages/engine/src/start-browser/kps-parser.test.ts
-- [ ] T013 [P] [US5] Write failing lint tests: `tagUsesRegion001("en-x-001")` is false; `regionSubtagOf("zh-yue-HK")` is `HK` — packages/keyboard-lint/src/checks/criteria/check-bcp47.test.ts
+- [x] T012 [P] [US5] Write a failing round-trip test: a fixture `.kps` with `en-US-x-twain` and `fr-u-co-phonebk` goes through Open and comes out in `.kps`, help docs and LDML with both tags unchanged — packages/engine/src/ldml-export/lower/document.test.ts, packages/engine/src/start-browser/kps-parser.test.ts
+- [x] T013 [P] [US5] Write failing lint tests: `tagUsesRegion001("en-x-001")` is false; `regionSubtagOf("zh-yue-HK")` is `HK` — packages/keyboard-lint/src/checks/criteria/check-bcp47.test.ts
 
 **Wave 2 — move every reader onto the parser (different files):**
 
-- [ ] T014 [P] [US5] `extractScriptSubtag` becomes a re-export of `scriptSubtagOf` — packages/engine/src/start-browser/kps-parser.ts
-- [ ] T015 [P] [US5] Make `minimalLocale` keep private use and extensions. Interim fix: split off the singleton tail, minimise the head, and re-append the tail. It is replaced by `minimalTagOf` in T042 — packages/engine/src/ldml-export/lower/document.ts
-- [ ] T016 [P] [US5] `regionSubtagOf` and `tagUsesRegion001` use the contracts parser; delete the local copy — packages/keyboard-lint/src/checks/criteria/check-bcp47.ts, packages/keyboard-lint/src/checks/criteria/check-currency.ts
-- [ ] T017 [P] [US5] Replace the mirror `regionSubtagOf` and the base-layouts region reader with the contracts parser — packages/studio/src/criteria/assembleLintContext.ts, packages/studio/src/components/rules/baseLayouts.ts
-- [ ] T018 [P] [US5] Replace `BCP47_SHAPE`, `isScript`, `isRegion` and the `.slice(1).find(isScript)` scan with parser calls; replace the shape regex with `isWellFormedBcp47` — packages/studio/src/criteria/languageTags.ts, packages/studio/src/survey/questions/docLanguageTag.ts
-- [ ] T019 [P] [US5] Use `scriptSubtagOf` from contracts in the facet-index utilities (their own test invocation, docs/tooling.md) — utilities/facet-index/build-index.ts, utilities/facet-index/declared-bcp47-tags-classifier.ts
+- [x] T014 [P] [US5] `extractScriptSubtag` becomes a re-export of `scriptSubtagOf` — packages/engine/src/start-browser/kps-parser.ts
+- [x] T015 [P] [US5] Make `minimalLocale` keep private use and extensions. Interim fix: split off the singleton tail, minimise the head, and re-append the tail. It is replaced by `minimalTagOf` in T042 — packages/engine/src/ldml-export/lower/document.ts
+- [x] T016 [P] [US5] `regionSubtagOf` and `tagUsesRegion001` use the contracts parser; delete the local copy — packages/keyboard-lint/src/checks/criteria/check-bcp47.ts, packages/keyboard-lint/src/checks/criteria/check-currency.ts
+- [x] T017 [P] [US5] Replace the mirror `regionSubtagOf` and the base-layouts region reader with the contracts parser — packages/studio/src/criteria/assembleLintContext.ts, packages/studio/src/components/rules/baseLayouts.ts
+- [x] T018 [P] [US5] Replace `BCP47_SHAPE`, `isScript`, `isRegion` and the `.slice(1).find(isScript)` scan with parser calls; replace the shape regex with `isWellFormedBcp47` — packages/studio/src/criteria/languageTags.ts, packages/studio/src/survey/questions/docLanguageTag.ts
+- [x] T019 [P] [US5] Use `scriptSubtagOf` from contracts in the facet-index utilities (their own test invocation, docs/tooling.md) — utilities/facet-index/build-index.ts, utilities/facet-index/declared-bcp47-tags-classifier.ts
 
 **Checkpoint**: T012 and T013 pass; contracts, engine, keyboard-lint and studio vitest green. A facet-index rebuild produces an unchanged index: the corpus has no `-x-` tags, so any difference is a bug. Commit: `spec 115 T012-T019`.
 

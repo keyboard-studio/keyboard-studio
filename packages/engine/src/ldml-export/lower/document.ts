@@ -47,7 +47,13 @@ export function normaliseVersion(v: string): string {
 
 /** The minimal likely-subtags form of a tag, never containing an extension such as `-k0-`. */
 export function minimalLocale(tag: string): string {
-  const base = tag.split(/-[a-z]-/i)[0] ?? tag;
+  const cut = tag.search(/-[a-z0-9]-/i);
+  const base = cut === -1 ? tag : tag.slice(0, cut);
+  const tail = cut === -1 ? "" : tag.slice(cut);
+  return minimalHead(base) + tail;
+}
+
+function minimalHead(base: string): string {
   const r = resolveLangtag(base);
   if (r === null) return base;
   const [lang = "", script = "", region = ""] = r.full.split("-");
