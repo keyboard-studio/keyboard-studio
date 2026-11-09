@@ -62,8 +62,8 @@ Each section records a decision, why, and what was rejected. Line references are
 
 **Decision**:
 - `scripts/codegen-glottolog.mjs` keeps `Countries` for languages and dialects, and emits a separate module, `generated/dialects.ts`. Each row is `[name, foldedName, glottocode, parentIso639_3, parentCountries]`. Only dialects whose `Language_ID` parent has an ISO code are kept: 13,392 rows, about 470 KB raw or 165 KB gzipped.
-- Expose it as a new subpath export, `@keyboard-studio/glottolog/dialects`, with `searchDialects(query)`.
-- The studio loads it with a dynamic `import()` when the language search returns fewer than five language-name hits, or when the dialect question opens.
+- Expose it as a new subpath export, `@keyboard-studio/glottolog/dialects`, with the rows only. Search is a second EthnoLib `LanguageSearcher` built over those rows, so dialect names rank by exactly the same tiers as language names (R7). It plugs in through the chooser's `searchResultModifier`, which appends each dialect hit as its parent's `ILanguage` with the match attached.
+- The studio loads it with a dynamic `import()` when the chooser's search has fewer than five results above the fuzzy tier, or when the dialect question opens.
 
 **Measured at the pinned commit**:
 - Every dialect's `Language_ID` points to a `language`-level languoid, so there is no nested-dialect walk.
@@ -80,7 +80,11 @@ Each section records a decision, why, and what was rejected. Line references are
 
 ## R5. IANA variant registry from an exact-pinned npm package
 
-**Decision**: add `language-subtag-registry` at exactly `0.4.2` as a root devDependency. It is CC0-1.0, published 2025-12-09, and carries registry `File-Date` 2025-08-25. A new `scripts/codegen-variants.mjs` reads its `variant.json` and writes `packages/engine/src/langtags/generated/variants.ts`: 134 rows of subtag, descriptions and prefixes. It joins the prebuild chain after `codegen-langtags`.
+**Decision**: add `language-subtag-registry` at exactly `0.4.2` as a root devDependency. It is CC0-1.0, published 2025-12-09, and carries registry `File-Date` 2025-08-25. A new `scripts/codegen-registry.mjs` reads two files from it:
+- `variant.json` → `packages/engine/src/langtags/generated/variants.ts`: 134 rows of subtag, descriptions and prefixes;
+- `language.json` → `generated/registeredLanguages.ts`: about 8,200 rows of subtag, description, scope and macrolanguage, for the FR-028 code check.
+
+It joins the prebuild chain after `codegen-langtags`.
 
 **Rationale**:
 - The registry URL (`iana.org/assignments/language-subtag-registry`) has no version, so a SHA pin there breaks every time IANA republishes.
@@ -104,25 +108,47 @@ Each section records a decision, why, and what was rejected. Line references are
 
 **Rationale**: kmc uses `new Intl.Locale(id).minimize()`, so its minimality verdicts follow CLDR. Where CLDR and langtags differ, the studio follows langtags (R2) and lists the difference, as the spec's FR-023 requires. The test skips visibly when `../keyboards` is absent, like the other corpus tests.
 
-## R7. Search composition in the studio
+## R7. Adopt SIL's shared language chooser (EthnoLib) — owner ruling 2026-11-09
 
-**Decision**: `languageResultsFor` (`studio/src/survey/resolveTypedLanguage.ts:56`) merges three sources into one ranked list:
-1. engine `lookupByName`, which gains diacritic folding, an exact-name tier, and langtags dialect rows (R3);
-2. glottolog `searchDialects` (R4), loaded lazily;
-3. the existing `listLanguages` for an empty query.
+**Decision**: the author-facing language search becomes EthnoLib's, as used by Bloom (`BloomDesktop/src/BloomBrowserUI/package.json`: `@ethnolib/language-chooser-react-mui` 0.4.4).
 
-The result type `LanguageSummary` (`contracts/src/langtags.ts:91`) gains optional `match?: { name, relation, source, glottocode?, dialectTag?, countries? }`.
+| Piece | Use | How |
+|---|---|---|
+| `@ethnolib/find-language` 0.4.4 (MIT) | **Adopt as a dependency**, exact pin | `asyncSearchForLanguage` and `LanguageSearcher` for search; `searchResultModifier` for dialect results; `splitTag` / `isValidBcp47Tag` only as UI hints, never for output |
+| `useLanguageChooser` (hook) | **Vendor the TS source** into the studio (MIT, with attribution) | The published `@ethnolib/language-chooser-react-hook` 0.3.7 has no `.d.ts` (its `package.json` names one), and it inlines its own copy of find-language's data. Importing both packages would ship the data twice (about 1.5 MB compressed). The vendored source imports `@ethnolib/find-language`: one copy, with types. Its React use is plain hooks and works on React 18. |
+| `LanguageChooser`, `LanguageCard`, `ScriptCard`, `CustomizeLanguageDialog` (MUI) | **Port the design**, not the code | The package needs React 17 and MUI 5; the studio is React 18 without MUI. They are rebuilt as studio components with the studio's styles, message ids (spec 046) and accessible names (spec 056), keeping EthnoLib's labels where they fit ("Search by name, code, or country", "Create Unlisted Language" becomes "My language isn't listed", "Customize"). |
+| `createTag`, `createTagFromOrthography`, `getShortestSufficientLangtag` | **Not on the output path** (FR-035) | Measured: `createTag({languageCode:"oc", dialectCode:"Gascon"})` gives `oc-x-Gascon`, which is private use, mixed case, and ignores the registered `gascon` variant. `getShortestSufficientLangtag("ca-Latn-AD-valencia")` returns `undefined`. The emitted tag stays `minimalTag` (R2) with the FR-008 preference order. |
 
-Rank tiers (FR-003):
-1. exact code;
-2. exact name, language before dialect;
-3. language or langtags-name prefix;
-4. dialect prefix;
-5. substring.
+**What it gives us, measured on 0.4.4**:
+- the tiers complete, whole-word, start-of-word, substring and fuzzy (fuse.js): "Bafutt" → Bafut, "Ewondoo" → Ewondo;
+- search by country: "Cameroon" → 251 languages;
+- search by code: `bft` → Balti;
+- langtags `-x-` names: "Rabinal" → Achi.
 
-`nameOptionLabel` (`QuestionField.tsx:327`) renders `match` as the "why it matched" line. The 50-option cap (:342) is unchanged.
+**What it does not do (ours to add)**:
+- Glottolog dialects: "Sursilvan" and "Lengadocian" return nothing (R4, via `searchResultModifier`).
+- Full tags: `oc-gascon` returns nothing (R12).
+- The "dialect of…" relation line (FR-002).
+- The unmatched-dialect path (R12).
 
-**Rationale**: FR-006 requires language-name results to be unchanged when no dialect matches, which falls out of appending dialect tiers below the existing ones.
+**Costs**:
+- **Bundle**: the data is embedded in the module and not tree-shaken. Importing only `LanguageSearcher` or `createTag` still bundles about 770 KB compressed (esbuild, minified). It sits behind the same lazy boundary as the language step (FR-037); our engine langtags chunk is already lazy, and the two load together on that step.
+- **Two snapshots**: EthnoLib's data is its own committed langtags copy (`find-language/language-data/languageData.json`, last updated 2026-07-29 in `fca1c7e`, "langtags.json API 1.4"), not pinned to our langtags commit. The FR-034 parity test checks every chooser code against our pinned langtags. Spot checks agree on defaults (ewo, bfd, aln, oc, ca, acr, sr).
+
+**Mapping into decisions (Article IX, FR-036)**: the chooser is a renderer; the decisions and registry declarations are unchanged.
+
+| Chooser state | Decision |
+|---|---|
+| `selectedLanguage.exonym` | `language-name` |
+| `selectedLanguage.languageSubtag`, canonicalised | `language-code` |
+| `selectedScript.code` | `target-script` |
+| `customizableLanguageDetails.region.code` | `language-region` |
+| `customizableLanguageDetails.dialect` | the dialect **name** → `proposeDialect` → `language-dialect` (FR-008) |
+| the dialect-result match | `language-search-match` |
+
+**Superseded**: the earlier plan to extend engine `lookupByName` into the author-facing search. `lookupByName` stays as is for its other callers (criteria, defaults, headless resolution).
+
+**Upstream** (non-blocking, filed as issues on sillsdev/EthnoLib): missing hook typings; data not separable from code (prevents tree-shaking and lets a host supply pinned data); `createTag` not lowercasing private use or offering registered variants.
 
 ## R8. The dialect question in the decision registry
 
@@ -160,8 +186,37 @@ The chosen search match is recorded as a decision too. Today it lives only in cl
 
 The `.kmn`-only upgrade-pair mechanism (`upgradePairs.ts:65`) is not reused. It targets file text, and a tag lives in identity.
 
+## R12. Nothing matches (User Story 6)
+
+**Decision**: a thin layer in front of the chooser's search, plus two fallback rows at the end of every result list that has no hit above the fuzzy tier.
+
+1. **Code or tag first (FR-028).**
+   - If the text parses as a BCP 47 tag (`parseBcp47`, R1) and its language subtag is registered, propose its parts. The chooser's search alone returns nothing for `oc-gascon`.
+   - The registered language subtags come from the same pinned `language-subtag-registry@0.4.2` (R5). T004's codegen also emits `language.json`: subtag, description, scope and macrolanguage, about 8,200 rows.
+2. **"*text* is a dialect: find its language" (FR-030).**
+   - Writes the pending dialect name to the `language-search-match` decision (`relation: "dialect"`, `source: "typed"`), clears the search box, and re-labels the box "Which language is *text* a dialect of?".
+   - Picking a language keeps the pending name; `proposeDialect` uses it as its third preference.
+3. **"My language isn't listed" (FR-031, FR-032).**
+   - Mirrors EthnoLib's unlisted path (`UNLISTED_LANGUAGE`, `qaa`) and manual tag entry (`selectManuallyEnteredTagLanguage`), with our checks added:
+     - the registry check on the code;
+     - the made-from-name rule for `qaa-x-…`;
+     - a link to SIL's ISO 639-3 request process.
+   - Where EthnoLib's syntax check (`isValidBcp47Tag`) differs from ours, ours decides (`parseBcp47`).
+4. **`il_language_code` loses free text (FR-033).** It becomes the confirmation of what the chooser produced; editing it runs the FR-028 check.
+
+**Measured**: Glottolog cannot supply a code for unlisted languages. Only 16 of its 759 languages without an ISO code have a "closest ISO" code, and most of the 759 are extinct. So `qaa-x-` is the honest proposal.
+
+## R13. Languages missing from the studio's langtags index (shipped defect)
+
+`codegen-langtags.mjs:140` keeps only tagsets whose `tag` has no hyphen. Languages whose canonical langtags tag carries a region or script have no bare tagset, so they are dropped from `defaultsIndex` and from search. That is 15 languages at the pinned commit:
+- `zh` (Chinese), `isv` (Interslavic), `con` (Cofán), `aux`, `nul`, `ocm`, `prn`, `sgn`, `spx`, `tpo`, `txr`, `xaq`, `xcc`, `xce`, `xib`.
+
+**Decision**: key `defaultsIndex` on the language subtag, taking the tagset whose `tag` is shortest for each language. This is fixed in Phase 2 as its own commit: it is a shipped defect outside the feature, and the FR-034 parity test needs it, since EthnoLib has `zh`. CJK authoring stays out of scope (Article VII); the language being findable is not authoring.
+
 ## R11. Unknowns carried forward (not blocking)
 
 - **keyman.com search**: does a search for `oc` find a keyboard listing only `oc-gascon`? Not verifiable from docs. Recorded; the owner ruled dialect tag only.
 - **Windows registration of `-x-` tags**: keep langtags' `windows` field (R3); no behaviour change.
-- **Glottolog alternate names**: deferred (R4).
+- **Glottolog alternate names**: deferred (R4); the fuzzy tier (R7) covers some spelling variants.
+- **Keyman keyboards repository and `qaa-x-` tags**: unverified; row 10.4 flags, nothing blocks.
+- **EthnoLib data refresh cadence**: manual upstream. The FR-034 fixture is re-reviewed on every `@ethnolib/find-language` bump.

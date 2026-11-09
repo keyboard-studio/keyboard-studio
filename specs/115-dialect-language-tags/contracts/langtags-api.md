@@ -23,9 +23,15 @@ export function variantEntry(subtag: string): VariantEntry | undefined;
 export function variantsFor(tag: string): readonly VariantEntry[];   // prefix-filtered
 export function variantAllowed(tag: string, variant: string): boolean;
 
-// R7: lookupByName gains folding, an exact-name tier and dialect rows
-export function lookupByName(query: string): readonly LanguageSummary[]; // signature unchanged
+// R12: registered language subtags (IANA), for the FR-028 code check
+export function registeredLanguage(subtag: string):
+  { subtag: string; description: string; scope?: string; macrolanguage?: string } | undefined;
+
+// R13: defaultsIndex keyed on language subtag, so zh, isv, con, … resolve
+export function getLanguageDefaults(code: string): LanguageDefaults | undefined; // unchanged signature
 ```
+
+`lookupByName` is **unchanged**. The author-facing search is EthnoLib's (research R7); `lookupByName` keeps its existing callers.
 
 ## `minimalTag` (each line is a test)
 
@@ -49,9 +55,18 @@ export function lookupByName(query: string): readonly LanguageSummary[]; // sign
 
 **Replaces**: `isSuppressedScript` and the default-script logic in `studio/src/survey/targetBcp47.ts:43,89`, and `minimalLocale` in `ldml-export/lower/document.ts:49` (whose callers `document.ts:286` and `ldml-export/package.ts:58` call `minimalTagOf`).
 
-## `lookupByName` changes
+## `getLanguageDefaults` (R13)
 
-- Diacritic and case folding on the query and on every name (FR-005).
-- New tier after exact code: an exact folded match on the English name or an alias (FR-003).
-- langtags dialect rows (R3) are searched after language rows. A hit returns the parent language's `LanguageSummary` with `match` set.
-- **Unchanged ordering** for queries whose results contain no `match` (FR-006); pinned by a snapshot test over 200 sampled names.
+| Code | Before | After |
+|---|---|---|
+| `zh` | `undefined` | Chinese, from the shortest-`tag` tagset |
+| `isv` | `undefined` | Interslavic |
+| `ewo` | Ewondo | unchanged |
+
+## `registeredLanguage` (R12)
+
+| Subtag | Result |
+|---|---|
+| `bft` | `{ description: "Balti" }` |
+| `qaa` | private-use range entry |
+| `zzz` | `undefined` (well-formed, unregistered → FR-031 warning) |

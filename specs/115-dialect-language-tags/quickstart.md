@@ -17,16 +17,17 @@ pnpm --filter @keyboard-studio/engine exec vitest run src/langtags
 
 Expect: every row of the tables in [bcp47-parser.md](contracts/bcp47-parser.md) and [langtags-api.md](contracts/langtags-api.md) passes. The property test reports `9596/9596 tagsets: minimalTag(full) === tag` (SC-003).
 
-## 2. Search coverage (SC-001, SC-002, SC-007)
+## 2. Search coverage and parity (SC-001, SC-002, SC-007, SC-009)
 
 ```sh
-pnpm --filter @keyboard-studio/studio exec vitest run src/survey/resolveTypedLanguage
+pnpm --filter @keyboard-studio/studio exec vitest run src/survey/languageChooser src/survey/resolveTypedLanguage
 ```
 
-Expect three printed measurements:
+Expect four printed measurements:
 - `glottolog dialects with ISO parent in top 5: >= 95%` (baseline 931/13392, about 7%).
 - `langtags dialect tagsets reachable: 229/229`.
-- `language-name top result unchanged: 200/200` sampled queries.
+- `top result code vs today: 200 sampled, N exceptions = fixture`.
+- `ethnolib codes in pinned langtags, same default script: all but fixture`.
 
 ## 3. Keyman parity (SC-004)
 
@@ -58,7 +59,17 @@ Script with the Playwright CLI against `pnpm dev`:
 3. **Made-from-name subtag.** Pick a Glottolog-only dialect, e.g. `Aranese`. The proposal is `oc-x-aranese (made from the name)`.
    - Edit it to `aranese-valley`: Confirm is disabled, with the reason "private-use subtags are 1-8 letters or digits".
 4. Change the language to Catalan. The dialect answer is flagged as re-proposed, not silently kept.
-5. **Open path.** Open a keyboard and add `sr-Latn-RS` to the language list: a hint offers "Use `sr-Latn`". Add `sq-AL-gheg`: an error.
+5. **Autosuggest kept (FR-038).**
+   - Type `Ewon`: suggestions appear as you type, with Ewondo's card content.
+   - Type `Ewondo` and tab away without clicking: it resolves, and code `ewo`, script and autonym are proposed.
+   - Type `Bafutt`: Bafut is suggested.
+6. **Nothing matches (US6).**
+   - Type `bft`: Balti is proposed for confirmation.
+   - Type `oc-gascon`: Occitan with the Gascon dialect.
+   - Type a made-up name, choose "… is a dialect: find its language", then pick Occitan: the dialect step proposes `oc-x-…` from the name.
+   - Choose "My language isn't listed" with no code: `qaa-x-…` is proposed. With code `zzz`: a warning.
+   - In every case the code question shows a confirmed, non-blank code (SC-008).
+7. **Open path.** Open a keyboard and add `sr-Latn-RS` to the language list: a hint offers "Use `sr-Latn`". Add `sq-AL-gheg`: an error.
 
 ## 6. Gates
 

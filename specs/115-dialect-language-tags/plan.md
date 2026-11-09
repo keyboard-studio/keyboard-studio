@@ -9,9 +9,11 @@
 Make a dialect expressible end to end:
 - one BCP 47 parser in contracts;
 - a minimal-tag function in engine, driven by the pinned langtags;
-- langtags dialect tagsets and a lazily loaded Glottolog dialect index in the language search;
+- SIL's shared language chooser (EthnoLib, as in Bloom) as the language search: its backend adopted, its hook vendored, its UI ported into the existing combobox;
+- a lazily loaded Glottolog dialect index plugged into that search;
+- a code-or-tag layer and "nothing matches" fallbacks, so no path leaves the code blank;
 - a new optional dialect question in the decision registry;
-- region offered for every language;
+- region available for every language;
 - tag validation that matches Keyman's package compiler.
 
 The existing tag readers that misread private use and extensions are moved onto the parser, which fixes them. Decisions are in [research.md](research.md) (R1-R11).
@@ -20,7 +22,13 @@ The existing tag readers that misread private use and extensions are moved onto 
 
 **Language/Version**: TypeScript 5 (ES2022), Node ≥ 22.19 (build and tests); browsers for the studio.
 
-**Primary Dependencies**: existing `@keyboard-studio/{contracts,engine,glottolog,studio,keyboard-lint}`; `@keymanapp/kmc-package` (already an engine dependency, test oracle only); new root devDependency `language-subtag-registry@0.4.2`, exact pin, codegen input only (R5). `Intl.Locale` (built in) for the parity cross-check only.
+**Primary Dependencies**:
+- existing `@keyboard-studio/{contracts,engine,glottolog,studio,keyboard-lint}`;
+- `@keymanapp/kmc-package` (already an engine dependency, test oracle only);
+- **new** `@ethnolib/find-language@0.4.4` (MIT, exact pin), a studio runtime dependency, with transitive `fuse.js`, `iso-15924` and `iso-3166` (R7);
+- **vendored** `useLanguageChooser` from EthnoLib `language-chooser-react-hook` 0.3.7 (MIT; typings missing upstream) (R7);
+- **new** root devDependency `language-subtag-registry@0.4.2`, exact pin, codegen input only (R5, R12);
+- `Intl.Locale` (built in) for the parity cross-check only.
 
 **Storage**: none new. Three new decisions plus a search-match decision persist in the existing decision snapshot (`draftPersistence.ts:855`); `glottocode` rides on `IdentityPatch`.
 
@@ -31,8 +39,9 @@ The existing tag readers that misread private use and extensions are moved onto 
 **Project Type**: pnpm monorepo (library packages plus a web app).
 
 **Performance Goals**:
-- Language-name search is no slower: the dialect index is not loaded for queries with ≥ 5 language hits.
-- The first dialect search pays one lazy chunk of about 165 KB gzipped.
+- No change to the first page load: the chooser chunk (about 770 KB gzipped; EthnoLib embeds its data, and it is not tree-shakeable) loads with the language step (FR-037).
+- The dialect index (about 165 KB gzipped) loads only when the search has fewer than 5 results above the fuzzy tier, or when the dialect question opens.
+- Suggestions keep pace with typing: EthnoLib's `asyncSearchForLanguage` streams results.
 
 **Constraints**:
 - deterministic output (langtags pinned by SHA, registry pinned by exact version);
@@ -57,7 +66,7 @@ The existing tag readers that misread private use and extensions are moved onto 
 | Art. V (VirtualFS only) | PASS: no host writes; codegen runs at prebuild like langtags. |
 | Art. VI (team split) | PASS: engine owns parser, search, question, codegen; content owns the criteria rows' ids and wording and the question's text (marked as proposals in contracts). |
 | Art. VII (out of scope) | PASS: no `-u-`/`-t-` authoring (FR-027); no opaque-fragment editing. |
-| Art. IX (registry) | PASS: `il_language_dialect` is declared in the registry with provides/requires; order derived; parity pins updated (R8). The registry declaration is a functional requirement here (FR-007). |
+| Art. IX (registry) | PASS: `il_language_dialect` is declared in the registry with provides/requires; order derived; parity pins updated (R8). The registry declaration is a functional requirement here (FR-007). The EthnoLib chooser is a renderer for existing decisions, with no surface of its own (FR-036, R7 mapping table). |
 | Art. X (proposals) | PASS: the dialect subtag, region default and variant link are `default`-provenance proposals, confirmed by the author; language change re-proposes via `recalculate` (FR-010, FR-013). |
 | Art. XI (done means integrated) | PASS if the manual walk (quickstart §5) passes on both paths; tasks will include it. |
 | D3 single debounce | PASS: no timer added. Search loading is a lazy import, not a validation cycle. |
@@ -91,20 +100,20 @@ specs/115-dialect-language-tags/
 ### Source Code (repository root)
 
 ```text
-package.json                                   + devDependency language-subtag-registry@0.4.2; prebuild + codegen-variants
+package.json                                   + devDependency language-subtag-registry@0.4.2; prebuild + codegen-registry
 scripts/
-  codegen-langtags.mjs                         keep dialect tagsets + windows; emit generated/dialects.ts (R3)
+  codegen-langtags.mjs                         key defaults on language subtag (R13); keep dialect tagsets + windows; emit generated/dialects.ts (R3)
   codegen-glottolog.mjs                        keep Countries; emit generated/dialects.ts (R4)
-  codegen-variants.mjs (new)                   IANA variants -> engine generated/variants.ts (R5)
+  codegen-registry.mjs (new)                   IANA variants + language subtags -> engine generated/{variants,registeredLanguages}.ts (R5, R12)
 packages/contracts/src/
   utils/bcp47.ts (+ test)                      parseBcp47, formatBcp47, scriptSubtagOf, regionSubtagOf (R1)
   langtags.ts                                  SearchMatch on LanguageSummary; DialectTagset, VariantEntry types
 packages/contracts/data/criteria.json          rows 12.8, 12.9; 10.3 text (R6)
 packages/engine/src/langtags/
   minimalTag.ts (+ test, property test)        minimalTag, minimalTagOf (R2)
-  dialects.ts, variants.ts (+ tests)           dialectTagsetsFor, variantsFor, variantAllowed
-  index.ts                                     lookupByName: folding, exact tier, dialect rows (R7)
-  generated/{dialects,variants}.ts (new)       codegen output
+  dialects.ts, variants.ts, registry.ts (+ tests)  dialectTagsetsFor, variantsFor, variantAllowed, registeredLanguage
+  index.ts                                     exports; lookupByName unchanged (R7)
+  generated/{dialects,variants,registeredLanguages}.ts (new)  codegen output
   codegen-determinism.test.ts                  cover tagsets, dialects, variants
   kmcParity.corpus.test.ts (+ fixture)         FR-023 (R6)
 packages/engine/src/ldml-export/lower/document.ts, ldml-export/package.ts   minimalLocale -> minimalTagOf
@@ -114,9 +123,13 @@ packages/glottolog/
   package.json                                 ./dialects subpath
   src/dialects.ts (+ test), src/generated/dialects.ts (new)
 packages/keyboard-lint/src/checks/criteria/check-bcp47.ts, check-currency.ts  use contracts parser
+packages/studio/package.json                   + @ethnolib/find-language@0.4.4
 packages/studio/src/
-  survey/resolveTypedLanguage.ts               compose engine + glottolog search (R7)
-  survey/QuestionField.tsx                     match line in result labels
+  survey/languageChooser/ (new)                LanguageChooser, LanguageCard, ScriptCard, CustomizePanel,
+                                               UnlistedLanguagePanel; dialectSearch.ts; resolveTypedTag.ts;
+                                               vendor/useLanguageChooser.ts (MIT notice); parity tests + fixtures
+  survey/resolveTypedLanguage.ts               generalise to ILanguage; same rule for UI and headless (FR-038)
+  survey/QuestionField.tsx                     language field renders the chooser inside the existing combobox
   survey/identityResolution.ts                 record search match; drop region gate (R9)
   survey/IdentityLite.tsx, identityLiteResult.ts, targetBcp47.ts
   survey/questions/a/il_language_dialect.ts (new), il_language_region.ts, il_language_english.ts
@@ -130,33 +143,28 @@ packages/studio/src/
 utilities/facet-index/{build-index,declared-bcp47-tags-classifier}.ts       parser
 ```
 
-**Structure Decision**: no new package. The parser sits in contracts because of dependency direction (R1). The minimal-tag function and variant data go in engine next to langtags (R2, R5). The Glottolog dialect index is a lazy subpath of glottolog, so engine gains no Glottolog dependency (R4). The studio composes the search and owns the question (R7, R8).
+**Structure Decision**: no new package.
+- The parser sits in contracts because of dependency direction (R1).
+- The minimal-tag function and registry data go in engine, next to langtags (R2, R5).
+- The Glottolog dialect index is a lazy subpath of glottolog, so engine gains no Glottolog dependency (R4).
+- EthnoLib is a studio dependency only; engine, contracts and lint do not see it. That keeps the emitted tag on our pinned data (FR-035).
+- The studio hosts the chooser and owns the question (R7, R8).
 
 ## Phases (one commit each, per the cadence rule)
 
-1. **Parser and fixes** (FR-024, FR-025; US5).
-   - `parseBcp47` and `formatBcp47`; move every reader onto them; replace the `lif-x-Deva` assertion.
-   - Fix `minimalLocale` to keep private use and extensions.
-   - Independent of everything else; ships alone.
-2. **Data** (FR-026; R3, R4, R5).
-   - Codegen changes for langtags, Glottolog and variants; determinism tests; the registry pin; `./dialects` subpath.
-3. **Minimal tag** (FR-014-FR-018; US3).
-   - `minimalTag` with the SC-003 property test.
-   - `buildTargetBcp47` and the LDML export go through it.
-   - Region available on demand for every language through "Specify a region…"; existing walks unchanged (R9).
-4. **Validation** (FR-019-FR-023; US4).
-   - Rows 12.8 and 12.9; 10.3 judged by `minimalTagOf`.
-   - Open mode list findings and fix.
-   - kmc parity corpus test and fixture.
-5. **Search** (FR-001-FR-006; US1).
-   - `lookupByName` folding and tiers; glottolog `searchDialects`; studio composition and labels.
-   - SC-001, SC-002 and SC-007 measurements.
-6. **Dialect question** (FR-007-FR-013; US2).
-   - Decisions, question module, proposal rules, re-proposal, parity pins, glottocode on identity.
-7. **Integration walk** (Art. XI).
-   - Quickstart §5 on Copy and Open; `pnpm lint`; full package test runs.
+The phase list is [tasks.md](tasks.md); in summary:
 
-Phases 1 and 2 are independent of each other. Phase 3 needs 1 and 2, phase 4 needs 1 and 3, phase 5 needs 2, and phase 6 needs 3 and 5.
+1. **Setup and foundational**: dependency pins; the parser; types; codegen for langtags (with the R13 fix as its own commit), Glottolog and the registry.
+2. **US5 preservation**: every tag reader moved onto the parser. Ships alone.
+3. **US1 chooser and dialect search**:
+   - EthnoLib backend, vendored hook, ported UI inside the existing combobox, with FR-038 behaviours kept;
+   - the Glottolog dialect modifier;
+   - the parity fixtures FR-006 and FR-034.
+4. **US6 nothing matches**: the code-or-tag layer, fallback rows, the unlisted panel, and `il_language_code` checked.
+5. **US3 minimal tag**: `minimalTag`, and region on demand.
+6. **US2 dialect question**.
+7. **US4 validation and kmc parity**.
+8. **Integration walk** (Article XI).
 
 ## Constitution Check (post-design)
 

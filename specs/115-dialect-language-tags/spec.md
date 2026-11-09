@@ -10,6 +10,8 @@
 
 **Builds on**: spec 030 (langtags identity autocomplete, region step) and spec 068 (langtags defaults, `/review` tag rows), both shipped; their AS-BUILT files and the code are the authority for what exists today. Spec 036 (Glottolog catalog) supplies the dialect data.
 
+**Adopts**: SIL's shared language chooser from [sillsdev/EthnoLib](https://github.com/sillsdev/EthnoLib), as used by Bloom (owner ruling 2026-11-09). Its search backend (`@ethnolib/find-language`) replaces the studio's language-name search, and its chooser component is adapted to the studio's React and design, without MUI.
+
 **Governing authority** (Constitution v2 precedence): survey surface and ordering, Article IX; proposals and confirmation, Article X; done means reachable, Article XI. The tag rules follow BCP 47 (RFC 5646) and the SIL langtags data pinned in `scripts/langtags-version.json`.
 
 ## Why
@@ -47,11 +49,11 @@
 
 ### User Story 1 - Find a language by a dialect name (Priority: P1)
 
-An author types the name of the dialect they write, not the name of its parent language. The language search finds it, shows which language it belongs to and why it matched, and picking it sets the language.
+An author types the name of the dialect they write, not the name of its parent language. The language search finds it, shows which language it belongs to and why it matched, and picking it sets the language. The search is SIL's shared language chooser (the one Bloom uses), extended with Glottolog dialect names.
 
 **Why this priority**: today 93% of Glottolog dialect names lead nowhere. It is the entry point for every other story, and it is valuable alone: even without a dialect subtag, the author reaches the right language.
 
-**Independent Test**: on the language step, search "Sursilvan", "Maprik", "Rabinal", "Gascon" and "Valencian". Each returns its parent language (Romansh, Ambulas, Achi, Occitan, Catalan) with a line naming the matched dialect. Picking it sets the language code.
+**Independent Test**: on the language step, search "Sursilvan", "Maprik", "Rabinal", "Gascon" and "Valencian". Each returns its parent language (Romansh, Ambulas, Achi, Occitan, Catalan) with a line naming the matched dialect. Picking it sets the language code. Searching "Cameroon" lists languages of Cameroon; searching "Bafutt" (a typo) still finds Bafut.
 
 **Acceptance Scenarios**:
 
@@ -59,7 +61,9 @@ An author types the name of the dialect they write, not the name of its parent l
 2. **Given** a name that is a language with its own ISO code (Gheg, Cajun French, Swiss German), **When** the author searches it, **Then** that language ranks first, ahead of any language that lists the name as a dialect.
 3. **Given** a dialect name shared by dialects of different languages, **When** the author searches it, **Then** every parent language is listed, each with its country or countries.
 4. **Given** a query that exactly matches one name and is a prefix of others ("Hakka", "Hakkari"), **When** results are shown, **Then** the exact match ranks first.
-5. **Given** a query that matches a language name, **When** results are shown, **Then** the order and content of language-name matches is unchanged from today.
+5. **Given** a query naming a country or a language code, **When** results are shown, **Then** languages of that country, or the language with that code, are listed.
+6. **Given** a query with a small spelling error, **When** no closer match exists, **Then** the intended language is offered as a close match.
+7. **Given** the author types "Ewondo" and does not click, **When** focus leaves the field, **Then** Ewondo is resolved and its code, script and autonym are proposed, as today (FR-038).
 
 ---
 
@@ -140,6 +144,32 @@ A keyboard opened in Open mode keeps any variant, extension or private-use subta
 2. **Given** a tag with an extension or private-use part, **When** any output is built, **Then** that part is kept unchanged.
 3. **Given** the langtags data, **When** it is generated for the studio, **Then** variant and `-x-` tagsets are kept as their own entries with their names, and the `variants` and `windows` fields are kept.
 
+---
+
+### User Story 6 - Nothing matches, and the author still ends with a tag (Priority: P1)
+
+An author types a name the lists do not know. The studio never stops at "no results". If the text is a code or tag, it resolves it. If the text is a dialect name, the author can say so and look for the language it belongs to, and the name is kept for the dialect step. If the language itself is unlisted, the author can enter its code if they know it, or the studio proposes a private-use tag. Every path ends in a proposal the author confirms.
+
+**Why this priority**: a blank or unchecked language code is a defect under "defaults are the product" (Article X). Today a name that isn't listed leaves the code empty, and a typed code goes unchecked into the package.
+
+**Independent Test**:
+- Type `bft`: Balti is proposed, and the author is asked to confirm it.
+- Type `oc-gascon`: Occitan is chosen with the Gascon dialect.
+- Type a made-up dialect name, choose "*name* is a dialect: find its language", and pick Occitan: the dialect step proposes `oc-x-` plus a code made from the name.
+- Choose "My language isn't listed" for a made-up name: the studio proposes `qaa-x-` plus the same kind of code, and review flags it as unusual.
+- Enter the code `zzz`: the studio warns that it is not a registered code.
+
+**Acceptance Scenarios**:
+
+1. **Given** text that is a well-formed language code or tag, **When** the author searches it, **Then** the language (and any script, region or dialect in the tag) is proposed. A code is checked against the registered language subtags, and the registered name is shown for confirmation.
+2. **Given** text that matches nothing, **When** results are shown, **Then** the list always ends with "*text* is a dialect: find its language" and "My language isn't listed".
+3. **Given** the author chooses "*text* is a dialect", **When** they then pick a language, **Then** the dialect step proposes a dialect subtag made from the kept text (FR-008's third preference) and shows its source.
+4. **Given** the author chooses "My language isn't listed", **When** they know the code, **Then** they can enter it. A well-formed registered code is accepted with its registered name; a private-use code (`qaa`–`qtz`) is accepted; a well-formed unregistered code is accepted with a warning; an ill-formed one is blocked with the reason.
+5. **Given** "My language isn't listed" with no code, **When** the author gives a language name, **Then** the studio proposes `qaa-x-` plus a code made from the name (the FR-011 rule), says why, and points to how to request an ISO 639-3 code. Review flags the tag as unusual (row 10.4).
+6. **Given** any of these paths, **When** the author confirms, **Then** the language code decision is set. No path leaves it blank.
+
+---
+
 ### Edge Cases
 
 - **The dialect has its own ISO code in langtags but Glottolog calls it a dialect.** The ISO code wins and no dialect subtag is proposed (User Story 1, scenario 2).
@@ -151,7 +181,9 @@ A keyboard opened in Open mode keeps any variant, extension or private-use subta
 - **A variant is registered for more than one language,** or for a language plus script (`1994` is registered for `sl-rozaj`). The prefix check follows the registry's recorded prefixes.
 - **The author changes the language after confirming a dialect.** The dialect answer is re-proposed against the new language, never silently kept or dropped (Article X).
 - **Extensions (`-u-`, `-t-`) in an opened keyboard.** They are preserved and validated for form, but the studio offers no way to author them.
-- **Name matching ignores case and accents** ("Lengadocian" vs "Languedocien" is not an accent difference; that pair is out of scope, see Assumptions).
+- **Name matching ignores case and accents.** Spelling variants such as "Lengadocian" for "Languedocien" are left to the fuzzy tier (FR-003).
+- **The chooser's language data and the studio's pinned langtags disagree.** The chooser's data is its own langtags snapshot. If they differ on a code or default script, the studio's pinned langtags decides the emitted tag (FR-014, FR-015), and the difference is listed in a test fixture (FR-034).
+- **The author pastes a tag with extensions** (`fr-u-co-phonebk`). The language, script and region are resolved; the extension is not authored and is dropped from the proposal, with a note (FR-027).
 
 ## Requirements *(mandatory)*
 
@@ -159,12 +191,12 @@ A keyboard opened in Open mode keeps any variant, extension or private-use subta
 
 **Search**
 
-- **FR-001**: The language search MUST match, in addition to what it matches today, the names of langtags variant and `-x-` tagsets and the names of Glottolog dialects whose parent language has an ISO 639 code.
+- **FR-001**: The language search MUST use SIL's shared language search (`@ethnolib/find-language`), which matches language names, autonyms, alternate names, codes and countries, and MUST add the names of Glottolog dialects whose parent language has an ISO 639 code.
 - **FR-002**: A result reached through a dialect name MUST show the matched name, its relation to the language ("a dialect of", "a variety of") and the language's code.
-- **FR-003**: Ranking MUST put, in order: exact code match; exact name match; language names and langtags names by prefix; dialect names by prefix; substring matches. Within a rank, a name that is a language with its own ISO code MUST rank above a dialect classification of the same name.
-- **FR-004**: A dialect name with more than one parent MUST list each parent with the countries Glottolog gives for the dialect.
+- **FR-003**: Ranking MUST follow the shared search's tiers: complete match, whole-word match, start-of-word match, substring match, then fuzzy match. Glottolog dialect names MUST be ranked by the same tiers and placed after language matches of the same tier. Within a tier, a name that is a language with its own ISO code MUST rank above a dialect classification of the same name.
+- **FR-004**: A dialect name with more than one parent MUST list each parent with the countries Glottolog gives for the dialect, or for its parent when the dialect has none.
 - **FR-005**: Matching MUST ignore case and diacritics.
-- **FR-006**: Language-name results for queries that match no dialect name MUST be unchanged from today.
+- **FR-006**: For a fixed sample of language-name queries, the top result's language code MUST match today's search. Every exception MUST be listed in a fixture with a reason; the fixture is reviewed when the shared search's data is updated.
 
 **Dialect step**
 
@@ -199,6 +231,29 @@ A keyboard opened in Open mode keeps any variant, extension or private-use subta
 - **FR-026**: The generated langtags data MUST keep variant and `-x-` tagsets as their own entries with their names, and MUST keep the `variants` and `windows` fields.
 - **FR-027**: The studio MUST NOT offer a way to author `-u-` or `-t-` extensions.
 
+**Nothing matches (US6)**
+
+- **FR-028**: Text that parses as a language code or tag MUST resolve to a proposal of its parts. A language subtag MUST be checked against the registered language subtags (IANA registry, pinned as in FR-021), and the registered name shown for confirmation.
+- **FR-029**: When the search has no result above the fuzzy tier, or at any time on request, the result list MUST end with two choices: "*text* is a dialect: find its language" and "My language isn't listed".
+- **FR-030**: Choosing "*text* is a dialect" MUST keep the text as the pending dialect name and return the author to the search to find the parent language. The dialect step then proposes from the kept name (FR-008, third preference; source `typed`).
+- **FR-031**: "My language isn't listed" MUST take a language name (pre-filled with the text) and an optional code. A code MUST be checked as in FR-028: a registered code is accepted with its name, a private-use code (`qaa`–`qtz`) is accepted, a well-formed unregistered code is accepted with a warning, and an ill-formed code blocks confirmation with its reason.
+- **FR-032**: With no code, the studio MUST propose `qaa-x-` plus a subtag made from the language name (FR-011 rule), explain why, and point to how to request an ISO 639-3 code. Row 10.4 MUST flag the tag at review.
+- **FR-033**: The language code question MUST NOT accept unchecked free text. Every way of setting the code goes through FR-028 or FR-031, so the language code is never blank or unchecked once the author confirms.
+
+**Shared language chooser**
+
+- **FR-034**: The chooser's language data MUST be checked against the studio's pinned langtags by a test: every chooser language code (after macrolanguage mapping) exists in the pinned langtags and agrees on the default script. Every disagreement MUST be listed in a fixture with a reason.
+- **FR-035**: The emitted tag MUST come from the studio's minimal-tag rule (FR-014) and dialect preference (FR-008), never from the chooser's own tag builder.
+- **FR-036**: The chooser MUST be a renderer for the identity decisions (language name, language code, script, region, dialect), declared in the decision registry as today (Article IX). It adds no survey surface of its own.
+- **FR-037**: The chooser's code and data MUST load only when the language step opens, not on the studio's first page load.
+- **FR-038**: The chooser MUST keep the language field's existing behaviour:
+  - suggestions appear in a dropdown as the author types;
+  - typed text that matches exactly one language's name or alternate name resolves without a click;
+  - picking or resolving proposes the code, script and autonym, and advances;
+  - the headless author (spec 107) resolves typed names by the same rule.
+
+  EthnoLib's card content is shown in the dropdown rows; the studio does not switch to a full-page card grid.
+
 ### Key Entities
 
 - **Language choice**: language code, optional script, optional region, optional dialect subtag. The source of the composed tag.
@@ -217,23 +272,30 @@ A keyboard opened in Open mode keeps any variant, extension or private-use subta
 - **SC-004**: The studio's validity and minimality verdicts agree with Keyman's package compiler on all tags in the keyboards corpus (4,691 language IDs), apart from the disagreements listed in the fixture.
 - **SC-005**: No output built from a keyboard whose tags carry variants, extensions or private use loses any part of those tags.
 - **SC-006**: An author who knows only a dialect's name reaches a confirmed dialect tag in at most three actions after typing the name (pick the result, confirm or edit the proposal, continue).
-- **SC-007**: Language searches for names already found today return the same top result as before.
+- **SC-007**: For 200 sampled language-name queries, the top result's language code matches today's search, apart from the exceptions listed in the fixture.
+- **SC-008**: For every one of these inputs, the author ends with a confirmed, non-blank language code in at most four actions after typing: a listed name, a dialect name, a code, a tag, a misspelled name, an unlisted dialect, and an unlisted language with or without a known code.
+- **SC-009**: Every language in the chooser's data resolves in the studio's pinned langtags with the same default script, apart from the exceptions listed in the fixture.
 
 ## Assumptions
 
 - **A dialect keyboard lists only its dialect tag** (Clarifications, 2026-11-09), not the bare parent language as well. Keyman shows only "language (script, region)", so the keyboard appears under its parent language in Keyman's lists. Whether keyman.com search for the parent code finds it is unverified.
 - **Windows registration of `-x-` tags is unverified.** The langtags `windows` field is kept for a later decision; this spec does not change how the package registers input languages.
-- **Glottolog alternate names are out of scope.** Search uses each dialect's primary Glottolog name; Glottolog's other names (a separate data file not fetched today) are a possible follow-up. Spelling pairs such as "Lengadocian"/"Languedocien" are therefore not matched.
+- **Glottolog alternate names are out of scope.** Search uses each dialect's primary Glottolog name; Glottolog's other names (a separate data file not fetched today) are a possible follow-up. The fuzzy tier catches some spelling variants.
+- **The shared chooser's data is its own langtags snapshot** (EthnoLib's committed copy, langtags API 1.4, refreshed 2026-07). It is not pinned to the studio's langtags commit; FR-034 keeps the two honest.
+- **Whether Keyman's keyboards repository accepts `qaa-x-` tags is unverified.** Row 10.4 flags them; the studio does not block them.
+- **No separate display name.** Bloom asks for a display name; the studio already asks for the English name and the autonym, which serve that purpose.
 - **Only Glottolog dialects with an ISO-coded parent are searchable.** The 314 others are not offered.
 - **The IANA variant registry becomes a pinned prebuild input**, fetched and checksummed like langtags, so validation and proposals are reproducible.
 - **Copy and Open both get the dialect step and validation.** Open's existing language list gains validation; the dialect step applies when an Open author adds or edits a language.
-- **Performance:** dialect data loads only when a search finds no language-name match or when the dialect step opens, so the language step is no slower for language-name searches.
+- **Performance:** the chooser's data (about 770 KB compressed) loads with the language step, and the Glottolog dialect data (about 165 KB compressed) only when a search needs it or the dialect step opens.
 
 ## Clarifications
 
 ### Session 2026-11-09
 
 - Q: For a dialect keyboard (e.g. Gascon), should the package list only the dialect tag, or the parent language too? → A: Dialect tag only (`oc-gascon`). The keyboard claims exactly what it is for. How keyman.com matches a parent-language search against a dialect tag is unverified; recorded as an assumption, not a requirement.
+- Q: What happens when the language or dialect is in no list? → A: Every path ends in a proposal (User Story 6). An unmatched dialect name is kept while the author finds its language; an unlisted language takes a code if the author knows one, else a proposed `qaa-x-` tag.
+- Q: Build our own search or reuse Bloom's? → A: Reuse SIL's shared language chooser (EthnoLib, as in Bloom): adapt its component to the studio's React and use its search backend.
 
 ## Out of Scope
 

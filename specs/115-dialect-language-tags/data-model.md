@@ -39,13 +39,13 @@ The author's identity answers that compose the tag. Derived from decisions by `d
 
 ## SearchMatch (contracts type, R7)
 
-An optional field on `LanguageSummary` (`contracts/src/langtags.ts:91`), present when a result was reached through something other than the language's own primary name.
+Attached to a chooser result (EthnoLib `ILanguage`, through its open index signature) when the result was reached through something other than the language's own name: a Glottolog dialect or langtags variety. It also holds the pending dialect name typed by the author on the "is a dialect" path (`source: "typed"`).
 
 | Field | Type | Example |
 |---|---|---|
 | `name` | string | `Gascon` |
 | `relation` | `alias` \| `dialect` \| `variety` | `dialect` |
-| `source` | `langtags` \| `glottolog` \| `iana` | `glottolog` |
+| `source` | `langtags` \| `glottolog` \| `iana` \| `typed` | `glottolog` |
 | `glottocode` | string? | `gasc1240` |
 | `dialectTag` | string? | `oc-gascon` (set when langtags or the registry already gives one) |
 | `countries` | string[]? | `["FR","ES"]`, from the parent when the dialect has none |
@@ -98,6 +98,22 @@ The main catalog's languoid record gains `countries?` for languages (FR-004).
 | `deprecated` | boolean |
 
 Prefix rule (FR-021): a variant is allowed when some prefix's subtags are all present in the tag's language, script, region and earlier variants. A variant with no prefixes is allowed anywhere.
+
+## RegisteredLanguage (engine, generated, R12)
+
+`packages/engine/src/langtags/generated/registeredLanguages.ts`: about 8,200 rows from the same pinned registry, `{subtag, description, scope?, macrolanguage?}`. Includes the `qaa..qtz` private-use range entry.
+
+## TypedTagProposal (studio, transient, R12)
+
+What `resolveTypedTag` returns when the search text parses as a tag: `{ language, script?, region?, dialectSubtag?, registeredName?, warning? }`. The author picks it like a search result; it then writes the same decisions a chooser pick does.
+
+## UnlistedLanguage (studio, transient → decisions, R12)
+
+| Field | Rule |
+|---|---|
+| `name` | required; pre-filled with the search text; becomes `language-name` |
+| `code` | optional; checked with `parseBcp47` + `registeredLanguage` (FR-031) |
+| proposed tag | `code` if given, else `qaa-x-` + made-from-name (FR-032) |
 
 ## DialectProposal (studio, transient → decision)
 
