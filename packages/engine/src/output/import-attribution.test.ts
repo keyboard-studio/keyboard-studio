@@ -174,4 +174,56 @@ describe("buildImportAttributionBlock", () => {
     expect(sourceIdx).toBeLessThan(statusIdx);
     expect(statusIdx).toBeLessThan(opaqueIdx);
   });
+
+  it("no deprecated rewrites — no rewrites section appears", () => {
+    const block = buildImportAttributionBlock({
+      sourcePath: "release/c/cm_qwerty",
+      report: makeReport(ImportStatus.Clean),
+    });
+    expect(block).not.toContain("Deprecated syntax rewrites");
+  });
+
+  it("deprecated rewrites — grouped by kind with source → rewritten lines (#2633)", () => {
+    const block = buildImportAttributionBlock({
+      sourcePath: "release/c/cm_qwerty",
+      report: {
+        ...makeReport(ImportStatus.Clean),
+        deprecatedRewrites: [
+          {
+            kind: "header-statement",
+            sourceLine: 1,
+            sourceText: `NAME "Foo"`,
+            rewrittenText: `store(&NAME) 'Foo'`,
+          },
+          {
+            kind: "legacy-value-format",
+            sourceLine: 12,
+            sourceText: "d241",
+            rewrittenText: "U+00F1",
+          },
+          {
+            kind: "target-selector",
+            sourceLine: 20,
+            sourceText: "$keymanonly: + [K_A] > 'a'",
+            rewrittenText: "platform('desktop native') + [K_A] > 'a'",
+          },
+          {
+            kind: "version-raise",
+            sourceLine: 3,
+            sourceText: `store(&VERSION) '5.0'`,
+            rewrittenText: `store(&VERSION) '9.0' (raised — platform() guards need Keyman 9.0+)`,
+          },
+        ],
+      },
+    });
+    expect(block).toContain("### Deprecated syntax rewrites");
+    expect(block).toContain("- Header statements (1):");
+    expect(block).toContain(`line 1: NAME "Foo" → store(&NAME) 'Foo'`);
+    expect(block).toContain("- Legacy value formats (1):");
+    expect(block).toContain("line 12: d241 → U+00F1");
+    expect(block).toContain("- Target selectors ($keyman*:) (1):");
+    expect(block).toContain("line 20: $keymanonly: + [K_A] > 'a' → platform('desktop native') + [K_A] > 'a'");
+    expect(block).toContain("- Version raise (1):");
+    expect(block).toContain("line 3: store(&VERSION) '5.0' → store(&VERSION) '9.0'");
+  });
 });

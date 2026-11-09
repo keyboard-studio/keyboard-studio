@@ -340,6 +340,24 @@ describe("emit — quoted store values", () => {
     const out = emit(makeUserStoreIR("emptied", []));
     expect(out).toContain("store(emptied) \n");
   });
+
+  // #2633: an empty store WITH a trailing comment spells the body as `''`.
+  // The bare `store(x)  c foo` line re-parses as content — stripTrailingComment
+  // cannot anchor the `c` at the start of the value — so a numeric comment
+  // word would be misread as a store item (eo_plus `store(S1) '' c 1`
+  // re-parsed `1` as octal U+0001). The `''` is the source spelling and
+  // keeps the comment a comment; a comment-less empty store keeps the bare
+  // form pinned above.
+  it("spells an empty store body as '' when it carries a trailing comment", () => {
+    const base = makeUserStoreIR("s1", []);
+    const store = base.stores.find((s) => s.name === "s1");
+    if (store) store.trailingComment = "1";
+    const out = emit(base);
+    expect(out).toContain("store(s1) '' c 1");
+    const { ir: ir2 } = parse(out, "kb");
+    expect(ir2.stores.find((s) => s.name === "s1")?.items).toEqual([]);
+    expect(ir2.stores.find((s) => s.name === "s1")?.trailingComment).toBe("1");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -439,8 +457,12 @@ describe("emit — match/nomatch group-transition rules", () => {
 // (galaxie_greek_mnemonic, eo_plus, ...) lose their target gating.
 // ---------------------------------------------------------------------------
 
-describe("emit — target-selector prefix", () => {
-  it("prepends $keymanweb: to a rule when targetSelector=keymanweb", () => {
+describe("emit — target-selector prefix (#2633)", () => {
+  // $keyman*: prefixes are Keyman 19-deprecated and removed in Keyman 20:
+  // emit NEVER writes them, even for a stale or hand-built IR that still
+  // carries a targetSelector (parse rewrites prefixed lines into
+  // platform() guards / merged stores, so a well-formed IR has none left).
+  it("drops $keymanweb: from a rule when targetSelector=keymanweb", () => {
     const base = makeIR();
     base.groups[0]?.rules.push({
       nodeId: "rule#kw",
@@ -449,10 +471,11 @@ describe("emit — target-selector prefix", () => {
       targetSelector: "keymanweb",
     });
     const out = emit(base);
-    expect(out).toContain("$keymanweb: + [K_Q] > U+0071");
+    expect(out).not.toContain("$keymanweb:");
+    expect(out).toContain("+ [K_Q] > U+0071");
   });
 
-  it("prepends $keymanonly: to a store when targetSelector=keymanonly", () => {
+  it("drops $keymanonly: from a store when targetSelector=keymanonly", () => {
     const base = makeIR();
     base.stores.push({
       nodeId: "store#kmo",
@@ -471,10 +494,11 @@ describe("emit — target-selector prefix", () => {
       output: [{ kind: "index", storeRef: "euro", offset: 1 }],
     });
     const out = emit(base);
-    expect(out).toContain("$keymanonly: store(euro) 'Cc'");
+    expect(out).not.toContain("$keymanonly:");
+    expect(out).toContain("store(euro) 'Cc'");
   });
 
-  it("prepends $keyman: when targetSelector=keyman (apply-to-both marker)", () => {
+  it("drops $keyman: when targetSelector=keyman (apply-to-both marker)", () => {
     const base = makeIR();
     base.groups[0]?.rules.push({
       nodeId: "rule#kb",
@@ -483,7 +507,8 @@ describe("emit — target-selector prefix", () => {
       targetSelector: "keyman",
     });
     const out = emit(base);
-    expect(out).toContain("$keyman: + [K_Z] > U+007A");
+    expect(out).not.toContain("$keyman:");
+    expect(out).toContain("+ [K_Z] > U+007A");
   });
 
   it("omits the prefix when targetSelector is unset", () => {

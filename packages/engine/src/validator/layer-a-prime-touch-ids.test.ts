@@ -30,7 +30,7 @@ function layoutWithIds(ids: string[]): TouchLayoutIR {
 }
 
 function result(layout?: TouchLayoutIR): ParseResult {
-  return { ir: irWithLayout(layout), opaqueFeatures: [] };
+  return { ir: irWithLayout(layout), opaqueFeatures: [], rewrites: [] };
 }
 
 describe("checkTouchLayoutIdentifiers — 0x05A as a Layer A' validity finding", () => {
