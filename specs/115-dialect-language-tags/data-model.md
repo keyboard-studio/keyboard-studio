@@ -75,7 +75,12 @@ The chosen match is persisted as the decision `language-search-match` (new), hol
 
 ## GlottologDialect row (glottolog, generated, R4)
 
-`packages/glottolog/src/generated/dialects.ts`: 13,392 rows, one per dialect whose parent has an ISO 639-3 code.
+`packages/glottolog/src/generated/dialects.ts`: 14,465 rows of three kinds (R4, R15):
+- 13,392 dialects whose language has an ISO 639-3 code;
+- 759 languages with no ISO code;
+- 314 dialects of those languages.
+
+Fields per row are in the contract (§ Glottolog dialect rows).
 
 | Field | Example |
 |---|---|
@@ -120,13 +125,17 @@ Picking an unresolved reading sets the language, then opens the remainder choose
 - `language-search-match` with a listed dialect;
 - nothing ("leave it out").
 
-## UnlistedLanguage (studio, transient → decisions, R12)
+## UnlistedLanguage (studio, transient → decisions, R12, R15)
 
 | Field | Rule |
 |---|---|
-| `name` | required; pre-filled with the search text; becomes `language-name` |
+| `name` | required; pre-filled with the search text, or the Glottolog name; becomes `language-name` |
 | `code` | optional; checked with `parseBcp47` + `registeredLanguage` (FR-031) |
-| proposed tag | `code` if given, else `qaa-x-` + made-from-name (FR-032) |
+| `glottocode` | pre-filled from a Glottolog `uncoded-*` row; written to `language-glottocode` (FR-045) |
+| `dialectName`, `dialectGlottocode` | for an `uncoded-dialect` row |
+| `countries` | from Glottolog; one country proposes a region |
+| proposed tag | `code` if given, else `proposeUncodedTag` (FR-032, FR-044) |
+| proposed script | `proposeScriptForUncoded` with its source (FR-046) |
 
 ## DialectProposal (studio, transient → decision)
 

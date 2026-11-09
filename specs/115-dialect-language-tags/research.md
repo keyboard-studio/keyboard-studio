@@ -61,7 +61,7 @@ Each section records a decision, why, and what was rejected. Line references are
 ## R4. Glottolog dialect name index as a lazy subpath of `@keyboard-studio/glottolog`
 
 **Decision**:
-- `scripts/codegen-glottolog.mjs` keeps `Countries` for languages and dialects, and emits a separate module, `generated/dialects.ts`. Each row is `[name, foldedName, glottocode, parentIso639_3, parentCountries]`. Only dialects whose `Language_ID` parent has an ISO code are kept: 13,392 rows, about 470 KB raw or 165 KB gzipped.
+- `scripts/codegen-glottolog.mjs` keeps `Countries` for languages and dialects, and emits a separate module, `generated/dialects.ts`. It holds 13,392 dialects whose `Language_ID` parent has an ISO code, about 470 KB raw or 165 KB gzipped. R15 adds 759 languages with no code and 314 dialects of them (about 1,100 rows more). Row fields are in the contract.
 - Expose it as a new subpath export, `@keyboard-studio/glottolog/dialects`, with the rows only.
 - Search is a second EthnoLib `LanguageSearcher` built over those rows and the langtags dialect tagsets (R3). It plugs in through the chooser's `searchResultModifier`.
 - The modifier gets no tier information from EthnoLib, so placement uses a query-and-names rule. Close dialect hits go before EthnoLib's fuzzy results ([contract § merge rule](contracts/dialect-search-and-question.md#merge-rule)).
@@ -252,6 +252,22 @@ The place picker ranks countries whose names share three or more leading letters
 This replaces the earlier plan to keep unmatched words as a dialect name by default, which would have turned "Swiss French" into a French keyboard for a "Swiss" dialect.
 
 **Alternative rejected**: patching EthnoLib's fuzzy options (token-set matching). It would change ranking for every query, and SC-007's parity fixture would churn; the reading layer only adds rows.
+
+## R15. Languages with no code, and dialects of them (owner, 2026-11-09)
+
+**Finding**: Glottolog has 759 languages with no ISO 639-3 code. 525 are not marked extinct (e.g. Mansim, Indonesia; Imbabura, Ecuador), and 752 have countries. A further 314 dialects belong to such languages (e.g. Olmos, a dialect of Sechuran, Peru). Families: Unclassifiable 90, Sino-Tibetan 78, Pidgin 71, Sign Language 71, Atlantic-Congo 60, …
+
+Until now the plan dropped all of these from the search (R4 kept only dialects with a coded parent). So the studio couldn't recognise them, keep their Glottolog code, or use where they are spoken.
+
+**Decision** (FR-043 to FR-046):
+1. **Search them.** Codegen adds them to the dialect rows as `uncoded-language` and `uncoded-dialect`, with countries. They render as "known to Glottolog, no ISO 639-3 code". The "is a dialect: find its language" parent search includes them too.
+2. **Tag.** `qaa`, plus a region if spoken in one country, plus `-x-<language>`, plus `-<dialect>` for a dialect. For example `qaa-ID-x-mansim` and `qaa-PE-x-sechuran-olmos`. Each private-use subtag is at most 8 characters.
+3. **Keep the Glottolog code** (`language-glottocode`) and show it at review with the 10.4 flag and the ISO 639-3 request pointer.
+4. **Script, never blank.** First, the nearest relatives that have codes. `relatedLanguages(glottocode)` already exists in `@keyboard-studio/glottolog` and ranks by shared-subgroup depth; take the most common langtags default script in the closest tier. Second, the most common default script among langtags languages of its country. Last, Latin. The source is shown with the proposal.
+
+**Measured constraint**: `relatedLanguages` returns `[]` for pseudo-families (Unclassifiable, Pidgin, Sign Language, …): `relatedness.ts:57`. At least 232 of the 759 (Unclassifiable 90, Pidgin 71, Sign Language 71) go straight to step 2.
+
+**Not used**: Glottolog's `Closest_ISO369P3code`. Only 16 of the 759 have it, and it names a different language; using it as the code would claim the wrong language.
 
 ## R13. Languages missing from the studio's langtags index (shipped defect)
 

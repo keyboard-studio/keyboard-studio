@@ -70,6 +70,9 @@ Script with the Playwright CLI against `pnpm dev`:
    - Type a made-up name, choose "… is a dialect: find its language", then pick Occitan: the dialect step proposes `oc-x-…` from the name.
    - Choose "My language isn't listed" with no code: `qaa-x-…` is proposed. With code `zzz`: a warning.
    - In every case the code question shows a confirmed, non-blank code (SC-008).
+   - **No code at all (SC-011):**
+     - `Mansim` → "known to Glottolog, no ISO 639-3 code · Indonesia" → `qaa-ID-x-mansim`, with a script proposed "from related languages";
+     - `Olmos` → `qaa-PE-x-sechuran-olmos`.
    - **Dialect typed as the language (SC-010):**
      - `Gascon Occitan` → "Occitan, dialect: Gascon", first, and the tag ends `oc-gascon`;
      - `Ewondo (Yabekolo)` → `ewo-x-yabekolo`;

@@ -47,7 +47,10 @@ The parser, the shared types and the generated data. Nothing here changes what a
   Files: scripts/codegen-langtags.mjs, packages/engine/src/langtags/generated/{dialects,tagsets}.ts
 - [ ] T007 [P] Change `scripts/codegen-glottolog.mjs`:
   - keep `Countries` on language and dialect records;
-  - emit `src/generated/dialects.ts`, one row per dialect whose `Language_ID` parent has an ISO code (13,392): `{name, folded, glottocode, parentIso, countries}`;
+  - emit `src/generated/dialects.ts` with three kinds of row (contract § Glottolog dialect rows):
+    - `dialect`: each dialect whose `Language_ID` parent has an ISO code (13,392);
+    - `uncoded-language`: each language with no ISO code (759);
+    - `uncoded-dialect`: each dialect of such a language (314), carrying `parentGlottocode` and `parentName`;
   - fold names as NFD, drop combining marks, lowercase;
   - take countries from the dialect, else from the parent.
 
@@ -218,11 +221,30 @@ Commit: `spec 115 T020-T029`.
   Files: packages/studio/src/survey/languageChooser/{LanguageChooser,RemainderChooser}.tsx, packages/studio/src/survey/resolveTypedLanguage.ts, packages/studio/src/locales/
 - [ ] T068 [US6] Add the SC-010 query set as a fixture-driven test over the full chooser (EthnoLib + dialect modifier + readings): the first result is the right language with the right dialect or region, or, for the unresolved queries, with the remainder chooser offered and the expected first place. The fixture is documented as the place to add misses authors report — packages/studio/src/survey/languageChooser/typedDialect.fixture.json, packages/studio/src/survey/languageChooser/typedDialect.test.ts
 
-**Wave 4:**
+**Wave 4 — languages with no code (FR-043 to FR-046, research R15; IDs T069-T072 added after the second analysis pass, out of sequence):**
+
+- [ ] T069 [P] [US6] Write failing tests:
+  - `proposeUncodedTag` and `proposeScriptForUncoded`, one per row of the contract's table;
+  - every proposed tag passes `parseBcp47`;
+  - the Unclassifiable case uses the country rule;
+  - a no-code name that collides with a coded language ranks below it but is still listed;
+  - SC-011: for all 752 no-code languages with countries, searching the name lists the no-code row, and picking it yields a well-formed tag and a proposed script with its source.
+
+  Files: packages/studio/src/survey/languageChooser/uncodedLanguage.test.ts, packages/studio/src/survey/languageChooser/uncodedSearch.test.ts
+- [ ] T070 [US6] Implement `proposeUncodedTag` and `proposeScriptForUncoded`, using `@keyboard-studio/glottolog` `relatedLanguages`, engine `getLanguageDefaults`, and the langtags regions for the country rule — packages/studio/src/survey/languageChooser/uncodedLanguage.ts
+- [ ] T071 [US6] Render the `uncoded-language` and `uncoded-dialect` rows ("known to Glottolog, no ISO 639-3 code · countries"), and include them as parents in the "is a dialect: find its language" search.
+  - Picking one opens `UnlistedLanguagePanel` pre-filled: name, glottocode, countries, proposed tag, and proposed script with its source.
+  - The proposed script is written as a `default`-provenance `target-script` proposal.
+  - **The labels and the script-source wording are survey text owned by the content team (Article VI): mark them for content review.**
+
+  Files: packages/studio/src/survey/languageChooser/{dialectSearch,LanguageCard,UnlistedLanguagePanel}.tsx, packages/studio/src/survey/identityResolution.ts, packages/studio/src/locales/
+- [ ] T072 [US6] Write `language-glottocode` for no-code languages too (it is first added in T048; if Phase 5 runs before Phase 7, create the DecisionId here, and T048 extends it). Show it at review beside the 10.4 flag and the ISO 639-3 request pointer (FR-045) — packages/studio/src/decisions/decisionTypes.ts, packages/studio/src/criteria/languageTags.ts
+
+**Wave 5:**
 
 - [ ] T037 [US6] Extend row 10.4's check to flag `qaa`–`qtz` private-use language codes (FR-032); mark the wording for content review — packages/studio/src/criteria/languageTags.ts, packages/contracts/data/criteria.json
 
-**Checkpoint**: T030 to T032, T065 and T068 pass; SC-008's eight inputs each end in a confirmed, non-blank code (asserted in T032); SC-010's set resolves (T068). Commit: `spec 115 T030-T037, T065-T068`.
+**Checkpoint**: T030 to T032, T065, T068 and T069 pass; SC-008's eight inputs each end in a confirmed, non-blank code (asserted in T032); SC-010's set resolves (T068); SC-011's 752 no-code languages each end in a tag and a script (T069). Commit: `spec 115 T030-T037, T065-T072`.
 
 ---
 

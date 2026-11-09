@@ -177,6 +177,13 @@ An author types a name the lists do not know. The studio never stops at "no resu
 4. **Given** the author chooses "My language isn't listed", **When** they know the code, **Then** they can enter it. A well-formed registered code is accepted with its registered name; a private-use code (`qaa`–`qtz`) is accepted; a well-formed unregistered code is accepted with a warning; an ill-formed one is blocked with the reason.
 5. **Given** "My language isn't listed" with no code, **When** the author gives a language name, **Then** the studio proposes `qaa-x-` plus a code made from the name (the FR-011 rule), says why, and points to how to request an ISO 639-3 code. Review flags the tag as unusual (row 10.4).
 6. **Given** any of these paths, **When** the author confirms, **Then** the language code decision is set. No path leaves it blank.
+7. **Given** a language Glottolog knows but which has no ISO 639-3 code (e.g. "Mansim", Indonesia), **When** the author searches its name, **Then** it is listed as "Mansim: known to Glottolog, no ISO 639-3 code · Indonesia". Picking it opens the unlisted path pre-filled with:
+   - the name;
+   - its Glottolog code;
+   - a proposed tag `qaa-ID-x-mansim`;
+   - a proposed script taken from its nearest relatives that have codes.
+8. **Given** a dialect whose language has no ISO code (e.g. "Olmos", a dialect of Sechuran), **When** the author picks it, **Then** the proposed tag names both, as `qaa-PE-x-sechuran-olmos` (Sechuran is spoken only in Peru), and both Glottolog codes are kept.
+9. **Given** an unlisted language with no Glottolog entry and no related language, **When** the author reaches the script question, **Then** a script is still proposed: the most common script among the listed languages of the author's chosen country. The proposal says where it came from.
 
 ---
 
@@ -193,6 +200,9 @@ An author types a name the lists do not know. The studio never stops at "no resu
 - **Extensions (`-u-`, `-t-`) in an opened keyboard.** They are preserved and validated for form, but the studio offers no way to author them.
 - **Name matching ignores case and accents.** Spelling variants such as "Lengadocian" for "Languedocien" are left to the fuzzy tier (FR-003).
 - **The chooser's language data and the studio's pinned langtags disagree.** The chooser's data is its own langtags snapshot. If they differ on a code or default script, the studio's pinned langtags decides the emitted tag (FR-014, FR-015), and the difference is listed in a test fixture (FR-034).
+- **A no-code language's name collides with a coded language's name.** The coded language ranks first (FR-003). The no-code entry is still listed, with its label.
+- **Two no-code names make the same private-use subtag**, or a long name is truncated to 8 characters. The proposal is editable; collisions with known langtags `-x-` subtags get a disambiguating digit (FR-011).
+- **A pseudo-family language** (Glottolog "Unclassifiable", pidgins, sign languages) has no genealogical relatives, so its script comes from FR-046 step 2.
 - **The author pastes a tag with extensions** (`fr-u-co-phonebk`) into the search. The language, script and region are resolved. The extension is not carried into the new keyboard's tag, with a note (FR-027). FR-025 governs the tags of keyboards that are opened, which keep their extensions.
 
 ## Requirements *(mandatory)*
@@ -249,6 +259,18 @@ An author types a name the lists do not know. The studio never stops at "no resu
 - **FR-031**: "My language isn't listed" MUST take a language name (pre-filled with the text) and an optional code. A code MUST be checked as in FR-028: a registered code is accepted with its name, a private-use code (`qaa`–`qtz`) is accepted, a well-formed unregistered code is accepted with a warning, and an ill-formed code blocks confirmation with its reason.
 - **FR-032**: With no code, the studio MUST propose `qaa-x-` plus a subtag made from the language name (FR-011 rule), explain why, and point to how to request an ISO 639-3 code. Row 10.4 MUST flag the tag at review.
 - **FR-033**: The language code question MUST NOT accept unchecked free text. Every way of setting the code goes through FR-028 or FR-031, so the language code is never blank or unchecked once the author confirms.
+
+**Languages with no code, and dialects of them**
+
+- **FR-043**: The search MUST also list the languages Glottolog has with no ISO 639-3 code, and the dialects of those languages. Each is labelled "known to Glottolog, no ISO 639-3 code", with its countries. Picking one opens the unlisted path (FR-031) pre-filled with its name, Glottolog code and countries. The "is a dialect: find its language" search (FR-030) MUST include these languages as possible parents.
+- **FR-044**: For a language with no code, the proposed tag MUST be `qaa`, plus a region when the language is spoken in exactly one country (or the author picks one), plus `-x-` and a subtag made from the language name (FR-011 rule): e.g. `qaa-ID-x-mansim`. For a dialect of such a language, a second private-use subtag is made from the dialect name: e.g. `qaa-PE-x-sechuran-olmos`. The tag MUST stay well-formed: each private-use subtag at most 8 characters, and the region before `-x-`.
+- **FR-045**: The Glottolog code of a language with no ISO code MUST be stored like a dialect's (FR-012). Review MUST show it alongside the row 10.4 flag and the pointer to requesting an ISO 639-3 code.
+- **FR-046**: A language with no langtags entry MUST still get a proposed script, never a blank (Article X). In order:
+  1. the default script shared by the most of its nearest Glottolog relatives that have codes;
+  2. otherwise, the most common default script among the langtags languages of its country (or the author's chosen country);
+  3. otherwise, Latin.
+
+  The proposal MUST say which rule produced it, and the author confirms or changes it.
 
 **Shared language chooser**
 
@@ -318,6 +340,7 @@ Authors will often type their dialect, or their dialect together with their lang
   - "Swiss French", where Switzerland is the first place offered.
 
   Today none of these does. The set lives in a test fixture and grows as authors report misses.
+- **SC-011**: For every Glottolog language with no ISO code that has countries (752 at the pinned commit), searching its name lists it as a no-code language. Picking it ends in a well-formed `qaa…-x-…` tag and a proposed script with its source shown, with no blank answer.
 
 ## Assumptions
 
@@ -328,7 +351,7 @@ Authors will often type their dialect, or their dialect together with their lang
 - **Whether Keyman's keyboards repository accepts `qaa-x-` tags is unverified.** Row 10.4 flags them; the studio does not block them.
 - **Places by country name; adjectives go to the chooser.** FR-040 matches country names and codes ("French Switzerland", "French CH") automatically. Adjectives such as "Swiss" have no data source, so they reach the remainder chooser (FR-040 step 3), where the shared-prefix ranking puts Switzerland first. No demonym data is needed (owner suggestion, 2026-11-09).
 - **No separate display name.** Bloom asks for a display name; the studio already asks for the English name and the autonym, which serve that purpose.
-- **Only Glottolog dialects with an ISO-coded parent are searchable.** The 314 others are not offered.
+- **All Glottolog languages and dialects are searchable.** This includes the 759 languages with no ISO code and the 314 dialects of those languages (FR-043). The 525 not marked extinct are the ones an author is likely to need.
 - **The IANA variant registry becomes a pinned prebuild input**, fetched and checksummed like langtags, so validation and proposals are reproducible.
 - **Copy and Open both get the dialect step and validation.** Open's existing language list gains validation; the dialect step applies when an Open author adds or edits a language.
 - **Performance:** the chooser's data (about 770 KB compressed) loads with the language step, and the Glottolog dialect data (about 165 KB compressed) only when a search needs it or the dialect step opens.
@@ -340,6 +363,7 @@ Authors will often type their dialect, or their dialect together with their lang
 - Q: For a dialect keyboard (e.g. Gascon), should the package list only the dialect tag, or the parent language too? → A: Dialect tag only (`oc-gascon`). The keyboard claims exactly what it is for. How keyman.com matches a parent-language search against a dialect tag is unverified; recorded as an assumption, not a requirement.
 - Q: What happens when the language or dialect is in no list? → A: Every path ends in a proposal (User Story 6). An unmatched dialect name is kept while the author finds its language; an unlisted language takes a code if the author knows one, else a proposed `qaa-x-` tag.
 - Q: What if the extra words typed with a language match no dialect or place? → A: Ask, don't guess. A small chooser asks whether they are a dialect name, a place (country picker), a listed dialect, or should be left out (FR-040 step 3).
+- Q: What if the language has no ISO code, or the dialect's language has none? → A: Recognise it from Glottolog where possible, keep its Glottolog code, propose `qaa[-REGION]-x-<language>[-<dialect>]`, and propose a script from its nearest coded relatives, else its country, else Latin. Every answer is a proposal; none is blank (FR-043 to FR-046).
 - Q: Build our own search or reuse Bloom's? → A: Reuse SIL's shared language chooser (EthnoLib, as in Bloom): adapt its component to the studio's React and use its search backend.
 
 ## Out of Scope

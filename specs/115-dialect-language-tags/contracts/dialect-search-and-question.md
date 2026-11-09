@@ -17,10 +17,17 @@ New subpath export in `packages/glottolog/package.json`; loaded by the studio wi
 
 ```ts
 export interface GlottologDialectRow {
-  name: string; folded: string; glottocode: string; parentIso: string; countries: string[];
+  kind: "dialect" | "uncoded-language" | "uncoded-dialect";
+  name: string; folded: string; glottocode: string;
+  parentIso?: string;          // "dialect": ISO 639-3 of its language
+  parentGlottocode?: string;   // "uncoded-dialect": its language (which has no ISO code)
+  parentName?: string;         // "uncoded-dialect": e.g. "Sechuran"
+  countries: string[];         // own, else the language's
 }
-export const dialectRows: readonly GlottologDialectRow[];
+export const dialectRows: readonly GlottologDialectRow[];   // 13,392 + 759 + 314 rows
 ```
+
+The `uncoded-*` rows (FR-043) render as "Mansim: known to Glottolog, no ISO 639-3 code · Indonesia". Picking one opens `UnlistedLanguagePanel` pre-filled (FR-044, FR-045); no parent `ILanguage` is looked up for them.
 
 ## Studio: dialect searcher and result modifier
 
@@ -147,6 +154,34 @@ Displayed list:
 | `resolveTypedLanguage` (unique primary name, else unique alias) | Kept; generalised from `LanguageSummary` to `ILanguage` (`exonym`, `names`). Same rule in the UI and the headless author. |
 | `onEntryResolved` → `seedFromEntry` (code, script, autonym as `default` provenance) | Unchanged entry point. The chooser maps the `ILanguage` to the existing `LanguageDefaults` with `getLanguageDefaults(languageSubtag)`, after macrolanguage mapping. |
 | `onSelectAdvance` | Unchanged. |
+
+## Studio: languages with no code (FR-043 to FR-046)
+
+```ts
+// packages/studio/src/survey/languageChooser/uncodedLanguage.ts
+export function proposeUncodedTag(input: {
+  languageName: string; dialectName?: string; countries: string[]; chosenRegion?: string;
+}): string;
+// "qaa" + ("-" + region if exactly one country, or chosenRegion) + "-x-" + slug(language) [+ "-" + slug(dialect)]
+// slug = FR-011 rule (NFD, ASCII letters/digits, lowercase, ≤ 8). The result must pass parseBcp47.
+
+export function proposeScriptForUncoded(input: {
+  glottocode?: string; countries: string[];
+}): { script: string; source: "relatives" | "country" | "fallback"; basis: string[] };
+// 1. glottolog relatedLanguages(glottocode): relatives that have ISO codes, closest shared-subgroup depth first;
+//    the most common langtags default script among the closest tier
+// 2. else the most common default script among langtags languages whose regions include a country
+// 3. else "Latn"
+```
+
+| Input | Tag | Script source |
+|---|---|---|
+| Mansim (`mans1260`, ID) | `qaa-ID-x-mansim` | relatives |
+| Olmos, a dialect of Sechuran (`sech1236`, PE) | `qaa-PE-x-sechuran-olmos` | relatives or country |
+| Mansoanka (`mans1259`, GM;GW) | `qaa-x-mansoank` (two countries, so no region unless chosen) | relatives |
+| An Unclassifiable language (pseudo-family) | `qaa-…-x-…` | country (relatedness returns nothing) |
+
+The proposed script is written as a `default`-provenance `target-script` proposal; the script question shows its source (Article X).
 
 ## Chooser UI (ported; no MUI)
 
