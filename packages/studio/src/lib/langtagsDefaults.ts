@@ -28,6 +28,10 @@ type LangtagsModule = {
   lookupByName: (query: string) => readonly LanguageSummary[];
   /** Every langtags variant and `-x-` tagset (spec 115): the dialect search's langtags source. */
   allDialectTagsets: readonly DialectTagset[];
+  /** The IANA language-subtag registry lookup (spec 115 FR-028); undefined when unregistered. */
+  registeredLanguage: (subtag: string) => { subtag: string; description: string; scope?: string; macrolanguage?: string } | undefined;
+  /** The raw IANA variant registry (spec 115 R5). */
+  allRegisteredVariants: readonly { subtag: string; descriptions: readonly string[]; prefixes: readonly string[]; deprecated: boolean }[];
 };
 
 let _modulePromise: Promise<LangtagsModule> | null = null;

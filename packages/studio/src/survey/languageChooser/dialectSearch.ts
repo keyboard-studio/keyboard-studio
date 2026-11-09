@@ -27,8 +27,23 @@ import {
 import type { DialectTagset, SearchMatch } from "@keyboard-studio/contracts";
 import type { GlottologDialectRow } from "@keyboard-studio/glottolog/dialects";
 
+/**
+ * A Glottolog language or dialect with no ISO 639-3 code (spec 115 FR-043). It is
+ * a chooser row of its own: there is no parent language to resolve.
+ */
+export interface UncodedInfo {
+  kind: "uncoded-language" | "uncoded-dialect";
+  /** Glottolog's name for the row (the language, or the dialect). */
+  name: string;
+  glottocode: string;
+  countries: string[];
+  /** "uncoded-dialect": the language (which has no ISO code) and its code. */
+  parentName?: string;
+  parentGlottocode?: string;
+}
+
 /** The chooser result type with the optional dialect match attached. */
-export type ChooserLanguage = ILanguage & { match?: SearchMatch };
+export type ChooserLanguage = ILanguage & { match?: SearchMatch; uncoded?: UncodedInfo };
 
 /** One searchable dialect name (either source), pointing at its parent language. */
 export interface DialectRow {
@@ -43,6 +58,8 @@ export interface DialectRow {
   /** Glottolog language name of the parent when known; used by the fallback row only. */
   parentName?: string;
   match: SearchMatch;
+  /** Set for a Glottolog row with no ISO code: the row stands for itself, with no parent. */
+  uncoded?: UncodedInfo;
   /** Folded dialect words a query must contain for this row to count (a "<language> <dialect>" row). */
   requires?: string;
 }
@@ -60,7 +77,7 @@ function titleCase(words: string): string {
 }
 
 /** Rows for one langtags variant or `-x-` tagset: its dialect-specific names. */
-function rowsForTagset(t: DialectTagset): DialectRow[] {
+export function rowsForTagset(t: DialectTagset): DialectRow[] {
   const subtagWords = t.dialectSubtag.replace(/^x-/, "").replace(/-/g, " ");
   const subtagFolded = fold(subtagWords);
   const relation: SearchMatch["relation"] = t.dialectSubtag.startsWith("x-") ? "dialect" : "variety";
@@ -89,7 +106,24 @@ function rowsForTagset(t: DialectTagset): DialectRow[] {
 }
 
 function rowForGlottolog(r: GlottologDialectRow): DialectRow | null {
-  if (r.kind !== "dialect" || r.parentIso === undefined) return null;
+  if (r.kind !== "dialect") {
+    return {
+      id: `gl:${r.glottocode}`,
+      name: r.name,
+      folded: r.folded,
+      parent: "",
+      match: { name: r.name, relation: "dialect", source: "glottolog", glottocode: r.glottocode, countries: r.countries },
+      uncoded: {
+        kind: r.kind,
+        name: r.name,
+        glottocode: r.glottocode,
+        countries: r.countries,
+        ...(r.parentName !== undefined ? { parentName: r.parentName } : {}),
+        ...(r.parentGlottocode !== undefined ? { parentGlottocode: r.parentGlottocode } : {}),
+      },
+    };
+  }
+  if (r.parentIso === undefined) return null;
   return {
     id: `gl:${r.glottocode}`,
     name: r.name,
@@ -150,7 +184,8 @@ function hasWordPrefix(foldedName: string, q: string): boolean {
   return qq !== "" && ` ${squash(foldedName)}`.includes(` ${qq}`);
 }
 
-function isClose(l: ILanguage, q: string): boolean {
+/** True when `q` (folded) is a prefix of a word in the result's names, or equals its code. */
+export function isClose(l: ILanguage, q: string): boolean {
   if (PLAIN(l.languageSubtag) === q || PLAIN(l.iso639_3_code) === q) return true;
   return namesOf(l).some((n) => hasWordPrefix(n, q));
 }
@@ -178,6 +213,11 @@ function fallbackRow(code: string, name: string): ChooserLanguage {
 /** The parent language for an ISO code, through EthnoLib's own modifier so `cmn` is the `zh` card. */
 export function defaultParentFor(iso: string): ILanguage | undefined {
   return getLanguageBySubtag(MACROLANGUAGE_PARENT[iso] ?? iso, defaultSearchResultModifier);
+}
+
+/** The chooser row for a Glottolog language with no ISO code. It has no code of its own. */
+function uncodedRow(info: UncodedInfo): ChooserLanguage {
+  return { ...fallbackRow("", info.name), regionNamesForDisplay: info.countries.join(", "), uncoded: info };
 }
 
 const MAX_DIALECT_HITS = 60;
@@ -219,6 +259,12 @@ export function dialectResultModifier(
     };
 
     for (const hit of hits) {
+      if (hit.uncoded !== undefined) {
+        // No ISO code, so no parent to attach to: the row is its own result.
+        const close = hasWordPrefix(hit.folded, q);
+        (close ? closeDialect : fuzzyDialect).push(uncodedRow(hit.uncoded));
+        continue;
+      }
       if (hit.requires !== undefined && !q.includes(hit.requires)) continue;
       const target = MACROLANGUAGE_PARENT[hit.parent] ?? hit.parent;
       const close = hasWordPrefix(hit.folded, q);

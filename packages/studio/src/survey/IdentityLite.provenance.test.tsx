@@ -123,7 +123,7 @@ async function renderReady(): Promise<HTMLElement> {
 async function selectLanguage(name: string): Promise<void> {
   const input = screen.getByRole<HTMLInputElement>("combobox");
   fireEvent.change(input, { target: { value: name } }); // the chooser lists nothing until text is typed
-  const option = await screen.findByRole("option", { name: new RegExp("^" + name) });
+  const option = await screen.findByRole("option", { name: new RegExp("^" + name + ", ") });
   fireEvent.mouseDown(option);
   await waitFor(() => {
     expect(screen.getByText(/Which region is your language from\?/)).toBeTruthy();

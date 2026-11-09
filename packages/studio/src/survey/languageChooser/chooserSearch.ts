@@ -10,12 +10,15 @@
 // "map the ILanguage to the existing LanguageDefaults after macrolanguage
 // mapping" step.
 
-import type { ILanguage } from "@ethnolib/find-language";
+import { getAllRegions, type ILanguage } from "@ethnolib/find-language";
 import type { LanguageSummary } from "@keyboard-studio/contracts";
 import type { GlottologDialectRow } from "@keyboard-studio/glottolog/dialects";
 import { loadLangtags } from "../../lib/langtagsDefaults.ts";
 import { languageResultsFor, resolveTypedLanguage } from "../resolveTypedLanguage.ts";
-import { MACROLANGUAGE_PARENT, defaultParentFor, dialectResultModifier, makeDialectSearcher, type ChooserLanguage } from "./dialectSearch.ts";
+import { MACROLANGUAGE_PARENT, defaultParentFor, dialectResultModifier, fold, isClose, makeDialectSearcher, rowsForTagset, type ChooserLanguage } from "./dialectSearch.ts";
+import type { ChosenSummary } from "../chosenLanguage.ts";
+import { plainText as plainTextOf } from "./LanguageCard.tsx";
+import { findCountry, readTypedText, type DialectOf, type TypedReading } from "./readTypedText.ts";
 
 export type ChooserModifier = (results: ILanguage[], searchString: string) => ChooserLanguage[];
 
@@ -101,8 +104,65 @@ export async function loadChooserModifier(options: { glottolog?: boolean } = {})
 export async function resolveTypedEntry(text: string, options: { glottolog?: boolean } = {}): Promise<LanguageSummary | null> {
   const modifier = await loadChooserModifier(options);
   const mod = await loadLangtags();
-  const hit = resolveTypedLanguage(text, languageResultsFor(text, modifier));
-  return hit === null ? null : summaryFor(hit, mod);
+  const results = languageResultsFor(text, modifier);
+  const hit = resolveTypedLanguage(text, results);
+  if (hit !== null) return summaryFor(hit, mod);
+  return autoResolveBeyondName(text, results, readingsFor(text, modifier, mod), mod);
+}
+
+/**
+ * The language, dialect and place readings of multi-word text (FR-039): the
+ * chooser's close search for each language part, matched against that language's
+ * dialects and the country table.
+ */
+export function readingsFor(text: string, modifier: ChooserModifier, mod: LangtagsMod): TypedReading[] {
+  const regions = getAllRegions();
+  const seen = new Map<string, ILanguage>();
+  return readTypedText(
+    text,
+    (part) => {
+      const q = fold(part);
+      const close = languageResultsFor(part, modifier).filter((l) => l.uncoded === undefined && isClose(l, q));
+      // A language the text names in full ("Achi") is kept ahead of those it only starts ("Achinese").
+      const named = (l: ILanguage): boolean => [l.exonym, l.autonym, ...l.names].some((n) => fold(plainTextOf(n)) === q);
+      const found = [...close.filter(named), ...close.filter((l) => !named(l))].slice(0, 3);
+      for (const l of found) seen.set(l.iso639_3_code, l);
+      return found;
+    },
+    (iso) => {
+      const language = seen.get(iso);
+      return language === undefined ? [] : dialectsOfLanguage(language, mod);
+    },
+    (part) => findCountry(part, regions),
+  );
+}
+
+/** The summary a resolved reading stands for: its language with the dialect or region attached. */
+export function readingSummary(reading: TypedReading, mod: LangtagsMod): ChosenSummary | null {
+  const base = summaryFor(reading.language, mod);
+  if (base === null) return null;
+  const withMatch: ChosenSummary = reading.dialect !== undefined ? { ...base, match: reading.dialect } : base;
+  return reading.region !== undefined
+    ? { ...withMatch, extras: { region: { code: reading.region.code, source: "what you typed" } } }
+    : withMatch;
+}
+
+/**
+ * Resolve without a click (FR-042) beyond a language's own name: text that names
+ * exactly one dialect, or has exactly one reading and that reading is resolved. An
+ * unresolved reading never resolves by itself.
+ */
+export function autoResolveBeyondName(
+  text: string,
+  results: readonly ChooserLanguage[],
+  readings: readonly TypedReading[],
+  mod: LangtagsMod,
+): LanguageSummary | null {
+  const q = fold(text);
+  const byDialect = results.filter((r) => r.uncoded === undefined && r.match !== undefined && fold(r.match.name) === q);
+  if (byDialect.length === 1) return summaryFor(byDialect[0]!, mod);
+  if (readings.length === 1 && readings[0]!.unresolved === undefined) return readingSummary(readings[0]!, mod);
+  return null;
 }
 
 /**
@@ -137,4 +197,46 @@ export function summaryFor(lang: ILanguage, mod: LangtagsMod): LanguageSummary |
     }
   }
   return null;
+}
+
+let glottologByIso: { rows: readonly GlottologDialectRow[]; map: Map<string, GlottologDialectRow[]> } | null = null;
+
+/**
+ * Every dialect the data knows for one language: its Glottolog dialects, its IANA
+ * registered variants (by prefix) and its langtags variant and `-x-` tagsets. The
+ * list the reading layer matches a typed remainder against, and the remainder
+ * chooser's "one of these dialects".
+ */
+export function dialectsOfLanguage(language: ILanguage, mod: LangtagsMod): DialectOf[] {
+  const subtag = (MACROLANGUAGE_PARENT[language.iso639_3_code.toLowerCase()] ?? language.languageSubtag).toLowerCase();
+  const iso = language.iso639_3_code.toLowerCase();
+  const out: DialectOf[] = [];
+  if (glottologRows !== null) {
+    if (glottologByIso === null || glottologByIso.rows !== glottologRows) {
+      const map = new Map<string, GlottologDialectRow[]>();
+      for (const r of glottologRows) {
+        if (r.kind !== "dialect" || r.parentIso === undefined) continue;
+        const list = map.get(r.parentIso) ?? [];
+        list.push(r);
+        map.set(r.parentIso, list);
+      }
+      glottologByIso = { rows: glottologRows, map };
+    }
+    for (const r of glottologByIso.map.get(iso) ?? []) {
+      out.push({ name: r.name, match: { name: r.name, relation: "dialect", source: "glottolog", glottocode: r.glottocode, countries: r.countries } });
+    }
+  }
+  for (const v of mod.allRegisteredVariants) {
+    if (v.deprecated || !v.prefixes.includes(subtag)) continue;
+    for (const d of v.descriptions) {
+      out.push({ name: d, match: { name: d, relation: "variety", source: "iana", dialectTag: `${subtag}-${v.subtag}` } });
+    }
+  }
+  for (const t of mod.allDialectTagsets) {
+    if (t.language !== subtag && t.language !== iso) continue;
+    for (const row of rowsForTagset(t)) {
+      if (row.requires === undefined) out.push({ name: row.name, match: row.match });
+    }
+  }
+  return out;
 }

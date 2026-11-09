@@ -6,18 +6,20 @@
 // code (e.g. "hau", "hin"), falling back to the canonical bare subtag when the
 // entry carries no 639-3 code. The author confirms it or overrides it.
 //
-// optional (required: false) — when the language was entered as free text with
-// no langtags match, this arrives empty and the author may type a code directly
-// or leave it blank (graceful degradation, spec 030 FR-003/US4-3). The code
-// drives IdentityLiteResult.bcp47 (buildTargetBcp47 in IdentityLite.tsx); an
-// empty subtag degrades suggestStarts() to script-match ranking (spec §8).
+// Spec 115 FR-033: a CONFIRMATION, not a free-text field. The code comes from the
+// language chooser (a listed language, a typed code or tag, or the unlisted panel,
+// each checked), and the field shows it with "Change", which reopens a checked
+// entry. The code drives IdentityLiteResult.bcp47 (buildTargetBcp47 in
+// IdentityLite.tsx); an empty subtag degrades suggestStarts() to script-match
+// ranking (spec §8), so blank stays allowed (required: false) until a language is
+// chosen.
 //
-// Type is "autocomplete" with options_source "@langtags_iso639" so the author
-// can search the code list when overriding; the native datalist always accepts
-// free text, so a typed/blank value is preserved.
+// Type is "autocomplete" with options_source "@langtags_iso639": the field renders
+// as the confirmation, and its Change entry offers the candidate codes or a search.
 
-import type { QuestionModule } from "../../types.ts";
+import type { QuestionModule, ValidationResult } from "../../types.ts";
 import type { ExtractContext } from "../../../decisions/extractContext.ts";
+import { checkLanguageCode } from "../../languageCodeCheck.ts";
 
 export const definition = {
   id: "il_language_code",
@@ -33,18 +35,40 @@ export const definition = {
   next: "il_target_script",
 } satisfies import("../../types.ts").FlowQuestion;
 
-// No validate() — optional free-text confirmation; no client-side gating.
+// Spec 115 FR-033: no unchecked free text. The code comes from the language chooser,
+// a typed code or tag, or the unlisted panel, and anything the author types here is
+// checked with the same parser (`parseBcp47`): a well-formed code is accepted (the
+// registry check is a warning the field shows, never a block, FR-031); an ill-formed
+// one is refused with the parser's reason. Blank stays allowed (required: false), as
+// when no language was chosen yet.
+export function validate(value: string | string[] | undefined): ValidationResult {
+  const text = (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
+  if (text === "") return { ok: true };
+  const check = checkLanguageCode(text, null);
+  if (check.ok) return { ok: true };
+  return {
+    ok: false,
+    code: "invalid_code",
+    message: `"${text}" is not a valid language code (${check.reason}). Use a code like "hau", or pick the language again.`,
+  };
+}
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [
     { value: "hau", note: "ISO 639-3 code seeded for Hausa (confirmation)" },
     { value: "hin", note: "ISO 639-3 code seeded for Hindi" },
     { value: "ha", note: "author override to the 2-letter subtag — accepted" },
-    { value: "bft", note: "free-text code for a language absent from langtags" },
+    { value: "bft", note: "a registered code absent from langtags: a checked entry" },
+    { value: "zzz", note: "well formed but unregistered: accepted, with a warning in the field" },
+    { value: "qaa", note: "private-use code (the unlisted-language proposal)" },
     { value: undefined, note: "blank is explicitly allowed (required: false)" },
     { value: "", note: "empty string is acceptable for an optional question" },
   ],
-  invalid: [],
+  invalid: [
+    { value: "not a code!", expectedCode: "invalid_code", note: "free text is not a code" },
+    { value: "12", expectedCode: "invalid_code", note: "too short to be a language subtag" },
+    { value: "oc-gascon", expectedCode: "invalid_code", note: "a full tag is entered in the language chooser, not here" },
+  ],
 };
 
 // Decision spike (km/decisions-spike): base-keyboard probe. Reads the BCP 47
@@ -67,6 +91,7 @@ export function extractLanguageCode(ctx: ExtractContext): string | undefined {
 // composed tag the descriptor declares.
 const mod: QuestionModule = {
   definition,
+  validate,
   fixtures,
   inputs: [],
   writes: [],

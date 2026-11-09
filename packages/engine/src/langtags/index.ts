@@ -136,3 +136,12 @@ export type { LangtagResolution } from "./tagsets.js";
 // search. `dialectTagsetsFor(language)` (with the registry-aware filters) is a
 // later task; this is the raw generated data, exported as-is.
 export { dialects as allDialectTagsets } from "./generated/dialects.js";
+
+// Spec 115 R12: registered language subtags (IANA), for the typed-code check.
+export { registeredLanguage } from "./registry.js";
+export type { RegisteredLanguage } from "./generated/registeredLanguages.js";
+
+// Spec 115 R5: the raw IANA variant registry, for the chooser's list of a language's
+// registered variants (the prefix-aware `variantsFor` arrives with the dialect question).
+export { registeredVariants as allRegisteredVariants } from "./generated/variants.js";
+export type { RegisteredVariant } from "./generated/variants.js";

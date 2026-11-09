@@ -171,7 +171,7 @@ const BASELINE_EDGES: ReadonlyArray<readonly [string, string, string]> = [
 /** Membership on `main` at 18e63aa4: the decisions each step's screen held. */
 const BASELINE_MEMBERSHIP: Readonly<Record<string, readonly string[]>> = {
   // spec 115: il_language_english also provides language-search-match (why a picked language matched a dialect name).
-  identity: ["language-name", "language-search-match", "language-region", "language-autonym", "language-code", "target-script"],
+  identity: ["language-name", "language-search-match", "language-glottocode", "language-region", "language-autonym", "language-code", "target-script"],
   layout: ["windows-layout", "caps-handling"],
   // track_choice removal (PR #2568): authoring-track moved from the removed
   // track screen into choose_base via the authoringTrackProvider module.

@@ -19,6 +19,7 @@ import { useDecisionStore } from "../stores/decisionStore.ts";
 import { questionRegistry } from "./questions/registry.ts";
 import type { ExtractContext, IdentityLookupInputs } from "../decisions/extractContext.ts";
 import { loadLangtags, getLoadedLangtags, scriptToTargetOption } from "../lib/langtagsDefaults.ts";
+import { extrasOf, type ChosenExtras } from "./chosenLanguage.ts";
 
 const SEEDED_QUESTIONS = ["il_language_autonym", "il_language_code", "il_target_script"] as const;
 
@@ -37,6 +38,13 @@ export interface IdentityResolution {
   englishNames(): readonly string[] | undefined;
 }
 
+/** The decision-proposal source a script's origin is recorded under (the contracts source union). */
+function scriptSourceOf(source: string): "analysis" | "region" | "identity" {
+  if (source === "relatives") return "analysis";
+  if (source === "country") return "region";
+  return "identity";
+}
+
 export function createIdentityResolution(): IdentityResolution {
   // The English name the author entered/picked at Q1 (il_language_english). Used
   // as Q2's FALLBACK own-language name (spec 030 US2) only when langtags has no
@@ -53,6 +61,9 @@ export function createIdentityResolution(): IdentityResolution {
   let resolvedSummary: LanguageSummary | null = null;
   // The full langtags entry resolved from the selected summary (spec 030 US3).
   let resolvedEntry: LanguageDefaults | null = null;
+  // Spec 115 FR-047: the pick carried a region proposal (a typed "French Switzerland",
+  // a customized region), so il_language_region is routed for the author to confirm.
+  let regionRequested = false;
 
   // Evaluate the three declared lookup defaults against the accumulated
   // inputs and record each result as a `default` decision record. Write rule
@@ -126,6 +137,7 @@ export function createIdentityResolution(): IdentityResolution {
       localNames: _ln,
       languageCode: _lc,
       targetScript: _ts,
+      targetScriptSource: _tss,
       q1English: _q1,
       ...restInputs
     } = identityInputs;
@@ -161,6 +173,46 @@ export function createIdentityResolution(): IdentityResolution {
     });
   }
 
+  // A language langtags does not index (a typed code, an unlisted language, a
+  // Glottolog language with no ISO code): the entry the seeds read is built from
+  // what the chooser knows, so the code, name and script still seed their questions.
+  function synthesizeDefaults(entry: LanguageSummary, extras: ChosenExtras): LanguageDefaults {
+    const script = extras.script?.script ?? entry.defaultScript;
+    return {
+      code: entry.code,
+      englishName: entry.englishName,
+      ...(script !== undefined ? { defaultScript: script } : {}),
+      regions: [],
+    };
+  }
+
+  // Record what the pick carried beyond its langtags entry. Every value is a
+  // `default` proposal the author confirms at its own question; only the
+  // glottocode, which no question asks for, is this question's own derived fact.
+  function applyExtras(extras: ChosenExtras | undefined): void {
+    const store = useDecisionStore.getState();
+    regionRequested = extras?.region !== undefined;
+    const existingGlotto = store.decisions["language-glottocode"];
+    if (extras?.glottocode === undefined) {
+      if (existingGlotto !== undefined) store.forget("language-glottocode");
+    } else if (existingGlotto?.value !== extras.glottocode) {
+      store.record({ id: "language-glottocode", value: extras.glottocode, provenance: "derived", source: "il_language_english" });
+    }
+    const region = store.decisions["language-region"];
+    if (extras?.region !== undefined) {
+      if (region === undefined || region.provenance === "default") {
+        store.record({ id: "language-region", value: extras.region.code, provenance: "default", source: "region" });
+      }
+    } else if (region?.provenance === "default" && region.source === "region") {
+      store.forget("language-region");
+    }
+    if (extras?.script !== undefined) {
+      const option = scriptToTargetOption(extras.script.script) ?? "other";
+      identityInputs = { ...identityInputs, targetScript: option, targetScriptSource: scriptSourceOf(extras.script.source) };
+      evaluateIdentityDefaults();
+    }
+  }
+
   // Reset every resolved-entry-derived seed. Called when the English name is
   // cleared / matches nothing (free text → graceful degradation, FR-003). The
   // autonym is re-evaluated afterwards: with no entry behind it, its declared
@@ -179,18 +231,21 @@ export function createIdentityResolution(): IdentityResolution {
       if (questionId !== "il_language_english") return;
       resolvedSummary = entry;
       recordSearchMatch(entry?.match);
+      const extras = extrasOf(entry);
       if (entry === null) {
         clearSeeds();
+        applyExtras(undefined);
         return;
       }
       const applyDefaults = (mod: NonNullable<ReturnType<typeof getLoadedLangtags>>): void => {
-        const defaults = mod.getLanguageDefaults(entry.code);
+        const defaults = mod.getLanguageDefaults(entry.code) ?? (extras !== undefined ? synthesizeDefaults(entry, extras) : null);
         if (defaults !== null) {
           resolvedEntry = defaults;
           seedFromEntry(defaults);
         } else {
           clearSeeds();
         }
+        applyExtras(extras);
       };
       // Seed SYNCHRONOUSLY when the module is already loaded. The name picker
       // cannot present a selectable row until it has loaded langtags, so on a
@@ -245,7 +300,7 @@ export function createIdentityResolution(): IdentityResolution {
           // subtag).
           forgetIdentityDefaults(["il_language_autonym", "il_target_script"]);
           const variantScript = scriptToTargetOption(variant.defaultScript) ?? undefined;
-          const { localNames: _ln, targetScript: _ts, ...restInputs } = identityInputs;
+          const { localNames: _ln, targetScript: _ts, targetScriptSource: _tss, ...restInputs } = identityInputs;
           identityInputs = {
             ...restInputs,
             ...(variant.localNames.length > 0 ? { localNames: variant.localNames } : {}),
@@ -261,7 +316,7 @@ export function createIdentityResolution(): IdentityResolution {
     // synchronously by onEntryResolved when the author selects a suggestion, so
     // it is current at render time (no dependency on onAnswerCommit ordering).
     nextOverride(questionId) {
-      if (questionId === "il_language_english" && resolvedSummary?.hasRegionVariants === true) {
+      if (questionId === "il_language_english" && (resolvedSummary?.hasRegionVariants === true || regionRequested)) {
         return "il_language_region";
       }
       return undefined;

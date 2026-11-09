@@ -12,7 +12,11 @@
 //   - 12.1 Not met only: the tag's script is absent from output that is
 //     confidently in another script. Agreement is not Met — a matching
 //     script does not show the language is right.
-//   - 10.4, 10.5, 12.5/12.6 Not applicable only, via positive facts.
+//   - 10.4, 10.5, 12.5/12.6 Not applicable only, via positive facts. 10.4 also
+//     flags a private-use language code (`qaa`-`qtz`, spec 115 FR-032): such a
+//     tag is never "unremarkable", and the line points at the ISO 639-3 request.
+//     CONTENT REVIEW (Article VI): the 10.4 wording below is review text owned by
+//     the content team.
 
 import { parseBcp47, scriptSubtagOf } from "@keyboard-studio/contracts";
 import type { CriteriaAssemblyVerdict, CriteriaFacts } from "./criteriaTypes.ts";
@@ -50,6 +54,8 @@ export interface LanguageTagFacts {
   script?: string;
   /** Scripts langtags records for the tag's language. */
   recordedScripts: readonly string[];
+  /** The language subtag is in the private-use range `qaa`-`qtz` (FR-032). */
+  privateUseLanguage?: boolean;
   /** Glottolog's classification; null when Glottolog does not have it. */
   conlang: "constructed" | "natural" | null;
   /**
@@ -65,6 +71,16 @@ export interface LanguageTagAnalysis {
   output?: { dominant: string; share: number; evidence: number };
   /** Script -> share of the output, for the per-tag share lines. */
   distribution: Readonly<Record<string, number>>;
+  /** The Glottolog code of a language with no ISO 639-3 code (`language-glottocode`), shown beside the 10.4 flag (FR-045). */
+  languageGlottocode?: string;
+}
+
+/** Where an author asks for an ISO 639-3 code (the pointer 10.4 shows, FR-032). */
+export const ISO_639_3_REQUEST_POINTER = "https://iso639-3.sil.org/code_changes/submitting_change_requests";
+
+/** A language subtag in the private-use range `qaa`-`qtz`. */
+export function isPrivateUseLanguage(lang: string): boolean {
+  return /^q[a-t][a-z]$/.test(lang.toLowerCase());
 }
 
 /** The facet-index classifier's `confident` share (engine CONFIDENT_SCRIPT_SHARE). */
@@ -164,6 +180,7 @@ export function analyzeLanguageTags(
   lookup: LangtagsTagLookup,
   conlang: ConlangLookup | undefined,
   profile: ScriptProfile | undefined,
+  languageGlottocode?: string,
 ): LanguageTagAnalysis {
   const tags = kpsTags.map((tag): LanguageTagFacts => {
     const lang = (tag.split("-")[0] ?? "").toLowerCase();
@@ -180,6 +197,7 @@ export function analyzeLanguageTags(
       ...(shorter.length > 0 ? { shorterEquivalents: shorter } : {}),
       ...(script !== undefined ? { script } : {}),
       recordedScripts: lookup.scripts(resolvedLang ?? lang),
+      ...(isPrivateUseLanguage(lang) ? { privateUseLanguage: true } : {}),
       conlang: cls.conlang,
       ...(cls.members !== undefined ? { macrolanguageMembers: cls.members } : {}),
     };
@@ -196,6 +214,7 @@ export function analyzeLanguageTags(
         }
       : {}),
     distribution: profile?.distribution ?? {},
+    ...(languageGlottocode !== undefined && languageGlottocode !== "" ? { languageGlottocode } : {}),
   };
 }
 
@@ -239,7 +258,7 @@ export function languageTagFacts(
 ): Partial<CriteriaFacts> {
   if (analysis === undefined || analysis.tags.length === 0) return {};
   const facts: Partial<CriteriaFacts> = {};
-  if (analysis.tags.every((t) => t.full !== undefined)) facts.kpsTagsAllInLangtags = true;
+  if (analysis.tags.every((t) => t.full !== undefined && t.privateUseLanguage !== true)) facts.kpsTagsAllInLangtags = true;
   if (analysis.tags.every((t) => t.conlang === "natural")) facts.kpsTagsNoConstructed = true;
   if (analysis.tags.every((t) => dominantRecorded(analysis, t) === true)) {
     facts.outputScriptRecordedByLangtags = true;
@@ -362,16 +381,23 @@ export function languageTagContextLines(
     );
   }
   if (criterionId.startsWith("10.4")) {
-    return problemsFirst(
-      tags.map((t) => ({
-        problem: t.full === undefined,
-        line:
-          t.full !== undefined
-            ? `${t.tag}: in langtags (${t.full}).`
-            : `${t.tag}: not in langtags.`,
-      })),
-      "in langtags",
-    );
+    return [
+      ...problemsFirst(
+        tags.map((t) => ({
+          problem: t.full === undefined || t.privateUseLanguage === true,
+          line:
+            t.privateUseLanguage === true
+              ? `${t.tag}: a private-use language code (qaa to qtz), standing in for a language with no ISO 639-3 code. Ask for a code: ${ISO_639_3_REQUEST_POINTER}`
+              : t.full !== undefined
+                ? `${t.tag}: in langtags (${t.full}).`
+                : `${t.tag}: not in langtags.`,
+        })),
+        "in langtags",
+      ),
+      ...(analysis.languageGlottocode !== undefined
+        ? [`Glottolog code of the language: ${analysis.languageGlottocode}.`]
+        : []),
+    ];
   }
   if (criterionId.startsWith("10.5")) {
     return problemsFirst(

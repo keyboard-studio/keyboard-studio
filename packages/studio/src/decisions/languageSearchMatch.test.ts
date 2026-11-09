@@ -33,7 +33,7 @@ describe("language-search-match decision", () => {
   });
 
   it("is provided by il_language_english, after language-name, and maps to no IR path", () => {
-    expect(questionRegistry["il_language_english"]?.provides).toEqual(["language-name", "language-search-match"]);
+    expect(questionRegistry["il_language_english"]?.provides).toEqual(["language-name", "language-search-match", "language-glottocode"]);
     expect(decisionIRPaths["language-search-match"]).toEqual([]);
   });
 
@@ -63,7 +63,7 @@ describe("language-search-match decision", () => {
     const english = questionRegistry["il_language_english"]!;
 
     it("declares it as renderer-written", () => {
-      expect(english.rendererWrites).toEqual(["language-search-match"]);
+      expect(english.rendererWrites).toEqual(["language-search-match", "language-glottocode"]);
     });
 
     it("answer commit writes only language-name", () => {

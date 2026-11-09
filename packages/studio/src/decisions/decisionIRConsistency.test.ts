@@ -25,6 +25,8 @@ const IR_LESS_DECISIONS: ReadonlySet<DecisionId> = new Set<DecisionId>([
   "language-name",
   // spec 115: the dialect-name match of a language pick lands in the decision record only.
   "language-search-match",
+  // spec 115: the Glottolog code of a language with no ISO code lands in the decision record only.
+  "language-glottocode",
   "language-region",
   "language-autonym",
   "language-code",

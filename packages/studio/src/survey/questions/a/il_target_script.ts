@@ -152,7 +152,9 @@ const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes
   // to a target-script option value at resolution time) as a lookup default.
   lookupDefault: (ctx) => {
     const script = ctx.identity?.targetScript;
-    return script !== undefined && script !== "" ? { value: script, source: "langtags" } : undefined;
+    return script !== undefined && script !== ""
+      ? { value: script, source: ctx.identity?.targetScriptSource ?? "langtags" }
+      : undefined;
   },
 };
 export default mod;

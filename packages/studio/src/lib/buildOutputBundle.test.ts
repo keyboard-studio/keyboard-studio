@@ -18,6 +18,7 @@ import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 
 const spies = vi.hoisted(() => ({
   compile: vi.fn(),
+  compileCall: vi.fn(),
   buildKmp: vi.fn(),
   validateWithOracle: vi.fn(),
   projected: { current: null as VirtualFS | null },
@@ -36,11 +37,14 @@ vi.mock("./services.ts", async (importOriginal) => {
     ...actual,
     getCompile: async () => {
       spies.compile();
-      return async () => ({
-        success: true,
-        diagnostics: [],
-        artifacts: [{ filename: "ldml_fixture.kmx", data: new Uint8Array([1, 2, 3]) }],
-      });
+      return async (...args: unknown[]) => {
+        spies.compileCall(...args);
+        return {
+          success: true,
+          diagnostics: [],
+          artifacts: [{ filename: "ldml_fixture.kmx", data: new Uint8Array([1, 2, 3]) }],
+        };
+      };
     },
     getCompileLdml: async () => {
       spies.compileLdml();
@@ -213,6 +217,21 @@ describe("buildLdmlExportForDownload", () => {
   it("throws an OutputBundleError with the ANSI-only reason for a begin ANSI keyboard", async () => {
     instantiate(KMN.replace("begin Unicode", "begin ANSI"));
     await expect(buildLdmlExportForDownload("46")).rejects.toThrow(/ANSI-only/);
+  });
+});
+
+describe("the shipped binaries are a release build", () => {
+  // kmc-kmn defaults saveDebug to true; a package must match what Keyman
+  // Developer builds from the same source, so the output compile turns it off.
+  it.each([
+    ["the .kmp", () => buildKmpForDownload()],
+    ["the source .zip", () => buildSourceZipForDownload()],
+  ])("%s compiles with saveDebug: false", async (_label, download) => {
+    instantiate();
+    spies.compileCall.mockClear();
+    await download();
+    expect(spies.compileCall).toHaveBeenCalledTimes(1);
+    expect(spies.compileCall.mock.calls[0]![2]).toEqual({ saveDebug: false });
   });
 });
 

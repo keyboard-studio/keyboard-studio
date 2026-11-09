@@ -49,6 +49,16 @@ export function useCardText(): CardText {
   const { t } = useLingui();
   const parentName = (l: ILanguage): string => plainText(l.exonym);
   const matchLine = (l: ChooserLanguage): string | undefined => {
+    // A Glottolog language (or dialect of one) with no ISO 639-3 code (FR-043).
+    if (l.uncoded !== undefined) {
+      const countries = l.uncoded.countries.join(", ");
+      const place = countries !== "" ? ` · ${countries}` : "";
+      if (l.uncoded.kind === "uncoded-dialect") {
+        const parent = l.uncoded.parentName ?? "";
+        return `${t({ id: "survey.languageChooser.uncoded.dialect", message: `a dialect of ${parent}: known to Glottolog, no ISO 639-3 code` })}${place}`;
+      }
+      return `${t({ id: "survey.languageChooser.uncoded.language", message: "known to Glottolog, no ISO 639-3 code" })}${place}`;
+    }
     const m: SearchMatch | undefined = l.match;
     if (m === undefined) return undefined;
     const language = parentName(l);
@@ -70,7 +80,7 @@ export function useCardText(): CardText {
     if (autonym !== "" && autonym !== plainText(l.exonym)) parts.push(autonym);
     const regions = plainText(l.regionNamesForDisplay);
     if (regions !== "") parts.push(regions);
-    parts.push(l.languageSubtag);
+    if (l.languageSubtag !== "") parts.push(l.languageSubtag);
     const line = matchLine(l);
     if (line !== undefined) parts.push(line);
     return parts.join(", ");

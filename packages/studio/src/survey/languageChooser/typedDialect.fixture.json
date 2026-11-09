@@ -1,0 +1,19 @@
+{
+  "_doc": "SC-010 query set (spec 115): people type their dialect, or the dialect and the language together, when asked for their language. `resolved` queries must list the right language first with the dialect or region attached; `unresolved` queries must list the right language first with the remainder chooser offered. ADD MISSES AUTHORS REPORT HERE: one row per query, with the language the author meant and what they meant by the extra words; the test in typedDialect.test.ts reads every row.",
+  "resolved": [
+    { "query": "Gascon Occitan", "language": "oc", "dialectName": "Gascon" },
+    { "query": "Occitan Gascon", "language": "oc", "dialectName": "Gascon" },
+    { "query": "Occitan - Gascon", "language": "oc", "dialectName": "Gascon" },
+    { "query": "Rabinal Achi", "language": "acr", "dialectTag": "acr-x-rabinal" },
+    { "query": "Achi Rabinal", "language": "acr", "dialectTag": "acr-x-rabinal" },
+    { "query": "Royal Bafut", "language": "bfd", "dialectName": "Royal Bafut" },
+    { "query": "Bafut Royal", "language": "bfd", "dialectName": "Royal Bafut" },
+    { "query": "Yabekolo Ewondo", "language": "ewo", "dialectName": "Yabekolo" },
+    { "query": "Ewondo (Yabekolo)", "language": "ewo", "dialectName": "Yabekolo" },
+    { "query": "French Switzerland", "language": "fr", "region": "CH" }
+  ],
+  "unresolved": [
+    { "query": "Ewondo Mvog-Ada", "language": "ewo", "remainder": "Mvog-Ada", "firstPlace": null },
+    { "query": "Swiss French", "language": "fr", "remainder": "Swiss", "firstPlace": "Switzerland" }
+  ]
+}

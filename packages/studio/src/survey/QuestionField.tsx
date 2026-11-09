@@ -9,7 +9,8 @@ import type { I18n } from "@lingui/core";
 import type { FlowQuestion, SurveyContext } from "./types.ts";
 import type { LintFinding, LanguageSummary } from "@keyboard-studio/contracts";
 import { LintChip } from "../lint/LintChip.tsx";
-import { loadLangtags } from "../lib/langtagsDefaults.ts";
+import { getLoadedLangtags, loadLangtags } from "../lib/langtagsDefaults.ts";
+import { checkLanguageCode } from "./languageCodeCheck.ts";
 import {
   TextField,
   Textarea,
@@ -233,30 +234,15 @@ function AutocompleteField({ question, value, onChange, onEntryResolved, onSelec
   //    unresolved / free-text language can still be searched by name or code.
   // Both render the same StyledCombobox and commit the language CODE.
   if (question.options_source === "@langtags_iso639") {
-    if ((question.options?.length ?? 0) > 0) {
-      return (
-        <StyledOptionsField
-          question={question}
-          value={value}
-          onChange={onChange}
-          {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
-        />
-      );
-    }
     return (
-      <LangtagsComboboxField
+      <LanguageCodeField
         question={question}
         value={value}
         onChange={onChange}
-        placeholder={t({
-          id: "survey.questionField.autocomplete.codePlaceholder",
-          message: "Search by name, autonym, or code…",
-        })}
         {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
       />
     );
   }
-
   // Generic options autocomplete (e.g. il_language_autonym Q2, il_language_region):
   // the SAME styled dropdown as the Q1 langtags name picker, driven by the
   // question's options (static or getSeedOptions-injected) instead of a langtags
@@ -269,6 +255,81 @@ function AutocompleteField({ question, value, onChange, onEntryResolved, onSelec
       onChange={onChange}
       {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
     />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// LanguageCodeField — il_language_code as a CONFIRMATION of the chooser's result
+// (spec 115 FR-033). The code arrives from the language chooser, a typed code or
+// the unlisted panel; the field shows it, with what the registry says about it, and
+// "Change" reopens the checked entry. There is no unchecked free text: the entry
+// shows the parser's reason for an ill-formed code, and the question's validate()
+// refuses it.
+// ---------------------------------------------------------------------------
+
+function LanguageCodeField({ question, value, onChange, onSelectAdvance }: FieldProps) {
+  const { t } = useLingui();
+  const code = stringValue(value).trim();
+  const [changing, setChanging] = useState(false);
+  const registered = getLoadedLangtags()?.registeredLanguage;
+  const check = code === "" ? null : checkLanguageCode(code, typeof registered === "function" ? registered : null);
+
+  const status =
+    check === null
+      ? null
+      : !check.ok
+        ? t({ id: "survey.codeField.invalid", message: `This is not a valid language code (${check.reason}).` })
+        : check.privateUse
+          ? t({ id: "survey.codeField.privateUse", message: "A private-use code (qaa to qtz)." })
+          : check.registeredName !== undefined
+            ? t({ id: "survey.codeField.registered", message: `Registered as ${check.registeredName}.` })
+            : check.warning === "unregistered"
+              ? t({ id: "survey.codeField.unregistered", message: "Well formed, but not in the ISO 639-3 registry. You can keep it." })
+              : null;
+
+  if (!changing && code !== "" && check !== null && check.ok) {
+    return (
+      <div>
+        <p style={{ margin: 0 }}>
+          <strong data-testid="language-code-value">{code}</strong>
+          {status !== null && <span style={{ color: TEXT_DIM }}>{" — "}{status}</span>}
+        </p>
+        <button type="button" className="ks-focus-ring" onClick={() => setChanging(true)} style={{ marginTop: 6 }}>
+          {t({ id: "survey.codeField.change", message: "Change" })}
+        </button>
+      </div>
+    );
+  }
+
+  const picker =
+    (question.options?.length ?? 0) > 0 ? (
+      <StyledOptionsField
+        question={question}
+        value={value}
+        onChange={onChange}
+        {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
+      />
+    ) : (
+      <LangtagsComboboxField
+        question={question}
+        value={value}
+        onChange={onChange}
+        placeholder={t({
+          id: "survey.questionField.autocomplete.codePlaceholder",
+          message: "Search by name, autonym, or code…",
+        })}
+        {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
+      />
+    );
+  return (
+    <div>
+      {picker}
+      {status !== null && (
+        <p role="note" style={{ margin: "6px 0 0", fontSize: 13, color: TEXT_DIM }}>
+          {status}
+        </p>
+      )}
+    </div>
   );
 }
 

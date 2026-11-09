@@ -291,7 +291,11 @@ export async function getParseKvks(): Promise<EngineModule["parseKvks"]> {
 //
 // This does NOT introduce a second debounce cycle (decision D3): it fires once,
 // on an explicit download click, and produces no live diagnostics.
-type CompileFn = (vfs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
+type CompileFn = (
+  vfs: VirtualFS,
+  keyboardId: string,
+  opts?: { saveDebug?: boolean },
+) => Promise<CompileResult>;
 let compileCache: CompileFn | null = null;
 export async function getCompile(): Promise<CompileFn> {
   if (!USE_REAL) {

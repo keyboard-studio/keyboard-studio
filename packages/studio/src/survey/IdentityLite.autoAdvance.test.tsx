@@ -104,6 +104,9 @@ describe("IdentityLite auto-advance seed race (PR #1050 regression)", () => {
 
     // Q3 is seeded with the ISO 639-3 code, and its dropdown offers BOTH plausible
     // forms for the resolved language: "amh" (ISO 639-3) and "am" (BCP 47 subtag).
+    // (Spec 115: the code is shown as a confirmation; "Change" reopens the checked entry.)
+    expect(screen.getByTestId("language-code-value").textContent).toBe("amh");
+    fireEvent.click(screen.getByRole("button", { name: "Change" }));
     expect(screen.getByRole<HTMLInputElement>("combobox").value).toBe("amh");
     fireEvent.focus(screen.getByRole("combobox"));
     const codes = Array.from(document.querySelectorAll('[role="option"]')).map(

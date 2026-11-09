@@ -174,8 +174,8 @@ Commit: `spec 115 T020-T029`.
 
 **Wave 1 — tests:**
 
-- [ ] T030 [P] [US6] Write failing `registeredLanguage` tests (contracts/langtags-api.md table) — packages/engine/src/langtags/registry.test.ts
-- [ ] T031 [P] [US6] Write failing `resolveTypedTag` tests:
+- [x] T030 [P] [US6] Write failing `registeredLanguage` tests (contracts/langtags-api.md table) — packages/engine/src/langtags/registry.test.ts
+- [x] T031 [P] [US6] Write failing `resolveTypedTag` tests:
   - `bft` → Balti;
   - `oc-gascon` → oc + `gascon`;
   - `fr-CA` → fr + CA;
@@ -186,7 +186,7 @@ Commit: `spec 115 T020-T029`.
   - `fr-u-co-phonebk` → fr, with the extension not carried and a note. Together with the absence of any extension input, this is FR-027's coverage (G3).
 
   File: packages/studio/src/survey/languageChooser/resolveTypedTag.test.ts
-- [ ] T032 [P] [US6] Write failing UI tests:
+- [x] T032 [P] [US6] Write failing UI tests:
   - the two fallback rows appear when no result is *close* (contract § merge rule; e.g. "Ewondoo" shows them below the fuzzy Ewondo row), and always via "Can't find it?";
   - "is a dialect" keeps the text in `language-search-match` (`source: "typed"`) and re-labels the search;
   - the unlisted panel: name pre-filled; code checks per FR-031; no code → `qaa-x-` from the name (FR-011 rule), with the explanation and request link;
@@ -197,13 +197,13 @@ Commit: `spec 115 T020-T029`.
 
 **Wave 2 — implementation:**
 
-- [ ] T033 [P] [US6] Implement `registeredLanguage(subtag)` over `generated/registeredLanguages.ts`; export it from the langtags barrel — packages/engine/src/langtags/registry.ts, packages/engine/src/langtags/index.ts
-- [ ] T034 [P] [US6] Implement `resolveTypedTag(text)` (parser plus `registeredLanguage`); show its proposal first in the list — packages/studio/src/survey/languageChooser/resolveTypedTag.ts
-- [ ] T035 [US6] Add the fallback rows and the "Can't find it?" link. Implement "is a dialect" (writes the `language-search-match` decision with the pending name, re-labels the search) and `UnlistedLanguagePanel`, mirroring EthnoLib's unlisted and manual-tag paths but checking with `parseBcp47` and `registeredLanguage`. Messages per spec 046. **The fallback rows, unlisted-panel text and the ISO 639-3 explanation are survey text owned by the content team (Article VI): mark them for content review** — packages/studio/src/survey/languageChooser/{LanguageChooser,UnlistedLanguagePanel}.tsx, packages/studio/src/locales/
-- [ ] T036 [US6] Turn `il_language_code` into a confirmation of the chooser's result. **Change** reopens the chooser or the typed-code check; there is no unchecked free text. Update its fixtures (the `bft` free-text fixture becomes a checked entry) — packages/studio/src/survey/questions/a/il_language_code.ts
+- [x] T033 [P] [US6] Implement `registeredLanguage(subtag)` over `generated/registeredLanguages.ts`; export it from the langtags barrel — packages/engine/src/langtags/registry.ts, packages/engine/src/langtags/index.ts
+- [x] T034 [P] [US6] Implement `resolveTypedTag(text)` (parser plus `registeredLanguage`); show its proposal first in the list — packages/studio/src/survey/languageChooser/resolveTypedTag.ts
+- [x] T035 [US6] Add the fallback rows and the "Can't find it?" link. Implement "is a dialect" (writes the `language-search-match` decision with the pending name, re-labels the search) and `UnlistedLanguagePanel`, mirroring EthnoLib's unlisted and manual-tag paths but checking with `parseBcp47` and `registeredLanguage`. Messages per spec 046. **The fallback rows, unlisted-panel text and the ISO 639-3 explanation are survey text owned by the content team (Article VI): mark them for content review** — packages/studio/src/survey/languageChooser/{LanguageChooser,UnlistedLanguagePanel}.tsx, packages/studio/src/locales/
+- [x] T036 [US6] Turn `il_language_code` into a confirmation of the chooser's result. **Change** reopens the chooser or the typed-code check; there is no unchecked free text. Update its fixtures (the `bft` free-text fixture becomes a checked entry) — packages/studio/src/survey/questions/a/il_language_code.ts
 **Wave 3 — dialects typed in the language field (FR-039 to FR-042, research R14; IDs T065-T068 were added after the second analysis pass, so they are out of sequence):**
 
-- [ ] T065 [P] [US6] Write failing `readTypedText` tests: every row of the contract's table (the SC-010 set), plus:
+- [x] T065 [P] [US6] Write failing `readTypedText` tests: every row of the contract's table (the SC-010 set), plus:
   - fewer than 2 words → no reading;
   - a longer language part wins;
   - duplicates removed;
@@ -212,19 +212,19 @@ Commit: `spec 115 T020-T029`.
   - no typed word dropped without appearing in a label.
 
   File: packages/studio/src/survey/languageChooser/readTypedText.test.ts
-- [ ] T066 [US6] Implement `readTypedText` and `rankPlacesFor` (contract § reading typed text). `dialectsOf(iso)` draws on the Glottolog rows, the registry (`variantsFor`, by description) and `dialectTagsetsFor`, with the language's own name words stripped. `countries` uses English country names and ISO 3166-1 codes from the chooser data (`getAllRegions`) — packages/studio/src/survey/languageChooser/readTypedText.ts
-- [ ] T067 [US6] Show readings first in the list, labelled.
+- [x] T066 [US6] Implement `readTypedText` and `rankPlacesFor` (contract § reading typed text). `dialectsOf(iso)` draws on the Glottolog rows, the registry (`variantsFor`, by description) and `dialectTagsetsFor`, with the language's own name words stripped. `countries` uses English country names and ISO 3166-1 codes from the chooser data (`getAllRegions`) — packages/studio/src/survey/languageChooser/readTypedText.ts
+- [x] T067 [US6] Show readings first in the list, labelled.
   - Picking a resolved reading writes the same decisions as a pick (data-model § TypedReading). A region reading (or "It's a place" in the remainder chooser) writes a `default`-provenance **proposal** to `language-region` and sets `ctx.ilRegionRequested`, so `il_language_region` is routed and the author confirms it (FR-047). It never writes the region as an answer. Test: "French Switzerland" routes the region question with Switzerland proposed.
   - Picking an unresolved reading opens the new `RemainderChooser`: dialect name, place (country picker ordered by `rankPlacesFor`), listed dialect, or leave it out. Nothing is written until the author chooses.
   - Extend the resolve-without-a-click rule (FR-042) to a unique dialect name or a unique *resolved* reading, in both the UI and the headless author. An unresolved reading never auto-resolves. The headless author answers the remainder chooser from its script, as it does any question.
   - Message ids for all labels. **The reading labels and remainder-chooser text are survey text owned by the content team (Article VI): mark them for content review.**
 
   Files: packages/studio/src/survey/languageChooser/{LanguageChooser,RemainderChooser}.tsx, packages/studio/src/survey/resolveTypedLanguage.ts, packages/studio/src/locales/
-- [ ] T068 [US6] Add the SC-010 query set as a fixture-driven test over the full chooser (EthnoLib + dialect modifier + readings): the first result is the right language with the right dialect or region, or, for the unresolved queries, with the remainder chooser offered and the expected first place. The fixture is documented as the place to add misses authors report — packages/studio/src/survey/languageChooser/typedDialect.fixture.json, packages/studio/src/survey/languageChooser/typedDialect.test.ts
+- [x] T068 [US6] Add the SC-010 query set as a fixture-driven test over the full chooser (EthnoLib + dialect modifier + readings): the first result is the right language with the right dialect or region, or, for the unresolved queries, with the remainder chooser offered and the expected first place. The fixture is documented as the place to add misses authors report — packages/studio/src/survey/languageChooser/typedDialect.fixture.json, packages/studio/src/survey/languageChooser/typedDialect.test.ts
 
 **Wave 4 — languages with no code (FR-043 to FR-046, research R15; IDs T069-T072 added after the second analysis pass, out of sequence):**
 
-- [ ] T069 [P] [US6] Write failing tests:
+- [x] T069 [P] [US6] Write failing tests:
   - `proposeUncodedTag` and `proposeScriptForUncoded`, one per row of the contract's table;
   - every proposed tag passes `parseBcp47`;
   - the Unclassifiable case uses the country rule;
@@ -232,18 +232,18 @@ Commit: `spec 115 T020-T029`.
   - SC-011: for all 752 no-code languages with countries, searching the name lists the no-code row, and picking it yields a well-formed tag and a proposed script with its source.
 
   Files: packages/studio/src/survey/languageChooser/uncodedLanguage.test.ts, packages/studio/src/survey/languageChooser/uncodedSearch.test.ts
-- [ ] T070 [US6] Implement `proposeUncodedTag` and `proposeScriptForUncoded`, using `@keyboard-studio/glottolog` `relatedLanguages`, engine `getLanguageDefaults`, and the langtags regions for the country rule — packages/studio/src/survey/languageChooser/uncodedLanguage.ts
-- [ ] T071 [US6] Render the `uncoded-language` and `uncoded-dialect` rows ("known to Glottolog, no ISO 639-3 code · countries"), and include them as parents in the "is a dialect: find its language" search.
+- [x] T070 [US6] Implement `proposeUncodedTag` and `proposeScriptForUncoded`, using `@keyboard-studio/glottolog` `relatedLanguages`, engine `getLanguageDefaults`, and the langtags regions for the country rule — packages/studio/src/survey/languageChooser/uncodedLanguage.ts
+- [x] T071 [US6] Render the `uncoded-language` and `uncoded-dialect` rows ("known to Glottolog, no ISO 639-3 code · countries"), and include them as parents in the "is a dialect: find its language" search.
   - Picking one opens `UnlistedLanguagePanel` pre-filled: name, glottocode, countries, proposed tag, and proposed script with its source.
   - The proposed script is written as a `default`-provenance `target-script` proposal.
   - **The labels and the script-source wording are survey text owned by the content team (Article VI): mark them for content review.**
 
   Files: packages/studio/src/survey/languageChooser/{dialectSearch,LanguageCard,UnlistedLanguagePanel}.tsx, packages/studio/src/survey/identityResolution.ts, packages/studio/src/locales/
-- [ ] T072 [US6] **Create the `language-glottocode` DecisionId here** (IR paths `[]`), provided by `il_language_english` (T027's declaration): the Glottolog code of a language with no ISO code, written from the unlisted panel. Add a persistence test. Show it at review beside the 10.4 flag and the ISO 639-3 request pointer (FR-045). T048 only reads it — packages/studio/src/decisions/decisionTypes.ts, packages/studio/src/criteria/languageTags.ts
+- [x] T072 [US6] **Create the `language-glottocode` DecisionId here** (IR paths `[]`), provided by `il_language_english` (T027's declaration): the Glottolog code of a language with no ISO code, written from the unlisted panel. Add a persistence test. Show it at review beside the 10.4 flag and the ISO 639-3 request pointer (FR-045). T048 only reads it — packages/studio/src/decisions/decisionTypes.ts, packages/studio/src/criteria/languageTags.ts
 
 **Wave 5:**
 
-- [ ] T037 [US6] Extend row 10.4's check to flag `qaa`–`qtz` private-use language codes (FR-032); mark the wording for content review — packages/studio/src/criteria/languageTags.ts, packages/contracts/data/criteria.json
+- [x] T037 [US6] Extend row 10.4's check to flag `qaa`–`qtz` private-use language codes (FR-032); mark the wording for content review — packages/studio/src/criteria/languageTags.ts, packages/contracts/data/criteria.json
 
 **Checkpoint**: T030 to T032, T065, T068 and T069 pass; SC-008's eight inputs each end in a confirmed, non-blank code (asserted in T032); SC-010's set resolves (T068); SC-011's 752 no-code languages each end in a tag and a script (T069). Commit: `spec 115 T030-T037, T065-T072`.
 

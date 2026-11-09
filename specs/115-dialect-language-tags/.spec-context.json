@@ -264,11 +264,139 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-09T13:06:48.698Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T14:45:46.075Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T14:45:46.275Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T14:47:47.871Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T14:47:48.058Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T065",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T14:51:23.786Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T066",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T14:51:23.973Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T16:04:49.377Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T16:04:49.490Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T16:04:49.593Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T16:04:49.698Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T067",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T16:04:57.438Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T068",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T16:04:57.643Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T069",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T16:04:57.884Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T070",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T16:04:58.119Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T071",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T16:04:58.336Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T072",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-09T16:04:58.578Z"
     }
   ],
   "telemetryInstanceId": "43929674-df99-4d12-aeca-bcc0ff06e188",
   "unattended": true,
-  "currentTask": "T027",
+  "currentTask": "T072",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -519,6 +647,153 @@
         "packages/studio/src/survey/languageChooser/searchParity.fixture.json",
         "packages/studio/src/survey/languageChooser/ethnolibParity.fixture.json"
       ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "registeredLanguage tests",
+      "files": [
+        "packages/engine/src/langtags/registry.test.ts"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "registeredLanguage over generated registry, exported from barrel",
+      "files": [
+        "packages/engine/src/langtags/registry.ts",
+        "packages/engine/src/langtags/index.ts"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "resolveTypedTag tests",
+      "files": [
+        "packages/studio/src/survey/languageChooser/resolveTypedTag.ts",
+        "packages/studio/src/survey/languageCodeCheck.ts",
+        "packages/studio/src/survey/languageChooser/resolveTypedTag.test.ts"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "resolveTypedTag + languageCodeCheck",
+      "files": [
+        "packages/studio/src/survey/languageChooser/resolveTypedTag.ts",
+        "packages/studio/src/survey/languageCodeCheck.ts",
+        "packages/studio/src/survey/languageChooser/resolveTypedTag.test.ts"
+      ]
+    },
+    "T065": {
+      "status": "DONE",
+      "did": "readTypedText/rankPlacesFor + tests (logic layer)",
+      "files": [
+        "packages/studio/src/survey/languageChooser/readTypedText.ts",
+        "packages/studio/src/survey/languageChooser/readTypedText.test.ts"
+      ]
+    },
+    "T066": {
+      "status": "DONE",
+      "did": "readTypedText/rankPlacesFor + tests (logic layer)",
+      "files": [
+        "packages/studio/src/survey/languageChooser/readTypedText.ts",
+        "packages/studio/src/survey/languageChooser/readTypedText.test.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "fallbacks.test.tsx: fallback rows, typed code, unlisted panel, il_language_code validation, SC-008 action counts",
+      "files": [
+        "packages/studio/src/survey/languageChooser/fallbacks.test.tsx"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "fallback rows, Can't find it?, is-a-dialect mode, UnlistedLanguagePanel; messages with French; content review marked",
+      "files": [
+        "packages/studio/src/survey/languageChooser/LanguageChooser.tsx",
+        "packages/studio/src/survey/languageChooser/UnlistedLanguagePanel.tsx",
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "il_language_code is a confirmation with Change; validate() refuses ill-formed codes; fixtures updated",
+      "files": [
+        "packages/studio/src/survey/questions/a/il_language_code.ts",
+        "packages/studio/src/survey/QuestionField.tsx"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "10.4 flags qaa-qtz private-use codes with ISO 639-3 request pointer and Glottolog code line (criteria.json description left to content team)",
+      "files": [
+        "packages/studio/src/criteria/languageTags.ts",
+        "packages/studio/src/criteria/languageTags.test.ts"
+      ]
+    },
+    "T067": {
+      "status": "DONE",
+      "did": "readings first in list, RemainderChooser, region proposal + routing gate, FR-042 auto-resolve (UI + headless resolveTypedEntry); headless remainder-from-script deferred",
+      "files": [
+        "packages/studio/src/survey/languageChooser/LanguageChooser.tsx",
+        "packages/studio/src/survey/languageChooser/RemainderChooser.tsx",
+        "packages/studio/src/survey/languageChooser/chooserSearch.ts",
+        "packages/studio/src/survey/identityResolution.ts",
+        "packages/studio/src/survey/chosenLanguage.ts"
+      ]
+    },
+    "T068": {
+      "status": "DONE",
+      "did": "SC-010 fixture-driven test",
+      "files": [
+        "packages/studio/src/survey/languageChooser/typedDialect.fixture.json",
+        "packages/studio/src/survey/languageChooser/typedDialect.test.ts",
+        "packages/studio/src/survey/languageChooser/typedReadings.test.tsx"
+      ]
+    },
+    "T069": {
+      "status": "DONE",
+      "did": "uncoded tag/script tests incl SC-011 over 752 languages",
+      "files": [
+        "packages/studio/src/survey/languageChooser/uncodedLanguage.test.ts",
+        "packages/studio/src/survey/languageChooser/uncodedSearch.test.ts"
+      ]
+    },
+    "T070": {
+      "status": "DONE",
+      "did": "proposeUncodedTag/proposeScriptForUncoded",
+      "files": [
+        "packages/studio/src/survey/languageChooser/uncodedLanguage.ts",
+        "packages/studio/src/survey/privateUseSlug.ts"
+      ]
+    },
+    "T071": {
+      "status": "DONE",
+      "did": "uncoded rows in search and card, unlisted panel prefill, script proposal as default",
+      "files": [
+        "packages/studio/src/survey/languageChooser/dialectSearch.ts",
+        "packages/studio/src/survey/languageChooser/LanguageCard.tsx",
+        "packages/studio/src/survey/languageChooser/UnlistedLanguagePanel.tsx"
+      ]
+    },
+    "T072": {
+      "status": "DONE",
+      "did": "language-glottocode DecisionId, provided by il_language_english, persistence test, shown beside 10.4 flag",
+      "files": [
+        "packages/studio/src/decisions/decisionTypes.ts",
+        "packages/studio/src/decisions/languageGlottocode.test.ts",
+        "packages/studio/src/criteria/languageTags.ts"
+      ]
     }
-  }
+  },
+  "concerns": [
+    {
+      "note": "T037: criteria.json 10.4 description not edited (cascades to content catalogs); flag lives in languageTags.ts",
+      "step": "implement"
+    },
+    {
+      "note": "Headless author does not answer RemainderChooser; language-glottocode not yet wired into 10.4 review caller; no-code -x- tag carried in language-search-match.dialectTag until Phase 7",
+      "step": "implement"
+    }
+  ],
+  "last_action": "Phase 5 US6 done; typecheck, lint, pnpm -r test green"
 }

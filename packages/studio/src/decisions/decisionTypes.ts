@@ -12,6 +12,8 @@ export type DecisionId =
   | "language-name"
   // Spec 115: why the picked language matched a dialect/variety name the author typed.
   | "language-search-match"
+  // Spec 115 FR-045: the Glottolog code of a language with no ISO 639-3 code ("" when it has one).
+  | "language-glottocode"
   | "language-region"
   | "language-autonym"
   | "language-code"
@@ -289,6 +291,7 @@ export interface DecisionRendererProps<T = unknown> {
 export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "language-name": [],
   "language-search-match": [],
+  "language-glottocode": [],
   "language-region": [],
   "language-autonym": [],
   "language-code": [],

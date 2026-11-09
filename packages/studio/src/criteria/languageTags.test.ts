@@ -18,7 +18,9 @@ import { EMPTY_CRITERIA_RECORD } from "./criteriaTypes.ts";
 import type { CriteriaInput } from "./criteriaTypes.ts";
 import { ARTIFICIAL_LANGUAGE_FAMILY } from "./judgeForeign.ts";
 import {
+  ISO_639_3_REQUEST_POINTER,
   analyzeLanguageTags,
+  isPrivateUseLanguage,
   languageTagContextLines,
   languageTagFacts,
   languageTagVerdicts,
@@ -93,6 +95,27 @@ describe("10.4 / 10.5 facts", () => {
   it("all tags in langtags -> 10.4's fact; an unknown one withholds it", () => {
     expect(languageTagFacts(analyze(["fr-BF", "en"])).kpsTagsAllInLangtags).toBe(true);
     expect(languageTagFacts(analyze(["fr", "ha-Zzzz"])).kpsTagsAllInLangtags).toBeUndefined();
+  });
+
+  it("a private-use language code (qaa to qtz) is flagged, never an unremarkable tag (FR-032)", () => {
+    const a = analyze(["qaa-ID-x-mansim"]);
+    expect(a.tags[0]!.privateUseLanguage).toBe(true);
+    expect(languageTagFacts(a).kpsTagsAllInLangtags).toBeUndefined();
+    const lines = languageTagContextLines("10.4-kps-unusual-tag-flagged", a);
+    expect(lines[0]).toMatch(/^qaa-ID-x-mansim: a private-use language code \(qaa to qtz\)/);
+    expect(lines[0]).toContain(ISO_639_3_REQUEST_POINTER);
+    // Every code in the range, and only those.
+    for (const lang of ["qaa", "qkx", "qtz"]) expect(isPrivateUseLanguage(lang)).toBe(true);
+    for (const lang of ["qu", "qua", "quz", "fr"]) expect(isPrivateUseLanguage(lang)).toBe(false);
+    // A real tag next to it does not hide it, and a keyboard with only real tags is unaffected.
+    expect(languageTagFacts(analyze(["fr", "qaa-x-foo"])).kpsTagsAllInLangtags).toBeUndefined();
+    expect(languageTagFacts(analyze(["fr", "en"])).kpsTagsAllInLangtags).toBe(true);
+  });
+
+  it("shows the Glottolog code of a language with no ISO code beside the 10.4 flag (FR-045)", () => {
+    const a = analyzeLanguageTags(["qaa-ID-x-mansim"], LANGTAGS, CONLANG, undefined, "mans1260");
+    expect(languageTagContextLines("10.4-kps-unusual-tag-flagged", a)).toContain("Glottolog code of the language: mans1260.");
+    expect(languageTagContextLines("10.4-kps-unusual-tag-flagged", analyze(["qaa-x-foo"])).join(" ")).not.toContain("Glottolog code");
   });
 
   it("10.5's fact needs every language natural in Glottolog", () => {

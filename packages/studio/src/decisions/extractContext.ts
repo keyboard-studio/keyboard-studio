@@ -124,6 +124,8 @@ export interface IdentityLookupInputs {
   languageCode?: string;
   /** The resolved entry's script, as a target-script option value. */
   targetScript?: string;
+  /** Where `targetScript` came from, when it is not the langtags default (a proposal's source, spec 115 FR-046). */
+  targetScriptSource?: "analysis" | "region" | "identity";
   /** The Q1 English answer (the autonym fallback when no local name exists). */
   q1English?: string;
   /** The stored author profile; a missing name/email seeds nothing. */

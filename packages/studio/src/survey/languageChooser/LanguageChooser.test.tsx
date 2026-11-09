@@ -76,7 +76,7 @@ describe("autosuggest (FR-038)", () => {
   it("suggestions update as the author types", async () => {
     const { input } = await renderChooser();
     fireEvent.change(input, { target: { value: "Ewon" } });
-    await screen.findByRole("option", { name: /Ewondo/ });
+    await screen.findByRole("option", { name: /^Ewondo, / });
     fireEvent.change(input, { target: { value: "Bafut" } });
     await screen.findByRole("option", { name: /Bafut/ });
     await waitFor(() => expect(screen.queryByRole("option", { name: /Ewondo/ })).toBeNull());
@@ -86,7 +86,9 @@ describe("autosuggest (FR-038)", () => {
     const { input } = await renderChooser();
     fireEvent.change(input, { target: { value: "an" } });
     await waitFor(() => expect(screen.getAllByRole("option").length).toBeGreaterThan(10));
-    expect(screen.getAllByRole("option").length).toBeLessThanOrEqual(50);
+    // The row cap is on language rows: a typed code ("an" is Aragonese's) is proposed above them.
+    const languageRows = screen.getAllByRole("option").filter((o) => !/^Use the (private-use )?code /.test(o.getAttribute("aria-label") ?? ""));
+    expect(languageRows.length).toBeLessThanOrEqual(50);
   });
 
   it("announces the number of suggestions politely", async () => {
@@ -103,7 +105,7 @@ describe("picking and auto-resolve (FR-038)", () => {
     const onChange = vi.fn();
     const { input } = await renderChooser({ onEntryResolved, onSelectAdvance, onChange });
     fireEvent.change(input, { target: { value: "Ewon" } });
-    fireEvent.mouseDown(await screen.findByRole("option", { name: /Ewondo/ }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: /^Ewondo, / }));
     expect(onChange).toHaveBeenLastCalledWith("Ewondo");
     expect(lastCode(onEntryResolved)).toBe("ewo");
     expect(onSelectAdvance).toHaveBeenCalledWith("Ewondo");

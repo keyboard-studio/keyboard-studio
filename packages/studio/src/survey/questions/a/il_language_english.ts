@@ -97,9 +97,9 @@ const mod: QuestionModule = {
   outputs: [{ target: "package-descriptor", field: "languageName" }],
   specRef: "specs/030-langtags-identity-autocomplete",
   // Decision spike (km/decisions-spike): anchor of the dependency chain.
-  provides: ["language-name", "language-search-match"],
+  provides: ["language-name", "language-search-match", "language-glottocode"],
   // The chooser records the dialect match itself; the typed name must not fill it.
-  rendererWrites: ["language-search-match"],
+  rendererWrites: ["language-search-match", "language-glottocode"],
   extract: extractLanguageName,
 };
 export default mod;

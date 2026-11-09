@@ -11,7 +11,7 @@
 // selection at il_language_english, never by replaying committed answers.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { screen, fireEvent, waitFor, cleanup, configure } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import type { LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 
@@ -64,6 +64,9 @@ vi.mock("../lib/langtagsDefaults.ts", async (importOriginal) => {
 
 import { IdentityLite } from "./IdentityLite.tsx";
 
+// The first chooser search builds EthnoLib's indexes (seconds).
+configure({ asyncUtilTimeout: 10_000 });
+
 afterEach(cleanup);
 
 /** Select Hausa at Q1 and click through Q2 (autonym) to land on il_language_code. */
@@ -72,18 +75,21 @@ async function reachLanguageCode(): Promise<void> {
 
   const q1 = await screen.findByRole<HTMLInputElement>("combobox");
   fireEvent.change(q1, { target: { value: "Hausa" } });
-  const option = await screen.findByRole("option", { name: /Hausa/ });
+  const option = await screen.findByRole("option", { name: /^Hausa, / });
   fireEvent.mouseDown(option); // resolves Hausa + auto-advances (advanceOnSelect)
 
   // il_language_autonym: accept whatever seeded default is pre-filled.
+  await screen.findByText(/What is your language called in your own language\?/);
   await waitFor(() => expect(screen.getByTestId("survey-advance")).toBeTruthy());
   fireEvent.click(screen.getByTestId("survey-advance"));
 
   // Now on il_language_code, seeded with Hausa's own code ("hau").
   await waitFor(() => {
-    const input = screen.getByRole<HTMLInputElement>("combobox");
-    expect(input.value).toBe("hau");
+    expect(screen.getByTestId("language-code-value").textContent).toBe("hau");
   });
+  // Spec 115: the code is a confirmation; "Change" reopens the checked entry.
+  fireEvent.click(screen.getByRole("button", { name: "Change" }));
+  expect(screen.getByRole<HTMLInputElement>("combobox").value).toBe("hau");
 }
 
 describe("il_language_code mismatch warning", () => {

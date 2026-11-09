@@ -129,7 +129,8 @@ describe("IdentityLite — resume", () => {
     // from the last question (target script) lands on il_language_code with
     // its restored value; assert on the display value rather than the
     // input role.
-    expect(screen.getByDisplayValue("ha")).toBeTruthy();
+    // (Spec 115: the code is shown as a confirmation, not an input.)
+    expect(screen.getByTestId("language-code-value").textContent).toBe("ha");
   });
 
   it("Finish on a resumed flow re-completes with the same extracted identity", () => {
