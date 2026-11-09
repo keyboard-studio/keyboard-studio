@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Language tags that describe dialects and variants",
+  "branch": "115-dialect-language-tags",
+  "currentStep": "specify",
+  "status": "specified",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-09T10:07:12.330Z"
+    }
+  ],
+  "telemetryInstanceId": "43929674-df99-4d12-aeca-bcc0ff06e188"
+}
