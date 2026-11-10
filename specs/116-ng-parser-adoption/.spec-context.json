@@ -1,9 +1,9 @@
 {
-  "workflow": "speckit",
+  "workflow": "companion",
   "specName": "Adopt the Keyman next-generation KMN parser, and type the IR for multi-target export",
   "branch": "116-ng-parser-adoption",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
