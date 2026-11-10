@@ -67,6 +67,18 @@ describe("replaceStartingPointFromText", () => {
     expect(vfsText("source/kb.kmn")).toBe(KMN);
   });
 
+  it("blocks text that is not a keyboard and changes nothing", () => {
+    open();
+    const before = useWorkingCopyStore.getState().startIr;
+    // An MSKLC .klc pasted into the .kmn: parse() keeps it as opaque
+    // fragments and returns an empty IR rather than throwing.
+    const klc = 'KBD\tXYZ\t"Example Layout"\r\nLAYOUT\r\n10\tQ\t1\tq\tQ\t-1\r\nENDKBD\r\n';
+    const result = useWorkingCopyStore.getState().replaceStartingPointFromText("source/kb.kmn", klc);
+    expect(result.ok).toBe(false);
+    expect(useWorkingCopyStore.getState().startIr).toBe(before);
+    expect(vfsText("source/kb.kmn")).toBe(KMN);
+  });
+
   it("writes a .kvks without touching startIr", () => {
     open();
     const before = useWorkingCopyStore.getState().startIr;
