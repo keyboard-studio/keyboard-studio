@@ -255,6 +255,12 @@ is absent and the deltas are reported in the AS-BUILT.
   copy, including overlay channels (090: overlays as decision values).
   One phase per surface (plan.md); a surface's direct writes MUST NOT be
   removed until its equivalence gate (FR-010) is green.
+  *Amended 2026-11-10 (Matthew, spec 118 clarification; D-090-24 revised):*
+  state that any output file carries (rules, stores, touch layout, visual
+  keyboard, identity) MUST fold into the keyboard model itself, so that
+  replay is the only producer of output. Overlay channels remain only for
+  state no output file carries (attribution, help-doc answers). See
+  [spec 118](../118-replayed-ir-output/spec.md).
 - **FR-008**: The per-surface recording bridges that journal edits after
   the fact (`recordEditorStep` and kin) MUST be retired for each surface
   as its phase lands: the decision record becomes the source, not the
@@ -354,7 +360,9 @@ is absent and the deltas are reported in the AS-BUILT.
 - Editor decision representations follow the shipped 089/090 conventions
   (pure `apply()`, overlay values as decision values, gallery settled
   values as records) rather than a new mechanism; spec 090's carve-overlay
-  fold (D-090-24) is the precedent for carve.
+  fold (D-090-24) is the precedent for carve. *(Superseded 2026-11-10:
+  D-090-24 is revised, and carve's `apply` returns the carved keyboard;
+  see the FR-007 amendment and spec 118.)*
 - The decision log (spec 053) is retained as the audit journal of the
   decision spine. If Phase 0 evidence shows a fact recoverable *only* from
   the log, that fact gets a DecisionSet representation in its surface's

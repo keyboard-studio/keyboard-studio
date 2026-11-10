@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-11-07",
+  "lastUpdated": "2026-11-10",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -1127,7 +1127,7 @@
     },
     "specs/105-derived-working-copy": {
       "title": "Feature Specification: Derived working copy — finish the 088–093 migration",
-      "hash": "sha256:f4b4b1ba6e0b28f0",
+      "hash": "sha256:86d1185a076ff075",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -1224,6 +1224,14 @@
     "specs/113-trial-and-publish-steps": {
       "title": "Feature Specification: Trial and Publish steps (split of the Output screen)",
       "hash": "sha256:697628078cf2c793",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/118-replayed-ir-output": {
+      "title": "Feature Specification: Output from the replayed keyboard",
+      "hash": "sha256:4dd9d2eb0f813742",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

@@ -17,14 +17,32 @@ every change works on the parsed keyboard model, not on source text. This spec b
 into line with both. It is the output side of spec 105 (derived working copy), depends on spec 116
 (typed keyboard model), and is sequenced with spec 117 (keyboard model restructure).
 
-**Rulings this revises** (an explicit revision request; none takes effect until ruled, see FR-001):
+**Rulings revised** (explicit revision request, ruled by Matthew 2026-11-10; see Clarifications):
 
 - **D-090-24**, with D-090-30/31 and D-090-39/40 (spec 090): carve and the editor surfaces were kept
-  out of the replayed keyboard, and "carve's apply returns the carved keyboard" was rejected. Their
-  "one producer only" reason now argues for this spec: today the replayed working copy and the file
-  output are two producers, and they disagree (defect list, FR-020).
-- **Spec 105 FR-007**: allows a surface to fold into "overlay channels". This spec narrows that:
-  anything that ends up in an output file folds into the keyboard model.
+  out of the replayed keyboard, and "carve's apply returns the carved keyboard" was rejected.
+  **Revised:** every surface's apply returns the transformed keyboard. Their "one producer only"
+  reason now argues for this: today the replayed working copy and the file output are two producers,
+  and they disagree (defect list, FR-020).
+- **Spec 105 FR-007**: allowed a surface to fold into "overlay channels". **Amended:** anything that
+  ends up in an output file folds into the keyboard model.
+
+## Clarifications
+
+### Session 2026-11-10
+
+- Q: Revise D-090-24 (and D-090-30/31/39/40), so that every surface's apply returns the
+  transformed keyboard? → A (Matthew): **Revise.** Every surface's `apply` returns the transformed
+  keyboard (spec 090 option c). The recorded values stay; `apply` stops being a no-op, and replay
+  becomes the only producer of output.
+- Q: Amend spec 105 FR-007's fold target? → A (Matthew): **Amend.** Anything an output file carries
+  (rules, stores, touch layout, visual keyboard, identity) folds into the keyboard model. Overlay
+  channels remain only for state that no output file carries (attribution, help-doc answers).
+  Recorded in spec 105 as a dated amendment.
+- Q: Scope split with spec 105? → A (Matthew): **Split as drafted.** Spec 105 keeps its per-surface
+  phases (moving editor state into decisions), under the amended FR-007. This spec owns the defect
+  fixes, pattern application, the touch and visual-keyboard models, the single output stage and
+  validation.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -135,13 +153,14 @@ that spec 105 introduced.
 
 **Governance**
 
-- **FR-001**: Work under FR-010 to FR-016 MUST NOT begin until the revisions above (D-090-24 and its
-  companions, spec 105 FR-007) are ruled on. The defect fixes in FR-020 do not depend on that ruling.
-- **FR-002**: Responsibility is split as follows:
-  - spec 105 keeps its per-surface phases (moving each editor's state into decisions);
-  - this spec amends what those phases produce, and owns the defect fixes, pattern application, the
-    touch and visual-keyboard models, the single output stage and validation.
-  [NEEDS CLARIFICATION: confirm this split with spec 105, or fold this work into 105 as new phases?]
+- **FR-001**: Work under this spec follows the 2026-11-10 rulings (Clarifications): every surface's
+  `apply` returns the transformed keyboard (D-090-24 revised), and anything an output file carries
+  folds into the keyboard model (spec 105 FR-007 amended).
+- **FR-002**: Responsibility is split as follows (ruled 2026-11-10):
+  - spec 105 keeps its per-surface phases (moving each editor's state into decisions), under the
+    amended FR-007;
+  - this spec owns the defect fixes, pattern application, the touch and visual-keyboard models, the
+    single output stage and validation.
 
 **One producer**
 

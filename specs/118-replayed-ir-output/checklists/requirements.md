@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,9 +31,9 @@
 
 ## Notes
 
-- **Open:** one marker, FR-002 (the scope split with spec 105).
-- **Gate:** FR-001 makes the D-090-24 / spec 105 FR-007 revision a precondition for the main
-  workstreams. That needs a ruling, recorded through `/speckit-clarify` or directly.
+- **Resolved 2026-11-10 (Matthew):** D-090-24 (and D-090-30/31/39/40) revised; spec 105 FR-007
+  amended; scope split as drafted. Recorded in the spec's Clarifications, in spec 105 FR-007, and in
+  spec 090's AS-BUILT "Later rulings".
 - **Domain terms:** the spec uses Keyman terms (touch layout, visual keyboard, LDML, `.kvks`,
   pattern). They are terms the authors use, not implementation details.
 - **File evidence:** file and line references were moved to `evidence/draft-sketch.md`.

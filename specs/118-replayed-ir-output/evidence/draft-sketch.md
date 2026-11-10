@@ -1,4 +1,9 @@
-# Feature Specification: Output from the replayed IR
+# Draft sketch: Output from the replayed IR (evidence, superseded)
+
+> **Superseded by [../spec.md](../spec.md).** Kept for its file-level evidence. The revision
+> request below was ruled on 2026-11-10: D-090-24 is revised, spec 105 FR-007 is amended, and the
+> scope is split as drafted. Q0 and Q1 here are closed; the spec's Assumptions settle the remaining
+> questions.
 
 **Feature Branch**: `118-replayed-ir-output`
 
