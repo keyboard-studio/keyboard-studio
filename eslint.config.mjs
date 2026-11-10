@@ -271,6 +271,18 @@ export default [
     },
   },
   {
+    // Vendored upstream Keyman parser front end (see codec/ng/PROVENANCE.md):
+    // style-only rules do not apply to third-party code. It is still
+    // type-checked by tsc and still under dependency-cruiser.
+    files: ["packages/engine/src/codec/ng/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-non-null-assertion": "off",
+      "no-console": "off",
+    },
+  },
+  {
     // Tests, codegen determinism harnesses, and other *.test.ts files run
     // only under vitest/Node and log freely for diagnostics — they never
     // reach a production bundle, so the no-console gate does not apply.

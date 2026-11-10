@@ -91,6 +91,33 @@ characters in Phase 2. Keys with modifiers in stores are left for the follow-on.
   4. **Escalation.** If profiling and patching can't reach the budget, Phase 2 stops and the finding
      goes to the owner before any lowering lands. The options would be a larger lexer rewrite offered
      upstream, or keeping the current tokenizer in front of Keyman's parser rules.
+- **Profile (T028, unpatched vendored lexer).** `node --cpu-prof` over the whole corpus (1,036
+  files, `tsx`, Node 22), lexing only. Total 7.0 s; slowest `vietnamese_telex` 1.08 s (the baseline
+  codec takes 1.10 s total and 177 ms on its slowest file). Top self time:
+
+  | Function | Self time | Share | Hypothesis |
+  |---|---|---|---|
+  | `Lexer.matchToken` (regex `exec` inlined) | 5.5 s | 71.5% | Every token tries the 102 recognisers in table order, each a sticky regex, so a late-table token (`PARAMETER`, `STRING`) costs about 100 failed matches. Confirmed: nothing else in the lexer is hot |
+  | garbage collector | 0.4 s | 5.2% | Per-token iterator and match-array allocation, and `line.concat` per token |
+  | `Lexer.parse` | 0.1 s | 1.3% | Driver loop only |
+
+  With the per-line parse added (`LineRule` over each NEWLINE slice): 12.1 s total, 1.83 s on
+  `vietnamese_telex`. The parse stage alone is about 4.8 s: `recursive-descent` `parse` 2.5 s self
+  (20%), `ASTNode` construction, `NodeType` getters and child-list copies about 1.3 s together.
+  The parser stage is therefore larger than the whole budget (2 x 1.10 s); the lexer patch alone
+  cannot reach it.
+
+- **Result of the lexer patch (T029, T031 attempt).** Lexing alone: 7.0 s to 0.8 s (about 9x).
+  Lex plus per-line `LineRule` parse, under vitest: **4,974 ms total** (baseline 1,104 ms, budget
+  2,208 ms), slowest `vietnamese_telex` **685 ms** (budget 300 ms). The remaining cost is the parser
+  stage (about 4.2 s): `recursive-descent` `parse` (backtracking over `Rule` objects), `ASTNode`
+  allocation, `NodeType` getters and child-list copies. All of it sits in files the performance patch
+  is told not to touch (`recursive-descent.ts`, `kmn-analyzer.ts`), and lowering and comment anchoring
+  would still be added on top. T031 is **not met**; the implement run stops here per the escalation
+  above. Options: a larger rewrite of the parser stage offered upstream, or keeping the current
+  tokenizer in front of Keyman's parser rules (does not remove the parser cost), or relaxing the
+  budget for a parse that runs once per import.
+
 - **Decision (comments, revising R2):** one lexer pass. The comment side-channel is a callback on
   non-emitted tokens, added in the same local lexer patch as the performance work. The two-pass wrap
   is rejected on the trial-run evidence.
