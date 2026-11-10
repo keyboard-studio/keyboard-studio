@@ -88,6 +88,12 @@
   "icon": [
     "specs/icon-editor"
   ],
+  "trial": [
+    "specs/113-trial-and-publish-steps"
+  ],
+  "publish": [
+    "specs/113-trial-and-publish-steps"
+  ],
   "package": [
     "§16"
   ],

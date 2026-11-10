@@ -1,9 +1,9 @@
-// StepHost — revising a section opened from Output (spec 094 research R3,
-// contracts C5).
+// StepHost — revising a section opened from Trial (spec 094 research R3,
+// contracts C5; spec 113 moved the revise-and-return home from Output to Trial).
 //
-// An arrival whose `returnTo` is Output:
+// An arrival whose `returnTo` is Trial:
 //   - pane step: origin-aware banner with "Discard changes and go back";
-//     confirming returns to Output (the existing 5b path);
+//     confirming returns to Trial (the existing 5b path);
 //   - full-layout step: the footer shows "Back to testing" (the editor's own
 //     forward, which completes and returns) and "Discard changes and go back",
 //     published on stepNavStore's revision channel;
@@ -33,7 +33,12 @@ const { pending, jumpToLocation } = vi.hoisted(() => ({
 vi.mock("../lib/jumpToLocation.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../lib/jumpToLocation.ts")>()),
   peekPendingJump: () => pending.current,
-  clearPendingJump: () => {},
+  // Honors the real contract: the mount/step-change effects clear the pending
+  // jump after capturing it, so a later step change must not re-capture the
+  // same arrival (spec 113: the step-change effect re-reads on every step).
+  clearPendingJump: () => {
+    pending.current = null;
+  },
   jumpToLocation: (...args: unknown[]) => jumpToLocation(...args),
 }));
 
@@ -115,10 +120,10 @@ afterEach(() => {
   useDecisionStore.getState().reset();
 });
 
-describe("full-layout step opened from Output", () => {
+describe("full-layout step opened from Trial", () => {
   it("publishes Back to testing and Discard in the footer", () => {
     seedInstantiatedWorkingCopy([]);
-    arriveAt("rules", { route: "output" });
+    arriveAt("rules", { route: "survey", step: "trial" });
     renderHostWithFooter("rules");
 
     expect(screen.getByTestId("step-revision-back-to-testing").textContent).toBe("Back to testing");
@@ -126,21 +131,53 @@ describe("full-layout step opened from Output", () => {
     expect(screen.queryByTestId("rules-continue")).toBeNull();
   });
 
-  it("Back to testing completes the step and returns to Output", () => {
+  it("Back to testing completes the step and returns to Trial", () => {
     seedInstantiatedWorkingCopy([]);
-    arriveAt("rules", { route: "output" });
+    arriveAt("rules", { route: "survey", step: "trial" });
     renderHostWithFooter("rules");
 
     fireEvent.click(screen.getByTestId("step-revision-back-to-testing"));
-    expect(jumpToLocation).toHaveBeenCalledWith({ route: "output" });
+    expect(jumpToLocation).toHaveBeenCalledWith({ route: "survey", step: "trial" });
+  });
+
+  it("captures a same-route Trial arrival without a remount (spec 113)", () => {
+    // Trial lives on #survey, so a Trial→Rules jump changes no hash and
+    // mounts nothing new: the mount-time initializer never re-runs, and only
+    // the step-change effect can open the revision session. Mount on a pane
+    // step, then jump to Rules with a pending return — no remount in between.
+    seedInstantiatedWorkingCopy([]);
+    act(() => {
+      useSurveySessionStore.getState().advance("punctuation");
+    });
+    const view = render(
+      <>
+        <StepHost reducerDeps={deps} onStartOver={() => {}} />
+        <StepNavCluster stepId="punctuation" />
+      </>,
+    );
+    expect(screen.queryByTestId("step-revision-back-to-testing")).toBeNull();
+
+    pending.current = { returnTo: { route: "survey", step: "trial" } };
+    act(() => {
+      useSurveySessionStore.getState().advance("rules");
+    });
+    view.rerender(
+      <>
+        <StepHost reducerDeps={deps} onStartOver={() => {}} />
+        <StepNavCluster stepId="rules" />
+      </>,
+    );
+
+    expect(screen.getByTestId("step-revision-back-to-testing").textContent).toBe("Back to testing");
+    expect(screen.getByTestId("step-revision-discard").textContent).toBe("Discard changes and go back");
   });
 
   it("puts the walk back where it stood before the jump, on Back to testing and on Discard", () => {
     for (const action of ["step-revision-back-to-testing", "step-revision-discard"]) {
       seedInstantiatedWorkingCopy([]);
-      arriveAt("rules", { route: "output" });
+      arriveAt("rules", { route: "survey", step: "trial" });
       pending.current = {
-        returnTo: { route: "output" },
+        returnTo: { route: "survey", step: "trial" },
         returnPosition: { activeStepId: "punctuation", history: ["identity"] },
       };
       renderHostWithFooter("rules");
@@ -150,7 +187,7 @@ describe("full-layout step opened from Output", () => {
       const s = useSurveySessionStore.getState();
       expect(s.activeStepId, action).toBe("punctuation");
       expect(s.history, action).toEqual(["identity"]);
-      expect(jumpToLocation).toHaveBeenCalledWith({ route: "output" });
+      expect(jumpToLocation).toHaveBeenCalledWith({ route: "survey", step: "trial" });
       cleanup();
       jumpToLocation.mockClear();
       useStepNavStore.getState().reset();
@@ -161,7 +198,7 @@ describe("full-layout step opened from Output", () => {
   it("Discard also restores the decisions a step wrote (spec 088 decision store)", () => {
     seedInstantiatedWorkingCopy([]);
     useDecisionStore.getState().record({ id: "marks-treatment", value: "before", provenance: "asked", step: "marks" });
-    arriveAt("rules", { route: "output" });
+    arriveAt("rules", { route: "survey", step: "trial" });
     renderHostWithFooter("rules");
 
     act(() => {
@@ -175,7 +212,7 @@ describe("full-layout step opened from Output", () => {
   it("Discard restores the arrival state, records nothing, and returns", () => {
     seedInstantiatedWorkingCopy([]);
     useWorkingCopyStore.getState().setTouchLayoutJson('{"before":true}');
-    arriveAt("rules", { route: "output" });
+    arriveAt("rules", { route: "survey", step: "trial" });
     renderHostWithFooter("rules");
     const entriesBefore = useDecisionLogStore.getState().record.entries.length;
 
@@ -186,7 +223,7 @@ describe("full-layout step opened from Output", () => {
 
     expect(useWorkingCopyStore.getState().touchLayoutJson).toBe('{"before":true}');
     expect(useDecisionLogStore.getState().record.entries).toHaveLength(entriesBefore);
-    expect(jumpToLocation).toHaveBeenCalledWith({ route: "output" });
+    expect(jumpToLocation).toHaveBeenCalledWith({ route: "survey", step: "trial" });
   });
 
   it("a decision-trail arrival gets no footer revision actions (unchanged)", () => {
@@ -200,7 +237,7 @@ describe("full-layout step opened from Output", () => {
 
   it("clears the revision actions when the step unmounts", () => {
     seedInstantiatedWorkingCopy([]);
-    arriveAt("rules", { route: "output" });
+    arriveAt("rules", { route: "survey", step: "trial" });
     const view = renderHostWithFooter("rules");
     expect(useStepNavStore.getState().revision?.stepId).toBe("rules");
     view.unmount();
@@ -209,7 +246,7 @@ describe("full-layout step opened from Output", () => {
 
   it("Back off the targeted full-layout step drops the footer actions and shows the slim banner (#2050)", () => {
     seedInstantiatedWorkingCopy([]);
-    arriveAt("rules", { route: "output" });
+    arriveAt("rules", { route: "survey", step: "trial" });
     renderHostWithFooter("rules");
     expect(screen.getByTestId("step-revision-back-to-testing")).toBeTruthy();
 
@@ -224,14 +261,14 @@ describe("full-layout step opened from Output", () => {
   });
 });
 
-describe("pane step opened from Output", () => {
-  it("shows the Output-origin banner with Discard", () => {
+describe("pane step opened from Trial", () => {
+  it("shows the Trial-origin banner with Discard", () => {
     seedInstantiatedWorkingCopy([]);
-    arriveAt("punctuation", { route: "output" });
+    arriveAt("punctuation", { route: "survey", step: "trial" });
     renderHostWithFooter("punctuation");
 
     const banner = screen.getByTestId("step-deep-link-return-banner");
-    expect(banner.textContent).toMatch(/opened this from Output/);
+    expect(banner.textContent).toMatch(/opened this from Trial/);
     expect(screen.getByTestId("step-revision-discard")).toBeTruthy();
   });
 
@@ -244,18 +281,22 @@ describe("pane step opened from Output", () => {
     expect(screen.queryByTestId("step-revision-discard")).toBeNull();
   });
 
-  it("confirming returns to Output", () => {
+  it("a legacy { route: 'output' } return still counts as a tail return (reads as Trial)", () => {
+    // Nothing produces the legacy return anymore, but an in-flight pending
+    // jump could still carry it (spec 113): it reads as Trial and jumps back
+    // to { route: "output" }, where the #output redirect lands on Trial.
     seedInstantiatedWorkingCopy([]);
-    arriveAt("punctuation", { route: "output" });
+    arriveAt("punctuation", { route: "survey", step: "trial" });
     renderHostWithFooter("punctuation");
 
+    expect(screen.getByTestId("step-deep-link-return-banner").textContent).toMatch(/opened this from Trial/);
     fireEvent.click(screen.getByTestId("pane-complete"));
-    expect(jumpToLocation).toHaveBeenCalledWith({ route: "output" });
+    expect(jumpToLocation).toHaveBeenCalledWith({ route: "survey", step: "trial" });
   });
 
   it("says plainly on the banner that leaving the step keeps the changes (#2050)", () => {
     seedInstantiatedWorkingCopy([]);
-    arriveAt("punctuation", { route: "output" });
+    arriveAt("punctuation", { route: "survey", step: "trial" });
     renderHostWithFooter("punctuation");
 
     expect(screen.getByTestId("step-deep-link-return-banner").textContent).toMatch(
@@ -265,7 +306,7 @@ describe("pane step opened from Output", () => {
 
   it("Back off the targeted step swaps the banner for a slim one that keeps Discard reachable (#2050)", () => {
     seedInstantiatedWorkingCopy([]);
-    arriveAt("punctuation", { route: "output" });
+    arriveAt("punctuation", { route: "survey", step: "trial" });
     renderHostWithFooter("punctuation");
 
     act(() => {
@@ -274,16 +315,16 @@ describe("pane step opened from Output", () => {
     });
 
     const banner = screen.getByTestId("step-deep-link-return-banner");
-    expect(banner.textContent).toMatch(/You left the step you opened from Output/);
+    expect(banner.textContent).toMatch(/You left the step you opened from Trial/);
     expect(banner.textContent).toMatch(/your changes were kept/);
     expect(screen.queryByTestId("step-deep-link-continue-instead")).toBeNull();
     expect(screen.getByTestId("step-revision-discard").textContent).toBe("Discard changes and go back");
   });
 
-  it("discarding from the slim banner restores the arrival snapshot and returns to Output (#2050)", () => {
+  it("discarding from the slim banner restores the arrival snapshot and returns to Trial (#2050)", () => {
     seedInstantiatedWorkingCopy([]);
     useWorkingCopyStore.getState().setTouchLayoutJson('{"before":true}');
-    arriveAt("punctuation", { route: "output" });
+    arriveAt("punctuation", { route: "survey", step: "trial" });
     renderHostWithFooter("punctuation");
     const entriesBefore = useDecisionLogStore.getState().record.entries.length;
 
@@ -299,7 +340,7 @@ describe("pane step opened from Output", () => {
 
     expect(useWorkingCopyStore.getState().touchLayoutJson).toBe('{"before":true}');
     expect(useDecisionLogStore.getState().record.entries).toHaveLength(entriesBefore);
-    expect(jumpToLocation).toHaveBeenCalledWith({ route: "output" });
+    expect(jumpToLocation).toHaveBeenCalledWith({ route: "survey", step: "trial" });
   });
 
   it("a decision-trail arrival shows no slim banner off the targeted step (#2050)", () => {

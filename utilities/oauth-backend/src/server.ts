@@ -5,7 +5,7 @@
  *   POST /oauth/exchange         — GitHub authorization_code → access_token
  *   POST /oauth/refresh          — GitHub refresh_token → new access_token
  *   POST /oauth/google/exchange  — Google authorization_code → identity claims (only when GOOGLE_OAUTH_ENABLED=true)
- *   POST /submit/managed-pr      — Option B org-mediated fork+PR (no user token; 503 until org creds set)
+ *   POST /submit/managed-pr      — Option B org-mediated fork+PR (requires a sign-in: Bearer Google session token or GitHub user token; 503 until org creds set)
  *   POST /report/crash           — crash report → issue in keyboard-studio/crash-reports (503 until the crash App creds are set)
  *   GET  /oauth/health           — liveness probe (no auth)
  *
@@ -31,6 +31,7 @@
  *   GOOGLE_OAUTH_ENABLED   set to "true" to enable the Google identity flow (default off)
  *   GOOGLE_CLIENT_ID       required only when GOOGLE_OAUTH_ENABLED=true
  *   GOOGLE_CLIENT_SECRET   required only when GOOGLE_OAUTH_ENABLED=true — never logged, never in responses
+ *   SESSION_SIGNING_KEY    optional — HMAC key for the Google session token that POST /submit/managed-pr requires of Google users; unset means only GitHub users can submit. Never logged.
  *   OAUTH_ALLOWED_ORIGINS  comma-separated list of allowed CORS origins
  *   PORT                   default 8787
  */
@@ -54,6 +55,11 @@ import {
   type GoogleHandlerConfig,
 } from "./google-handlers.js";
 import { ManagedPRBodySchema } from "./managed-pr-schemas.js";
+import {
+  authenticateSubmitter,
+  sessionSigningKeyFromEnv,
+  withSessionToken,
+} from "./submitter-auth.js";
 import { checkManagedPRRateLimit } from "./managed-pr-rate-limit.js";
 import {
   submitManagedPR,
@@ -438,7 +444,7 @@ export async function buildServer(opts: {
       if (!result.ok) {
         return reply.status(result.status).send({ error: result.error });
       }
-      return reply.status(200).send(result.data);
+      return reply.status(200).send(withSessionToken(result.data, sessionSigningKeyFromEnv()));
     });
   }
 
@@ -494,7 +500,17 @@ export async function buildServer(opts: {
       return reply.status(429).send({ error: "rate_limited" });
     }
 
-    const result = await submitManagedPR(parsed.data, managedPRConfig);
+    // Submitting requires a sign-in (Google session token or GitHub user
+    // token) — parity with the Vercel route.
+    const submitter = await authenticateSubmitter(req.headers.authorization, {
+      sessionKey: sessionSigningKeyFromEnv(),
+      fetch: nodeFetch,
+    });
+    if (submitter === null) {
+      return reply.status(401).send({ error: "sign_in_required" });
+    }
+
+    const result = await submitManagedPR(parsed.data, managedPRConfig, submitter);
     if (!result.ok) {
       if (result.retryAfterSeconds !== undefined) {
         reply.header("Retry-After", String(result.retryAfterSeconds));

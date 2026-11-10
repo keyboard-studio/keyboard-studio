@@ -186,7 +186,7 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     expect(await row.isVisible()).toBe(true);
 
     await driveHelpPhase(page);
-    await page.waitForURL(/#output$/);
+    await expect(page.getByRole("heading", { name: "Survey complete" })).toBeVisible({ timeout: 30_000 });
   });
 
   test("a real reproposal (marks) shows the FR-016 notice and a live badge, which clears once resolved", async ({

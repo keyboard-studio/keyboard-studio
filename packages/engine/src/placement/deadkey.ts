@@ -51,6 +51,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import { ruleContextElements, ruleLhsKind } from "../shared/rule-shape.js";
 import { US_UNSHIFTED, isSingleCodepoint } from "./filters.js";
+import { isRewritePlatformGuard } from "../codec/target-guards.js";
 
 // ---------------------------------------------------------------------------
 // Base-letter -> vkey lookup (inverse of the engine's pinned US base layout)
@@ -158,9 +159,17 @@ export function extractDeadkeyCandidatesFromRule(
   rule: IRRule,
   skipCounts: DeadkeySkipCounts,
 ): RawCandidate[] {
-  // Platform-gated rules ($keymanonly:/$keymanweb:) are corpus-idiosyncratic
-  // per-target overrides — skip loudly rather than mining a partial view.
-  if (rule.targetSelector !== undefined) {
+  // Platform-gated rules are corpus-idiosyncratic per-target overrides —
+  // skip loudly rather than mining a partial view. That covers both the
+  // legacy `$keymanonly:`/`$keymanweb:` form (stale IRs) and the #2633
+  // rewrite form, where the guard is the rule context's first element
+  // (a sourced guard such as platform('touch') is not one of the rewrite
+  // spellings and keeps its existing treatment).
+  const firstCtx = rule.context[0];
+  if (
+    rule.targetSelector !== undefined ||
+    (firstCtx?.kind === "raw" && isRewritePlatformGuard(firstCtx.text))
+  ) {
     bump(skipCounts, DEADKEY_SKIP_REASONS.PLATFORM_GATED);
     return [];
   }

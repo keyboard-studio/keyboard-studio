@@ -9,6 +9,15 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { buildServer } from "./server.js";
 import type { GitHubPipelineFetchFn } from "./github-pipeline.js";
+import { signSessionToken } from "./submitter-auth.js";
+
+// POST /submit/managed-pr requires a sign-in: a Google session token signed
+// with SESSION_SIGNING_KEY satisfies it without any GitHub /user call.
+process.env["SESSION_SIGNING_KEY"] = "server-test-key";
+const SIGNED_IN = `Bearer ${signSessionToken(
+  { sub: "1", email: "author@example.org", name: "Author" },
+  "server-test-key",
+)}`;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -658,6 +667,7 @@ describe("POST /submit/managed-pr — config gating", () => {
     const res = await unconfigured.inject({
       method: "POST",
       url: "/submit/managed-pr",
+      headers: { authorization: SIGNED_IN },
       payload: validManagedBody(),
     });
     expect(res.statusCode).toBe(503);
@@ -679,6 +689,7 @@ describe("POST /submit/managed-pr — body validation", () => {
     const res = await mApp.inject({
       method: "POST",
       url: "/submit/managed-pr",
+      headers: { authorization: SIGNED_IN },
       payload: validManagedBody({
         attribution: { displayName: "Ada", email: "not-an-email" },
       }),
@@ -695,6 +706,7 @@ describe("POST /submit/managed-pr — body validation", () => {
     const res = await mApp.inject({
       method: "POST",
       url: "/submit/managed-pr",
+      headers: { authorization: SIGNED_IN },
       payload: validManagedBody({ sourceFiles: tooMany }),
     });
     expect(res.statusCode).toBe(400);
@@ -705,6 +717,7 @@ describe("POST /submit/managed-pr — body validation", () => {
     const res = await mApp.inject({
       method: "POST",
       url: "/submit/managed-pr",
+      headers: { authorization: SIGNED_IN },
       payload: validManagedBody({
         sourceFiles: [{ path: "release/m/my_keyboard/big.kmn", content: oversized }],
       }),
@@ -716,6 +729,7 @@ describe("POST /submit/managed-pr — body validation", () => {
     const res = await mApp.inject({
       method: "POST",
       url: "/submit/managed-pr",
+      headers: { authorization: SIGNED_IN },
       payload: validManagedBody({ keyboardId: "My-Keyboard" }),
     });
     expect(res.statusCode).toBe(400);
@@ -725,6 +739,7 @@ describe("POST /submit/managed-pr — body validation", () => {
     const res = await mApp.inject({
       method: "POST",
       url: "/submit/managed-pr",
+      headers: { authorization: SIGNED_IN },
       payload: validManagedBody({
         attribution: { displayName: "Ada", email: "LEAKED_VALUE@@bad" },
       }),
@@ -737,6 +752,7 @@ describe("POST /submit/managed-pr — body validation", () => {
     const res = await mApp.inject({
       method: "POST",
       url: "/submit/managed-pr",
+      headers: { authorization: SIGNED_IN },
       payload: validManagedBody(),
     });
     expect(res.statusCode).toBe(200);
@@ -749,6 +765,7 @@ describe("POST /submit/managed-pr — body validation", () => {
     const res = await mApp.inject({
       method: "POST",
       url: "/submit/managed-pr",
+      headers: { authorization: SIGNED_IN },
       payload: validManagedBody({
         sourceFiles: [
           { path: "release/m/my_keyboard/my_keyboard.kmn", content: "store(&VERSION) '14.0'" },
@@ -767,6 +784,7 @@ describe("POST /submit/managed-pr — body validation", () => {
     const res = await mApp.inject({
       method: "POST",
       url: "/submit/managed-pr",
+      headers: { authorization: SIGNED_IN },
       payload: validManagedBody({
         sourceFiles: [
           {
@@ -788,6 +806,7 @@ describe("POST /submit/managed-pr — installation token never leaks", () => {
     const res = await mApp.inject({
       method: "POST",
       url: "/submit/managed-pr",
+      headers: { authorization: SIGNED_IN },
       payload: validManagedBody(),
     });
     expect(res.statusCode).toBe(200);
@@ -808,6 +827,7 @@ describe("POST /submit/managed-pr — installation token never leaks", () => {
     const res = await mApp.inject({
       method: "POST",
       url: "/submit/managed-pr",
+      headers: { authorization: SIGNED_IN },
       payload: validManagedBody(),
     });
     expect(res.statusCode).toBe(502);
@@ -834,6 +854,7 @@ describe("POST /submit/managed-pr — installation token never leaks", () => {
     const res = await mApp.inject({
       method: "POST",
       url: "/submit/managed-pr",
+      headers: { authorization: SIGNED_IN },
       payload: validManagedBody(),
     });
     expect(res.statusCode).toBe(429);
@@ -855,6 +876,7 @@ describe("POST /submit/managed-pr — CORS", () => {
     const res = await mApp.inject({
       method: "OPTIONS",
       url: "/submit/managed-pr",
+      headers: { authorization: SIGNED_IN },
       headers: { Origin: ALLOWED_ORIGIN, "Access-Control-Request-Method": "POST" },
     });
     expect(res.statusCode).toBe(204);
@@ -865,6 +887,7 @@ describe("POST /submit/managed-pr — CORS", () => {
     const res = await mApp.inject({
       method: "OPTIONS",
       url: "/submit/managed-pr",
+      headers: { authorization: SIGNED_IN },
       headers: { Origin: DISALLOWED_ORIGIN, "Access-Control-Request-Method": "POST" },
     });
     expect(res.statusCode).not.toBe(500);

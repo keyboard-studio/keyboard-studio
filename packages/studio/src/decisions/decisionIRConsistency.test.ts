@@ -114,6 +114,12 @@ const IR_LESS_DECISIONS: ReadonlySet<DecisionId> = new Set<DecisionId>([
   // #2485: the icon gallery module's apply is a no-op — the .ico is written
   // by the output pipeline from the step's own payload, never via IR paths.
   "icon",
+  // spec 113 (#2540): the trial and publish gallery modules' apply is a
+  // no-op — the test builds and reports live in the testingStore slice of
+  // the draft envelope, and the release is emitted by the output pipeline
+  // from the working copy, never via IR paths.
+  "trial",
+  "publish",
   "indic-conjuncts-wanted",
   "indic-nukta-detail",
   "indic-nukta-wanted",

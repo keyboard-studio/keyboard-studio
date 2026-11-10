@@ -25,7 +25,7 @@ import {
   type EditorActionSummary,
   type EditorActionType,
 } from "@keyboard-studio/contracts";
-import { derivedScreens } from "../steps/manifest.ts";
+import { manifestStepIds } from "../steps/derivedViews.ts";
 import type { HeadlineDimension, HeadlineDimensionKind } from "./headline.ts";
 
 /**
@@ -205,7 +205,6 @@ export function buildStageGroups(
     bucket.push(entry);
   }
 
-  const manifestStepIds = [...derivedScreens.map((s) => s.id), "package"];
   const manifestStepIdSet = new Set(manifestStepIds);
 
   // Unknown-to-the-manifest stepIds (PRE_IDENTITY_STEP_ID included, since it

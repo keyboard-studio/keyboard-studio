@@ -25,6 +25,7 @@
 
 import type { ManagedPRBody } from "./managed-pr-schemas.js";
 import { isSafeTreePath } from "./managed-pr-schemas.js";
+import { describeSubmitter, type Submitter } from "./submitter-auth.js";
 
 // ---------------------------------------------------------------------------
 // Pipeline-local fetch abstraction -- richer than OAuthFetchResponse so we
@@ -154,9 +155,10 @@ export function buildCommitMessage(
  * Divergence 5 from the Option A origin: Option A uses the PR body verbatim;
  * Option B must surface the human author because the committer is the org bot.
  */
-export function buildPrBody(body: ManagedPRBody): string {
+export function buildPrBody(body: ManagedPRBody, submitter?: Submitter): string {
   const provenance = [
     `> Submitted through **Keyboard Studio** on behalf of **${body.attribution.displayName}** (${body.attribution.email}).`,
+    ...(submitter !== undefined ? [describeSubmitter(submitter)] : []),
     `> Keyman maintainers: please contact the author above for licensing or DISCUS follow-up.`,
   ].join("\n");
 
@@ -267,7 +269,9 @@ function buildHeaders(token: string): Record<string, string> {
  */
 export async function submitManagedPR(
   body: ManagedPRBody,
-  config: ManagedPRPipelineConfig
+  config: ManagedPRPipelineConfig,
+  /** The signed-in submitter, named in the provenance block. */
+  submitter?: Submitter,
 ): Promise<ManagedPRHandlerResult> {
   const { getInstallationToken, orgLogin, fetch: fetchFn } = config;
   const forkBase = `${API_BASE}/repos/${orgLogin}/${UPSTREAM_REPO}`;
@@ -405,7 +409,7 @@ export async function submitManagedPR(
     // 7. Open the draft PR upstream (divergences 4 and 5 from Option A).
     const pr = await call(`${upstreamBase}/pulls`, "POST", {
       title: normalizedTitle,
-      body: buildPrBody(body),
+      body: buildPrBody(body, submitter),
       head: `${orgLogin}:${branchName}`,
       base: "master",
       draft: true,

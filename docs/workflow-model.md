@@ -346,9 +346,9 @@ script family that silently gets a degraded strategy. Both need an explicit
   gallery. The working copy (`KeyboardIR` + `VirtualFS`) is the session's single
   source of truth from instantiation to output, with no intermediate disk writes.
   Ratified in [spec.md](../spec.md) §8 and §12 as part of v1.3.0 (extends D9).
-- **Output is not a dead end (spec 094).** From Output the author can reopen any
+- **Trial is not a dead end (spec 094, split by spec 113).** From Trial the author can reopen any
   completed section and come straight back. The jump carries
-  `returnTo: { route: "output" }`, so no unchanged step is replayed. Full-layout
+  `returnTo: { route: "survey", step: "trial" }`, so no unchanged step is replayed. Full-layout
   steps get "Back to testing" and "Discard changes and go back" in the footer.
   Discard restores a revision snapshot taken on arrival (working copy, phase-B
   draft, survey answers, decision record; not traversal). Between revisions the

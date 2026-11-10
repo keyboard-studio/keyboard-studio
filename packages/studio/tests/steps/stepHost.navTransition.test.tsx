@@ -71,7 +71,7 @@ vi.mock("../../src/components/UnsupportedScriptStub.tsx", () =>
 );
 vi.mock("../../src/components/OSKFrame.tsx", () => import("../../src/test/studioShellMocks/OSKFrame.tsx"));
 vi.mock("../../src/components/OskModeToggle.tsx", () => import("../../src/test/studioShellMocks/OskModeToggle.tsx"));
-vi.mock("../../src/components/OutputScreen.tsx", () => import("../../src/test/studioShellMocks/OutputScreen.tsx"));
+vi.mock("../../src/components/OutputRedirect.tsx", () => import("../../src/test/studioShellMocks/OutputRedirect.tsx"));
 vi.mock("../../src/dashboard/DashboardView.tsx", () => import("../../src/test/studioShellMocks/DashboardView.tsx"));
 vi.mock("../../src/hooks/useKeyboardArtifact.ts", () =>
   import("../../src/test/studioShellMocks/idleKeyboardArtifact.ts"),

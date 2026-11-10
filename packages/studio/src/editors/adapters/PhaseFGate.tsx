@@ -55,7 +55,7 @@ export function PhaseFGate(props: EditorStepProps): React.ReactElement {
 
   // Single shared hook (hooks/useInventoryCoverageGate.ts) — do not re-derive
   // the desktop-always / touch-only-if-authored booleans locally; StepHost's
-  // gate and OutputScreen's download gate use the same hook.
+  // gate and PublishStep's download gate use the same hook.
   const gate = useInventoryCoverageGate();
   const { unimplementedDesktop, unimplementedTouch, blockedOnDesktop, blockedOnTouch, blocked, touchLayoutCorrupted } =
     gate;
