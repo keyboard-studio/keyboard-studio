@@ -87,3 +87,17 @@ Findings and caveats:
   9 envelope v3 + store reduction. So spec 105's Phases 4 and 7 have not started: the blocking edges for
   spec 118 Phases 4 and 7 are real. Whether Phase 0 of 105 is on `origin/main` was not verified beyond
   the git log hits above.
+
+## T017. Rebuild timings after phase 3 (FR-032)
+
+Same harness and protocol as T001b (15 measured runs, 3 warmups), one run via a throwaway copy that writes the
+report to a file (deleted afterwards). Phase 3 routes every `.kmn` write and every output path through the emit
+stage; no replay change.
+
+| run | edit median / mean / min / max (ms) | resume median / mean / min / max (ms) |
+|---|---|---|
+| phase 3 | 199.51 / 199.71 / 162.20 / 236.90 | 197.91 / 199.29 / 152.06 / 242.06 |
+
+- No regression against the T001b band (edit 520-600, resume 550-600). The absolute drop is larger than a phase that
+  changed no replay should explain; it is most likely machine load at the baseline run, so read it as "not slower",
+  not as a speed-up. Edit is under the 300 ms SC-006 target on this run; one run only, no browser timing.
