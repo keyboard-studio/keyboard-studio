@@ -22,6 +22,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ContextElement, FallbackPolicy, IRRule, KeyboardIR, OutputElement } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
+import { NORMALIZATION_GROUP } from "@keyboard-studio/engine/context-tolerance";
 import type { DecisionSet } from "../decisions/decisionTypes.ts";
 import type { CarvedLayoutValue } from "../survey/carve/carveValue.ts";
 import { readVfsText } from "../lib/vfsText.ts";
@@ -181,6 +182,15 @@ describe.skipIf(!sc004GatesEnabled)("carving fixture (Bafut on Cameroon QWERTY)"
       it("no emitted rule references a carved character in context or output", () => {
         const offenders: string[] = [];
         for (const g of out.groups) {
+          // The normalization step's rules are its internal lookup tables,
+          // not keyboard content: the head stores hold the pasted alternates
+          // (the keyboard's other form) so the step can match them — the same
+          // exemption G4 gives the step's stores as a whole. A carved
+          // character is an alternate of a produced cluster, so the step
+          // legitimately matches it in pasted text; it never outputs one
+          // (its outputs are the produced clusters). The carve's invariant
+          // holds for every author rule; the step's rules are exempt.
+          if (g.name.toLowerCase() === NORMALIZATION_GROUP) continue;
           for (const rule of g.rules) {
             const hit = [...literalChars(rule), ...storeChars(out, rule)].filter((c) => carved.chars.has(NFC(c)));
             if (hit.length > 0) offenders.push(`${rule.nodeId}: ${[...new Set(hit)].join(" ")}`);
