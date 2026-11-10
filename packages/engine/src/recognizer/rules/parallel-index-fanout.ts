@@ -1,11 +1,20 @@
 import type { IRRule } from "@keyboard-studio/contracts";
+import {
+  elementAtOffset,
+  ruleConditions,
+  ruleExtraKeystrokeElements,
+  ruleHasNulContext,
+  rulePreContext,
+  ruleKeystrokeLoose,
+} from "@keyboard-studio/contracts";
 
 /**
  * isParallelIndexFanOut -- predicate for parallel-store fan-out rules.
  *
  * Returns true iff the rule has the shape:
  *   [dk(D)*, any(BASE)] > index(OUT, N)
- * where N === context.length (the offset-alignment invariant).
+ * where N is the offset of the terminal any() (the offset-alignment invariant;
+ * the `+` keystroke separator is never counted).
  *
  * Alignment invariant: the index() offset must equal the context length so that
  * the `any()` element and the `index()` output refer to the same position in their
@@ -30,18 +39,20 @@ export function isParallelIndexFanOut(rule: IRRule): boolean {
   const outEl = rule.output[0];
   if (outEl === undefined || outEl.kind !== "index") return false;
 
-  // Context must have at least one element (the terminal any()).
-  if (rule.context.length < 1) return false;
+  // No group is in scope here; assume a `using keys` group (the loose reader).
+  const group = { usingKeys: true };
+  if (ruleHasNulContext(rule) || ruleConditions(rule).length > 0) return false;
+  if (ruleExtraKeystrokeElements(rule, group).length > 0) return false;
 
-  // Terminal context element must be any().
-  const terminal = rule.context[rule.context.length - 1];
+  // The keystroke (terminal) element must be any().
+  const terminal = ruleKeystrokeLoose(rule);
   if (terminal === undefined || terminal.kind !== "any") return false;
 
-  // Alignment invariant: offset must equal context.length.
-  if (outEl.offset !== rule.context.length) return false;
+  // Alignment invariant: the offset must name the terminal any().
+  if (elementAtOffset(rule, group, outEl.offset) !== terminal) return false;
 
-  // Pre-terminal elements (all except the last) must all be deadkey.
-  const preTerminal = rule.context.slice(0, -1);
+  // Pre-terminal elements must all be deadkey.
+  const preTerminal = rulePreContext(rule, group);
   for (const el of preTerminal) {
     if (el.kind !== "deadkey") return false;
   }
