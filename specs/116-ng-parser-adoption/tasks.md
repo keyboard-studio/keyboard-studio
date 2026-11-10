@@ -330,21 +330,21 @@ and the importer policy (FR-027 to FR-029b, SC-007, SC-010).
 - Adding a scratch union member with no row fails it.
 - Every KMN export cell is `mapped`.
 
-- [ ] T060 [US4] Create `packages/contracts/src/capability/format-capability.ts` with the types from [contracts/capability-table.md](contracts/capability-table.md). It needs an `IR_KIND_PATHS` list bound to the contract by compile-time exhaustiveness: a `Record<StoreItem["kind"] | …, true>`-style guard per union, plus the typed node fields of `IRRule`, `IRStore`, `IRGroup`, `IRHeader` and `RawKmnFragment`.
-- [ ] T061 [US4] Fill the rows for every `IR_KIND_PATHS` entry in `format-capability.ts`:
+- [x] T060 [US4] Create `packages/contracts/src/capability/format-capability.ts` with the types from [contracts/capability-table.md](contracts/capability-table.md). It needs an `IR_KIND_PATHS` list bound to the contract by compile-time exhaustiveness: a `Record<StoreItem["kind"] | …, true>`-style guard per union, plus the typed node fields of `IRRule`, `IRStore`, `IRGroup`, `IRHeader` and `RawKmnFragment`.
+- [x] T061 [US4] Fill the rows for every `IR_KIND_PATHS` entry in `format-capability.ts`:
   - **KMN**: export `mapped`, with `ref` = the `emit.ts` function; import `produced`.
   - **LDML**: export `ref` = the row number in `specs/108-ldml-export/contracts/ldml-mapping.md`; import per the #2624 scope (planning).
   - **cldr-legacy**: import per the open PR #2625 importer, read from its branch `origin/km/2599-cldr-import`; export `n/a`.
   - **klc / xkb / keylayout**: import and export cells from each format's documentation (research R7), each with a `ref` URL or document section.
-- [ ] T062 [US4] Fill `UNHOMED_CONSTRUCTS` in `format-capability.ts` (FR-029a). Include LDML `<reorder>` and markers, `<transform>` groups beyond what KMN maps, `.keylayout` `<actions>` states and terminators, XKB levels beyond 4 and groups, and MSKLC `SGCAPS` and ligatures. Give each a disposition and a note.
-- [ ] T063 [US4] Write `packages/contracts/src/capability/format-capability.test.ts`, which checks:
+- [x] T062 [US4] Fill `UNHOMED_CONSTRUCTS` in `format-capability.ts` (FR-029a). Include LDML `<reorder>` and markers, `<transform>` groups beyond what KMN maps, `.keylayout` `<actions>` states and terminators, XKB levels beyond 4 and groups, and MSKLC `SGCAPS` and ligatures. Give each a disposition and a note.
+- [x] T063 [US4] Write `packages/contracts/src/capability/format-capability.test.ts`, which checks:
   - completeness (rows equal `IR_KIND_PATHS`);
   - KMN export always `mapped`;
   - an import and an export cell for every format, with `n/a` requiring a note;
   - the FR-029b rule: the `RawKmnFragment` row has `n/a` import cells for every non-KMN format, with the policy note.
 
   Export the module from `packages/contracts/src/index.ts`.
-- [ ] T064 [US4] Gate:
+- [x] T064 [US4] Gate:
   1. `pnpm lint`, `pnpm typecheck` and `pnpm -r test`.
   2. Tick T060–T064 and commit as `feat(contracts): format-capability table for the IR hub (spec 116 T060-T064)`.
   3. Push.

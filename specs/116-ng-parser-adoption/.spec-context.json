@@ -408,6 +408,46 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-11-10T16:35:34.001Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T060",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T16:43:08.322Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T061",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T16:43:08.491Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T062",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T16:43:08.665Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T063",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T16:43:08.813Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T064",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T16:47:37.672Z"
     }
   ],
   "decisions": [
@@ -431,10 +471,25 @@
     },
     {
       "decision": "producedSet/expandStore stays frozen (spec 063 FR-008/FR-010): a store holding a typed outs item contributes nothing, as its pre-116 outs-expansion fragment did; T055's 'producedSet uses resolveStoreItems' yields to its own same-result rule. typed-members.test pins this."
+    },
+    {
+      "decision": "Capability types are prefixed (CapabilityFormat, CapabilityImportStatus, CapabilityExportStatus)",
+      "why": "contracts already exports ImportStatus (the import report); the barrel would clash",
+      "rejected": "the contract names Format/ImportStatus/ExportStatus as written"
+    },
+    {
+      "decision": "Node fields are classified row|internal in a satisfies-Record map; only row fields get table rows, RawKmnFragment is one row",
+      "why": "nodeId, sourceLine, ownership markers and analysis sketches are not format constructs, and a KMN-mapped cell for them would be meaningless; the map still forces a decision for every new field",
+      "rejected": "a row for every field"
+    },
+    {
+      "decision": "cldr-legacy export cells are n/a with a note rather than absent",
+      "why": "the coverage check asks for a cell per format; n/a with a note says input-only explicitly",
+      "rejected": "omitting cldr-legacy export cells as the contract sketch says"
     }
   ],
   "unattended": true,
-  "currentTask": "T059",
+  "currentTask": "T064",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -874,6 +929,42 @@
     "T059": {
       "status": "DONE",
       "did": "Gate green: build, typecheck, lint, pnpm -r test (contracts 1150, engine 5129, studio 11743), reader-regression corpus + LDML fixtures at CI corpus pin, nfd-tolerance; stale producedSet outs-expansion test corrected to the frozen view; scratch zz-diff probe removed"
+    },
+    "T060": {
+      "status": "DONE",
+      "did": "capability types plus IR_KIND_PATHS bound by satisfies-Record guards over the three element unions and five node interfaces",
+      "files": [
+        "packages/contracts/src/capability/format-capability.ts"
+      ]
+    },
+    "T061": {
+      "status": "DONE",
+      "did": "rows for all 60 kind paths x 6 formats; KMN cites emit.ts functions, LDML cites ldml-mapping rows, cldr-legacy from the in-review importer, klc/xkb/keylayout from format docs",
+      "files": [
+        "packages/contracts/src/capability/format-capability.ts"
+      ]
+    },
+    "T062": {
+      "status": "DONE",
+      "did": "UNHOMED_CONSTRUCTS: 10 entries (LDML reorder/markers/transforms/touch, keylayout states/terminators, XKB levels/groups, KLC SGCAPS/ligatures)",
+      "files": [
+        "packages/contracts/src/capability/format-capability.ts"
+      ]
+    },
+    "T063": {
+      "status": "DONE",
+      "did": "format-capability.test.ts (completeness, KMN mapped, coverage, CLDR input-only, FR-029b, FR-029a) and barrel export",
+      "files": [
+        "packages/contracts/src/capability/format-capability.test.ts",
+        "packages/contracts/src/index.ts"
+      ]
+    },
+    "T064": {
+      "status": "DONE",
+      "did": "gate green: pnpm typecheck 0, pnpm lint 0 (after a justified disable on the field map), pnpm -r test 0; committed and pushed",
+      "files": [
+        "packages/contracts/src/capability/format-capability.ts"
+      ]
     }
   },
   "step_summaries": {
@@ -881,7 +972,7 @@
       "summary": "Phase 1 setup: baseline and timing helper"
     }
   },
-  "last_action": "Phase 5 T042-T047 done, gates green",
+  "last_action": "Phase 7 (T060-T064) done, gate green",
   "concerns": [
     {
       "note": "T031 speed gate not met: lex+LineRule parse 4974 ms vs 2208 ms budget, slowest vietnamese_telex 685 ms vs 300 ms. Remaining cost is in recursive-descent/kmn-analyzer which T029 forbids touching. Owner decision needed (R1 finding 5 options, or revisit budget). contracts/vendoring.md exclusion of statement-analyzer/store-analyzer is wrong; analyzer imports them.",
@@ -889,6 +980,10 @@
     },
     {
       "note": "Full-reader timing is 2532 ms against a 2760 ms budget; slowest file 362 ms against a 374 ms cap. Little headroom left for US3.",
+      "step": "implement"
+    },
+    {
+      "note": "klc/xkb/keylayout and planned LDML import cells are researched claims from format docs, not checked against an implementation; the cldr-legacy cells read the in-review importer branch and may drift if it changes before merge",
       "step": "implement"
     }
   ],
@@ -932,6 +1027,33 @@
       "exitCode": 0,
       "durationSeconds": 1.2,
       "result": "      Tests  7 passed (7) ·    Start at  15:46:43 ·    Duration  598ms (transform 219ms, setup 431ms, import 51ms, tests 5ms, environment 0ms)"
+    },
+    {
+      "what": "compile-time guard rejects a scratch StoreItem/OutputElement member",
+      "command": "tsc --noEmit -p packages/contracts with a temporary { kind: \"scratch\" } member, then reverted",
+      "result": "TS1360 at format-capability.ts lines 76 and 87"
+    },
+    {
+      "what": "Phase 7 full gate",
+      "command": "pnpm typecheck; pnpm lint; pnpm -r test",
+      "result": "all exit 0; lint 61 warnings, none new"
     }
-  ]
+  ],
+  "coverage": {
+    "FR-028": {
+      "tests": [
+        "packages/contracts/src/capability/format-capability.test.ts"
+      ]
+    },
+    "FR-029a": {
+      "tests": [
+        "packages/contracts/src/capability/format-capability.test.ts::lists the FR-029a constructs"
+      ]
+    },
+    "FR-029b": {
+      "tests": [
+        "packages/contracts/src/capability/format-capability.test.ts::never lets a non-KMN format import into RawKmnFragment"
+      ]
+    }
+  }
 }

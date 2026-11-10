@@ -24,6 +24,7 @@ export * from "./criteriaLintInput";
 export * from "./iso639_5";
 export * from "./cldrCurrency";
 export * from "./keyboard-ir";
+export * from "./capability/format-capability";
 export * from "./keyboardId";
 // The single authoritative key-budget determination (spec 052 FR-016); axis A7
 // in ./axes is its projection, never an independent measurement.
