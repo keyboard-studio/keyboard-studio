@@ -66,16 +66,17 @@ describe("pre-reordering draft loads on the current build", () => {
     useSurveyAnswerStore.getState().reset();
   });
 
-  it("the reordering changed the order of steps, not the set of step ids (deliberate additions since: attribution, #1901; open_languages, open_missing_letters, open_upgrades, spec 111; icon, #2485; fallback_policy, #2549; deliberate removal: track, #2568 — its decision lives on choose_base)", () => {
+  it("the reordering changed the order of steps, not the set of step ids (deliberate additions since: attribution, #1901; open_languages, open_missing_letters, open_upgrades, spec 111; icon, #2485; fallback_policy, #2549; trial, publish, #2540; deliberate removal: track, #2568 — its decision lives on choose_base)", () => {
     // The 091 reordering itself changed no ids. #1901 deliberately ADDED
     // one step (attribution), spec 111 added open_languages (Open only),
     // open_missing_letters and open_upgrades, #2485 added icon, and #2549
-    // added fallback_policy — and #2568 deliberately REMOVED the track
+    // added fallback_policy, and #2540 added trial and publish (the Output
+    // screen split, spec 113) — and #2568 deliberately REMOVED the track
     // step, whose decision now lives on choose_base. Every other
     // pre-reordering id still exists, so a draft persisted before any of
     // these changes names only known (or legacy-mapped) steps.
     expect([...STEP_ORDER].sort()).toEqual(
-      [...PRE_REORDER_STEP_IDS.filter((id) => !RETIRED_STEP_IDS.includes(id)), "attribution", "open_languages", "open_missing_letters", "open_upgrades", "icon", "fallback_policy"].sort(),
+      [...PRE_REORDER_STEP_IDS.filter((id) => !RETIRED_STEP_IDS.includes(id)), "attribution", "open_languages", "open_missing_letters", "open_upgrades", "icon", "fallback_policy", "trial", "publish"].sort(),
     );
   });
 
