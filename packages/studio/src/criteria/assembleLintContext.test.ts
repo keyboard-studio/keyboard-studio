@@ -126,6 +126,61 @@ function buildMinimalFont(family: string): Uint8Array {
   ]);
 }
 
+/**
+ * A minimal two-table font: a `name` table (family) plus a format-4
+ * `cmap` covering only A–Z, for the §18.13 assembly tests.
+ */
+function buildFontWithCmap(family: string): Uint8Array {
+  const str: number[] = [];
+  for (const c of family) str.push(0, c.charCodeAt(0));
+  const nameHeader = 6 + 12;
+  const nameTable: number[] = [
+    0, 0, 0, 1,
+    (nameHeader >> 8) & 0xff, nameHeader & 0xff,
+    0, 3, 0, 9, 0, 0, 0, 1,
+    (str.length >> 8) & 0xff, str.length & 0xff, 0, 0,
+    ...str,
+  ];
+  // Format-4 cmap: one segment A–Z (delta 0) plus the 0xFFFF sentinel.
+  const cmapSub: number[] = [
+    0, 4, 0, 32, // format 4, length 32
+    0, 0, // language
+    0, 4, // segCountX2 (2 segments)
+    0, 4, // searchRange
+    0, 1, // entrySelector
+    0, 0, // rangeShift
+    0, 0x5a, 0xff, 0xff, // endCode: Z, sentinel
+    0, 0, // reservedPad
+    0, 0x41, 0xff, 0xff, // startCode: A, sentinel
+    0, 0, 0, 1, // idDelta: 0, 1
+    0, 0, 0, 0, // idRangeOffset: 0, 0
+  ];
+  const cmapTable: number[] = [
+    0, 0, 0, 1, // version 0, one subtable
+    0, 3, 0, 1, // platform 3, encoding 1
+    0, 0, 0, 12, // subtable offset
+    ...cmapSub,
+  ];
+  const cmapOffset = 12 + 2 * 16;
+  const nameOffset = cmapOffset + cmapTable.length;
+  const u32 = (n: number): number[] => [
+    (n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff,
+  ];
+  return new Uint8Array([
+    0, 1, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0,
+    0x63, 0x6d, 0x61, 0x70, // "cmap"
+    0, 0, 0, 0,
+    ...u32(cmapOffset),
+    ...u32(cmapTable.length),
+    0x6e, 0x61, 0x6d, 0x65, // "name"
+    0, 0, 0, 0,
+    ...u32(nameOffset),
+    ...u32(nameTable.length),
+    ...cmapTable,
+    ...nameTable,
+  ]);
+}
+
 function fixtureVfs(): VirtualFS {
   return createVirtualFS([
     { path: `source/${KEYBOARD_ID}.kmn`, content: KMN, isBinary: false },
@@ -190,6 +245,41 @@ describe("assembleLintContext", () => {
     ]);
     const { ctx } = assembleLintContext({ vfs, keyboardId: KEYBOARD_ID });
     expect(ctx.criteriaInput?.kpsFontFamilies).toEqual([]);
+  });
+
+  it("§18.13: extracts cmap coverage of a .kps-listed font present in the VFS", () => {
+    const font = buildFontWithCmap("Fixture Sans");
+    const kpsWithFont = KPS.replace(
+      "</Files>",
+      "    <File><Name>..\\\\source\\\\FixtureSans.ttf</Name><Description></Description><FileType>.ttf</FileType></File>\n  </Files>",
+    );
+    const vfs = createVirtualFS([
+      { path: `source/${KEYBOARD_ID}.kmn`, content: KMN, isBinary: false },
+      { path: `source/${KEYBOARD_ID}.kps`, content: kpsWithFont, isBinary: false },
+      { path: "source/FixtureSans.ttf", content: font, isBinary: true },
+      { path: "HISTORY.md", content: HISTORY_MD, isBinary: false },
+    ]);
+    const { ctx } = assembleLintContext({ vfs, keyboardId: KEYBOARD_ID });
+    expect(ctx.criteriaInput?.kpsFontCoverage).toEqual([
+      { ref: "source/FixtureSans.ttf", covered: [{ start: 0x41, end: 0x5a }] },
+    ]);
+  });
+
+  it("§18.13: a listed font with an unreadable cmap contributes no coverage", () => {
+    // buildMinimalFont carries a name table but no cmap.
+    const font = buildMinimalFont("Fixture Sans");
+    const kpsWithFont = KPS.replace(
+      "</Files>",
+      "    <File><Name>..\\\\source\\\\FixtureSans.ttf</Name><Description></Description><FileType>.ttf</FileType></File>\n  </Files>",
+    );
+    const vfs = createVirtualFS([
+      { path: `source/${KEYBOARD_ID}.kmn`, content: KMN, isBinary: false },
+      { path: `source/${KEYBOARD_ID}.kps`, content: kpsWithFont, isBinary: false },
+      { path: "source/FixtureSans.ttf", content: font, isBinary: true },
+      { path: "HISTORY.md", content: HISTORY_MD, isBinary: false },
+    ]);
+    const { ctx } = assembleLintContext({ vfs, keyboardId: KEYBOARD_ID });
+    expect(ctx.criteriaInput?.kpsFontCoverage).toEqual([]);
   });
 
   it("Batch 3 §18.7: a region with no CLDR currency entry is named context-missing", () => {

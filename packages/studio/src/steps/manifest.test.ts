@@ -148,10 +148,10 @@ describe("M2 — spine order matches FR-012", () => {
     expect(spine[1]?.id).toBe("layout");
   });
 
-  it("'track' is a spine step between 'choose_base' and 'characters'", () => {
+  it("'choose_base' precedes 'characters' on the spine with no track step between them (track question removed)", () => {
     const spine = spineSteps(manifest);
-    assertStepOrder(spine, "choose_base", "track");
-    assertStepOrder(spine, "track", "characters");
+    assertStepOrder(spine, "choose_base", "characters");
+    expect(spine.some((s) => s.id === "track")).toBe(false);
   });
 
   it("'mechanisms' appears before 'touch' on the spine", () => {
@@ -308,8 +308,8 @@ describe("M4b — project_name CYOA fork (copy-track only)", () => {
     expect(spineOf(targetStep)).toBe(true);
   });
 
-  it("project_name appears in the manifest between track and characters", () => {
-    assertStepOrder(manifest, "track", "project_name");
+  it("project_name appears in the manifest between choose_base and characters", () => {
+    assertStepOrder(manifest, "choose_base", "project_name");
     assertStepOrder(manifest, "project_name", "characters");
   });
 });
@@ -347,9 +347,13 @@ describe("Off-spine step inventory", () => {
 // needs the two-pane shell's persistent right-pane OSKFrame suppressed, or
 // two live OSKs co-mount).
 //
-// Exactly {carve, deadkeys, rules, mechanisms, touch, touch_seed_source, css, html, icon}
-// must declare layout:"full". All other steps must have layout:"pane" or
-// omit the field (implicit "pane").
+// Exactly {carve, deadkeys, rules, mechanisms, fallback_policy, osk, touch,
+// touch_seed_source, css, html, icon, trial, publish} must declare layout:"full". All other
+// steps must have layout:"pane" or omit the field (implicit "pane").
+//
+// trial and publish joined this set in spec 113 (#2540): the Trial and
+// Publish steps host the Output screen's panels, which need the full width
+// the Output pane used to have.
 // ---------------------------------------------------------------------------
 
 const FULL_LAYOUT_IDS = [
@@ -357,16 +361,19 @@ const FULL_LAYOUT_IDS = [
   "deadkeys",
   "rules",
   "mechanisms",
+  "fallback_policy",
   "osk",
   "touch",
   "touch_seed_source",
   "css",
   "html",
   "icon",
+  "trial",
+  "publish",
 ] as const;
 
 describe("layout declarations (spec 024 Stage 0)", () => {
-  it("exactly ten steps declare layout:'full'", () => {
+  it("exactly thirteen steps declare layout:'full'", () => {
     const fullSteps = manifest.filter((s) => s.layout === "full");
     const fullIds = fullSteps.map((s) => s.id).sort();
     expect(fullIds).toEqual([...FULL_LAYOUT_IDS].sort());
@@ -400,6 +407,16 @@ describe("layout declarations (spec 024 Stage 0)", () => {
   it("touch_seed_source declares layout:'full' (P0 fix: suppresses the outer persistent OSK pane so the panel's own inline OSK is the only preview)", () => {
     const seedSource = manifest.find((s) => s.id === "touch_seed_source");
     expect(seedSource?.layout).toBe("full");
+  });
+
+  it("trial declares layout:'full' (spec 113: hosts the Output screen's test-build panels)", () => {
+    const trial = manifest.find((s) => s.id === "trial");
+    expect(trial?.layout).toBe("full");
+  });
+
+  it("publish declares layout:'full' (spec 113: hosts the Output screen's download + submit panels)", () => {
+    const publish = manifest.find((s) => s.id === "publish");
+    expect(publish?.layout).toBe("full");
   });
 
   it("all other steps have layout:'pane' or omit layout (implicit pane)", () => {

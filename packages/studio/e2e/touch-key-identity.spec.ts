@@ -60,7 +60,7 @@ import {
   seedReturningVisitor,
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   openExistingKeyboard,
   continueOpenWalkUntil,
   driveAttributionStep,
@@ -73,7 +73,7 @@ import {
   driveMarksSeries,
   driveDeadkeysStep,
   driveMechanismsGallery,
-  navigateToOutput,
+  navigateToPublish,
   triggerDownload,
 } from "./helpers/surveyFlow";
 import {
@@ -161,7 +161,7 @@ async function driveToBasicKbdusTouchStep(page: Page): Promise<void> {
     languageCode: "en",
   });
   await pickStartKeyboard(page, "basic_kbdus");
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page);
   await acceptProjectName(page);
   await confirmPrefill(page);
@@ -260,7 +260,7 @@ test.describe("spec 104 walk 1: creation with the start-of-line default", () => 
       languageCode: "fr",
     });
     await pickStartKeyboard(page, "basic_kbdfr");
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -365,13 +365,13 @@ test.describe("spec 104 walk 2: copy parity and the repair list", () => {
       languageCode: "agq",
     });
     await pickStartKeyboard(page, "sil_cameroon_qwerty");
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
     await buildOneCharacterList(page, "ɨ");
     await finishGalleryWork(page);
-    await navigateToOutput(page);
+    await navigateToPublish(page);
 
     // Cameroon has no dead keys: nothing may be listed as unapplied.
     await expect(page.getByTestId("touch-key-unapplied-repairs")).toHaveCount(0);
@@ -436,7 +436,7 @@ test.describe("spec 104 walk 2: copy parity and the repair list", () => {
 
     // The author never answers the list. Download is not blocked, the
     // repairs pass through UNAPPLIED, and Output lists them (FR-015).
-    await navigateToOutput(page);
+    await navigateToPublish(page);
     const unapplied = page.getByTestId("touch-key-unapplied-repairs");
     await expect(unapplied).toBeVisible({ timeout: 30_000 });
     await expect(unapplied).toContainText("T_0031");

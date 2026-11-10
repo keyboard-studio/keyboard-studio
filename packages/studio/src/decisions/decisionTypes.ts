@@ -60,6 +60,7 @@ export type DecisionId =
   | "syllabic-finals-wanted"
   // Phase F help-doc answers (spec 087 US4)
   | "help-welcome-paragraph"
+  | "help-body-parity"
   | "help-usage-tip-1"
   | "help-usage-tip-2"
   | "help-history-bullets"
@@ -154,6 +155,7 @@ export type DecisionId =
   | "deadkeys-defined"
   | "rule-set"
   | "physical-layout"
+  | "fallback-policy"
   | "osk-layout"
   | "touch-seed-source"
   | "language-list"
@@ -165,7 +167,9 @@ export type DecisionId =
   | "custom-css"
   | "help-docs"
   | "welcome-htm"
-  | "icon";
+  | "icon"
+  | "trial"
+  | "publish";
 
 /**
  * The `caps-handling` decision value (spec 112): how the copied keyboard
@@ -329,6 +333,9 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "syllabic-finals-wanted": [],
   // Phase F help-doc answers: package-descriptor / help output, no IR writes.
   "help-welcome-paragraph": [],
+  // Issue #2530: the body-parity answer writes the doc-fix-proposals
+  // working-copy slice via its apply, not the IR.
+  "help-body-parity": [],
   "help-usage-tip-1": [],
   "help-usage-tip-2": [],
   "help-history-bullets": [],
@@ -428,6 +435,7 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   // additions into the groups/stores subtrees.
   "rule-set": [["groups"], ["stores"]],
   "physical-layout": [],
+  "fallback-policy": [],
   "osk-layout": [],
   "touch-seed-source": [],
   "language-list": [],
@@ -442,4 +450,6 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "help-docs": [],
   "welcome-htm": [],
   "icon": [],
+  "trial": [],
+  "publish": [],
 };

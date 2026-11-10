@@ -2384,6 +2384,24 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     null,
   );
 
+  // Multi-selection set (#2596 item 2), next to the anchor: every single-key
+  // write below goes through `selectKeyAddress`, which collapses the set to
+  // that one key — only the builder pane's explicit Ctrl/Shift gestures
+  // build a multi-selection (see TouchBuilderPane). The raw setter stays
+  // for the two funnel callbacks only.
+  const [selectedKeyAddresses, setSelectedKeyAddresses] = useState<string[]>([]);
+  const selectKeyAddress = useCallback((address: string | null) => {
+    setSelectedKeyAddress(address);
+    setSelectedKeyAddresses(address === null ? [] : [address]);
+  }, []);
+  const selectKeyAddresses = useCallback(
+    (addresses: readonly string[], anchor: string | null) => {
+      setSelectedKeyAddresses([...addresses]);
+      setSelectedKeyAddress(anchor);
+    },
+    [],
+  );
+
   // Repair the active platform whenever the catalog changes (layout just
   // loaded, or the previously-active platform id no longer exists) — falls
   // back to the first platform rather than stranding the grid unselected.
@@ -2488,9 +2506,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [],
   );
 
-  const handleSelectKeyCell = useCallback((cell: KeyGridCellViewModel) => {
-    setSelectedKeyAddress(cell.address);
-  }, []);
+  const handleSelectKeyCell = useCallback(
+    (cell: KeyGridCellViewModel) => {
+      selectKeyAddress(cell.address);
+    },
+    [selectKeyAddress],
+  );
 
   const keyModeGridNav = useGridNav({
     viewModel: keyModeViewModel ?? emptyKeyGridViewModel,
@@ -3039,18 +3060,25 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       if (op.kind === "set" && op.fields.id !== undefined) {
         const parts = parseTouchKeyAddress(op.address);
         if (parts !== undefined) {
-          setSelectedKeyAddress(touchKeyAddress(parts.platform, parts.layerId, op.fields.id));
+          selectKeyAddress(touchKeyAddress(parts.platform, parts.layerId, op.fields.id));
         }
       } else if (op.kind === "add") {
         const parts = parseTouchKeyAddress(op.address);
         if (parts !== undefined) {
-          setSelectedKeyAddress(touchKeyAddress(parts.platform, parts.layerId, op.key.id));
+          selectKeyAddress(touchKeyAddress(parts.platform, parts.layerId, op.key.id));
         }
       } else if (op.kind === "moveToLayer") {
         // The moved key keeps its id — follow it to the target layer.
         const parts = parseTouchKeyAddress(op.address);
         if (parts !== undefined) {
-          setSelectedKeyAddress(touchKeyAddress(parts.platform, op.toLayer, parts.keyId));
+          selectKeyAddress(touchKeyAddress(parts.platform, op.toLayer, parts.keyId));
+        }
+      } else if (op.kind === "copyToLayer") {
+        // The copied key keeps its id — follow it to the target layer, like
+        // a move (#2596 item 1). The pane switches the displayed layer.
+        const parts = parseTouchKeyAddress(op.address);
+        if (parts !== undefined) {
+          selectKeyAddress(touchKeyAddress(parts.platform, op.toLayer, parts.keyId));
         }
       }
 
@@ -3060,7 +3088,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
       return committed;
     },
-    [layoutForLintAndGate, commitKeyEditCore, maybeOfferFamilyApply, resolveKeyEditSubjectSp],
+    [
+      layoutForLintAndGate,
+      commitKeyEditCore,
+      maybeOfferFamilyApply,
+      resolveKeyEditSubjectSp,
+      selectKeyAddress,
+    ],
   );
 
   // -- Spec 104 T016 helpers (see the state block above) ----------------------
@@ -3094,7 +3128,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     if (result.op.kind === "set" && result.op.fields.id !== undefined) {
       const parts = parseTouchKeyAddress(result.op.address);
       if (parts !== undefined) {
-        setSelectedKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.op.fields.id));
+        selectKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.op.fields.id));
       }
     }
     return true;
@@ -3142,7 +3176,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     if (result.op.kind === "set" && result.op.fields.id !== undefined) {
       const parts = parseTouchKeyAddress(result.op.address);
       if (parts !== undefined) {
-        setSelectedKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.op.fields.id));
+        selectKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.op.fields.id));
       }
     }
     const affected = new Set(plan.speculative.layersAffected);
@@ -3681,10 +3715,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       setActiveKeyLayerId(nextlayer);
       const parts = parseTouchKeyAddress(cell.address);
       if (parts !== undefined) {
-        setSelectedKeyAddress(touchKeyAddress(parts.platform, nextlayer, parts.keyId));
+        selectKeyAddress(touchKeyAddress(parts.platform, nextlayer, parts.keyId));
       }
     },
-    [],
+    [selectKeyAddress],
   );
 
   // T013 — the command layer (spec 063 T094; FR-029, US4 AS1). `onAddKeyAfter`/
@@ -3963,7 +3997,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           // in context; an honest "not yet" rather than inventing a
           // mutation the engine cannot express (see this task's own report
           // for the follow-up this leaves).
-          setSelectedKeyAddress(fix.address);
+          selectKeyAddress(fix.address);
           return;
         }
         case "addRequiredKeys": {
@@ -4002,7 +4036,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           // only the author can make, and the crowding is explicitly
           // non-blocking — so the fix takes them to the row and stops. Anchored
           // on the row's first key, which is the address the detector carries.
-          setSelectedKeyAddress(fix.address);
+          selectKeyAddress(fix.address);
           return;
         }
         case "setKeycap": {
@@ -4022,7 +4056,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           // "Look at this key" — ReviewKeyFix's own doc: "FR-041 asks only
           // that a fix be concrete, not that it be a data mutation."
           // Selecting the key IS the whole fix.
-          setSelectedKeyAddress(fix.address);
+          selectKeyAddress(fix.address);
           return;
         }
         default: {
@@ -4031,7 +4065,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         }
       }
     },
-    [selectedKeyCell, commitKeyEditOp, focusAssignPanelCharacterField, openRenameDialog],
+    [
+      selectedKeyCell,
+      commitKeyEditOp,
+      focusAssignPanelCharacterField,
+      openRenameDialog,
+      selectKeyAddress,
+    ],
   );
 
   // T013 — RemoveKeyDialog's proposal (FR-029g), from the row `selectedKeyCell`
@@ -4130,7 +4170,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
         const parts = parseTouchKeyAddress(result.op.address);
         if (parts !== undefined) {
-          setSelectedKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.newId));
+          selectKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.newId));
         }
       } else {
         // The store rename found nothing to rename in `ir.touchLayout` —
@@ -4152,7 +4192,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           resolveKeyAddress(effectiveKeyModeLayout, parts) !== undefined
         ) {
           if (commitKeyEditOp(result.op, { offerFamilyApply: false })) {
-            setSelectedKeyAddress(
+            selectKeyAddress(
               touchKeyAddress(parts.platform, parts.layerId, result.newId),
             );
           }
@@ -4168,6 +4208,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       keyModeProvenance,
       effectiveKeyModeLayout,
       commitKeyEditOp,
+      selectKeyAddress,
     ],
   );
 
@@ -4212,13 +4253,18 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       if (selectedKeyAddress !== null) {
         const parts = parseTouchKeyAddress(selectedKeyAddress);
         if (parts !== undefined) {
-          setSelectedKeyAddress(
+          selectKeyAddress(
             touchKeyAddress(parts.platform, parts.layerId, record.sourceId),
           );
         }
       }
     },
-    [effectiveKeyModeLayout, keyModeProvenance, selectedKeyAddress],
+    [
+      effectiveKeyModeLayout,
+      keyModeProvenance,
+      selectedKeyAddress,
+      selectKeyAddress,
+    ],
   );
 
   const _handleRenameCancel = useCallback(() => {
@@ -4252,12 +4298,15 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // selecting the address, per that component's own module doc ("Seams left
   // for later tasks" — "a future composing task can switch the grid's active
   // platform/layer... and then select address there").
-  const handleFindJump = useCallback((result: FindPanelResult) => {
-    setActiveKeyPlatformId(result.platform);
-    setActiveKeyLayerId(result.layerId);
-    setSelectedKeyAddress(result.address);
-    setFindPanelOpen(false);
-  }, []);
+  const handleFindJump = useCallback(
+    (result: FindPanelResult) => {
+      setActiveKeyPlatformId(result.platform);
+      setActiveKeyLayerId(result.layerId);
+      selectKeyAddress(result.address);
+      setFindPanelOpen(false);
+    },
+    [selectKeyAddress],
+  );
 
   // Grid Enter -> AssignPanel's character field (SC-004's keyboard-only
   // path): a native gridcell <button> already answers Enter/Space with its
@@ -4666,7 +4715,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               setActiveKeyPlatformId(parts.platform);
               setActiveKeyLayerId(parts.layerId);
             }
-            setSelectedKeyAddress(carry.primary);
+            selectKeyAddress(carry.primary);
           }
         }
       } else if (mode === "character" && touchEditorMode === "key") {
@@ -4691,6 +4740,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       keyModeRuleIndex,
       modeContextCarry,
       setTouchEditorMode,
+      selectKeyAddress,
     ],
   );
 
@@ -6829,7 +6879,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           <PublishStepNav
             spec={{
               back: {
-                label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+                label: t({ id: "editor.assignLoop.backButton", message: "Back" }),
                 onClick: onBack,
                 testId: "touch-back",
                 ariaLabel: t({
@@ -6894,7 +6944,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               ...(currentChar !== null && touchLettersToAdd.includes(currentChar)
                 ? {
                     back: {
-                      label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+                      label: t({ id: "editor.assignLoop.backButton", message: "Back" }),
                       onClick: handleBack,
                       testId: "touch-back",
                       ariaLabel:
@@ -7536,7 +7586,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       <PublishStepNav
         spec={{
           back: {
-            label: t({ id: "editor.assignLoop.touch.keyMode.backButton", message: "← Back" }),
+            label: t({ id: "editor.assignLoop.touch.keyMode.backButton", message: "Back" }),
             onClick: onBack,
             testId: "touch-key-mode-back",
             ariaLabel: t({
@@ -7626,7 +7676,9 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         activeLayerId={activeKeyLayerId}
         onSelectLayer={setActiveKeyLayerId}
         selectedKeyAddress={selectedKeyAddress}
-        onSelectKey={setSelectedKeyAddress}
+        onSelectKey={selectKeyAddress}
+        selectedKeyAddresses={selectedKeyAddresses}
+        onSelectKeys={selectKeyAddresses}
         commitOp={commitKeyEditOp}
         fontFaceUrl={stage.kind === "ready" ? stage.fontFaceUrl : undefined}
         fontFaceFamily={stage.kind === "ready" ? stage.fontFaceFamily : undefined}
@@ -7797,7 +7849,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         <PublishStepNav
           spec={{
             back: {
-              label: t({ id: "editor.assignLoop.touch.keyMode.backButton", message: "← Back" }),
+              label: t({ id: "editor.assignLoop.touch.keyMode.backButton", message: "Back" }),
               onClick: onBack,
               testId: "touch-code-back",
               ariaLabel: t({
@@ -7847,14 +7899,14 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         id: "character",
         label: t({
           id: "editor.assignLoop.touch.mode.characterTab",
-          message: "By character",
+          message: "Place Letters",
         }),
       },
       {
         id: "key",
         label: t({
           id: "editor.assignLoop.touch.mode.keyTab",
-          message: "By key",
+          message: "Manage Layout",
         }),
       },
       {

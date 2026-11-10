@@ -35,11 +35,13 @@ function seedProject(): void {
   });
 }
 
-/** Walk identity -> choose_base -> track -> characters. */
+/** Walk identity -> choose_base -> attribution -> characters. */
 function walkToCharacters(): void {
   const s = useSurveySessionStore.getState();
   s.advance("choose_base");
-  useSurveySessionStore.getState().advance("track");
+  // No "track": the step was removed by #2568; attribution is the next
+  // step after choose_base on the copy track.
+  useSurveySessionStore.getState().advance("attribution");
   useSurveySessionStore.getState().advance("characters");
 }
 

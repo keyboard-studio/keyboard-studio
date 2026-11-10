@@ -1,5 +1,5 @@
 // phases — the ONE mapping from the wizard's real step ids (steps/manifest.ts)
-// onto the six DISPLAY phases (A-F) a phase-stepper UI renders.
+// onto the eight DISPLAY phases (A-H) a phase-stepper UI renders.
 //
 // This mapping is FIXED by the product owner (design handoff) — do not
 // re-derive or "improve" it here. It is display-only: "Discard" is the label
@@ -18,7 +18,7 @@
 // survey/questions/g/*.ts "Phase G — Authoring Track"). In THAT scheme `track`
 // and `project_name` are phase "G", not part of this file's B. The two schemes
 // share some letters (A, B, F) but not meaning, membership, or count (this one
-// has exactly 6 — A-F). Do not cross-reference the two: they answer different
+// has exactly 8 — A-H). Do not cross-reference the two: they answer different
 // questions ("which flow does this question belong to" vs. "which stepper pill
 // does this manifest step light up").
 // -----------------------------------------------------------------------
@@ -46,7 +46,6 @@ export type StepId =
   | "identity"
   | "layout"
   | "choose_base"
-  | "track"
   | "attribution"
   | "project_name"
   | "open_languages"
@@ -61,6 +60,7 @@ export type StepId =
   | "deadkeys"
   | "rules"
   | "mechanisms"
+  | "fallback_policy"
   | "osk"
   | "touch_seed_source"
   | "touch"
@@ -68,13 +68,15 @@ export type StepId =
   | "help"
   | "html"
   | "icon"
+  | "trial"
+  | "publish"
   | "package";
 
 // ---------------------------------------------------------------------------
 // PhaseLetter / PhaseDef
 // ---------------------------------------------------------------------------
 
-export type PhaseLetter = "A" | "B" | "C" | "D" | "E" | "F";
+export type PhaseLetter = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H";
 
 export interface PhaseDef {
   letter: PhaseLetter;
@@ -84,7 +86,7 @@ export interface PhaseDef {
 }
 
 // ---------------------------------------------------------------------------
-// PHASES — the fixed A-F mapping (product owner handoff). Order matters:
+// PHASES — the fixed A-H mapping (product owner handoff). Order matters:
 // this is also the pill-display order.
 // ---------------------------------------------------------------------------
 
@@ -98,9 +100,9 @@ export const PHASES: readonly PhaseDef[] = [
     letter: "B",
     label: msg({ id: "phaseStepper.phase.starting", message: "Starting keyboard" }),
     // attribution (#1901): the author/copyright step walks between
-    // track and project_name — same "Base keyboard" phase as its
+    // the base choice and project_name — same "Base keyboard" phase as its
     // neighbours (it settles who the base-derived keyboard belongs to).
-    stepIds: ["choose_base", "track", "attribution", "project_name", "open_languages", "open_missing_letters", "open_upgrades"],
+    stepIds: ["choose_base", "attribution", "project_name", "open_languages", "open_missing_letters", "open_upgrades"],
   },
   {
     letter: "C",
@@ -127,7 +129,7 @@ export const PHASES: readonly PhaseDef[] = [
     // rules (spec 082): the before/after rule demo + rule list/builder sits
     // between carve and mechanisms — it shows what the working copy's rules
     // do before the author assigns mechanisms.
-    stepIds: ["rules", "mechanisms", "osk", "touch_seed_source", "touch", "css"],
+    stepIds: ["rules", "mechanisms", "fallback_policy", "osk", "touch_seed_source", "touch", "css"],
   },
   {
     letter: "F",
@@ -137,6 +139,23 @@ export const PHASES: readonly PhaseDef[] = [
     // because validatePhaseMap() throws at module load for any manifest
     // step with no phase (this is that guard doing its job).
     stepIds: ["help", "html", "icon"],
+  },
+  {
+    letter: "G",
+    label: msg({ id: "phaseStepper.phase.g", message: "Trial" }),
+    // Trial (spec 113, #2540): try the keyboard and get it to testers —
+    // the test-build, tester-report and revise-and-return parts of spec 094
+    // that used to sit inside the Output screen. Its own phase after
+    // Finalize, so the author can see testing coming and jump back to it.
+    stepIds: ["trial"],
+  },
+  {
+    letter: "H",
+    label: msg({ id: "phaseStepper.phase.h", message: "Publish" }),
+    // Publish (spec 113, #2540): get the finished keyboard out — release
+    // checks, final downloads and the managed GitHub PR, moved out of the
+    // Output screen. The last phase; completing it ends the walk.
+    stepIds: ["publish"],
   },
 ] as const;
 
@@ -169,10 +188,10 @@ export function phaseOfStep(id: StepId): PhaseDef | null {
 //      UNPHASED_STEP_IDS — none missing, none duplicated.
 //   3. The flattened PHASES step order is a subsequence of the manifest's
 //      declared order (so the pills can never render out of order).
-//   4. PHASES letters are exactly A-F, in order, no gaps.
+//   4. PHASES letters are exactly A-H, in order, no gaps.
 // ---------------------------------------------------------------------------
 
-const EXPECTED_LETTERS: readonly PhaseLetter[] = ["A", "B", "C", "D", "E", "F"];
+const EXPECTED_LETTERS: readonly PhaseLetter[] = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
 export function validatePhaseMap(): void {
   const manifestIds = manifest.map((s) => s.id);
@@ -237,11 +256,11 @@ export function validatePhaseMap(): void {
     manifestCursor = idx + 1;
   }
 
-  // Invariant 4 — letters are exactly A-F, in order, no gaps.
+  // Invariant 4 — letters are exactly A-H, in order, no gaps.
   const letters = PHASES.map((p) => p.letter);
   if (letters.length !== EXPECTED_LETTERS.length) {
     throw new Error(
-      `[phases] expected exactly ${EXPECTED_LETTERS.length} phases (A-F), got ${letters.length}`,
+      `[phases] expected exactly ${EXPECTED_LETTERS.length} phases (A-H), got ${letters.length}`,
     );
   }
   for (let i = 0; i < EXPECTED_LETTERS.length; i++) {

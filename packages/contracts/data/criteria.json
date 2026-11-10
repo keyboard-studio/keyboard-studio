@@ -1349,6 +1349,14 @@
     "description": "The keyboard meets any applicable legislated, societal, and accessibility requirements for its locale"
   },
   {
+    "id": "18.13-packaged-fonts-cover-typed-characters",
+    "section": "18. Design heuristics (DISCUS)",
+    "band": "layer-c-enforce",
+    "principle": "discoverability",
+    "lintRuleId": "KM_LINT_FONT_GLYPH_COVERAGE",
+    "description": "Every character the keyboard types has a glyph in each packaged font it ships (cmap coverage check)"
+  },
+  {
     "id": "19.1-import-attribution-in-pr-body",
     "section": "19. Import output",
     "band": "scaffolder-bake",

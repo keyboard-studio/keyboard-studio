@@ -157,7 +157,7 @@ export interface EditorStep extends StepBase {
    * A gallery or panel adapter. Must satisfy React.ComponentType<EditorStepProps>.
    * Compile-checked by G3 (adapter conformance).
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   component: React.ComponentType<EditorStepProps>;
   /** For the carve/add editors (surface-parameterized shell). */
   surface?: "physical" | "touch";
@@ -191,4 +191,13 @@ export interface EditorStepProps {
   onBack?: () => void;
   /** Shared survey/identity context (existing shape from survey/types.ts). */
   ctx?: SurveyContext;
+  /**
+   * True once the project has at least one test build (testingStore). The
+   * Documentation step's read-only HISTORY preview needs it for the publish
+   * version — and the step itself must NOT import testingStore: depcruise
+   * `no-circular` (HtmlEditor sits downstream of decisionLogStore via the
+   * welcomeHtm decision renderer). Supplied by StepHost; absent when a step
+   * is rendered outside it (tests, headless author) — treated as false.
+   */
+  hasTestBuilds?: boolean;
 }

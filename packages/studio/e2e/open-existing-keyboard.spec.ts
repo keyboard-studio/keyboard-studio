@@ -115,7 +115,9 @@ test.describe("Open an existing keyboard (spec 111)", () => {
     await expect(page.getByTestId("criteria-page")).toBeVisible({ timeout: 60_000 });
 
     await page.getByTestId("criteria-continue").click();
-    await expect(page).toHaveURL(/#output/);
+    // "Continue to Output" still navigates to #output, but the route now
+    // redirects into the tail — the finished walk lands on Publish.
+    await expect(page.getByTestId("publish-step-root")).toBeVisible({ timeout: 30_000 });
     return pressed;
   }
 
@@ -148,7 +150,8 @@ test.describe("Open an existing keyboard (spec 111)", () => {
     console.log(`[OK] ${NON_BASIC_ID} walk controls pressed after Letters: ${pressed.join(" > ")}`);
     const at = (id: string) => pressed.findIndex((p) => p.includes(id));
     expect(at("mechanisms")).toBeGreaterThan(-1);
-    expect(at("osk-continue")).toBeGreaterThan(at("mechanisms"));
+    expect(at("fallback-policy-continue")).toBeGreaterThan(at("mechanisms"));
+    expect(at("osk-continue")).toBeGreaterThan(at("fallback-policy-continue"));
     expect(at("touch-continue")).toBeGreaterThan(at("osk-continue"));
   });
 });

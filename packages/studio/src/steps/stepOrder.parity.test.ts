@@ -47,6 +47,16 @@
 // (icon requires welcome-htm, so it follows the html screen).
 
 //
+// AMENDMENT (spec 113, #2540, same rule — a deliberate decision, not a
+// regeneration): the Output screen splits into Trial and Publish steps
+// after the icon step. BASELINE_ORDER gains "trial" after "icon" and
+// "publish" after "trial"; BASELINE_MEMBERSHIP gains trial: ["trial"] and
+// publish: ["publish"]; the Flow Map edges re-route: icon -> trial ->
+// publish -> package (trial requires icon, publish requires trial, so
+// both follow their predecessor by chain). The tie-break pairs gain the
+// (earlier-screen, trial) and (earlier-screen, publish) pairs no requires
+// chain orders — see BASELINE_TIE_BREAK_PAIRS.
+//
 // AMENDMENT (spec 111, same rule -- a deliberate decision, not a
 // regeneration): Open adds an "open_languages" side trail (the editable
 // language list, shown on the adapt track only). BASELINE_ORDER gains it
@@ -60,6 +70,19 @@
 // open_languages, "open_missing_letters" and "open_upgrades" (each shown only
 // for the problem kind the baseline recorded). Both rejoin at characters, gain
 // one membership entry each and a Flow Map fork and join. Nothing else moves.
+//
+// AMENDMENT (track_choice removal, PR #2568, same rule -- a deliberate
+// decision, not a regeneration): the "How do you want to work with Cameroon
+// QWERTY?" question had only the Copy option left, so the track step is
+// removed and the track defaults to copy wherever it is unrecorded.
+// BASELINE_ORDER loses "track"; BASELINE_EDGES re-route choose_base ->
+// attribution directly (the authoring-track provider module is grouped into
+// the choose_base screen, so attribution's screenRequires edge on
+// authoring-track still chain-fixes choose_base before attribution);
+// BASELINE_MEMBERSHIP loses the track entry and choose_base gains
+// authoring-track; the tie-break pairs lose ["layout", "track"] (the only
+// pair naming the removed screen). Nothing else moves: the derivation, the
+// trails and the locks are unchanged.
 
 import { describe, expect, it } from "vitest";
 import { manifest, screenTrails } from "./manifest.ts";
@@ -73,7 +96,6 @@ const BASELINE_ORDER = [
   "identity",
   "layout",
   "choose_base",
-  "track",
   "attribution",
   "project_name",
   "open_languages",
@@ -88,6 +110,7 @@ const BASELINE_ORDER = [
   "deadkeys",
   "rules",
   "mechanisms",
+  "fallback_policy",
   "osk",
   "touch_seed_source",
   "touch",
@@ -95,6 +118,8 @@ const BASELINE_ORDER = [
   "help",
   "html",
   "icon",
+  "trial",
+  "publish",
   "package",
 ] as const;
 
@@ -114,8 +139,7 @@ const BASELINE_LOCKS: ReadonlyArray<readonly [string, string]> = [
 const BASELINE_EDGES: ReadonlyArray<readonly [string, string, string]> = [
   ["identity", "layout", "spine"],
   ["layout", "choose_base", "spine"],
-  ["choose_base", "track", "spine"],
-  ["track", "attribution", "spine"],
+  ["choose_base", "attribution", "spine"],
   ["attribution", "open_languages", "spine"],
   ["attribution", "project_name", "fork"],
   ["project_name", "open_languages", "join"],
@@ -130,7 +154,8 @@ const BASELINE_EDGES: ReadonlyArray<readonly [string, string, string]> = [
   ["carve", "deadkeys", "spine"],
   ["deadkeys", "rules", "spine"],
   ["rules", "mechanisms", "spine"],
-  ["mechanisms", "osk", "spine"],
+  ["mechanisms", "fallback_policy", "spine"],
+  ["fallback_policy", "osk", "spine"],
   ["osk", "touch", "spine"],
   ["osk", "touch_seed_source", "fork"],
   ["touch_seed_source", "touch", "join"],
@@ -138,15 +163,18 @@ const BASELINE_EDGES: ReadonlyArray<readonly [string, string, string]> = [
   ["css", "help", "spine"],
   ["help", "html", "spine"],
   ["html", "icon", "spine"],
-  ["icon", "package", "spine"],
+  ["icon", "trial", "spine"],
+  ["trial", "publish", "spine"],
+  ["publish", "package", "spine"],
 ];
 
 /** Membership on `main` at 18e63aa4: the decisions each step's screen held. */
 const BASELINE_MEMBERSHIP: Readonly<Record<string, readonly string[]>> = {
   identity: ["language-name", "language-region", "language-autonym", "language-code", "target-script"],
   layout: ["windows-layout", "caps-handling"],
-  choose_base: ["base-keyboard"],
-  track: ["authoring-track"],
+  // track_choice removal (PR #2568): authoring-track moved from the removed
+  // track screen into choose_base via the authoringTrackProvider module.
+  choose_base: ["base-keyboard", "authoring-track"],
   // #1901 amendment: the author trio's membership, moved from identity.
   attribution: ["author-name", "author-email", "copyright-holder"],
   project_name: ["project-display-name", "project-keyboard-id"],
@@ -162,13 +190,16 @@ const BASELINE_MEMBERSHIP: Readonly<Record<string, readonly string[]>> = {
   deadkeys: ["deadkeys-defined"],
   rules: ["rule-set"],
   mechanisms: ["physical-layout"],
+  fallback_policy: ["fallback-policy"],
   osk: ["osk-layout"],
   touch_seed_source: ["touch-seed-source"],
   touch: ["touch-layout"],
   css: ["custom-css"],
-  help: ["help-welcome-paragraph", "help-usage-tip-1", "help-history-entry", "help-history-bullets", "help-more-detail", "help-doc-language", "help-doc-language-other", "help-doc-language-second", "help-doc-language-second-other", "help-font-guidance", "help-usage-tip-2", "help-scope-variety", "help-provenance-basis", "help-design-rationale", "help-canonical-order", "help-script-glossary", "help-example-words", "help-troubleshooting", "help-related-keyboards", "help-known-limitations", "help-further-reading", "help-project-url", "help-credits", "help-contact-info", "help-docs"],
+  help: ["help-welcome-paragraph", "help-body-parity", "help-usage-tip-1", "help-history-entry", "help-history-bullets", "help-more-detail", "help-doc-language", "help-doc-language-other", "help-doc-language-second", "help-doc-language-second-other", "help-font-guidance", "help-usage-tip-2", "help-scope-variety", "help-provenance-basis", "help-design-rationale", "help-canonical-order", "help-script-glossary", "help-example-words", "help-troubleshooting", "help-related-keyboards", "help-known-limitations", "help-further-reading", "help-project-url", "help-credits", "help-contact-info", "help-docs"],
   html: ["welcome-htm"],
   icon: ["icon"],
+  trial: ["trial"],
+  publish: ["publish"],
   package: [],
 };
 
@@ -323,15 +354,15 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
     //   - marks/punctuation/invisibles/convenience each read the alphabet
     //     and feed carve, but none reads another.
     //   - attribution (#1901 amendment) is ordered only against identity
-    //     (target-script) and track (authoring-track, via screenRequires);
-    //     nothing downstream requires its decisions, so it is a
-    //     tie-break against every other screen it neighbours. NOT against
-    //     choose_base: that pair is chain-fixed (choose_base -> track via
-    //     base-keyboard, track -> attribution via authoring-track) once
-    //     il_author_name's target-script edge is a screenRequires like
-    //     the others (#1901 reclassification).
+    //     (target-script) and choose_base (authoring-track, via
+    //     screenRequires); nothing downstream requires its decisions, so
+    //     it is a tie-break against every other screen it neighbours.
+    //     The choose_base pair is chain-fixed (choose_base provides
+    //     authoring-track, which attribution's il_author_name
+    //     screen-requires) — since the track_choice removal (PR #2568)
+    //     the chain runs directly, without the removed track screen.
     //   - open_languages (spec 111 amendment) is a gated side trail with only
-    //     the track gate, so it is a tie-break against every other screen.
+    //     the authoring-track gate, so it is a tie-break against every other screen.
     //   - open_missing_letters and open_upgrades (spec 111 Phase 12) are chained
     //     after open_languages (and each other) by screenRequires, and the
     //     Mechanisms screen screen-requires the Upgrades page, so all three Open pages
@@ -340,7 +371,6 @@ describe("FR-005 parity: derived screens vs the main@18e63aa4 baseline", () => {
     //     against the character-survey and trim screens that Open hides.
     const BASELINE_TIE_BREAK_PAIRS: ReadonlyArray<readonly [string, string]> = [
       ["layout", "choose_base"],
-      ["layout", "track"],
       ["layout", "attribution"],
       ["layout", "project_name"],
       ["layout", "open_languages"],

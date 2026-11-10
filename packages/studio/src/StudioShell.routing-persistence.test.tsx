@@ -23,7 +23,7 @@ vi.mock("./components/UnsupportedScriptStub.tsx", () => import("./test/studioShe
 vi.mock("./components/OSKFrame.tsx", () => import("./test/studioShellMocks/OSKFrame.tsx"));
 vi.mock("./components/OskModeToggle.tsx", () => import("./test/studioShellMocks/OskModeToggle.tsx"));
 vi.mock("./components/CompareScreen.tsx", () => import("./test/studioShellMocks/CompareScreen.tsx"));
-vi.mock("./components/OutputScreen.tsx", () => import("./test/studioShellMocks/OutputScreen.tsx"));
+vi.mock("./components/OutputRedirect.tsx", () => import("./test/studioShellMocks/OutputRedirect.tsx"));
 vi.mock("./components/WelcomeScreen.tsx", () => import("./test/studioShellMocks/WelcomeScreen.tsx"));
 vi.mock("./dashboard/DashboardView.tsx", () => import("./test/studioShellMocks/DashboardView.tsx"));
 // Controllable: static idle by default; the "resume draft banner" F1/P1
@@ -61,7 +61,7 @@ installShellHooks();
 
 // ---------------------------------------------------------------------------
 // StudioShell routing regression — #preview mounts CompareScreen and #output
-// mounts OutputScreen (distinct screens, NOT RoutePlaceholder).
+// mounts OutputRedirect (distinct screens, NOT RoutePlaceholder).
 // ---------------------------------------------------------------------------
 
 describe("StudioShell — route: #preview renders CompareScreen", () => {
@@ -77,15 +77,15 @@ describe("StudioShell — route: #preview renders CompareScreen", () => {
 
     // CompareScreen stub must be present.
     expect(screen.getByTestId("compare-screen-root")).toBeTruthy();
-    // OutputScreen must NOT be present — these are distinct screens.
-    expect(screen.queryByTestId("output-screen-root")).toBeNull();
+    // OutputRedirect must NOT be present — these are distinct screens.
+    expect(screen.queryByTestId("output-redirect-root")).toBeNull();
     // RoutePlaceholder renders a "coming soon" stub; must NOT be present.
     expect(screen.queryByText(/coming soon/i)).toBeNull();
   });
 });
 
-describe("StudioShell — route: #output renders OutputScreen", () => {
-  it("mounts OutputScreen (not RoutePlaceholder) when hash is #output", async () => {
+describe("StudioShell — route: #output renders OutputRedirect (spec 113)", () => {
+  it("mounts OutputRedirect (not RoutePlaceholder) when hash is #output", async () => {
     window.location.hash = "#output";
     localStorage.setItem("ks.visited", "1"); // returning visitor: deep-link hash is honored
 
@@ -93,8 +93,9 @@ describe("StudioShell — route: #output renders OutputScreen", () => {
       render(<StudioShell />);
     });
 
-    // OutputScreen stub must be present.
-    expect(screen.getByTestId("output-screen-root")).toBeTruthy();
+    // OutputRedirect stub must be present — the #output route is a redirect
+    // into the Trial/Publish tail now, not a screen of its own.
+    expect(screen.getByTestId("output-redirect-root")).toBeTruthy();
     // CompareScreen must NOT be present — these are distinct screens.
     expect(screen.queryByTestId("compare-screen-root")).toBeNull();
     expect(screen.queryByText(/coming soon/i)).toBeNull();
@@ -434,7 +435,7 @@ describe("StudioShell — silent boot restore (no local resume banner)", () => {
     window.location.hash = "";
     localStorage.clear();
 
-    // Reach an L4-equivalent position (base confirmed, track chosen, on the
+    // Reach an L4-equivalent position (base confirmed, track recorded, on the
     // characters/prefill step) via the top-level stores.
     useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, {
       vfs: createVirtualFS([]),
@@ -453,7 +454,7 @@ describe("StudioShell — silent boot restore (no local resume banner)", () => {
     useSurveySessionStore.getState().setLocalStart(basicKbdus);
     useSurveySessionStore.getState().setStartConfirmed(true);
     useSurveySessionStore.getState().advance("choose_base");
-    useSurveySessionStore.getState().advance("track");
+    useSurveySessionStore.getState().advance("attribution");
     useSurveySessionStore.getState().advance("characters");
 
     const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());

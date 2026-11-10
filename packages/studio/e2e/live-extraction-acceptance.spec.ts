@@ -3,7 +3,7 @@
  * wizard (never the demo, per the owner's words carried in the spec).
  *
  * The placement is #1901's: the author/copyright questions form their own
- * attribution step AFTER the track choice (the identity step no longer
+ * attribution step AFTER the base choice (the identity step no longer
  * asks them), and 092's extraction pass has run at setup. The attribution
  * step's last question, on the Copy track:
  *
@@ -28,17 +28,17 @@ import {
   seedReturningVisitor,
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   surveyAdvance,
 } from "./helpers/surveyFlow";
 
 const BASE_COPYRIGHT = "(c) 2009-2019 SIL International";
 
-async function driveToTrackChoice(page: Parameters<typeof driveIdentityLite>[0]) {
+async function driveToAttribution(page: Parameters<typeof driveIdentityLite>[0]) {
   await seedReturningVisitor(page);
   await page.goto("/");
   // Identity carries no author/copyright questions anymore (#1901) — they
-  // are the attribution step's, after the track choice.
+  // are the attribution step's, after the base choice.
   await driveIdentityLite(page, { languageCode: "fr" });
   await pickStartKeyboard(page, "basic_kbdfr");
 }
@@ -61,8 +61,8 @@ async function driveToCopyrightQuestion(page: Parameters<typeof driveIdentityLit
 test("spec 092 US1 (copy): holder defaults to the author; the copied notice is not offered", async ({
   page,
 }) => {
-  await driveToTrackChoice(page);
-  await chooseTrackCopy(page);
+  await driveToAttribution(page);
+  await confirmCopyTrack(page);
   await driveToCopyrightQuestion(page);
 
   const field = page.locator("#il_copyright_holder");

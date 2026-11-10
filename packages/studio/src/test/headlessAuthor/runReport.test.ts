@@ -6,18 +6,17 @@ const gate = (g: "G1" | "G2", applicable: boolean, pass: boolean) => ({ gate: g,
 
 describe("runReport", () => {
   it("accumulates entries", () => {
-    const acc = createRunReport("store-default");
+    const acc = createRunReport();
     acc.addStep({ decisionId: "d", rule: "default", value: 1 });
     acc.addPlaceholder({ char: "x", sequence: "zzq78", decisionId: "d" });
     acc.setTiming({ author: 1, replay: 2 });
     expect(acc.report.steps).toHaveLength(1);
     expect(acc.report.placeholders).toHaveLength(1);
-    expect(acc.report.fallbackPolicy).toBe("store-default");
     expect(acc.report.timingMs).toEqual({ author: 1, replay: 2 });
   });
 
   it("formats ASCII console lines", () => {
-    const report = createRunReport("p").report;
+    const report = createRunReport().report;
     const ok: AuthorRun = {
       caseId: "c1",
       outcome: "completed",
@@ -44,7 +43,7 @@ describe("runReport", () => {
       caseId: "c",
       outcome: "completed",
       gates: [],
-      report: createRunReport("p").report,
+      report: createRunReport().report,
       bundle: { artifacts: { kmx: new Uint8Array([1, 2, 3]) } },
     } as unknown as AuthorRun;
     const text = serializeRunReport(run);
@@ -74,7 +73,7 @@ describe("summarise", () => {
   });
 
   it("formats a too-large skip as an ASCII console line", () => {
-    const report = createRunReport("p").report;
+    const report = createRunReport().report;
     expect(formatCaseLine({ caseId: "k", outcome: "skipped", skipReason: "too-large", gates: [], report })).toBe(
       "[SKIP] k too-large",
     );

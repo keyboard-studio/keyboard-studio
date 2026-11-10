@@ -113,6 +113,16 @@ function ownedInRoute(code: LintCode, route: ReadonlySet<string> | undefined): b
   return ownerStepsOf(code).some((step) => route.has(step));
 }
 
+export interface BuildFindingsByQuestionIdOptions {
+  /**
+   * When set, only distribute findings whose mapped question id is in this set.
+   * Used by the headless author's Phase F driver so tens of thousands of
+   * `rules`-step LDML findings are not scanned for questions that do not exist
+   * on that flow (#2469).
+   */
+  questionIdFilter?: ReadonlySet<string>;
+}
+
 /**
  * Distribute a flat findings array into a record keyed by survey question ID.
  * A finding may appear under multiple question IDs if its code maps to several.
@@ -122,13 +132,16 @@ function ownedInRoute(code: LintCode, route: ReadonlySet<string> | undefined): b
 export function buildFindingsByQuestionId(
   findings: LintFinding[],
   route?: ReadonlySet<string>,
+  options?: BuildFindingsByQuestionIdOptions,
 ): Record<string, LintFinding[]> {
+  const filter = options?.questionIdFilter;
   const result: Record<string, LintFinding[]> = {};
   for (const finding of findings) {
     const questionIds = LINT_CODE_TO_QUESTION_IDS[finding.code];
     if (!questionIds) continue;
     if (route !== undefined && !ownedInRoute(finding.code, route)) continue;
     for (const qid of questionIds) {
+      if (filter !== undefined && !filter.has(qid)) continue;
       (result[qid] ??= []).push(finding);
     }
   }

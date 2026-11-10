@@ -16,6 +16,7 @@ vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMo
 vi.mock("./editors/adapters/deadkeyAdapter.tsx", () => import("./test/studioShellMocks/deadkeyAdapter.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
+vi.mock("./editors/adapters/fallbackPolicyAdapter.tsx", () => import("./test/studioShellMocks/FallbackPolicyAdapter.tsx"));
 vi.mock("./editors/adapters/oskAdapter.tsx", () => import("./test/studioShellMocks/OskEditorAdapter.tsx"));
 vi.mock("./editors/assignLoop/CssEditor.tsx", () => import("./test/studioShellMocks/CssEditor.tsx"));
 vi.mock("./editors/assignLoop/HtmlEditor.tsx", () => import("./test/studioShellMocks/HtmlEditor.tsx"));
@@ -29,7 +30,7 @@ vi.mock("./components/UnsupportedScriptStub.tsx", () => import("./test/studioShe
 vi.mock("./components/OSKFrame.tsx", () => import("./test/studioShellMocks/OSKFrame.tsx"));
 vi.mock("./components/OskModeToggle.tsx", () => import("./test/studioShellMocks/OskModeToggle.tsx"));
 vi.mock("./components/CompareScreen.tsx", () => import("./test/studioShellMocks/CompareScreen.tsx"));
-vi.mock("./components/OutputScreen.tsx", () => import("./test/studioShellMocks/OutputScreen.tsx"));
+vi.mock("./components/OutputRedirect.tsx", () => import("./test/studioShellMocks/OutputRedirect.tsx"));
 vi.mock("./components/WelcomeScreen.tsx", () => import("./test/studioShellMocks/WelcomeScreen.tsx"));
 vi.mock("./dashboard/DashboardView.tsx", () => import("./test/studioShellMocks/DashboardView.tsx"));
 // Controllable: static idle by default; the "resume draft banner" F1/P1
@@ -55,7 +56,7 @@ import { saveDraft, loadDraft, deriveProjectKeyFromWorkingCopy } from "./lib/dra
 import { manifest, screenGates } from "./steps/manifest.ts";
 import { STEP_TRAILS } from "./steps/stepOrder.ts";
 import * as StudioShellModule from "./StudioShell.tsx";
-import { advanceToTrack, advanceToB, completeInvisibles, advanceToMechanisms, installShellHooks } from "./StudioShell.testkit.tsx";
+import { advanceToAttributionAdapt, advanceToB, completeInvisibles, advanceToMechanisms, installShellHooks } from "./StudioShell.testkit.tsx";
 
 installShellHooks({ warmLazySteps: true });
 
@@ -116,7 +117,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
 });
 
 describe("T029 — runtime step order matches manifest spine order", () => {
-  it("survey advances: identity → choose_base → track (manifest step) → attribution (#1901) → project_name (copy, side trail) → characters (prefill) → B → marks (S0 auto-skip) → carve → deadkeys → rules → mechanisms → osk → touch → help", async () => {
+  it("survey advances: identity → choose_base → attribution (#1901) → project_name (copy, side trail) → characters (prefill) → B → marks (S0 auto-skip) → carve → deadkeys → rules → mechanisms → fallback_policy → osk → touch → help", async () => {
     await act(async () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -134,18 +135,13 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     expect(screen.getByTestId("stage-base")).toBeTruthy();
     expect(screen.queryByTestId("stage-identity")).toBeNull();
 
-    // → track (manifest step: copy vs adapt). Preview then confirm — two
-    // separate clicks (preview-before-commit).
+    // → attribution (manifest step, #1901: author/copyright — the track
+    // is recorded by the start screen, or defaults to copy). Preview then
+    // confirm — two separate clicks (preview-before-commit).
     fireEvent.click(screen.getByTestId("base-preview"));
     fireEvent.click(screen.getByTestId("base-confirm"));
-    expect(screen.getByTestId("stage-track")).toBeTruthy();
-    expect(screen.queryByTestId("stage-base")).toBeNull();
-
-    // → attribution (manifest step, #1901: author/copyright after the
-    // track choice)
-    fireEvent.click(screen.getByTestId("track-copy"));
     expect(screen.getByTestId("stage-attribution")).toBeTruthy();
-    expect(screen.queryByTestId("stage-track")).toBeNull();
+    expect(screen.queryByTestId("stage-base")).toBeNull();
 
     // → project_name (manifest step: gated side trail, copy-track CYOA fork)
     fireEvent.click(screen.getByTestId("survey-advance"));
@@ -188,8 +184,12 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("rules-continue"));
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
-    // → osk (the OSK editor step sits between mechanisms and touch)
+    // → fallback_policy (#2539: keyboard-wide policy after mechanisms, before OSK)
     fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    expect(screen.getByTestId("fallback-policy-continue")).toBeTruthy();
+
+    // → osk (the OSK editor step sits after fallback_policy)
+    fireEvent.click(screen.getByTestId("fallback-policy-continue"));
     expect(screen.getByTestId("osk-continue")).toBeTruthy();
 
     // → touch_seed_source fork (stage-seed-source; spec 035 R4/R12, no choice recorded yet)
@@ -214,13 +214,15 @@ describe("T029 — runtime step order matches manifest spine order", () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
-    advanceToTrack();
-    expect(screen.getByTestId("stage-track")).toBeTruthy();
+    // The adapt track is recorded by the start screen's Open entry, before
+    // the walk reaches the attribution fork (see advanceToAttributionAdapt:
+    // recorded between the base preview and confirm, so the identity-first
+    // screens are already walked and the Open gates don't skip them).
+    advanceToAttributionAdapt();
+    expect(screen.getByTestId("stage-attribution")).toBeTruthy();
 
     // adapt-track: the fork now leaves from attribution (#1901) —
     // nextMainLineStepAfter("attribution") skips project_name (side trail).
-    fireEvent.click(screen.getByTestId("track-adapt"));
-    expect(screen.getByTestId("stage-attribution")).toBeTruthy();
 
     // Spec 111: adapt is Open, so the language list comes next, then Letters and the
     // Mechanisms gallery (a non-basic keyboard), then the on-screen keyboard; the
@@ -232,6 +234,8 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
     fireEvent.click(screen.getByTestId("mechanisms-continue"));
+    expect(screen.getByTestId("stage-fallback_policy")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("fallback-policy-continue"));
     expect(screen.getByTestId("stage-osk")).toBeTruthy();
     expect(screen.queryByTestId("stage-prefill")).toBeNull();
     expect(screen.queryByTestId("stage-project-name")).toBeNull();
@@ -300,7 +304,7 @@ describe("rehydrate of a corrupted persisted draft does not runaway-render (free
       ir: fakeIr,
     });
     useSurveySessionStore.getState().advance("choose_base");
-    useSurveySessionStore.getState().advance("track");
+    useSurveySessionStore.getState().advance("attribution");
     useSurveySessionStore.getState().advance("characters");
     useSurveySessionStore.getState().advance("marks");
     useSurveySessionStore.getState().advance("carve");
@@ -364,7 +368,7 @@ describe("rehydrate of a corrupted persisted draft does not runaway-render (free
       ir: fakeIr,
     });
     useSurveySessionStore.getState().advance("choose_base");
-    useSurveySessionStore.getState().advance("track");
+    useSurveySessionStore.getState().advance("attribution");
     useSurveySessionStore.getState().advance("characters");
     useSurveySessionStore.getState().advance("marks");
     useSurveySessionStore.getState().advance("carve");

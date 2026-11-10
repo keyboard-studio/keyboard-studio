@@ -39,6 +39,9 @@ vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () =>
 vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () =>
   import("../../src/test/studioShellMocks/TouchGallery.tsx"),
 );
+vi.mock("../../src/editors/adapters/fallbackPolicyAdapter.tsx", () =>
+  import("../../src/test/studioShellMocks/FallbackPolicyAdapter.tsx"),
+);
 vi.mock("../../src/editors/adapters/oskAdapter.tsx", async () => {
   const { usePublishStepNav } = await import("../../src/hooks/usePublishStepNav.ts");
   return {
@@ -68,7 +71,7 @@ vi.mock("../../src/components/UnsupportedScriptStub.tsx", () =>
 );
 vi.mock("../../src/components/OSKFrame.tsx", () => import("../../src/test/studioShellMocks/OSKFrame.tsx"));
 vi.mock("../../src/components/OskModeToggle.tsx", () => import("../../src/test/studioShellMocks/OskModeToggle.tsx"));
-vi.mock("../../src/components/OutputScreen.tsx", () => import("../../src/test/studioShellMocks/OutputScreen.tsx"));
+vi.mock("../../src/components/OutputRedirect.tsx", () => import("../../src/test/studioShellMocks/OutputRedirect.tsx"));
 vi.mock("../../src/dashboard/DashboardView.tsx", () => import("../../src/test/studioShellMocks/DashboardView.tsx"));
 vi.mock("../../src/hooks/useKeyboardArtifact.ts", () =>
   import("../../src/test/studioShellMocks/idleKeyboardArtifact.ts"),
@@ -178,9 +181,8 @@ const COPY_WALK: Array<{ testIds: string[]; settleFor?: string }> = [
   { testIds: ["survey-advance"] },
   { testIds: ["layout-continue"] },
   { testIds: ["base-preview", "base-confirm"] },
-  { testIds: ["track-copy"] },
   { testIds: ["survey-advance"] },
-  // #1901: the attribution step sits between track and project_name.
+  // #1901: the attribution step sits between the base choice and project_name.
   { testIds: ["survey-advance"] },
   { testIds: ["prefill-continue"] },
   { testIds: ["charlist-done"], settleFor: "punctuation-done" },
@@ -190,6 +192,7 @@ const COPY_WALK: Array<{ testIds: string[]; settleFor?: string }> = [
   { testIds: ["deadkeys-continue"] },
   { testIds: ["rules-continue"] },
   { testIds: ["mechanisms-continue"] },
+  { testIds: ["fallback-policy-continue"] },
   { testIds: ["osk-continue"] },
   { testIds: ["seed-source-confirm"] },
 ];

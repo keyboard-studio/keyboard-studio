@@ -38,7 +38,7 @@ interface JourneyCase {
   visitsOnce?: readonly string[];
   /** The step the replay ends on. */
   lastStep?: string;
-  /** The replay's last edge is icon->done (help, html and icon editor steps precede output). */
+  /** The replay's last edge is publish->done (help, html, icon, trial and publish precede done). */
   endsAtDone: boolean;
   /** The last edge when it is not html->done: Open skips help and html when its documents are fine. */
   lastEdge?: string;
@@ -51,7 +51,6 @@ const JOURNEYS: readonly JourneyCase[] = [
     visits: [
       "identity",
       "choose_base",
-      "track",
       "attribution",
       "project_name",
       "characters",
@@ -63,8 +62,10 @@ const JOURNEYS: readonly JourneyCase[] = [
       "help",
       "html",
       "icon",
+      "trial",
+      "publish",
     ],
-    lastStep: "icon",
+    lastStep: "publish",
     endsAtDone: true,
   },
   {
@@ -73,7 +74,6 @@ const JOURNEYS: readonly JourneyCase[] = [
     visits: [
       "identity",
       "choose_base",
-      "track",
       "attribution",
       "project_name",
       "characters",
@@ -85,8 +85,10 @@ const JOURNEYS: readonly JourneyCase[] = [
       "help",
       "html",
       "icon",
+      "trial",
+      "publish",
     ],
-    lastStep: "icon",
+    lastStep: "publish",
     endsAtDone: true,
   },
   {
@@ -130,7 +132,7 @@ describe.each(JOURNEYS)("replayJourney — $name", (j) => {
       expect(result.exercisedStepIds.filter((s) => s === id)).toHaveLength(1);
     }
     if (j.lastStep !== undefined) expect(result.exercisedStepIds.at(-1)).toBe(j.lastStep);
-    if (j.endsAtDone) expect(result.exercisedEdges.at(-1)).toBe(j.lastEdge ?? "icon->done");
+    if (j.endsAtDone) expect(result.exercisedEdges.at(-1)).toBe(j.lastEdge ?? "publish->done");
   });
 });
 

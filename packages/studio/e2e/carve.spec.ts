@@ -64,7 +64,7 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
@@ -73,6 +73,7 @@ import {
   driveMechanismsGallery,
   driveTouchGallery,
   driveHelpPhase,
+  goToPublishFromDone,
   zipSourceEntry,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
@@ -108,7 +109,7 @@ const KNOWN_CONTRAST_DEBT: readonly string[] = [];
 /**
  * #1477's ground-truth sweep found OskModeToggle's inactive button and
  * SignUpPanel's GitHub button — the two entries this list used to carry —
- * already clean. Nothing left to exclude on the Output screen for this walk.
+ * already clean. Nothing left to exclude on the done panel for this walk.
  */
 const KNOWN_CONTRAST_DEBT_OUTPUT: readonly string[] = [];
 
@@ -188,7 +189,7 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
       script: "other",
     });
     await pickStartKeyboard(page, START_KEYBOARD_ID);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -269,13 +270,16 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
     await driveTouchGallery(page);
     await driveHelpPhase(page);
 
-    // handlePhaseFComplete navigates to #output.
-    await page.waitForURL(/#output$/);
+    // The walk ends at the done panel now (spec 113); the release lives on Publish.
+    await expect(page.getByRole("heading", { name: "Survey complete" })).toBeVisible({ timeout: 30_000 });
 
-    // Accessibility gate (spec 056 FR-003): scan the output screen.
-    await expectNoSeriousAxeViolations(page, "output screen (carve walk)", {
+    // Accessibility gate (spec 056 FR-003): scan the done panel.
+    await expectNoSeriousAxeViolations(page, "done panel (carve walk)", {
       exclude: KNOWN_CONTRAST_DEBT_OUTPUT,
     });
+
+    // The release lives on Publish (spec 113) — go there for the download.
+    await goToPublishFromDone(page);
 
     // ---------------------------------------------------------------------
     // AC2 checkpoint 2: the emitted .kmn omits both deleted rules.
@@ -367,7 +371,7 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
       script: "other",
     });
     await pickStartKeyboard(page, START_KEYBOARD_ID);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -402,7 +406,7 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
     await driveTouchGallery(page);
     await driveHelpPhase(page);
 
-    await page.waitForURL(/#output$/);
+    await goToPublishFromDone(page);
 
     const downloadButton = page.getByTestId("emit-download");
     await expect(downloadButton).toBeEnabled({ timeout: 30_000 });

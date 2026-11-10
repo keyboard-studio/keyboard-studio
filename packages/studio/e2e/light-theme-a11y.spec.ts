@@ -22,7 +22,7 @@ import {
   seedReturningVisitor,
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
@@ -118,7 +118,7 @@ test("dense wizard screens have no serious axe violations on light", async ({ pa
   await expectNoSeriousAxeViolations(page, "base picker (light)");
 
   await pickStartKeyboard(page, START_KEYBOARD_ID);
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page);
   await acceptProjectName(page);
 

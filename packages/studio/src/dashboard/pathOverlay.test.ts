@@ -41,18 +41,18 @@ function recordOf(entries: readonly DecisionEntry[]): DecisionRecord {
 describe("buildPathOverlay", () => {
   it("collects every step the record visited", () => {
     const overlay = buildPathOverlay(
-      recordOf([entry("identity"), entry("track"), entry("characters")]),
+      recordOf([entry("identity"), entry("attribution"), entry("characters")]),
     );
-    expect([...overlay.walkedSteps]).toEqual(["identity", "track", "characters"]);
+    expect([...overlay.walkedSteps]).toEqual(["identity", "attribution", "characters"]);
   });
 
   it("derives one edge per transition, in append order", () => {
     const overlay = buildPathOverlay(
-      recordOf([entry("identity"), entry("track"), entry("characters")]),
+      recordOf([entry("identity"), entry("attribution"), entry("characters")]),
     );
     expect([...overlay.walkedEdges]).toEqual([
-      edgeKey("identity", "track"),
-      edgeKey("track", "characters"),
+      edgeKey("identity", "attribution"),
+      edgeKey("attribution", "characters"),
     ]);
   });
 

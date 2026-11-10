@@ -81,8 +81,22 @@ vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () => ({
   MechanismGallery: () => <div data-testid="stub-MechanismGallery" />,
 }));
 
+vi.mock("../../src/editors/adapters/fallbackPolicyAdapter.tsx", () => ({
+  FallbackPolicyAdapter: () => <div data-testid="stub-FallbackPolicyStep" />,
+}));
+
 vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () => ({
   TouchGallery: () => <div data-testid="stub-TouchGallery" />,
+}));
+
+// Trial/Publish steps (spec 113): the manifest's declared components, stubbed
+// so SC-005 checks the chrome without the artifact pipeline.
+vi.mock("../../src/editors/assignLoop/TrialStep.tsx", () => ({
+  TrialStep: () => <div data-testid="stub-TrialStep" />,
+}));
+
+vi.mock("../../src/editors/assignLoop/PublishStep.tsx", () => ({
+  PublishStep: () => <div data-testid="stub-PublishStep" />,
 }));
 
 vi.mock("../../src/survey/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
@@ -265,10 +279,13 @@ const STEP_TO_EXPECTED_STUB: Record<string, string> = {
   invisibles: "stub-InvisiblesStep",
   carve: "stub-CarveGalleryV2",
   mechanisms: "stub-MechanismGallery",
+  fallback_policy: "stub-FallbackPolicyStep",
   touch_seed_source: "stub-TouchSeedSourcePanel",
   touch: "stub-TouchGallery",
   help: "stub-FlowStepHost-phase_f_helpdocs",
   package: "stub-FlowStepHost-phase_f_helpdocs",
+  trial: "stub-TrialStep",
+  publish: "stub-PublishStep",
 };
 
 // Full-layout step ids (declared in manifest as layout:"full").
@@ -276,7 +293,17 @@ const STEP_TO_EXPECTED_STUB: Record<string, string> = {
 // TouchSeedSourcePanel now renders its own inline live OSK preview, so the
 // step must be full-screen to suppress SurveyView's persistent right-pane
 // OSKFrame — see manifest.ts's FULL_LAYOUT_IDS guard.
-const FULL_LAYOUT_IDS = new Set<string>(["carve", "mechanisms", "touch", "touch_seed_source"]);
+const FULL_LAYOUT_IDS = new Set<string>([
+  "carve",
+  "mechanisms",
+  "fallback_policy",
+  "touch",
+  "touch_seed_source",
+  // spec 113: Trial and Publish are full-screen steps like the other
+  // assign-loop galleries.
+  "trial",
+  "publish",
+]);
 
 describe("SC-005: declared component matches mounted component for all manifest editor steps", () => {
   for (const step of editorSteps) {
@@ -313,9 +340,8 @@ describe("Chrome-by-layout: full-screen for layout:full steps (FR-002, R4)", () 
 
       const stub = screen.getByTestId(stubTestId);
       // StepHost wraps full-screen steps in a div with style.height === "100%"
-      // and overflow hidden. The mechanisms adapter nests the gallery one level
-      // deeper (it stacks the fallback-policy section beneath it), so walk up
-      // to the nearest overflow:hidden ancestor instead of assuming the parent.
+      // and overflow hidden. Some adapters nest their stub one level deeper,
+      // so walk up to the nearest overflow:hidden ancestor instead of assuming the parent.
       let wrapper = stub.parentElement!;
       while (wrapper.style.overflow !== "hidden" && wrapper.parentElement !== null) {
         wrapper = wrapper.parentElement;

@@ -243,6 +243,7 @@ export {
   renderHelpPhp,
   // spec 080 FR-003 — the standard help-site header a fresh help page opens with.
   helpSiteHeader,
+  leadingPhpBlock,
   helpSitePageName,
   helpPhpStub,
   // spec 080 FR-004/FR-006 — the welcome page's layout section and the pure
@@ -270,6 +271,11 @@ export type {
 // spec 102 — documentation forms: the renderer, the slot vocabulary, the
 // per-file escapers and the markers around Track 2's generated sections.
 export { renderDocForm, parseDocForm, DocFormParseError } from "./shared/renderDocForm.js";
+// spec 064 FR-004 / serialize step 5d — the LICENSE.md body
+// `ensurePackageFiles` writes when the package has none; the Documentation
+// step's read-only preview renders the same text (holder-less MIT body)
+// instead of showing an empty preview.
+export { licenseMd } from "./shared/packageDocs.js";
 export {
   DOC_SLOT_IDS,
   DOC_GENERATED_START,
@@ -364,6 +370,7 @@ export type { StartBrowserServiceWithDocProfile } from "./start-browser/index.js
 export {
   createScaffolderService,
   renameFilesInVfs,
+  rewriteKmwKeyboardSelectors,
   generateStubs,
   resolveInheritedHolders,
   packageAttributionFields,

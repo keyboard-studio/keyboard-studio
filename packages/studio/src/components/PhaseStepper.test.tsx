@@ -23,16 +23,16 @@ describe("PhaseStepper", () => {
     cleanup();
   });
 
-  it("renders all six phases in A-F order", () => {
+  it("renders all eight phases in A-H order", () => {
     render(<PhaseStepper activeStepId="identity" />);
-    const pills = ["a", "b", "c", "d", "e", "f"].map((letter) =>
+    const pills = ["a", "b", "c", "d", "e", "f", "g", "h"].map((letter) =>
       screen.getByTestId(`phase-pill-${letter}`),
     );
     const nav = screen.getByTestId("phase-stepper");
     const order = pills.map((pill) =>
       Array.from(nav.querySelectorAll("li")).indexOf(pill),
     );
-    expect(order).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(order).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
   });
 
   it("marks aria-current='step' on exactly one pill", () => {
@@ -47,7 +47,7 @@ describe("PhaseStepper", () => {
   it.each([
     ["identity", "a"],
     ["choose_base", "b"],
-    ["track", "b"],
+    ["attribution", "b"],
     ["project_name", "b"],
     ["characters", "c"],
     ["marks", "c"],
@@ -59,6 +59,9 @@ describe("PhaseStepper", () => {
     ["css", "e"],
     ["help", "f"],
     ["html", "f"],
+    ["icon", "f"],
+    ["trial", "g"],
+    ["publish", "h"],
   ])("activates phase pill %s -> %s", (stepId, letter) => {
     render(<PhaseStepper activeStepId={stepId} />);
     const active = screen.getByTestId(`phase-pill-${letter}`);

@@ -55,6 +55,8 @@ export const INVENTORY: readonly InventoryEntry[] = [
   { fn: "completeStep", module: "lib/completeStep.ts", callers: ["components/StepHost.tsx"] },
   { fn: "createStudioReducerDeps", module: "lib/studioReducerDeps.ts", callers: ["StudioShell.tsx"] },
   { fn: "completeOskStep", module: "lib/oskStepCompletion.ts", callers: ["editors/adapters/oskAdapter.tsx"] },
+  { fn: "completeHtmlStep", module: "lib/htmlStepCompletion.ts", callers: ["editors/assignLoop/HtmlEditor.tsx"] },
+  { fn: "completeFallbackPolicyStep", module: "lib/fallbackPolicyStepCompletion.ts", callers: ["editors/adapters/fallbackPolicyAdapter.tsx"] },
   { fn: "oskContinueResult", module: "@keyboard-studio/engine", callers: ["editors/assignLoop/OskEditor.tsx"] },
   { fn: "generateKvksFromIR", module: "@keyboard-studio/engine", callers: ["editors/assignLoop/OskEditor.tsx"] },
   { fn: "createStudioRecordDecision", module: "lib/studioReducerDeps.ts", callers: ["StudioShell.tsx"] },
@@ -64,7 +66,33 @@ export const INVENTORY: readonly InventoryEntry[] = [
   { fn: "bindManifest", module: "stores/workingCopyStore.ts", callers: ["StudioShell.tsx"] },
   { fn: "useWorkingCopyStore", module: "stores/workingCopyStore.ts", callers: ["StudioShell.tsx", "components/StepHost.tsx"] },
   { fn: "useSurveySessionStore", module: "stores/surveySessionStore.ts", callers: ["StudioShell.tsx", "components/StepHost.tsx"] },
+  {
+    // The decision log the trial driver reads for the test build's cursor
+    // (spec 113) — a store hook like the two above, so it lives in the main
+    // inventory, not the step-proposal inventory: the per-case reset file
+    // imports it too (FR-011's "only stepDrivers import proposals" rule).
+    fn: "useDecisionLogStore",
+    module: "decisions/decisionLogStore.ts",
+    callers: ["components/OutputSectionList.tsx"],
+  },
+  {
+    // The testing store the Trial step driver records a test build into
+    // (spec 113) — a store hook, so it lives in the main inventory, not the
+    // step-proposal inventory: the per-case reset file imports it too
+    // (FR-011's "only stepDrivers import proposals" rule).
+    fn: "useTestingStore",
+    module: "stores/testingStore.ts",
+    callers: ["hooks/usePreviewArtifact.ts"],
+  },
   { fn: "getDecisionSnapshot", module: "stores/decisionStore.ts", callers: ["StudioShell.tsx", "lib/completeStep.ts"] },
+  {
+    // The start screen's act of recording the track (New = copy, Open =
+    // adapt), now the track question is gone — the headless author records
+    // the case's track the same way before its first step (FR-040).
+    fn: "recordAuthoringTrack",
+    module: "lib/recordAuthoringTrack.ts",
+    callers: ["components/StartScreen.tsx", "components/OpenKeyboardEntry.tsx"],
+  },
   { fn: "useSurveyAnswerStore", module: "stores/surveyAnswerStore.ts", callers: ["survey/CharactersStep.tsx", "survey/punctuation/PunctuationStep.tsx"] },
   {
     // The Phase F hard gate StepHost reads through useInventoryCoverageGate.
@@ -77,7 +105,7 @@ export const INVENTORY: readonly InventoryEntry[] = [
   { fn: "snapshotDecisionRecord", module: "decisions/decisionLogStore.ts", callers: ["lib/serializeWorkingCopy.ts", "lib/draftPersistence.ts"] },
   { fn: "parseDecisionRecord", module: "@keyboard-studio/engine", callers: ["lib/draftPersistence.ts"] },
   // --- Parity normalisation (parity.ts, research R8) ---
-  { fn: "effectiveEntries", module: "@keyboard-studio/contracts", callers: ["decisions/historyProposalSeed.ts"] },
+  { fn: "effectiveEntries", module: "@keyboard-studio/contracts", callers: ["decisions/progressDots.ts"] },
   { fn: "suggestionFingerprintOf", module: "survey/carve/carveValue.ts", callers: ["editors/carve/CarveGalleryV2.tsx"] },
   ...PROPOSAL_INVENTORY,
 ];

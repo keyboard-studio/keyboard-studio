@@ -62,7 +62,7 @@ vi.mock("./hooks/useWorkingCopyTransform.ts", () => import("./test/studioShellMo
 vi.mock("./lib/confirmRebase.ts", () => import("./test/studioShellMocks/confirmRebase.ts"));
 vi.mock("./lib/buildTouchLayoutJson.ts", () => import("./test/studioShellMocks/buildTouchLayoutJson.ts"));
 vi.mock("./components/CompareScreen.tsx", () => import("./test/studioShellMocks/CompareScreen.tsx"));
-vi.mock("./components/OutputScreen.tsx", () => import("./test/studioShellMocks/OutputScreen.tsx"));
+vi.mock("./components/OutputRedirect.tsx", () => import("./test/studioShellMocks/OutputRedirect.tsx"));
 vi.mock("./dashboard/DashboardView.tsx", () => import("./test/studioShellMocks/DashboardView.tsx"));
 vi.mock("./lib/navigate.ts", () => import("./test/studioShellMocks/navigate.ts"));
 
@@ -143,8 +143,8 @@ describe("SurveyView — right pane gating on the characters step", () => {
       render(<><SurveyView startKeyboard={null} /><ActiveStepNav /></>);
     });
 
-    // Set discoveryMethod pre-emptively while still on "track" — activeRightPane
-    // for the track step is "preview" (default), so showCharacterMap must stay
+    // Set discoveryMethod pre-emptively while still on "attribution" — activeRightPane
+    // for the attribution step is "preview" (default), so showCharacterMap must stay
     // false even though discoveryMethod is already "build-list".
     fireEvent.click(screen.getByTestId("survey-advance"));
     fireEvent.click(screen.getByTestId("layout-continue"));
@@ -157,9 +157,8 @@ describe("SurveyView — right pane gating on the characters step", () => {
 
     // Now advance into "characters" — the same discoveryMethod value gates
     // the pane swap on ONLY once activeRightPane flips to "character-map".
-    // (#1901: the attribution step sits between track and characters.)
+    // (The attribution step sits between the base choice and characters.)
     // (Spec 111: Open hides the character survey, so this takes the Copy path.)
-    fireEvent.click(screen.getByTestId("track-copy"));
     fireEvent.click(screen.getByTestId("survey-advance"));
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(screen.getByLabelText("Character map")).toBeTruthy();

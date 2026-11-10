@@ -28,17 +28,12 @@ import { irPath } from "@keyboard-studio/contracts";
 import type { Step } from "./types.ts";
 import {
   decisionModules,
-  declaredScreenGates,
-  openScreenGates,
 } from "../survey/questions/registry.ts";
-import { deriveScreens, type DerivedScreen } from "../decisions/deriveScreens.ts";
-import type { DecisionSet } from "../decisions/decisionTypes.ts";
-import type { StepTrail } from "../decisions/orderDecisions.ts";
+import { deriveScreens } from "../decisions/deriveScreens.ts";
 import type { QuestionModule } from "../survey/types.ts";
 import { CharactersStepHost } from "../survey/CharactersStepHost.tsx";
 import { MarksStepHost } from "../survey/marks/MarksStepHost.tsx";
 import { CONTEXT_TOLERANCE_WRITES } from "./contextToleranceWrites.ts";
-import { registerRouteProvider } from "../decisions/routeProvider.ts";
 import { PunctuationStepHost } from "../survey/punctuation/PunctuationStepHost.tsx";
 import { InvisiblesStepHost } from "../survey/invisibles/InvisiblesStepHost.tsx";
 import { ConvenienceStepHost } from "../survey/convenience/ConvenienceStepHost.tsx";
@@ -46,7 +41,6 @@ import {
   identityStep,
   layoutStep,
   chooseStartStep,
-  trackStep,
   attributionStep,
   projectNameStep,
   languageListStep,
@@ -56,6 +50,7 @@ import {
   deadkeysStep,
   rulesStep,
   mechanismsStep,
+  fallbackPolicyStep,
   oskStep,
   touchSeedSourceStep,
   touchStep,
@@ -63,6 +58,8 @@ import {
   helpStep,
   htmlStep,
   iconStep,
+  trialStep,
+  publishStep,
   packageStep,
 } from "./registerEditorSteps.ts";
 
@@ -142,11 +139,8 @@ const stepPool: readonly Step[] = [
   // --- Base selection (base picker only) ---
   chooseStartStep,
 
-  // --- Track selection (copy vs adapt) ---
-  trackStep,
-
   // --- Attribution (author / copyright, #1901) ---
-  // Both tracks walk it, immediately after the track choice: the
+  // Both tracks walk it, immediately after the base choice: the
   // questions' proposals are track-shaped (profile confirmation on
   // copy; the base's copyright holder seeded on update).
   attributionStep,
@@ -300,6 +294,9 @@ const stepPool: readonly Step[] = [
     lock: "physical",
   } satisfies Step,
 
+  // --- Fallback policy (spec 109) — after mechanisms, before OSK (#2539) ---
+  fallbackPolicyStep,
+
   // --- OSK (on-screen keyboard customization) ---
   // Runs after the Mechanical gallery: the underlying OSK is generated from
   // the physical layout, and this step lets the author customize key labels.
@@ -336,6 +333,17 @@ const stepPool: readonly Step[] = [
   // 256px pixel editing, low-res-friendly text tool, live 16/32/48 previews.
   // Unskippable — unchanged means the template keyboard's icon.
   iconStep,
+
+  // --- Trial (spec 113, #2540: after the icon step) ---
+  // Try the keyboard and get it to testers: numbered test builds, tester
+  // reports, revise-and-return (spec 094, moved out of the Output screen).
+  trialStep,
+
+  // --- Publish (spec 113, #2540: after Trial) ---
+  // Get the finished keyboard out: release checks, final downloads (.kmp /
+  // source .zip / LDML) and the managed GitHub PR (moved out of the Output
+  // screen). Completing Publish ends the walk (advance: publish → done).
+  publishStep,
 
   // --- Package (reserved, out of scope for v1) ---
   packageStep,
@@ -381,71 +389,14 @@ export const manifest: readonly Step[] = ((): readonly Step[] => {
   return built;
 })();
 
-/**
- * The derived screens of the live registry, computed once (spec 091).
- * The manifest above is arranged by these screens; the gate and trail
- * views below are published from the same derivation so every consumer
- * reads one source.
- */
-export const derivedScreens: readonly DerivedScreen[] = deriveScreens(
-  decisionModules,
-  declaredScreenGates,
-);
-
-/**
- * Derived screen gates by screen id (spec 091 T015): present only for a
- * screen whose every member decision is gated. Steps no longer carry
- * `gatedBy` (T014) — gate reads (steps/advance.ts, lib/resolveLocation.ts
- * via its ResolveContext) come from here.
- */
-export const screenGates: ReadonlyMap<string, (decisions: DecisionSet) => boolean> =
-  new Map([
-    ...derivedScreens.flatMap((s) =>
-      s.gatedBy !== undefined ? [[s.id, s.gatedBy] as const] : [],
-    ),
-    // Spec 111: the screens Open hides gate the walk without leaving the spine.
-    ...openScreenGates,
-  ]);
-
-// The author's current route for the lint fallback (spec 108 FR-015): a screen is on the route
-// while its derived gate passes, and a screen with no gate always is. Registered here, not
-// imported by the consumers, because they sit upstream of this module's evaluation.
-registerRouteProvider((decisions) => {
-  const route = new Set<string>();
-  for (const { id } of derivedScreens) {
-    const gate = screenGates.get(id);
-    let on = true;
-    if (gate !== undefined) {
-      try {
-        on = gate(decisions);
-      } catch {
-        on = true;
-      }
-    }
-    if (on) route.add(id);
-  }
-  return route;
-});
-
-/**
- * Derived screen trails by screen id (spine membership + join target),
- * including the ruled terminal "package" screen (ungated spine). The
- * Flow Map and completeness checks read trails from here (spec 091 T014)
- * instead of re-deriving them from step declarations.
- */
-export const screenTrails: ReadonlyMap<string, StepTrail> = new Map<string, StepTrail>([
-  ...derivedScreens.map(
-    (s) =>
-      [
-        s.id,
-        s.joinTarget !== undefined
-          ? { spine: s.spine, joinTarget: s.joinTarget }
-          : { spine: s.spine },
-      ] as const,
-  ),
-  ["package", { spine: true }],
-]);
-
+// The derived screen views live in ./derivedViews.ts (spec 113): they are
+// computed from the registry alone and must stay importable by lib/ and
+// components/ without pulling in the step pool — see that module's header.
+// Re-exported here so every existing importer keeps working.
+export { derivedScreens, manifestStepIds, screenGates, screenTrails } from "./derivedViews.ts";
+// Local binding for validateManifestShape below (a re-export alone binds
+// nothing locally).
+import { derivedScreens, screenTrails } from "./derivedViews.ts";
 
 // ---------------------------------------------------------------------------
 // validateManifestShape — throw-on-mismatch structural guard (M3, M5, layout).
@@ -495,8 +446,8 @@ export function validateManifestShape(): void {
 
   // Layout guard (spec 028 Stage 5, T016): layout:"full" is LOAD-BEARING —
   // StepHost reads step.layout to select full-screen vs two-pane chrome (R4).
-  // EXACTLY {carve, deadkeys, rules, mechanisms, osk, touch, touch_seed_source,
-  // css, html} must declare layout:"full"; all others must be "pane" or omit
+  // EXACTLY {carve, deadkeys, rules, mechanisms, fallback_policy, osk, touch, touch_seed_source,
+  // css, html, icon, trial, publish} must declare layout:"full"; all others must be "pane" or omit
   // layout. A
   // mismatched layout would silently change the chrome. touch_seed_source
   // joined this set in the P0 fix for the panel's inline live OSK preview
@@ -506,23 +457,29 @@ export function validateManifestShape(): void {
   // its own Back/Continue nav renders inside.
   // rules joined in spec 082: the demo pane + rule builder need the full
   // width, same as the carve and mechanisms galleries it sits between.
+  // trial and publish joined in spec 113 (#2540): the Trial and Publish
+  // steps host the Output screen's panels (test builds, downloads, PR
+  // submit), which need the full width the Output pane used to have.
   const FULL_LAYOUT_IDS = new Set([
     "carve",
     "deadkeys",
     "rules",
     "mechanisms",
+    "fallback_policy",
     "osk",
     "touch",
     "touch_seed_source",
     "css",
     "html",
     "icon",
+    "trial",
+    "publish",
   ]);
   for (const step of manifest) {
     if (step.layout === "full") {
       if (!FULL_LAYOUT_IDS.has(step.id)) {
         throw new Error(
-          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/deadkeys/rules/mechanisms/osk/touch/touch_seed_source/css/html/icon may be full-screen (spec 024 Stage 0)`,
+          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/deadkeys/rules/mechanisms/fallback_policy/osk/touch/touch_seed_source/css/html/icon/trial/publish may be full-screen (spec 024 Stage 0)`,
         );
       }
     }

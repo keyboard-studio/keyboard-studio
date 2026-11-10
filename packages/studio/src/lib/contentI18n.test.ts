@@ -144,13 +144,13 @@ describe("resolveContentString — flowQuestions catalog (spec 073 US1)", () => 
     // contract and render the English fallback, not a blank string.
     _setContentCatalogForTesting("fr", {
       flowQuestions: {
-        "content.flowQuestion.track_choice.option.copy.note": "",
+        "content.flowQuestion.choose_base.option.copy.note": "",
       },
     });
     expect(
       resolveContentString(
         "flowQuestions",
-        "track_choice",
+        "choose_base",
         "option.copy.note",
         "You will give it a new name and keyboard ID. The original is not changed.",
         i18nFor("fr"),
@@ -194,13 +194,13 @@ describe("resolveContentString — flowQuestions catalog (spec 073 US1)", () => 
     // resolves (research.md D5 / flow-question-catalog-format.md).
     _setContentCatalogForTesting("fr", {
       flowQuestions: {
-        "content.flowQuestion.track_choice.option.0_6.label": "Variante zéro virgule six",
+        "content.flowQuestion.choose_base.option.0_6.label": "Variante zéro virgule six",
       },
     });
     expect(
       resolveContentString(
         "flowQuestions",
-        "track_choice",
+        "choose_base",
         `option.${slugifyIdSegment("0.6")}.label`,
         "Point six variant",
         i18nFor("fr"),

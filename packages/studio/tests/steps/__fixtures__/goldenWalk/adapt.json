@@ -31,28 +31,22 @@
     "stepId": "choose_base",
     "applyStepCompletion": [],
     "storeMutations": [
-      "setLocalStart",
+      "setLocalStart"
+    ],
+    "workingCopyMutations": [],
+    "decisionMutations": [],
+    "navigateTo": []
+  },
+  {
+    "stepId": "choose_base",
+    "applyStepCompletion": [],
+    "storeMutations": [
       "record",
       "advance"
     ],
     "workingCopyMutations": [],
     "decisionMutations": [
       "record"
-    ],
-    "navigateTo": []
-  },
-  {
-    "stepId": "track",
-    "applyStepCompletion": [],
-    "storeMutations": [
-      "recordAll",
-      "advance"
-    ],
-    "workingCopyMutations": [
-      "recordPhase"
-    ],
-    "decisionMutations": [
-      "recordAll"
     ],
     "navigateTo": []
   },
@@ -105,6 +99,16 @@
     "decisionMutations": [
       "record"
     ],
+    "navigateTo": []
+  },
+  {
+    "stepId": "fallback_policy",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "decisionMutations": [],
     "navigateTo": []
   },
   {

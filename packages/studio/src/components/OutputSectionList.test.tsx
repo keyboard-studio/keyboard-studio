@@ -1,4 +1,4 @@
-// OutputSectionList — Output's "Revise a section" list (spec 094 FR-001, R4).
+// OutputSectionList — Trial's "Revise a section" list (spec 094 FR-001, R4; spec 113).
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, fireEvent, cleanup } from "@testing-library/react";
@@ -64,7 +64,7 @@ afterEach(() => {
 });
 
 const STEP_IDS: ReadonlySet<string> = new Set([
-  "identity", "layout", "choose_base", "track", "characters", "rules", "mechanisms", "touch_seed_source", "touch",
+  "identity", "layout", "choose_base", "attribution", "characters", "rules", "mechanisms", "touch_seed_source", "touch",
 ]);
 
 describe("completedSections", () => {
@@ -72,19 +72,19 @@ describe("completedSections", () => {
     const entries = [
       surveyEntry("identity"),
       surveyEntry("choose_base"),
-      surveyEntry("track"),
+      surveyEntry("attribution"),
       surveyEntry("characters"),
       editorEntry("mechanisms", { mechanismsAssigned: 3 }),
       surveyEntry("rules"),
     ];
     const groups = buildStageGroups({ entries });
     const sections = completedSections(
-      ["identity", "layout", "choose_base", "track", "characters", "rules", "mechanisms", "touch"],
+      ["identity", "layout", "choose_base", "attribution", "characters", "rules", "mechanisms", "touch"],
       groups,
       { activeStepId: "touch_seed_source", stepIds: STEP_IDS },
     );
     // "touch" was finished with nothing recorded: listed, with no roll-up.
-    expect(sections.map((s) => s.stepId)).toEqual(["identity", "characters", "rules", "mechanisms", "touch"]);
+    expect(sections.map((s) => s.stepId)).toEqual(["identity", "attribution", "characters", "rules", "mechanisms", "touch"]);
     expect(sections.find((s) => s.stepId === "touch")?.group).toBeUndefined();
   });
 
@@ -146,13 +146,13 @@ describe("OutputSectionList", () => {
     expect(screen.getByRole("button", { name: "Revise Rules: Kept as it was" })).toBeTruthy();
   });
 
-  it("opens a section with the return-to-Output seam", () => {
+  it("opens a section with the return-to-Trial seam", () => {
     seed([surveyEntry("rules")], ["rules"]);
     render(<OutputSectionList />);
     fireEvent.click(screen.getByRole("button", { name: "Revise a section" }));
     fireEvent.click(screen.getByTestId("output-section-rules"));
 
-    expect(jumpToLocation).toHaveBeenCalledWith({ route: "survey", step: "rules" }, { returnTo: { route: "output" } });
+    expect(jumpToLocation).toHaveBeenCalledWith({ route: "survey", step: "rules" }, { returnTo: { route: "survey", step: "trial" } });
   });
 
   it("states the reason in the live region when the jump is refused", () => {

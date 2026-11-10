@@ -11,6 +11,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 
 import { Button } from "../ui/Button.tsx";
 import { BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
+import { sectionHeading } from "../survey/surveyStyles.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { decideGalleryValue } from "../steps/galleryHost.tsx";
 import { buildGalleryHostDeps } from "../lib/galleryHostDeps.ts";
@@ -46,7 +47,7 @@ const sectionStyle: React.CSSProperties = {
   margin: "0 0 16px",
   padding: "8px 12px",
   border: `1px solid ${BORDER}`,
-  borderRadius: 4,
+  borderRadius: "var(--app-radius-sm)",
   fontFamily: FONT,
   fontSize: 13,
 };
@@ -91,7 +92,7 @@ export function MissingLettersByLanguage({
 
   return (
     <section style={sectionStyle} data-testid="missing-letters-by-language">
-      <h3 style={{ margin: "0 0 4px", fontSize: 14 }}>
+      <h3 style={sectionHeading}>
         <Trans id="missingLetters.title">Letters the listed languages need</Trans>
       </h3>
       <p style={{ margin: "0 0 4px", color: TEXT_DIM }}>

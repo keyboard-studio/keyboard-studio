@@ -4,11 +4,6 @@
     "value": "Walk Author",
     "provenance": "asked"
   },
-  "authoring-track": {
-    "id": "authoring-track",
-    "value": "copy",
-    "provenance": "asked"
-  },
   "base-keyboard": {
     "id": "base-keyboard",
     "value": {
@@ -1766,7 +1761,13 @@
         "migrationNeeded": false,
         "guardReevaluation": []
       },
-      "contextTolerance": null
+      "contextTolerance": {
+        "decision": "accept",
+        "acceptedSiteIds": [],
+        "proposedSiteIds": [],
+        "fingerprint": "",
+        "origin": "default"
+      }
     },
     "provenance": "asked"
   },

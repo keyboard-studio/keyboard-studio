@@ -5,6 +5,7 @@
 import type {
   Attribution,
   DecisionProposalSource,
+  DocFixProposals,
   HelpDocsAnswers,
   HistoryEntryState,
   IRPath,
@@ -200,6 +201,15 @@ export interface ApplyContext {
   readonly decisions: DecisionSet;
   /** The working copy's current HISTORY-entry state, or null before it is first derived. */
   readonly currentHistoryEntryState: HistoryEntryState | null;
+  /**
+   * The working copy's current documentation-fix proposals, or null
+   * before any proposal is answered (issue #2530). Supplied by the
+   * runner/host; absent in bare contexts (tests, impact analysis), which
+   * read as "no proposals recorded". Lets the `help-body-parity` apply
+   * preserve the sibling proposals it does not own (`pagename`,
+   * `imageWidth`) when it writes `bodySync`.
+   */
+  readonly currentDocFixProposals?: DocFixProposals | null;
 }
 
 /**
@@ -224,6 +234,12 @@ export interface WorkingCopyPatch {
   helpDocs?: HelpDocsAnswers;
   /** The working copy's HISTORY-entry state slice (whole-value replace). */
   historyEntryState?: HistoryEntryState;
+  /**
+   * The working copy's documentation-fix proposals slice (whole-value
+   * replace; issue #2530). Only the `help-body-parity` provider may
+   * return this channel (A3 table in steps/applyAuthorization.ts).
+   */
+  docFixProposals?: DocFixProposals;
 }
 
 /**

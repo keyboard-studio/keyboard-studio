@@ -400,7 +400,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // covered (accepted above), so an "Added" chip ("Remove U+00E0 à") also
     // carries "U+00E0" in its own aria-label — an unscoped query would be
     // ambiguous.
-    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(onBack).not.toHaveBeenCalled();
     await waitFor(() => {
       expectCurrentChar("à");
@@ -446,7 +446,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     });
 
     // Navigate back to "à" without ever resolving its suggestion.
-    fireEvent.click(screen.getByRole("button", { name: /← back/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
     await waitFor(() => {
       expectCurrentChar("à", { marked: true });
     });

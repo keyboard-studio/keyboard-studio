@@ -1,22 +1,22 @@
-// E2E: the keyboard-wide fallback policy (spec 076, fallback-surface-design.md).
+// E2E: the keyboard-wide fallback policy (spec 076, issue #2539).
 //
-// The policy lives in a collapsible section at the bottom of the Assign
-// Mechanisms step (interim host) and never in the carve gallery. This spec
-// walks to each place, then chooses each option and checks the choice sticks.
+// The policy is its own full-step screen after Assign Mechanisms (not a collapsed
+// panel). This spec walks to that step, chooses each option, and checks the
+// choice sticks. Carve still has no fallback control.
 //
-// Run (Playwright is the global CLI only — see playwright.config.ts header):
-//   cd packages/studio && npx playwright test fallback-policy.spec.ts
+// Run: cd packages/studio && npx playwright test fallback-policy.spec.ts
 
 import { test, expect } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
   buildOneCharacterList,
   driveDeadkeysStep,
+  driveMechanismsGallery,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
 
@@ -26,19 +26,18 @@ const DO_NOTHING = "Do nothing";
 const USE_COMPUTER = "Use the computer's layout";
 
 test.describe("Fallback policy (keyboard-wide)", () => {
-  test("is absent from the carve gallery and chooses each policy in Assign Mechanisms", async ({ page }) => {
+  test("is absent from the carve gallery and chooses each policy on the fallback step", async ({ page }) => {
     await seedReturningVisitor(page);
     await page.goto("/?e2e=1");
 
     await driveIdentityLite(page, { english: "Test", autonym: "Nehiyawewin", script: "other" });
     await pickStartKeyboard(page, START_KEYBOARD_ID);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
     await buildOneCharacterList(page, "᙮");
 
-    // Carve gallery: a plain review exists, but no fallback control.
     await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId("fallback-policy-section")).toHaveCount(0);
     await expect(page.getByRole("radio", { name: DO_NOTHING })).toHaveCount(0);
@@ -48,13 +47,14 @@ test.describe("Fallback policy (keyboard-wide)", () => {
     await driveDeadkeysStep(page);
     await page.getByTestId("rules-continue").click();
 
-    // Assign Mechanisms: the section is there, collapsed, naming the default.
-    const section = page.getByTestId("fallback-policy-section");
-    await expect(section).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId("fallback-policy-current")).toHaveText(DO_NOTHING);
+    await driveMechanismsGallery(page);
 
-    await section.locator("summary").click();
-    const group = page.getByRole("group", { name: "When a key isn't in your keyboard" });
+    await expect(page.getByTestId("fallback-policy-step")).toBeVisible({ timeout: 30_000 });
+    const section = page.getByTestId("fallback-policy-section");
+    await expect(section).toBeVisible();
+    await expect(page.locator("summary").filter({ hasText: "When a key" })).toHaveCount(0);
+
+    const group = page.getByRole("group", { name: "Undefined keys: allow or block" });
     await expect(group).toBeVisible();
     await expect(group.getByRole("radio")).toHaveCount(2);
     await expect(page.getByRole("radio", { name: DO_NOTHING })).toBeChecked();
@@ -63,21 +63,15 @@ test.describe("Fallback policy (keyboard-wide)", () => {
     );
     await expect(page.getByTestId("fallback-host-caption")).toContainText("best guess");
 
-    // Each option, in turn.
     await page.getByRole("radio", { name: USE_COMPUTER }).check();
     await expect(page.getByRole("radio", { name: USE_COMPUTER })).toBeChecked();
-    await expect(page.getByTestId("fallback-policy-current")).toHaveText(USE_COMPUTER);
 
     await page.getByRole("radio", { name: DO_NOTHING }).check();
     await expect(page.getByRole("radio", { name: DO_NOTHING })).toBeChecked();
-    await expect(page.getByTestId("fallback-policy-current")).toHaveText(DO_NOTHING);
 
-    // The choice is a stored setting, not disclosure state: collapse and
-    // reopen the section and it stands.
     await page.getByRole("radio", { name: USE_COMPUTER }).check();
-    await section.locator("summary").click();
-    await expect(page.getByTestId("fallback-policy-current")).toHaveText(USE_COMPUTER);
-    await section.locator("summary").click();
     await expect(page.getByRole("radio", { name: USE_COMPUTER })).toBeChecked();
+
+    await page.getByTestId("fallback-policy-continue").click();
   });
 });

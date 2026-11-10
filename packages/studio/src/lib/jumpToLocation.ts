@@ -14,7 +14,7 @@
 import { formatLocation, type Location } from "./location.ts";
 import { navigateTo } from "./navigate.ts";
 import { resolveLocation, type ResolveContext, type UnreachableReason } from "./resolveLocation.ts";
-import { manifest, screenGates } from "../steps/manifest.ts";
+import { manifestStepIds, screenGates } from "../steps/derivedViews.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import {
   applyTraversalSnapshot,
@@ -150,7 +150,11 @@ export function consumePendingWelcomeLocation(): Location | null {
  */
 export function liveResolveContext(): ResolveContext {
   return {
-    manifest,
+    // Membership only: the resolver reads `manifest` as ids (see
+    // ResolveContext), so the derived id list from steps/derivedViews.ts
+    // serves — importing the Step pool here would cycle back through the
+    // Trial/Publish hosts (spec 113).
+    manifest: manifestStepIds.map((id) => ({ id })),
     // Spec 091 T015: the derived screen gates resolveLocation reads.
     screenGates,
     questionRegistry,

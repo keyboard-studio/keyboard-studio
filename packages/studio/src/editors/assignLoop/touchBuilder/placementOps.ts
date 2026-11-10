@@ -382,16 +382,92 @@ export function buildPanelDropOps(
 
 /**
  * A subkey chip dropped onto a panel target: reorder within longpress /
- * multitap, or move a flick between directions (swap when occupied).
- * Cross-kind drops are meaningless and produce no ops.
+ * multitap, move a flick between directions (swap when occupied), or move
+ * BETWEEN families (#2596 item 3) — longpress ↔ flick ↔ multitap.
+ *
+ * Cross-kind moves remove the entry from its source family and upsert it
+ * into the target, carrying `text`/`sp`/`output` with it; the id follows
+ * the target family's convention (a flick slot's id IS its direction; a
+ * longpress/multitap entry keeps its id where it can, else takes
+ * `freshId`). A displaced occupant — a flick direction already taken, or a
+ * full multitap's 3x entry — goes back to the tray, never silently
+ * demoted (the tray-drop pattern). The longpress `default` flag cannot
+ * round-trip a remove+re-add (see `reorderFamilyOps`) and is meaningless
+ * outside `sk`, so a moved default-flagged longpress loses it.
+ *
+ * `freshId` is the one minted id this plan may consume (flick-source moves
+ * need one: a flick entry's id is its direction, which cannot travel).
  */
 export function buildSubkeyMoveOps(
   address: string,
   targetKey: TouchKeyIR,
   source: SubkeyDragPayload,
   target: PanelDropSpec,
+  freshId: string,
 ): PlacementOpPlan {
   const ops: PendingKeyEditOperation[] = [];
+  let displacedBackToTray: string | null = null;
+
+  // Rewrite one multitap list in a new order (remove-all + re-add — the
+  // contract has no reorder op). Shared by the mt-source and mt-target
+  // branches below.
+  const rewriteMultitap = (
+    ordered: readonly SubkeySnapshot[],
+  ): PendingKeyEditOperation[] => {
+    const existing = targetKey.multitap ?? [];
+    const rewrite: PendingKeyEditOperation[] = [];
+    for (const s of existing) {
+      rewrite.push({ address, kind: "removeSubKey", sub: { kind: "multitap", id: s.id } });
+    }
+    for (const s of ordered) {
+      rewrite.push(setSubKeyOp(address, { kind: "multitap", id: s.id }, s));
+    }
+    return rewrite;
+  };
+
+  // Land a snapshot in a multitap list: append while a tap is free, else
+  // replace the 3x entry (index given = replace that entry instead). The
+  // displaced glyph goes back to the tray.
+  const landInMultitap = (
+    snap: SubkeySnapshot,
+    index: number | undefined,
+  ): PendingKeyEditOperation[] => {
+    const existing = targetKey.multitap ?? [];
+    if (index !== undefined) {
+      if (index < 0 || index >= existing.length) return [];
+      const old = snapshotSubkey(existing[index]!);
+      const ordered = existing.map((s) => snapshotSubkey(s));
+      ordered[index] = snap;
+      if (isPreservableText(old.text) && old.text !== snap.text) {
+        displacedBackToTray = old.text;
+      }
+      return rewriteMultitap(ordered);
+    }
+    if (existing.length < 2) {
+      return [setSubKeyOp(address, { kind: "multitap", id: snap.id }, snap)];
+    }
+    const old = snapshotSubkey(existing[1]!);
+    if (isPreservableText(old.text) && old.text !== snap.text) {
+      displacedBackToTray = old.text;
+    }
+    return rewriteMultitap([snapshotSubkey(existing[0]!), snap]);
+  };
+
+  // Land a snapshot in a flick direction slot (upsert). A displaced
+  // occupant goes back to the tray.
+  const landInFlick = (
+    snap: SubkeySnapshot,
+    direction: FlickDirection,
+  ): PendingKeyEditOperation[] => {
+    const occupant = targetKey.flick?.[direction];
+    if (occupant !== undefined) {
+      const old = snapshotSubkey(occupant);
+      if (isPreservableText(old.text) && old.text !== snap.text) {
+        displacedBackToTray = old.text;
+      }
+    }
+    return [setSubKeyOp(address, { kind: "flick", id: direction }, { ...snap, id: direction })];
+  };
 
   if (source.kind === "sk" && target.area === "lp") {
     const list = targetKey.sk ?? [];
@@ -437,6 +513,103 @@ export function buildSubkeyMoveOps(
       );
     }
     return { ops, displacedBackToTray: null };
+  }
+
+  // --- cross-kind moves (#2596 item 3) -------------------------------------
+  // Longpress → flick: the flick slot takes the entry (id = direction).
+  if (source.kind === "sk" && target.area === "flick") {
+    const entry = (targetKey.sk ?? []).find((s) => s.id === source.id);
+    if (entry === undefined) return { ops, displacedBackToTray: null };
+    ops.push({ address, kind: "removeSubKey", sub: { kind: "sk", id: source.id } });
+    ops.push(...landInFlick(snapshotSubkey(entry), target.direction));
+    return { ops, displacedBackToTray };
+  }
+
+  // Longpress → multitap: keeps its id unless a multitap entry already
+  // carries it (hand-maintained ids can repeat across families), in which
+  // case the fresh id stands in.
+  if (source.kind === "sk" && target.area === "mt") {
+    const entry = (targetKey.sk ?? []).find((s) => s.id === source.id);
+    if (entry === undefined) return { ops, displacedBackToTray: null };
+    // Validate the landing slot BEFORE removing the entry — a bad index
+    // must leave the key untouched, not strand the entry nowhere.
+    if (
+      target.index !== undefined &&
+      (target.index < 0 || target.index >= (targetKey.multitap ?? []).length)
+    ) {
+      return { ops, displacedBackToTray: null };
+    }
+    const snap = snapshotSubkey(entry);
+    const idTaken = (targetKey.multitap ?? []).some((s) => s.id === snap.id);
+    const landed: SubkeySnapshot = idTaken ? { ...snap, id: freshId } : snap;
+    ops.push({ address, kind: "removeSubKey", sub: { kind: "sk", id: source.id } });
+    ops.push(...landInMultitap(landed, target.index));
+    return { ops, displacedBackToTray };
+  }
+
+  // Flick → longpress: a flick entry's id is its direction, so the fresh id
+  // becomes the longpress id.
+  if (source.kind === "flick" && target.area === "lp") {
+    const entry = targetKey.flick?.[source.direction];
+    if (entry === undefined) return { ops, displacedBackToTray: null };
+    const snap = snapshotSubkey(entry);
+    ops.push({ address, kind: "removeSubKey", sub: { kind: "flick", id: source.direction } });
+    ops.push(
+      setSubKeyOp(address, { kind: "sk", id: freshId }, { ...snap, id: freshId }),
+    );
+    return { ops, displacedBackToTray: null };
+  }
+
+  // Flick → multitap: fresh id, append-or-replace-3x like a tray drop.
+  if (source.kind === "flick" && target.area === "mt") {
+    const entry = targetKey.flick?.[source.direction];
+    if (entry === undefined) return { ops, displacedBackToTray: null };
+    // Validate the landing slot BEFORE removing the entry — see sk → mt.
+    if (
+      target.index !== undefined &&
+      (target.index < 0 || target.index >= (targetKey.multitap ?? []).length)
+    ) {
+      return { ops, displacedBackToTray: null };
+    }
+    const snap = snapshotSubkey(entry);
+    ops.push({ address, kind: "removeSubKey", sub: { kind: "flick", id: source.direction } });
+    ops.push(...landInMultitap({ ...snap, id: freshId }, target.index));
+    return { ops, displacedBackToTray };
+  }
+
+  // Multitap → longpress: keeps its id unless a longpress entry already
+  // carries it, in which case the fresh id stands in.
+  if (source.kind === "multitap" && target.area === "lp") {
+    const list = targetKey.multitap ?? [];
+    if (source.index < 0 || source.index >= list.length) {
+      return { ops, displacedBackToTray: null };
+    }
+    const moving = list[source.index]!;
+    const snap = snapshotSubkey(moving);
+    const idTaken = (targetKey.sk ?? []).some((s) => s.id === snap.id);
+    const landed: SubkeySnapshot = idTaken ? { ...snap, id: freshId } : snap;
+    const remaining = list
+      .filter((_, i) => i !== source.index)
+      .map((s) => snapshotSubkey(s));
+    ops.push(...rewriteMultitap(remaining));
+    ops.push(setSubKeyOp(address, { kind: "sk", id: landed.id }, landed));
+    return { ops, displacedBackToTray: null };
+  }
+
+  // Multitap → flick: the flick slot takes the entry (id = direction).
+  if (source.kind === "multitap" && target.area === "flick") {
+    const list = targetKey.multitap ?? [];
+    if (source.index < 0 || source.index >= list.length) {
+      return { ops, displacedBackToTray: null };
+    }
+    const moving = list[source.index]!;
+    const snap = snapshotSubkey(moving);
+    const remaining = list
+      .filter((_, i) => i !== source.index)
+      .map((s) => snapshotSubkey(s));
+    ops.push(...rewriteMultitap(remaining));
+    ops.push(...landInFlick(snap, target.direction));
+    return { ops, displacedBackToTray };
   }
 
   return { ops, displacedBackToTray: null };

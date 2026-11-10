@@ -60,15 +60,21 @@ const BASELINE_STEP_REQUIRES: Readonly<Record<string, readonly string[]>> = {
   deadkeys: ["carved-layout"],
   rules: ["deadkeys-defined", "windows-layout"],
   mechanisms: ["carved-layout", "deadkeys-defined", "rule-set", "marks-treatment", "windows-layout"],
-  osk: ["physical-layout"],
+  fallback_policy: ["physical-layout"],
+  osk: ["physical-layout", "fallback-policy"],
   touch_seed_source: ["osk-layout"],
   touch: ["osk-layout", "touch-seed-source"],
   css: ["touch-layout"],
-  help: ["physical-layout", "touch-layout", "custom-css"],
+  help: ["physical-layout", "fallback-policy", "touch-layout", "custom-css"],
   html: ["help-docs"],
   // #2485: the icon step follows the html step and needs its welcome-htm
   // decision recorded first (mirrors the icon gallery module's requires).
   icon: ["welcome-htm"],
+  // spec 113 (#2540): the Trial step follows the icon step and needs its
+  // icon decision recorded first; Publish follows Trial the same way
+  // (each mirrors its gallery module's requires).
+  trial: ["icon"],
+  publish: ["trial"],
 };
 
 /**
@@ -83,8 +89,8 @@ const INTRA_STEP_REQUIRES: Readonly<Partial<Record<DecisionId, readonly string[]
 const SETTLES = derivedSettles();
 
 describe("gallery module coverage (FR-002)", () => {
-  it("the derived settles set is exactly the twenty-two gallery decisions (spec 111 adds language-list, missing-letters-review and upgrades-review, spec 112 caps-handling, #2485 icon)", () => {
-    expect(SETTLES.size).toBe(22);
+  it("the derived settles set is exactly the twenty-five gallery decisions (spec 111 adds language-list, missing-letters-review and upgrades-review, spec 112 caps-handling, issue #2539 fallback-policy, #2485 icon, and spec 113 trial + publish)", () => {
+    expect(SETTLES.size).toBe(25);
     expect([...SETTLES.keys()].sort()).toEqual([
       "base-keyboard",
       "caps-handling",
@@ -92,6 +98,7 @@ describe("gallery module coverage (FR-002)", () => {
       "character-inventory",
       "custom-css",
       "deadkeys-defined",
+      "fallback-policy",
       "help-docs",
       // #2485: the icon editor step settles the keyboard icon.
       "icon",
@@ -101,11 +108,13 @@ describe("gallery module coverage (FR-002)", () => {
       "missing-letters-review",
       "osk-layout",
       "physical-layout",
+      "publish",
       "punctuation-inventory",
       "retained-convenience-chars",
       "rule-set",
       "touch-layout",
       "touch-seed-source",
+      "trial",
       "upgrades-review",
       "welcome-htm",
       "windows-layout",
@@ -151,7 +160,7 @@ describe("gallery module coverage (FR-002)", () => {
   });
 
   it("question-only screens settle nothing (the recorder's negative case)", () => {
-    for (const id of ["identity", "track", "project_name", "package", "no-such-step"]) {
+    for (const id of ["identity", "project_name", "package", "no-such-step"]) {
       expect(settlesForStep(id), id).toEqual([]);
       expect(stepHasSettles(id), id).toBe(false);
     }

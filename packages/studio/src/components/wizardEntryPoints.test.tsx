@@ -14,8 +14,8 @@
 //
 // Deliberately at the store/primitive level rather than through the full
 // screens: what each entry point promises is "the wizard is at X when you
-// arrive", and X is the traversal store. Rendering OutputScreen or
-// ProfileScreen to click their buttons would test their layout, not their
+// arrive", and X is the traversal store. Rendering the Trial/Publish banners
+// or ProfileScreen to click their buttons would test their layout, not their
 // promise — the end-to-end version of that is `e2e/tab-roundtrip.spec.ts`.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -73,7 +73,7 @@ function seedWalkedSession(): void {
   });
   const s = useSurveySessionStore.getState();
   s.advance("choose_base");
-  useSurveySessionStore.getState().advance("track");
+  useSurveySessionStore.getState().advance("attribution");
   useSurveySessionStore.getState().advance("characters");
   useSurveySessionStore.getState().advance("carve");
   useSurveySessionStore.getState().advance("mechanisms");
@@ -90,7 +90,7 @@ describe("entry point 1 — the coverage-blocked banner's 'go finish them now'",
   it("lands on the gallery it names, not on the identity question", async () => {
     seedWalkedSession();
 
-    // What OutputScreen.handleGoToGallery does, in order: set the target step,
+    // What OutputGateBanners' handleGoToGallery does, in order: set the target step,
     // then navigate. The navigate is what remounts the wizard.
     useSurveySessionStore.getState().backToUnfinishedGallery("mechanisms");
     await leaveAndReturn();
@@ -153,7 +153,7 @@ describe("entry point 4 — Resume from the My-keyboards list", () => {
     const snapshot = {
       ...useSurveySessionStore.getState(),
       activeStepId: "carve" as const,
-      history: ["identity", "choose_base", "track", "characters"] as const,
+      history: ["identity", "choose_base", "attribution", "characters"] as const,
     };
     useSurveySessionStore.getState().hydrate(snapshot as never);
 
@@ -163,7 +163,7 @@ describe("entry point 4 — Resume from the My-keyboards list", () => {
     expect([...useSurveySessionStore.getState().history]).toEqual([
       "identity",
       "choose_base",
-      "track",
+      "attribution",
       "characters",
     ]);
   });

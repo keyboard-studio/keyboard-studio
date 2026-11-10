@@ -93,6 +93,14 @@ export interface JourneyFixture {
   };
   backtrack_events?: JourneyBacktrackEvent[];
   /**
+   * The walk's authoring track, declared up front like the start screen
+   * records it (New = copy, Open = adapt). The track question is gone, so
+   * a fixture no longer answers it as a step — the harness reads this
+   * field instead and instantiates the base at choose_base with it.
+   * Absent means "copy".
+   */
+  track?: "copy" | "adapt";
+  /**
    * OPTIONAL. Base letters (single NFC graphemes) for the "characters" step's
    * `SurveyPhaseResult.alphabet.bases` — a fixture-declared stand-in for
    * PhaseB.tsx's real alphabet-confirmation UI (CLDR/SLDR exemplar lookups,
@@ -279,6 +287,13 @@ export function parseJourneyFixture(raw: string): JourneyFixture {
       fail("confirmed_alphabet_bases must be a string[] of non-empty graphemes if present");
     }
     fixture.confirmed_alphabet_bases = parsed["confirmed_alphabet_bases"] as string[];
+  }
+
+  if (parsed["track"] !== undefined) {
+    if (parsed["track"] !== "copy" && parsed["track"] !== "adapt") {
+      fail('track must be "copy" or "adapt" if present');
+    }
+    fixture.track = parsed["track"];
   }
 
   return fixture;

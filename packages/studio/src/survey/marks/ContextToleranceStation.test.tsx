@@ -39,7 +39,7 @@ const DISCLOSURES: Record<string, SiteDisclosure> = {
 };
 const LINES = { r10: 10, r12: 12, r20: 20 };
 
-function renderStation(prior?: MarksContextToleranceDecision) {
+function renderStation(prior?: MarksContextToleranceDecision, gapFindings?: RuleToleranceFinding[]) {
   const onDecide = vi.fn();
   render(
     <ContextToleranceStation
@@ -48,6 +48,7 @@ function renderStation(prior?: MarksContextToleranceDecision) {
       ruleLines={LINES}
       fingerprint={FINGERPRINT}
       {...(prior !== undefined ? { prior } : {})}
+      {...(gapFindings !== undefined ? { gapFindings } : {})}
       onDecide={onDecide}
     />,
   );
@@ -100,6 +101,9 @@ describe("ContextToleranceStation — proposal", () => {
         onDecide={vi.fn()}
       />,
     );
+    // Spec 106 FR-060: gap findings show the normalization pre-accepted; the
+    // worked cases live in the proposal panel behind the change control.
+    fireEvent.click(screen.getByRole("button", { name: "Change this decision" }));
     const cases = screen.getByTestId("context-tolerance-gap-cases");
     expect(cases.textContent).toMatch(/Rule on line 10: pressing the \[ key/);
     expect(cases.textContent).toMatch(/After this text, with the diacritic joined to the letter/);
@@ -122,6 +126,7 @@ describe("ContextToleranceStation — proposal", () => {
       acceptedSiteIds: ["r10", "r12"],
       proposedSiteIds: ["r10", "r12"],
       fingerprint: FINGERPRINT,
+      origin: "asked",
     });
   });
 
@@ -130,7 +135,7 @@ describe("ContextToleranceStation — proposal", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: /rule on line 12/ }));
     fireEvent.click(screen.getByRole("button", { name: "Add these rules" }));
     expect(onDecide).toHaveBeenCalledWith(
-      expect.objectContaining({ decision: "partial", acceptedSiteIds: ["r10"], proposedSiteIds: ["r10", "r12"] }),
+      expect.objectContaining({ decision: "partial", acceptedSiteIds: ["r10"], proposedSiteIds: ["r10", "r12"], origin: "asked" }),
     );
   });
 
@@ -138,7 +143,7 @@ describe("ContextToleranceStation — proposal", () => {
     const onDecide = renderStation();
     for (const tick of screen.getAllByRole("checkbox")) fireEvent.click(tick);
     fireEvent.click(screen.getByRole("button", { name: "Add these rules" }));
-    expect(onDecide).toHaveBeenCalledWith(expect.objectContaining({ decision: "decline", acceptedSiteIds: [] }));
+    expect(onDecide).toHaveBeenCalledWith(expect.objectContaining({ decision: "decline", acceptedSiteIds: [], origin: "asked" }));
   });
 
   it("'Leave my keyboard as it is' declines with no accepted sites (T044)", () => {
@@ -149,6 +154,7 @@ describe("ContextToleranceStation — proposal", () => {
       acceptedSiteIds: [],
       proposedSiteIds: ["r10", "r12"],
       fingerprint: FINGERPRINT,
+      origin: "asked",
     });
   });
 
@@ -187,6 +193,41 @@ describe("ContextToleranceStation — prior decision (FR-009)", () => {
   it("a changed fingerprint raises the proposal again, pre-filled", () => {
     renderStation(prior("1111111111111111"));
     expect(screen.queryByText(/You chose to leave your keyboard as it is/)).toBeNull();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(2);
+  });
+});
+
+describe("ContextToleranceStation — pre-accepted default (spec 106 FR-060)", () => {
+  const gaps: RuleToleranceFinding[] = [
+    { ruleId: "r10", location: { file: "k.kmn", line: 10 }, status: "not-analysed", failingKeystrokes: [{ vkey: "K_LBRKT", modifiers: [] }] },
+  ];
+
+  it("with gap findings and no decision, shows the normalization as pre-accepted and records nothing on render", () => {
+    const onDecide = renderStation(undefined, gaps);
+    const station = screen.getByTestId("context-tolerance-station");
+    expect(station.getAttribute("data-default")).toBe("accepted");
+    expect(screen.getByText(/2 rules are fixed by default/)).toBeTruthy();
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+    expect(screen.getByTestId("context-tolerance-change")).toBeTruthy();
+    expect(onDecide).not.toHaveBeenCalled();
+  });
+
+  it("the change control re-opens the pre-filled proposal, where declining is an asked decline", () => {
+    const onDecide = renderStation(undefined, gaps);
+    fireEvent.click(screen.getByRole("button", { name: "Change this decision" }));
+    expect(screen.getByTestId("context-tolerance-station").getAttribute("data-default")).toBeNull();
+    const ticks = screen.getAllByRole("checkbox");
+    expect(ticks).toHaveLength(2);
+    for (const tick of ticks) expect((tick as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Leave my keyboard as it is" }));
+    expect(onDecide).toHaveBeenCalledWith(
+      expect.objectContaining({ decision: "decline", acceptedSiteIds: [], origin: "asked" }),
+    );
+  });
+
+  it("without gap findings there is no default view: the proposal panel shows", () => {
+    renderStation();
+    expect(screen.getByTestId("context-tolerance-station").getAttribute("data-default")).toBeNull();
     expect(screen.getAllByRole("checkbox")).toHaveLength(2);
   });
 });

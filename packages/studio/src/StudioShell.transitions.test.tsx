@@ -16,6 +16,7 @@ vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMo
 vi.mock("./editors/adapters/deadkeyAdapter.tsx", () => import("./test/studioShellMocks/deadkeyAdapter.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
+vi.mock("./editors/adapters/fallbackPolicyAdapter.tsx", () => import("./test/studioShellMocks/FallbackPolicyAdapter.tsx"));
 vi.mock("./editors/adapters/oskAdapter.tsx", () => import("./test/studioShellMocks/OskEditorAdapter.tsx"));
 vi.mock("./editors/assignLoop/CssEditor.tsx", () => import("./test/studioShellMocks/CssEditor.tsx"));
 vi.mock("./editors/assignLoop/HtmlEditor.tsx", () => import("./test/studioShellMocks/HtmlEditor.tsx"));
@@ -26,7 +27,7 @@ vi.mock("./components/UnsupportedScriptStub.tsx", () => import("./test/studioShe
 vi.mock("./components/OSKFrame.tsx", () => import("./test/studioShellMocks/OSKFrame.tsx"));
 vi.mock("./components/OskModeToggle.tsx", () => import("./test/studioShellMocks/OskModeToggle.tsx"));
 vi.mock("./components/CompareScreen.tsx", () => import("./test/studioShellMocks/CompareScreen.tsx"));
-vi.mock("./components/OutputScreen.tsx", () => import("./test/studioShellMocks/OutputScreen.tsx"));
+vi.mock("./components/OutputRedirect.tsx", () => import("./test/studioShellMocks/OutputRedirect.tsx"));
 vi.mock("./components/WelcomeScreen.tsx", () => import("./test/studioShellMocks/WelcomeScreen.tsx"));
 vi.mock("./dashboard/DashboardView.tsx", () => import("./test/studioShellMocks/DashboardView.tsx"));
 // Controllable: static idle by default; the "resume draft banner" F1/P1
@@ -167,10 +168,13 @@ describe("SurveyView — mechanisms → F transition", () => {
     await advanceToMechanisms();
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
-    // mechanisms → osk → touch_seed_source fork (spec 035 R4/R12)
+    // mechanisms → fallback_policy → osk → touch_seed_source fork (spec 035 R4/R12)
     fireEvent.click(screen.getByTestId("mechanisms-continue"));
-    expect(screen.getByTestId("osk-continue")).toBeTruthy();
+    expect(screen.getByTestId("fallback-policy-continue")).toBeTruthy();
     expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("fallback-policy-continue"));
+    expect(screen.getByTestId("osk-continue")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("osk-continue"));
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();

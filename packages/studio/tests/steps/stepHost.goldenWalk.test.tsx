@@ -90,7 +90,7 @@ import { useDecisionStore } from "../../src/stores/decisionStore.ts";
 // ---------------------------------------------------------------------------
 // Mock child survey components — the shared StudioShell harness
 // (src/test/studioShellMocks/), the same stubs StudioShell.test.tsx mounts.
-// The track, project_name and phase_f_helpdocs flows go through the
+// The project_name and phase_f_helpdocs flows go through the
 // FlowStepHost stub (spec 029); see that module for what each emits.
 // ---------------------------------------------------------------------------
 
@@ -123,6 +123,9 @@ vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () =>
 );
 vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () =>
   import("../../src/test/studioShellMocks/TouchGallery.tsx"),
+);
+vi.mock("../../src/editors/adapters/fallbackPolicyAdapter.tsx", () =>
+  import("../../src/test/studioShellMocks/FallbackPolicyAdapter.tsx"),
 );
 vi.mock("../../src/editors/adapters/oskAdapter.tsx", async () => {
   const { usePublishStepNav } = await import("../../src/hooks/usePublishStepNav.ts");
@@ -220,12 +223,60 @@ vi.mock("../../src/editors/assignLoop/IconEditor.tsx", async () => {
     },
   };
 });
+vi.mock("../../src/editors/assignLoop/TrialStep.tsx", async () => {
+  const { usePublishStepNav } = await import("../../src/hooks/usePublishStepNav.ts");
+  return {
+    TrialStep: ({
+      onComplete,
+      onBack,
+    }: {
+      onComplete: (result: { buildsAtCompletion: number }) => void;
+      onBack?: () => void;
+    }) => {
+      usePublishStepNav({
+        ...(onBack !== undefined
+          ? { back: { label: "trial-back", onClick: onBack, testId: "trial-back" } }
+          : {}),
+        forward: {
+          label: "trial-continue",
+          onClick: () => onComplete({ buildsAtCompletion: 0 }),
+          testId: "trial-continue",
+        },
+      });
+      return <div data-testid="stage-trial" />;
+    },
+  };
+});
+vi.mock("../../src/editors/assignLoop/PublishStep.tsx", async () => {
+  const { usePublishStepNav } = await import("../../src/hooks/usePublishStepNav.ts");
+  return {
+    PublishStep: ({
+      onComplete,
+      onBack,
+    }: {
+      onComplete: (result: { submitted: boolean }) => void;
+      onBack?: () => void;
+    }) => {
+      usePublishStepNav({
+        ...(onBack !== undefined
+          ? { back: { label: "publish-back", onClick: onBack, testId: "publish-back" } }
+          : {}),
+        forward: {
+          label: "publish-finish",
+          onClick: () => onComplete({ submitted: false }),
+          testId: "publish-finish",
+        },
+      });
+      return <div data-testid="stage-publish" />;
+    },
+  };
+});
 vi.mock("../../src/components/UnsupportedScriptStub.tsx", () =>
   import("../../src/test/studioShellMocks/UnsupportedScriptStub.tsx"),
 );
 vi.mock("../../src/components/OSKFrame.tsx", () => import("../../src/test/studioShellMocks/OSKFrame.tsx"));
 vi.mock("../../src/components/OskModeToggle.tsx", () => import("../../src/test/studioShellMocks/OskModeToggle.tsx"));
-vi.mock("../../src/components/OutputScreen.tsx", () => import("../../src/test/studioShellMocks/OutputScreen.tsx"));
+vi.mock("../../src/components/OutputRedirect.tsx", () => import("../../src/test/studioShellMocks/OutputRedirect.tsx"));
 vi.mock("../../src/dashboard/DashboardView.tsx", () => import("../../src/test/studioShellMocks/DashboardView.tsx"));
 vi.mock("../../src/hooks/useKeyboardArtifact.ts", () =>
   import("../../src/test/studioShellMocks/idleKeyboardArtifact.ts"),
@@ -331,9 +382,9 @@ interface WalkEntry {
   workingCopyMutations: string[];
   /**
    * Decision-store mutator names in call order (spec 088). The completion
-   * writer (recordAll via StudioShell's injected deps) and the flow
-   * onCommit record for the track step land here — this is where the track
-   * choice is visible now that the session store no longer carries it.
+   * writer (recordAll via StudioShell's injected deps) and the
+   * authoring-track record land here — this is where the track choice is
+   * visible now that the session store no longer carries it.
    */
   decisionMutations: string[];
   navigateTo: string[];
@@ -570,11 +621,11 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
 
 /**
  * Drive the full copy-track walk.
- * identity -> layout -> choose_base -> track(copy) -> attribution ->
+ * identity -> layout -> choose_base -> attribution (copy is the default) ->
  * project_name ->
  * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
  * rules ->
- * mechanisms -> touch_seed_source -> touch -> help -> done
+ * mechanisms -> fallback_policy -> osk -> touch_seed_source -> touch -> help -> done
  *
  * S-03 sequences build inline in the Mechanism Gallery's method chooser (the
  * right-hand preview pane swaps for a one-character sequence builder while
@@ -585,8 +636,9 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
  * "deadkeys-continue" testid — before the real "mechanisms" step (still the
  * MechanismGallery mock, "mechanisms-continue").
  *
- * touch_seed_source (spec 035 R4/R12) is inserted between mechanisms and touch
- * on a FRESH walk because touchSeedSource starts null — advance("mechanisms")
+ * fallback_policy (#2539) and osk sit after mechanisms; touch_seed_source
+ * (spec 035 R4/R12) is inserted between osk and touch on a FRESH walk because
+ * touchSeedSource starts null — advance("osk")
  * routes into the fork instead of straight to "touch". The fork step renders
  * the mocked TouchSeedSourcePanel stub (T014, registerEditorSteps.ts) — driven
  * via its own "seed-source-confirm" testid — before the real "touch" step
@@ -597,7 +649,6 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "identity", testId: "survey-advance" },
     { stepId: "layout", testId: "layout-continue" },
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
-    { stepId: "track", testId: "track-copy" },
     // #1901: author/copyright are asked here now (FlowStepHost stub emits
     // the same answers the identity stub used to).
     { stepId: "attribution", testId: "survey-advance" },
@@ -618,6 +669,7 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "deadkeys", testId: "deadkeys-continue" },
     { stepId: "rules", testId: "rules-continue" },
     { stepId: "mechanisms", testId: "mechanisms-continue" },
+    { stepId: "fallback_policy", testId: "fallback-policy-continue", async: true },
     { stepId: "osk", testId: "osk-continue", async: true },
     { stepId: "touch_seed_source", testId: "seed-source-confirm", async: true },
     { stepId: "touch", testId: "touch-continue", async: true },
@@ -625,25 +677,47 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "help", testId: "survey-advance", async: true },
     { stepId: "html", testId: "html-continue", async: true },
     { stepId: "icon", testId: "icon-continue", async: true },
+    { stepId: "trial", testId: "trial-continue", async: true },
+    { stepId: "publish", testId: "publish-finish", async: true },
   ]);
 }
 
 /**
  * Drive the full adapt-track walk.
- * identity -> layout -> choose_base -> track(adapt) -> attribution ->
+ * identity -> layout -> choose_base -> attribution (adapt, recorded up
+ * front the way the start screen's Open entry records it) ->
  * characters(prefill->B) -> punctuation -> invisibles -> carve -> deadkeys ->
  * rules ->
- * mechanisms -> touch_seed_source -> touch -> help -> done
+ * mechanisms -> fallback_policy -> osk -> touch_seed_source -> touch -> help -> done
  * project_name MUST NOT appear. See driveCopyTrack's docstring for why
  * touch_seed_source appears (spec 035 R4/R12 fork memory) and why there is no
  * separate "sequences" step.
  */
 async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
+  // The track question is gone: adapt is recorded between the base preview
+  // and the base confirm. It must be known by the time the base is
+  // confirmed (so StudioShell's instantiation effect does not default it
+  // to copy), but recording it before the walk starts would gate the
+  // identity-first screens off (spec 111 hides them on Open) and the walk
+  // would skip straight to attribution. The split choose_base window below
+  // is the price: the recorder opens one window for the preview and a
+  // second for the confirm, so the fixture shows choose_base twice — and
+  // the adapt record itself falls between the two windows, so it is in
+  // the decision store (the fork reads it) but attributed to neither
+  // window in the ledger.
   await driveSteps(recorder, [
     { stepId: "identity", testId: "survey-advance" },
     { stepId: "layout", testId: "layout-continue" },
-    { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
-    { stepId: "track", testId: "track-adapt" },
+    { stepId: "choose_base", testIds: ["base-preview"] },
+  ]);
+  useDecisionStore.getState().record({
+    id: "authoring-track",
+    value: "adapt",
+    provenance: "asked",
+    step: "start",
+  });
+  await driveSteps(recorder, [
+    { stepId: "choose_base", testIds: ["base-confirm"] },
     { stepId: "attribution", testId: "survey-advance" },
     // Open (spec 111): the editable language list rides the adapt track only.
     // Open (spec 111) hides the character survey, punctuation, invisibles, carve,
@@ -652,7 +726,8 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     // problem, which this walk (no baseline) did not.
     { stepId: "open_languages", testId: "survey-advance" },
     { stepId: "open_missing_letters", testId: "survey-advance", settleFor: "mechanisms-continue" },
-    { stepId: "mechanisms", testId: "mechanisms-continue", settleFor: "osk-continue" },
+    { stepId: "mechanisms", testId: "mechanisms-continue", settleFor: "fallback-policy-continue" },
+    { stepId: "fallback_policy", testId: "fallback-policy-continue", settleFor: "osk-continue" },
     { stepId: "osk", testId: "osk-continue", async: true },
     { stepId: "touch", testId: "touch-continue", async: true },
     { stepId: "css", testId: "css-continue", async: true },

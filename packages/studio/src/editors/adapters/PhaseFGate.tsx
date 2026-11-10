@@ -36,7 +36,6 @@ import { useInventoryCoverageGate } from "../../hooks/useInventoryCoverageGate.t
 import { formatCoverageBannerParts } from "../../lib/unimplementedInventory.ts";
 import { ConfirmDialog } from "../assignLoop/parts/ConfirmDialog.tsx";
 import { PhaseFStepFactoryComponent } from "./flowStepOptions.tsx";
-import { DocsPreviewPanel } from "../../components/DocsPreviewPanel.tsx";
 import { DocumentationFixProposals } from "../../components/DocumentationFixProposals.tsx";
 import { composeHelpDocsValue } from "../../survey/questions/gallery/helpDocs.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
@@ -56,7 +55,7 @@ export function PhaseFGate(props: EditorStepProps): React.ReactElement {
 
   // Single shared hook (hooks/useInventoryCoverageGate.ts) — do not re-derive
   // the desktop-always / touch-only-if-authored booleans locally; StepHost's
-  // gate and OutputScreen's download gate use the same hook.
+  // gate and PublishStep's download gate use the same hook.
   const gate = useInventoryCoverageGate();
   const { unimplementedDesktop, unimplementedTouch, blockedOnDesktop, blockedOnTouch, blocked, touchLayoutCorrupted } =
     gate;
@@ -125,7 +124,6 @@ export function PhaseFGate(props: EditorStepProps): React.ReactElement {
           1) — the deterministic fixes are proposed here, never applied
           silently. Renders nothing on the copy track. */}
       <DocumentationFixProposals />
-      <DocsPreviewPanel />
       <ConfirmDialog
         open={blocked}
         title={t({

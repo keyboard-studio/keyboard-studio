@@ -108,7 +108,7 @@ import { MarkTreatmentStation } from "./MarkTreatmentStation.tsx";
 import { OutputFormStation } from "./OutputFormStation.tsx";
 import { StackingStation } from "./StackingStation.tsx";
 import { ContextToleranceStation, type ContextToleranceDecisionInput, type SiteDisclosure } from "./ContextToleranceStation.tsx";
-import { toleranceProposalFor, toleranceStationShown } from "./contextToleranceProposal.ts";
+import { defaultToleranceDecision, toleranceProposalFor, toleranceStationShown } from "./contextToleranceProposal.ts";
 import {
   ACCENT,
   TEXT_MAIN,
@@ -489,8 +489,8 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
           t({
             id: "marks.contextTolerance.station.description",
             message: plural(added, {
-              one: `Adds # rule. Afterwards these ${sites} keys give the same result whether the diacritic is joined to the letter or stored as a separate character.`,
-              other: `Adds # rules. Afterwards these ${sites} keys give the same result whether the diacritic is joined to the letter or stored as a separate character.`,
+              one: `Adds # rule. Afterwards these ${sites} keys give the same result whether the mark is joined to the letter or stored as a separate character.`,
+              other: `Adds # rules. Afterwards these ${sites} keys give the same result whether the mark is joined to the letter or stored as a separate character.`,
             }),
           }),
       }),
@@ -936,7 +936,24 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
       // Stamp the final station as the position before completing, so the
       // entries step completion records are attributed to it.
       setPosition(STEP_ID, activeStation);
-      complete(toleranceOverride);
+      // Spec 106 FR-060: the tolerance station shows the normalization as
+      // pre-accepted; pressing Continue without changing it records the
+      // default decision here — on Continue, never on render (Art. X). The
+      // tolerance station is always last (visibleMarksStations), so this is
+      // the only Continue it can take; an explicit confirm/decline arrives
+      // as the override instead, and a prior decision is carried forward by
+      // resolvedToleranceDecision.
+      const defaultDecision =
+        toleranceOverride === undefined &&
+        activeStation === "marks_context_tolerance" &&
+        toleranceDecision === null &&
+        priorTolerance === undefined &&
+        toleranceProposal !== null &&
+        toleranceFingerprint !== undefined &&
+        toleranceGapFindings.length > 0
+          ? defaultToleranceDecision(toleranceProposal, toleranceFingerprint)
+          : undefined;
+      complete(toleranceOverride ?? defaultDecision);
     }
   }
 
@@ -960,8 +977,8 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
         {t({
           id: "survey.marks.series.intro",
           message: plural(gate.alphabet.marks.length, {
-            one: "Your alphabet includes # mark. Confirm how they attach to your letters before placing keys.",
-            other: "Your alphabet includes # marks. Confirm how they attach to your letters before placing keys.",
+            one: "Your alphabet includes # mark. These questions settle how it is typed and how it combines with your letters.",
+            other: "Your alphabet includes # marks. These questions settle how they are typed and how they combine with your letters.",
           }),
         })}
       </p>
@@ -1007,7 +1024,7 @@ const MarksSeriesStep: ComponentType<DecisionRendererProps<MarksTreatmentValue>>
       {activeStation === "marks_context_tolerance" && toleranceProposal === null && (
         <p data-testid="context-tolerance-checking" style={mutedParaFlush}>
           <Trans id="marks.contextTolerance.station.checking">
-            Checking whether your keys also work when the letter and its diacritic are stored as separate characters.
+            Checking whether your keys also work when the letter and its mark are stored as separate characters.
             You can continue; the result will appear with the other messages.
           </Trans>
         </p>

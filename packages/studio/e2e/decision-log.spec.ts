@@ -6,7 +6,7 @@
  * downloaded source .zip's `.studio/decision-record.json` sidecar is
  * parsed and checked:
  *
- *   - every one of the fourteen gallery decision ids has EXACTLY ONE live
+ *   - every one of the gallery decision ids in GALLERY_DECISION_IDS has EXACTLY ONE live
  *     `decision`-kind entry (live = no other entry's `supersedes` names
  *     it), carrying a non-empty summary within the format's bound;
  *   - no slot of any kind holds more than one live entry (the exactly-once
@@ -36,7 +36,7 @@ import {
   seedReturningVisitor,
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   driveAttributionStep,
   acceptProjectName,
   confirmPrefill,
@@ -44,10 +44,11 @@ import {
   driveMechanismsGallery,
   driveTouchGallery,
   driveHelpPhase,
+  goToPublishFromDone,
   triggerDownload,
 } from "./helpers/surveyFlow";
 
-/** The fourteen gallery decision ids (spec 090 FR-002's coverage set). */
+/** Gallery decision ids asserted on the golden walk (spec 090 FR-002 + issue #2539). */
 const GALLERY_DECISION_IDS = [
   "windows-layout",
   "base-keyboard",
@@ -60,6 +61,7 @@ const GALLERY_DECISION_IDS = [
   "deadkeys-defined",
   "rule-set",
   "physical-layout",
+  "fallback-policy",
   "touch-seed-source",
   "touch-layout",
   "help-docs",
@@ -93,7 +95,7 @@ test("spec 090 SC-003: full walk leaves exactly one live log entry per decision"
 
   await driveIdentityLite(page, { languageCode: "fr" });
   await pickStartKeyboard(page, "basic_kbdfr");
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page);
   await acceptProjectName(page);
   await confirmPrefill(page);
@@ -113,7 +115,7 @@ test("spec 090 SC-003: full walk leaves exactly one live log entry per decision"
   await driveMechanismsGallery(page);
   await driveTouchGallery(page);
   await driveHelpPhase(page, "Welcome to the keyboard.", "Press a key to start.");
-  await page.waitForURL(/#output$/, { timeout: 30_000 });
+  await goToPublishFromDone(page);
 
   const download = await triggerDownload(page);
   const zipPath = await download.path();
@@ -140,7 +142,7 @@ test("spec 090 SC-003: full walk leaves exactly one live log entry per decision"
   const doubled = [...liveBySlot.entries()].filter(([, count]) => count > 1);
   expect(doubled, `slots with more than one live entry: ${JSON.stringify(doubled)}`).toEqual([]);
 
-  // The fourteen gallery decisions: exactly one live decision-kind entry
+  // Each gallery decision: exactly one live decision-kind entry
   // each, with a bounded human-readable summary (the format contract the
   // trail renders from — no per-module knowledge needed downstream).
   for (const decisionId of GALLERY_DECISION_IDS) {

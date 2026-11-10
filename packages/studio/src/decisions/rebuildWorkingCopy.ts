@@ -31,6 +31,7 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { isNormalizationStepBatch } from "@keyboard-studio/engine";
 import type { QuestionModule } from "../survey/types.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
+import { authoringTrackProviderModule } from "../survey/questions/authoringTrackProvider.ts";
 import { useDecisionStore, getDecisionSnapshot } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { Decision, DecisionId, DecisionSet } from "./decisionTypes.ts";
@@ -333,7 +334,11 @@ export function rebuildWorkingCopyFromStores(
   const source = ctx.catalog?.id ?? ctx.ir?.header.keyboardId ?? ctx.ir?.header.name;
   const outcome = rebuildWorkingCopy(
     {
-      modules: Object.values(questionRegistry),
+      // The authoring-track provider rides along: the registry no longer
+      // has a question providing authoring-track (the track question is
+      // gone), and orderDecisions throws on the character-inventory
+      // module's requires edge without it.
+      modules: [...Object.values(questionRegistry), authoringTrackProviderModule],
       extractContext: ctx,
       ...(source !== undefined ? { source } : {}),
     },
@@ -356,7 +361,7 @@ export function rebuildWorkingCopyFromStores(
 /**
  * The live entry for a starting-point change (spec 093 T017, owner
  * ruling (b) — RETAIN + RECALCULATE): called by StudioShell's doCommit
- * (and the OutputScreen picker's instantiate path) AFTER the new base
+ * (and the PublishStep change-base flow's instantiate path) AFTER the new base
  * has been instantiated and the live extraction pass has seeded the new
  * bundle's records. The retained decision set is recalculated against
  * the new starting point — extracted/default records re-derive from the
@@ -388,7 +393,11 @@ export function recalculateForStartingPointChangeFromStores(): RebuildOutcome | 
   const source = ctx.catalog?.id ?? ctx.ir?.header.keyboardId ?? ctx.ir?.header.name;
   const outcome = recalculateForStartingPointChange(
     {
-      modules: Object.values(questionRegistry),
+      // The authoring-track provider rides along: the registry no longer
+      // has a question providing authoring-track (the track question is
+      // gone), and orderDecisions throws on the character-inventory
+      // module's requires edge without it.
+      modules: [...Object.values(questionRegistry), authoringTrackProviderModule],
       extractContext: ctx,
       ...(source !== undefined ? { source } : {}),
     },

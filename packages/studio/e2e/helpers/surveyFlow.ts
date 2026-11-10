@@ -64,8 +64,8 @@ export function surveyAdvance(page: Page) {
  *
  * A returning visitor with no draft lands on the New-or-Open start screen (spec
  * 111), so the script also points an empty hash at `#survey`: the walks below
- * start at identity as before, with no track recorded, so the track step still
- * asks (Copy only). The start screen itself is covered by
+ * start at identity as before, with no track recorded, so the walk defaults
+ * to copy at the base choice. The start screen itself is covered by
  * open-existing-keyboard.spec.ts.
  *
  * This is draft-safe: it only sets the visited flag, unlike clicking
@@ -161,8 +161,8 @@ async function waitVisible(locator: Locator, timeout: number): Promise<boolean> 
  *
  * (#1901: the author/copyright questions — il_author_name, il_author_email,
  * il_copyright_holder — are no longer part of this flow. They form the
- * post-track attribution step; see driveAttributionStep, which walks call
- * after chooseTrackCopy.)
+ * attribution step; see driveAttributionStep, which walks call
+ * after confirmCopyTrack.)
  *
  * This helper detects presence rather than assuming the fixed sequence above,
  * since il_language_region is conditional and may not render at all:
@@ -240,7 +240,7 @@ export async function driveIdentityLite(
 
   // The identity flow ends here (#1901): a supported script completes the
   // step and hands off to the layout step. The author/copyright questions
-  // are the post-track attribution step's (driveAttributionStep).
+  // are the attribution step's (driveAttributionStep).
 
   // Community-layout step (spec 076 A4): sits between identity and the base
   // picker. Confirm the studio's suggested Windows layout (the default,
@@ -393,21 +393,23 @@ export function zipSourceEntry(
 }
 
 /**
- * Choose the "Copy" track (Track 1, copy-edit path) and advance.
+ * Confirm the walk is on the Copy track (Track 1, copy-edit path) past the
+ * base choice.
  *
- * The track step renders as a survey radio question. For the copy-edit variant,
- * select the "Copy" option.
+ * The track question is gone: after the base is confirmed the walk lands
+ * on attribution directly, with copy in force (the start screen records
+ * copy for New, or StudioShell defaults it). There is nothing to click —
+ * this waits for the attribution step's author-name field as the proof
+ * the walk arrived there on the copy track.
  */
-export async function chooseTrackCopy(page: Page): Promise<void> {
-  const copyRadio = page.getByRole("radio", { name: /^Copy/i });
-  await copyRadio.waitFor({ state: "visible", timeout: 15_000 });
-  await copyRadio.check();
-  await surveyAdvance(page).click();
+export async function confirmCopyTrack(page: Page): Promise<void> {
+  const nameField = page.locator("#il_author_name");
+  await nameField.waitFor({ state: "visible", timeout: 15_000 });
 }
 
 /**
  * Drive the attribution step (#1901) — the author/copyright questions,
- * asked AFTER the track choice (call after chooseTrackCopy, before acceptProjectName / confirmPrefill):
+ * asked after the base choice (call after confirmCopyTrack, before acceptProjectName / confirmPrefill):
  *
  *   1. il_author_name (text) — REQUIRED (validate() rejects blank). Unseeded
  *      in an unauthenticated e2e run (the profile seed comes from
@@ -419,10 +421,7 @@ export async function chooseTrackCopy(page: Page): Promise<void> {
  *      email must never block emission per spec 064). Left blank unless
  *      `authorEmail` is passed.
  *   3. il_copyright_holder (text) — optional, terminal for the flow. On the
- *      update track it arrives PRE-FILLED with the base keyboard's own
- *      copyright (the 092 extraction pass seeded it at setup) and is kept
- *      as-is unless `copyrightHolder` is passed; on the copy track it is
- *      blank, and blank defaults to the author name (D1).
+ *      copy track it is blank, and blank defaults to the author name (D1).
  */
 export async function driveAttributionStep(
   page: Page,
@@ -1000,6 +999,10 @@ async function assignToKey(page: Page, placement: MechanismPlacement): Promise<v
  * characters is never misread as "the gallery already completed".
  */
 export async function driveOskEditor(page: Page): Promise<void> {
+  const fallbackContinue = page.getByTestId("fallback-policy-continue");
+  if (await waitVisible(fallbackContinue, 30_000)) {
+    await fallbackContinue.click();
+  }
   const oskContinue = page.getByTestId("osk-continue");
   if (await waitVisible(oskContinue, 30_000)) {
     await oskContinue.click();
@@ -1102,7 +1105,7 @@ export async function driveTouchGallery(page: Page): Promise<void> {
  *      pf_history_entry) — the minimal path every existing walk wants,
  *      rather than opening the optional documentation battery
  *   6. Advances through remaining optional questions in a bounded loop
- *   7. Detects arrival at #output (phase boundary)
+ *   7. Detects arrival at the done panel (phase boundary)
  *
  * @param page Page instance
  * @param welcomeText Welcome paragraph text (e.g. "Welcome to the keyboard.")
@@ -1198,13 +1201,18 @@ export async function driveHelpPhase(
   await moreDetailNo.check();
   await surveyAdvance(page).click();
 
-  await advanceThroughTailToOutput(page);
+  await advanceThroughTailToDone(page);
 }
 
-/** Advance through optional Phase F tail questions, then css/html editor steps, until #output. */
-export async function advanceThroughTailToOutput(page: Page): Promise<void> {
+/** Advance through optional Phase F tail questions, then the html/icon/trial/publish tail, until the done panel. */
+export async function advanceThroughTailToDone(page: Page): Promise<void> {
   for (let guard = 0; guard < 20; guard++) {
-    if (/#output$/.test(page.url())) {
+    if (
+      await page
+        .getByRole("heading", { name: "Survey complete" })
+        .isVisible()
+        .catch(() => false)
+    ) {
       return;
     }
     const next = surveyAdvance(page);
@@ -1216,17 +1224,20 @@ export async function advanceThroughTailToOutput(page: Page): Promise<void> {
     const editorContinue = page
       .getByTestId("html-continue")
       .or(page.getByTestId("css-continue"))
+      .or(page.getByTestId("icon-continue"))
+      .or(page.getByTestId("trial-continue"))
+      .or(page.getByTestId("publish-finish"))
       .or(page.getByRole("button", { name: "Continue" }));
     if (await editorContinue.isVisible().catch(() => false)) {
       await editorContinue.click();
       continue;
     }
     throw new Error(
-      `advanceThroughTailToOutput: stuck before #output (url: ${page.url()}) — ` +
+      `advanceThroughTailToDone: stuck before the done panel (url: ${page.url()}) — ` +
         "no survey-advance or editor Continue visible",
     );
   }
-  throw new Error("advanceThroughTailToOutput: did not reach #output within the step budget");
+  throw new Error("advanceThroughTailToDone: did not reach the done panel within the step budget");
 }
 
 /** Optional custom CSS step (after touch): continue with empty CSS (no .css file). */
@@ -1287,11 +1298,43 @@ export async function switchTab(page: Page, route: TabRoute): Promise<void> {
 }
 
 /**
- * Navigate to the Output tab via the nav link and wait for the screen to load.
+ * Go to the Publish step, where the release lives (spec 113).
+ *
+ * The `#output` tab is a redirect into the tail now: a finished walk lands
+ * on Publish directly; mid-walk it lands on Trial, so Continue once. The
+ * coverage gate must already be open, or Trial's Continue is disabled and
+ * this waits out the timeout naming the stall.
  */
-export async function navigateToOutput(page: Page): Promise<void> {
+export async function navigateToPublish(page: Page): Promise<void> {
   await page.click('a[href="#output"]');
-  await page.waitForSelector('[data-testid="output-screen-root"]', { timeout: 10_000 });
+  const tail = page.locator('[data-testid="publish-step-root"], [data-testid="trial-step-root"]');
+  await tail.first().waitFor({ state: "visible", timeout: 10_000 });
+  const trialContinue = page.getByTestId("trial-continue");
+  if (await trialContinue.isVisible().catch(() => false)) {
+    await expect(trialContinue).toBeEnabled({ timeout: 15_000 });
+    await trialContinue.click();
+    await page.waitForSelector('[data-testid="publish-step-root"]', { timeout: 10_000 });
+  }
+}
+
+/**
+ * Go to the Trial step, where test builds live (spec 113).
+ *
+ * The `#output` tab is a redirect into the tail now: mid-walk it lands on
+ * Trial. The coverage gate must already be open (the galleries walked), or
+ * Trial mounts with Continue disabled — the builds themselves still work.
+ * Callers that need a FINISHED walk must use navigateToPublish instead: once
+ * the walk is done, `#output` redirects to Publish and Trial is behind.
+ */
+export async function navigateToTrial(page: Page): Promise<void> {
+  await page.click('a[href="#output"]');
+  await page.waitForSelector('[data-testid="trial-step-root"]', { timeout: 30_000 });
+}
+
+/** From the done panel, open the Publish step (spec 113: the walk ends at done; the release lives on Publish). */
+export async function goToPublishFromDone(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Review the Publish step" }).click();
+  await page.waitForSelector('[data-testid="publish-step-root"]', { timeout: 30_000 });
 }
 
 /**

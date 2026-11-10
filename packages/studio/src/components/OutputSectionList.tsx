@@ -1,10 +1,10 @@
-// OutputSectionList — "Revise a section" on Output (spec 094 FR-001, research
-// R4).
+// OutputSectionList — "Revise a section" on Trial (spec 094 FR-001, research
+// R4; moved from Output by spec 113).
 //
 // Lists the sections the author has completed, each opening that step with
-// the return-to-Output seam (`jumpToLocation(..., { returnTo: { route:
-// "output" } })`), so a fix after testing never means walking the rest of the
-// survey again.
+// the return-to-Trial seam (`jumpToLocation(..., { returnTo: { route:
+// "survey", step: "trial" } })`), so a fix after testing never means
+// walking the rest of the survey again.
 //
 // Membership and order come from what the author actually did, not from a
 // hand-kept list (constitution Article IX): the steps they walked past
@@ -27,11 +27,11 @@ import { stageLabel, unreachableReasonLabel } from "../decisions/progressDots.ts
 import { useSurveySessionStore, type ActiveStepId } from "../stores/surveySessionStore.ts";
 import { useTestingStore } from "../stores/testingStore.ts";
 import { jumpToLocation } from "../lib/jumpToLocation.ts";
-import { manifest } from "../steps/manifest.ts";
+import { manifestStepIds } from "../steps/derivedViews.ts";
 import { ACCENT, BORDER, TEXT_DIM } from "../ui/theme.ts";
 
 /** Steps that pick the starting point. Revising one would replace the working copy (FR-005). */
-const STARTING_POINT_STEPS: ReadonlySet<string> = new Set(["layout", "choose_base", "track"]);
+const STARTING_POINT_STEPS: ReadonlySet<string> = new Set(["layout", "choose_base"]);
 
 export interface OutputSection {
   stepId: string;
@@ -74,12 +74,22 @@ export function useCompletedSections(): OutputSection[] {
   const visited = useSurveySessionStore((s) => s.visited);
   const activeStepId = useSurveySessionStore((s) => s.activeStepId);
   return useMemo(
-    () => completedSections(visited, buildStageGroups(record), { activeStepId, stepIds: MANIFEST_STEP_IDS }),
+    () => completedSections(visited, buildStageGroups(record), { activeStepId, stepIds: manifestStepIdSet() }),
     [visited, record, activeStepId],
   );
 }
 
-const MANIFEST_STEP_IDS: ReadonlySet<string> = new Set(manifest.map((s) => s.id));
+// This build's step ids, for `completedSections`' scope. Read from
+// steps/derivedViews.ts — NOT from steps/manifest.ts. This component is
+// imported by the Trial step host, which the manifest itself imports
+// (registerEditorSteps), so importing the manifest here closed a module
+// cycle (spec 113, depcruise `no-circular`). The derived views are computed
+// from the registry alone and sit below the step pool, so they are safe to
+// read at module top.
+/** This build's step ids, for `completedSections`' scope. */
+function manifestStepIdSet(): ReadonlySet<string> {
+  return new Set(manifestStepIds);
+}
 
 export function OutputSectionList() {
   const { t, i18n } = useLingui();
@@ -118,7 +128,9 @@ export function OutputSectionList() {
   const openSection = (stepId: string) => {
     const outcome = jumpToLocation(
       { route: "survey", step: stepId as ActiveStepId },
-      { returnTo: { route: "output" } },
+      // spec 113 (#2540): revise-and-return now returns to the Trial step,
+      // which owns this list — the Output route is a redirect, not a home.
+      { returnTo: { route: "survey", step: "trial" } },
     );
     setStatus(outcome.kind === "refused" ? unreachableReasonLabel(outcome.reason, i18n) : null);
   };

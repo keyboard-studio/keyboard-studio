@@ -2,8 +2,8 @@
 // flowStepOptions.tsx (spec 029 Stage 6, T005).
 //
 // makeFlowStepComponent.test.tsx exercises the FACTORY against synthetic
-// buildTrackOptions()/buildSeedOptions() records, so trackOptions.extract
-// and the whole of phaseFOptions were never run at all. This file drives
+// buildProjectNameOptions()/buildSeedOptions() records, so the whole of
+// phaseFOptions was never run at all. This file drives
 // the exported records directly against the REAL zustand stores, reset
 // between tests by the global test setup.
 //
@@ -21,7 +21,6 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  trackOptions,
   phaseFOptions,
   projectNameOptions,
   slugRetainsMostLetters,
@@ -36,6 +35,7 @@ import pfCreditsMod from "../../survey/questions/f/pf_credits.ts";
 import pfWelcomeParagraphMod from "../../survey/questions/f/pf_welcome_paragraph.ts";
 
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import type { InstantiationMode } from "../../stores/workingCopyStore.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { runLiveExtractionFromStores } from "../../decisions/liveExtraction.ts";
 import { buildExtractContext, type ExtractContext } from "../../decisions/extractContext.ts";
@@ -81,70 +81,6 @@ function buildResult(
 ): SurveyPhaseResult {
   return { phase: "G", answers, confirmedInventory: [] };
 }
-
-// ---------------------------------------------------------------------------
-// trackOptions.buildContext
-// ---------------------------------------------------------------------------
-
-describe("trackOptions.buildContext", () => {
-  it("returns base_name from localBase.displayName", () => {
-    const { deps } = buildDeps({ localStart: { displayName: "English (US)" } });
-    expect(trackOptions.buildContext(deps)).toEqual({ base_name: "English (US)" });
-  });
-
-  it("falls back to empty string when localBase is null", () => {
-    const { deps } = buildDeps({ localStart: null });
-    expect(trackOptions.buildContext(deps)).toEqual({ base_name: "" });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// trackOptions.seeds — FR-031 (spec 057): arriving at the step (deep link or
-// Back) shows the currently-recorded answer, never an empty radio group.
-// ---------------------------------------------------------------------------
-
-describe("trackOptions.seeds.getSeedValue (FR-031 recorded-answer prefill)", () => {
-  it("seeds track_choice from the recorded track (deps.selectedTrack)", () => {
-    const { deps } = buildDeps({ selectedTrack: "adapt" });
-    expect(trackOptions.seeds!.getSeedValue("track_choice", deps)).toBe("adapt");
-  });
-
-  it("a recorded track always wins, and names no proposal source", () => {
-    const { deps } = buildDeps({
-      selectedTrack: "copy",
-      surveyContext: { bcp47_tag: "ewo" },
-      localStart: { displayName: "Ewondo", languages: ["ewo"] },
-    });
-    expect(trackOptions.seeds!.getSeedValue("track_choice", deps)).toBe("copy");
-    expect(trackOptions.seeds!.getSeedSource?.("track_choice", deps)).toBeUndefined();
-    expect(trackOptions.seeds!.getSeedCaption?.("track_choice", deps)).toBeUndefined();
-  });
-
-  it("returns undefined for any other questionId", () => {
-    const { deps } = buildDeps({ selectedTrack: "copy" });
-    expect(trackOptions.seeds!.getSeedValue("some_other_question", deps)).toBeUndefined();
-    expect(trackOptions.seeds!.getSeedSource?.("some_other_question", deps)).toBeUndefined();
-    expect(trackOptions.seeds!.getSeedCaption?.("some_other_question", deps)).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// trackOptions.seeds — with no recorded track the seed is Copy, the step's only
-// option since spec 111 (Open is chosen on the start screen).
-// ---------------------------------------------------------------------------
-
-describe("trackOptions.seeds — first arrival", () => {
-  it("seeds copy when no track is recorded, with no proposal source or caption", () => {
-    const { deps } = buildDeps({
-      selectedTrack: null,
-      surveyContext: { bcp47_tag: "ewo" },
-      localStart: { displayName: "Ewondo", languages: ["ewo"] },
-    });
-    expect(trackOptions.seeds!.getSeedValue("track_choice", deps)).toBe("copy");
-    expect(trackOptions.seeds!.getSeedSource?.("track_choice", deps)).toBeUndefined();
-    expect(trackOptions.seeds!.getSeedCaption?.("track_choice", deps)).toBeUndefined();
-  });
-});
 
 // ---------------------------------------------------------------------------
 // projectNameOptions.seeds — English-preferred keyboard id (#1777) + FR-031
@@ -255,57 +191,6 @@ describe("projectNameOptions.seeds.getSeedValue (English-preferred keyboard id)"
 });
 
 // ---------------------------------------------------------------------------
-// trackOptions.extract
-// ---------------------------------------------------------------------------
-
-describe("trackOptions.extract", () => {
-  it("extracts {track:'copy'} from a select answer", () => {
-    const result = buildResult([
-      { questionId: "track_choice", answerType: "select", value: "copy" },
-    ]);
-    expect(trackOptions.extract(result)).toEqual({ track: "copy" });
-  });
-
-  it("extracts {track:'adapt'} from a text answer", () => {
-    const result = buildResult([
-      { questionId: "track_choice", answerType: "text", value: "adapt" },
-    ]);
-    expect(trackOptions.extract(result)).toEqual({ track: "adapt" });
-  });
-
-  it("returns undefined for a value other than 'copy'/'adapt'", () => {
-    const result = buildResult([
-      { questionId: "track_choice", answerType: "select", value: "something_else" },
-    ]);
-    expect(trackOptions.extract(result)).toBeUndefined();
-  });
-
-  it("returns undefined when track_choice is missing entirely", () => {
-    const result = buildResult([]);
-    expect(trackOptions.extract(result)).toBeUndefined();
-  });
-
-  it("returns undefined when the answerType is neither select nor text (e.g. boolean)", () => {
-    const result = buildResult([
-      { questionId: "track_choice", answerType: "boolean", value: true },
-    ]);
-    expect(trackOptions.extract(result)).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// trackOptions — record shape (spec 089: no onCommit; effects are the
-// recorded authoring-track decision + track_choice's empty apply)
-// ---------------------------------------------------------------------------
-
-describe("trackOptions — record shape", () => {
-  it("declares no onCommit", () => {
-    expect("onCommit" in trackOptions).toBe(false);
-
-  });
-});
-
-// ---------------------------------------------------------------------------
 // Spec 092 (T036): Phase F seeds are extracts / lookup defaults declared
 // on the pf_* modules and seeded as decision records by the live
 // extraction pass — the PHASE_F_SEEDS table and phaseFOptions' seed
@@ -384,12 +269,47 @@ describe("phaseFOptions.buildContext", () => {
       ...ctx,
       history_heading: "",
       history_bullets: "",
+      // Issue #2530: the body-parity routing token + snippet tokens are
+      // always present; the finding is not live on an uninstantiated copy.
+      body_parity_live: "false",
+      body_parity_welcome: "",
+      body_parity_help: "",
     });
   });
 
   it("returns just the (empty) HISTORY tokens when deps.surveyContext is empty (default)", () => {
     const { deps } = buildDeps({ surveyContext: {} });
-    expect(phaseFOptions.buildContext(deps)).toEqual({ history_heading: "", history_bullets: "" });
+    expect(phaseFOptions.buildContext(deps)).toEqual({
+      history_heading: "",
+      history_bullets: "",
+      body_parity_live: "false",
+      body_parity_welcome: "",
+      body_parity_help: "",
+    });
+  });
+
+  // Issue #2530: on an adaptation whose inherited pages differ, the
+  // routing token is live and the snippet tokens carry the first
+  // difference as plain text (never raw HTML).
+  it("reports the finding live with plain-text snippets on an adaptation with differing pages", () => {
+    useWorkingCopyStore.getState().reset();
+    useWorkingCopyStore.setState({
+      instantiationMode: "adapt-existing",
+      startWelcomeHtmText: "<html><body><p>Welcome to Test Keyboard</p></body></html>",
+      startHelpPhpText:
+        "<?php\n  $pagename = 'Test Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<html><body><p>Something totally different.</p></body></html>",
+    });
+    try {
+      const { deps } = buildDeps({ surveyContext: {} });
+      const ctx = phaseFOptions.buildContext(deps);
+      expect(ctx["body_parity_live"]).toBe("true");
+      expect(ctx["body_parity_welcome"]).toBe("Welcome to Test Keyboard");
+      expect(ctx["body_parity_help"]).toBe("Something totally different.");
+      expect(ctx["body_parity_welcome"]).not.toContain("<");
+      expect(ctx["body_parity_help"]).not.toContain("<");
+    } finally {
+      useWorkingCopyStore.getState().reset();
+    }
   });
 
   // spec 079 US5: once onMount has derived a proposal (historyEntryState
@@ -732,11 +652,35 @@ describe("extraction pass — Phase F choice defaults", () => {
       .filter((d) => d !== undefined && (d.type === "bool" || d.type === "radio"));
     expect(choice.length).toBeGreaterThanOrEqual(3);
     for (const d of choice) {
+      // pf_body_parity only seeds when the 11.9 finding is live (issue
+      // #2530): arrange an adaptation with differing inherited pages for
+      // its iteration, then restore the copy state the other questions
+      // seed from, so the loop stays order-independent.
+      let prevBodyParity: {
+        instantiationMode: InstantiationMode;
+        startWelcomeHtmText: string | null;
+        startHelpPhpText: string | null;
+      } | null = null;
+      if (d.id === "pf_body_parity") {
+        const wc = useWorkingCopyStore.getState();
+        prevBodyParity = {
+          instantiationMode: wc.instantiationMode,
+          startWelcomeHtmText: wc.startWelcomeHtmText,
+          startHelpPhpText: wc.startHelpPhpText,
+        };
+        useWorkingCopyStore.setState({
+          instantiationMode: "adapt-existing",
+          startWelcomeHtmText: "<html><body><p>Welcome to Test Keyboard</p></body></html>",
+          startHelpPhpText:
+            "<?php\n  $pagename = 'Test Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<html><body><p>Something totally different.</p></body></html>",
+        });
+      }
       const seed = passSeedWithGateOpen(d.id);
       expect(seed, d.id).toBeDefined();
       if (d.options !== undefined) {
         expect(d.options.map((o) => o.value), d.id).toContain(seed);
       }
+      if (prevBodyParity !== null) useWorkingCopyStore.setState(prevBodyParity);
     }
   });
 });

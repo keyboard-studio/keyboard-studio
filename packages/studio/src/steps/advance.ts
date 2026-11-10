@@ -15,7 +15,6 @@
 // Research decisions: R1 (advance owns the fork), R2 (signature), R3 (mapping),
 // R9 (boundary).
 
-import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { DecisionSet } from "../decisions/decisionTypes.ts";
 import { manifest, screenGates } from "./manifest.ts";
 import { STEP_TRAILS } from "./stepOrder.ts";
@@ -33,7 +32,6 @@ type ActiveStepId =
   | "identity"
   | "layout"
   | "choose_base"
-  | "track"
   | "attribution"
   | "project_name"
   | "open_languages"
@@ -48,6 +46,7 @@ type ActiveStepId =
   | "invisibles"
   | "convenience"
   | "mechanisms"
+  | "fallback_policy"
   | "osk"
   | "touch_seed_source"
   | "touch"
@@ -55,6 +54,8 @@ type ActiveStepId =
   | "help"
   | "html"
   | "icon"
+  | "trial"
+  | "publish"
   | "done"
   | "unsupported";
 
@@ -252,14 +253,7 @@ function advanceStep(
       return { next: nextMainLineStepAfter("layout", ctx) }; // choose_base
 
     case "choose_base":
-      return { next: nextMainLineStepAfter("choose_base", ctx) }; // track
-
-    case "track":
-      // #1901: both tracks continue to the attribution step — the
-      // author/copyright questions are asked after the track choice
-      // because their proposals are track-shaped. The copy/update fork
-      // is evaluated at the attribution step's completion, below.
-      return { next: "attribution" };
+      return { next: nextMainLineStepAfter("choose_base", ctx) }; // attribution
 
     case "attribution":
       if (ctx.selectedTrack !== null) {
@@ -273,18 +267,12 @@ function advanceStep(
         const after = nextMainLineStepAfter("attribution", ctx);
         return after === "characters" ? { next: after, setCharactersSubStage: "prefill" } : { next: after };
       } else {
-        // Invariant violation: selectedTrack is null here, but the track
-        // step's completion recorded the authoring-track decision before
-        // this step could be reached. A null at this point means something
-        // went wrong upstream. Log the violation and default to the copy
-        // path (project_name) — copy is the safer default because it does
-        // NOT skip a step. Do NOT silently route as update (which skips
-        // project_name and could confuse the user).
-        devLog.error(
-          "[advance] invariant violation: selectedTrack is null at attribution step. " +
-          "The track step must record the authoring-track decision before attribution is reached. " +
-          "Defaulting to copy path (project_name) to avoid silent wrong-fork routing."
-        );
+        // No track recorded: the track question is gone, and the start
+        // screen is what records the track — so a walk can reach here
+        // with none (a legacy draft, a deep link). Copy is the default:
+        // it does NOT skip a step, and the single-instantiation effect
+        // records it (provenance "default") when the base is confirmed,
+        // so this branch only fires before that effect has run.
         return { next: "project_name" };
       }
 
@@ -352,6 +340,9 @@ function advanceStep(
     case "mechanisms":
       return { next: nextMainLineStepAfter("mechanisms", ctx) };
 
+    case "fallback_policy":
+      return { next: nextMainLineStepAfter("fallback_policy", ctx) };
+
     case "osk":
       // Same touch-seed fork as the former post-mechanisms hop (spec 035 R4/R12).
       return stepApplies(stepById("touch_seed_source"), ctx)
@@ -379,7 +370,19 @@ function advanceStep(
       return { next: nextMainLineStepAfter("html") }; // icon
 
     case "icon":
-      return { next: "done", navigate: "output" };
+      return { next: nextMainLineStepAfter("icon") }; // trial
+
+    case "trial":
+      return { next: nextMainLineStepAfter("trial") }; // publish
+
+    case "publish":
+      // Spec 113 (#2540): completing Publish ends the walk. No navigate —
+      // the author rests on the `done` terminal panel, whose copy points
+      // back at the Publish step. (The old `icon → done + navigate:"output"`
+      // hop is gone with the Output screen: `#output` is now a redirect
+      // into the tail, and navigating there from `done` would land the
+      // author back on Publish in a loop.)
+      return { next: "done" };
 
     // Terminals — if somehow called, stay put (host does not call advance for terminals).
     case "done":

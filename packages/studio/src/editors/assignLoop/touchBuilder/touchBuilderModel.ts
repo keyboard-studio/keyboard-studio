@@ -7,7 +7,7 @@
 //
 // Behavior basis: `developer/src/tike/xml/layoutbuilder/src/*.ts` in
 // keymanapp/keyman (read for BEHAVIOR only, never transliterated). The
-// write channel is exclusively the 8 `KeyEditOperation` kinds, built here
+// write channel is exclusively the 10 `KeyEditOperation` kinds, built here
 // as `PendingKeyEditOperation` (no `seq`) and committed by the pane through
 // `commitKeyEditOp`.
 
@@ -20,7 +20,7 @@ import {
   type TouchLayoutIR,
   type TouchKeyIR,
 } from "@keyboard-studio/contracts";
-import { resolveKeyAddress } from "@keyboard-studio/engine";
+import { isCombiningMark, proposeSuppressFields, resolveKeyAddress } from "@keyboard-studio/engine";
 import type { PendingKeyEditOperation } from "../../../stores/workingCopyStore.ts";
 
 /**
@@ -44,6 +44,43 @@ export const BUILDER_DEFAULT_KEY_WIDTH = 100;
 /** TIKE resize clamp, in units (`makeKeyResizable`: 10–500). */
 export const BUILDER_MIN_KEY_WIDTH = 10;
 export const BUILDER_MAX_KEY_WIDTH = 500;
+/**
+ * Alignment grid, in units (#2596 item 4): widths snap to the nearest 10.
+ * A TIKE row is 100 units, so 10 is a tenth of a standard key — fine
+ * enough to line rows up, coarse enough to feel like a grid, and it
+ * preserves every existing multiple-of-10 width unchanged.
+ */
+export const BUILDER_WIDTH_SNAP = 10;
+
+/**
+ * Snap a width to the alignment grid (#2596 item 4), clamped to TIKE's
+ * 10–500 range. Pure; the pane applies it to resize-drag commits and to
+ * the Width field, so a snapped value is what commits in both paths.
+ */
+export function snapBuilderWidth(width: number): number {
+  const snapped = Math.round(width / BUILDER_WIDTH_SNAP) * BUILDER_WIDTH_SNAP;
+  return Math.min(BUILDER_MAX_KEY_WIDTH, Math.max(BUILDER_MIN_KEY_WIDTH, snapped));
+}
+
+/**
+ * Right-edge position of the key at `index` in a row (#2596 item 4): the
+ * running sum of `width + pad` up to and including that key, in units — the
+ * number an author lines rows up against. `pad` is the row's effective pad
+ * (the pane passes its narrow-aware value), so the readout matches the
+ * rendered row. Out-of-range index → the row's full width.
+ */
+export function rightEdgeUnits(
+  keys: readonly { readonly width: number; readonly pad: number }[],
+  index: number,
+): number {
+  let edge = 0;
+  const last = Math.min(index, keys.length - 1);
+  for (let i = 0; i <= last; i++) {
+    const key = keys[i]!;
+    edge += key.width + key.pad;
+  }
+  return edge;
+}
 
 /** A device presentation: the pixel box the keyboard is scaled into. */
 export interface BuilderPresentation {
@@ -429,6 +466,29 @@ export function synthesizeDropKeyId(text: string): string {
 }
 
 /**
+ * Suggest a key id from the text typed into a fresh key (#2596 item 5,
+ * spec 104 FR-005 arm (c)): a single plain character mints `U_<HEX>`.
+ * Returns null — no suggestion — for everything else, deliberately:
+ * - a combining mark mints guarded `T_` under FR-005(d) (unticked
+ *   start-of-line), so suggesting `U_` would mint an unguarded mark;
+ * - a multi-character string mints `U_` only when `&VERSION` is 15.0+,
+ *   which this pane cannot see, so suggesting blindly could mint an id
+ *   the keyboard cannot use;
+ * - empty text and whitespace name no character at all.
+ * The pane offers this as an explicit button on `T_new_N` keys only — an
+ * author action, never an auto-rename (identity changes are presented,
+ * never silent).
+ */
+export function suggestKeyIdFromText(text: string): string | null {
+  const chars = [...text];
+  if (chars.length !== 1) return null;
+  const ch = chars[0]!;
+  if (/\s/u.test(ch)) return null;
+  if (isCombiningMark(ch)) return null;
+  return synthesizeDropKeyId(text);
+}
+
+/**
  * Map a charmap drop onto ops (TIKE `builder-charmap.ts`): dropped text
  * sets the key's text; Ctrl-drop (or a drop onto a `T_new_*` key) also
  * synthesizes a `U_XXXX` id via a `rename` — id is identity, never a `set`
@@ -515,4 +575,141 @@ export function keycapFontFamily(
   }
   families.push("system-ui", "-apple-system", "'Segoe UI'", "sans-serif");
   return families.join(", ");
+}
+
+// ---------------------------------------------------------------------------
+// Multi-select (#2596 item 2, keymanapp/keyman#3611)
+// ---------------------------------------------------------------------------
+
+/**
+ * Toggle one address in a multi-selection: append when absent, remove when
+ * present. Pure; the pane owns the gesture, TouchGallery owns the state.
+ */
+export function toggleKeySelection(
+  selected: readonly string[],
+  address: string,
+): string[] {
+  return selected.includes(address)
+    ? selected.filter((a) => a !== address)
+    : [...selected, address];
+}
+
+/**
+ * Row-major range selection from the anchor to the target, inclusive —
+ * the Shift+click / Shift+Enter half of multi-select (covers the upstream
+ * "select all the keys in a row": click first, Shift+click last). The range
+ * REPLACES the selection (the standard extend-from-anchor convention). An
+ * anchor that is null or not on the current layer degrades to `[target]`
+ * rather than guessing.
+ */
+export function rangeKeySelection(
+  flatAddresses: readonly string[],
+  anchor: string | null,
+  target: string,
+): string[] {
+  if (anchor === null) return [target];
+  const from = flatAddresses.indexOf(anchor);
+  const to = flatAddresses.indexOf(target);
+  if (from === -1 || to === -1) return [target];
+  const lo = Math.min(from, to);
+  const hi = Math.max(from, to);
+  return flatAddresses.slice(lo, hi + 1);
+}
+
+/**
+ * The value a field carries across a multi-selection: the common value when
+ * every key agrees, `mixed: true` when they do not. The multi-inspector
+ * renders a "Mixed" placeholder/option for the mixed case. Empty → not
+ * mixed, no value (nothing selected).
+ */
+export function commonFieldValue<T>(
+  values: readonly T[],
+): { readonly mixed: boolean; readonly value: T | undefined } {
+  if (values.length === 0) return { mixed: false, value: undefined };
+  const first = values[0]!;
+  for (const value of values) {
+    if (value !== first) return { mixed: true, value: undefined };
+  }
+  return { mixed: false, value: first };
+}
+
+/**
+ * The bulk-appliable fields (#2596 item 2): attributes that are meaningful
+ * identical across keys. Text/hint are per-key content (the same value on
+ * every key is almost never wanted, and a bulk text set would silently
+ * destroy distinct keycaps); id is identity; subkeys and structural ops
+ * (add/delete/move/copy) are single-key.
+ */
+export interface BulkKeyEditFields {
+  readonly width?: number;
+  readonly pad?: number;
+  readonly sp?: 0 | 1 | 2 | 8 | 9 | 10;
+  readonly nextlayer?: string;
+  readonly layer?: string;
+}
+
+/**
+ * Build the op sequence for applying `fields` to every entry: one `set`
+ * per key carrying all of that key's differing fields, plus one `suppress`
+ * per key whose `sp` target is 9/10 (Key Type → Blank/Spacer is the
+ * compound `suppress` op — never a `set` half, FR-029c). Keys already at
+ * the target value emit nothing: a `set` that changes nothing is not a
+ * change the overlay should record (same rule as template apply). Width
+ * snaps to the item-4 alignment grid here too, so a bulk Width commit and
+ * a single Width commit can never disagree.
+ *
+ * Comparison is against the STORED value: `width` defaults to
+ * `BUILDER_DEFAULT_KEY_WIDTH`, `sp` to 0, `nextlayer`/`layer` to "" (the
+ * None/clear value). A stored `pad` of `undefined` is the default margin,
+ * so it compares unequal to an explicit target — committing then makes the
+ * value explicit rather than silently skipping a real change.
+ */
+export function buildBulkKeyEditOps(
+  entries: readonly { readonly address: string; readonly key: TouchKeyIR }[],
+  fields: BulkKeyEditFields,
+): PendingKeyEditOperation[] {
+  const ops: PendingKeyEditOperation[] = [];
+  for (const { address, key } of entries) {
+    // `BuilderSetFields` is readonly — assemble, never mutate.
+    const widthTarget =
+      fields.width !== undefined ? snapBuilderWidth(fields.width) : undefined;
+    const setFields: BuilderSetFields = {
+      ...(widthTarget !== undefined &&
+      (key.width ?? BUILDER_DEFAULT_KEY_WIDTH) !== widthTarget
+        ? { width: widthTarget }
+        : {}),
+      ...(fields.pad !== undefined && key.pad !== fields.pad
+        ? { pad: fields.pad }
+        : {}),
+      ...(fields.sp !== undefined &&
+      fields.sp !== 9 &&
+      fields.sp !== 10 &&
+      (key.sp ?? 0) !== fields.sp
+        ? { sp: fields.sp }
+        : {}),
+      ...(fields.nextlayer !== undefined &&
+      (key.nextlayer ?? "") !== fields.nextlayer
+        ? { nextlayer: fields.nextlayer }
+        : {}),
+      ...(fields.layer !== undefined &&
+      (key.layer ?? key.layerAnnotation ?? "") !== fields.layer
+        ? { layer: fields.layer }
+        : {}),
+    };
+    if (Object.keys(setFields).length > 0) {
+      ops.push({ address, kind: "set", fields: setFields });
+    }
+    if (fields.sp === 9 || fields.sp === 10) {
+      if ((key.sp ?? 0) !== fields.sp) {
+        // Shared sentinel ids (`T_BLANK`/`T_SPACER`): duplicates on one
+        // layer are normal and occurrence-addressed — a shipped layout
+        // carries `T_BLANK` twenty-five times.
+        const { spClass, sentinelId } = proposeSuppressFields(
+          fields.sp === 9 ? "keycap-hole" : "spacer",
+        );
+        ops.push({ address, kind: "suppress", spClass, sentinelId });
+      }
+    }
+  }
+  return ops;
 }

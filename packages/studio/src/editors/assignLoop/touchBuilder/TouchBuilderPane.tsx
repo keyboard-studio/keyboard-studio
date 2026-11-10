@@ -10,11 +10,12 @@
 // secondary `{ kind, id }` held locally and reset whenever the main-key
 // selection changes.
 //
-// Every gesture decomposes per slice-spec §4 into the 8 `KeyEditOperation`
+// Every gesture decomposes per slice-spec §4 into the 10 `KeyEditOperation`
 // kinds. Key-level ops only (Q1): no row/layer structural UI, no
 // per-platform font editing.
 
 import { useEffect, useRef, useState } from "react";
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { useIsNarrow } from "../../../hooks/useViewport.ts";
 import {
@@ -29,21 +30,27 @@ import type { PendingKeyEditOperation } from "../../../stores/workingCopyStore.t
 import {
   BUILDER_DEFAULT_KEY_WIDTH,
   BUILDER_KEY_MARGIN,
-  BUILDER_MAX_KEY_WIDTH,
-  BUILDER_MIN_KEY_WIDTH,
   BUILDER_PRESENTATIONS,
   BUILDER_ROW_HEIGHT,
   FLICK_GRID,
+  type BulkKeyEditFields,
   type FlickDirection,
+  buildBulkKeyEditOps,
   builderPresentationById,
   buildTemplateApplyOps,
+  commonFieldValue,
   computeBuilderScale,
   defaultBuilderPresentationId,
   keycapFontFamily,
   mintBuilderKeyId,
   parseBuilderTemplate,
+  rangeKeySelection,
   resolveBuilderKey,
+  rightEdgeUnits,
+  snapBuilderWidth,
   subKeyEntriesOf,
+  suggestKeyIdFromText,
+  toggleKeySelection,
   type BuilderSubKeyEntry,
   type BuilderSubKeyKind,
 } from "./touchBuilderModel.ts";
@@ -72,8 +79,27 @@ export interface TouchBuilderPaneProps {
   readonly onSelectLayer: (layerId: string) => void;
   readonly selectedKeyAddress: string | null;
   readonly onSelectKey: (address: string | null) => void;
-  /** The bare-op commit entry point (`commitKeyEditOp`). */
-  readonly commitOp: (op: PendingKeyEditOperation) => boolean;
+  /**
+   * The multi-selection set (#2596 item 2), owned by TouchGallery next to
+   * the anchor. The pane always reads it through the render-time filter
+   * (`selectedOnLayer` below) — the stored array may transiently hold
+   * off-layer addresses after a layer switch, and the next gesture drops
+   * them. `onSelectKeys` replaces the set AND the anchor together.
+   */
+  readonly selectedKeyAddresses: readonly string[];
+  readonly onSelectKeys: (
+    addresses: readonly string[],
+    anchor: string | null,
+  ) => void;
+  /**
+   * The bare-op commit entry point (`commitKeyEditOp`). Accepts the same
+   * options object as `commitKeyEditOp` — bulk commits pass
+   * `{ offerFamilyApply: false }` (see `handleBulkSet`).
+   */
+  readonly commitOp: (
+    op: PendingKeyEditOperation,
+    options?: { readonly offerFamilyApply?: boolean },
+  ) => boolean;
   /**
    * The keyboard's font as a blob URL + CSS family (from the artifact
    * stage). Injected as a FontFace so keycaps render in the real typeface
@@ -182,6 +208,8 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     onSelectLayer,
     selectedKeyAddress,
     onSelectKey,
+    selectedKeyAddresses,
+    onSelectKeys,
     commitOp,
     fontFaceUrl,
     fontFaceFamily,
@@ -285,10 +313,26 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     const plan =
       source.type === "tray"
         ? buildPanelDropOps(selectedKeyAddress, resolved.key, source.letter, spec, mintBuilderKeyId(layout))
-        : buildSubkeyMoveOps(selectedKeyAddress, resolved.key, source.payload, spec);
+        : buildSubkeyMoveOps(
+            selectedKeyAddress,
+            resolved.key,
+            source.payload,
+            spec,
+            mintBuilderKeyId(layout),
+          );
     if (plan.ops.length === 0) return;
     for (const op of plan.ops) {
       if (!commitOp(op)) break;
+    }
+    if (source.type === "subkey") {
+      // A cross-kind move leaves the moved entry under a different kind (and
+      // possibly a fresh id) — the subkey selection would dangle, so clear
+      // it. Within-family moves keep the entry resolvable and keep it.
+      const crossKind =
+        (source.payload.kind === "sk" && spec.area !== "lp") ||
+        (source.payload.kind === "flick" && spec.area !== "flick") ||
+        (source.payload.kind === "multitap" && spec.area !== "mt");
+      if (crossKind) setSubSel(null);
     }
     if (plan.displacedBackToTray !== null) {
       const back = plan.displacedBackToTray;
@@ -373,6 +417,18 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
       })),
     );
   })();
+
+  // Multi-selection, scoped to the active platform+layer (#2596 item 2):
+  // the stored set may transiently hold addresses from another layer (a
+  // layer switch, or a move/copy follow that legitimately leaves the anchor
+  // elsewhere) — only the on-layer members are selectable, displayed, or
+  // bulk-edited. Every gesture below operates on this filtered list, so a
+  // stale address can never re-enter through a toggle or a range.
+  const flatAddresses = rowViews.flat().map((v) => v.address);
+  const selectedOnLayer = selectedKeyAddresses.filter((a) =>
+    flatAddresses.includes(a),
+  );
+  const selectedOnLayerSet = new Set(selectedOnLayer);
 
   // Row geometry for the scaler. On narrow viewports the last key of shorter
   // rows stretches so every row matches the widest — like a real mobile
@@ -459,6 +515,18 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     if (toLayer === activeLayerId) return;
     // `commitKeyEditOp` follows the selection to the moved key (TouchGallery).
     commitOp({ address: selectedKeyAddress, kind: "moveToLayer", toLayer });
+  };
+
+  // -- copy key to another layer (#2596 item 1) ------------------------------
+  const handleCopyKeyToLayer = (toLayer: string): void => {
+    if (selectedOnActiveLayer === undefined || selectedKeyAddress === null) return;
+    if (toLayer === activeLayerId) return;
+    // `copyToLayer` clones the whole key (subkeys included) onto the target
+    // layer. Switch the display there so the author sees the copy;
+    // selection-follow in TouchGallery tracks its address.
+    if (commitOp({ address: selectedKeyAddress, kind: "copyToLayer", toLayer })) {
+      onSelectLayer(toLayer);
+    }
   };
 
   // -- drag reorder → direction-step `move` ops, or `moveToLayer` --------------
@@ -581,11 +649,9 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     if (resizeDrag === null) return;
     const { address, previewWidthUnits } = resizeDrag;
     setResizeDrag(null);
-    // TIKE clamp (10–500 units); the studio validates width as integer > 0.
-    const width = Math.min(
-      BUILDER_MAX_KEY_WIDTH,
-      Math.max(BUILDER_MIN_KEY_WIDTH, previewWidthUnits),
-    );
+    // Snap to the 10-unit alignment grid (#2596 item 4), clamped to TIKE's
+    // 10–500 range; the studio validates width as integer > 0.
+    const width = snapBuilderWidth(previewWidthUnits);
     const resolved = resolveBuilderKey(layout, address);
     if (resolved === undefined || resolved.key.width === width) return;
     commitSet(address, { width });
@@ -609,6 +675,51 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
   };
 
   const selectedKey = selectedOnActiveLayer?.key;
+
+  // The on-layer members of the multi-selection, resolved against the
+  // CURRENT layout — the bulk-commit population (see `handleBulkSet`).
+  // `layout` is non-null here (the early return above).
+  const selectedEntriesOnLayer = selectedOnLayer
+    .map((address) => {
+      const resolved = resolveBuilderKey(layout, address);
+      return resolved === undefined
+        ? undefined
+        : { address, key: resolved.key };
+    })
+    .filter(
+      (e): e is { address: string; key: TouchKeyIR } => e !== undefined,
+    );
+  const showMulti = selectedEntriesOnLayer.length >= 2;
+
+  // -- bulk apply (#2596 item 2) -------------------------------------------
+  // One op per key, sequential commits = one undo batch (slice-spec §4,
+  // same pattern as template apply). Family-apply is suppressed: a
+  // width/pad `set` is family-parallelism-affecting, so each commit would
+  // otherwise pop the family-apply dialog once per key — and bulk apply IS
+  // the fan-out. Stop at the first failed commit; the selection stays so
+  // the author can retry.
+  const handleBulkSet = (fields: BulkKeyEditFields): void => {
+    const ops = buildBulkKeyEditOps(selectedEntriesOnLayer, fields);
+    for (const op of ops) {
+      if (!commitOp(op, { offerFamilyApply: false })) break;
+    }
+  };
+
+  // Right-edge position of the selected key (#2596 item 4): the running
+  // width+pad sum of its row up to and including it, in units — the number
+  // an author lines rows up against. `geomRows` already carries the
+  // narrow-aware pad, so this matches the rendered row.
+  const selectedRowIndex = rowViews.findIndex((row) =>
+    row.some((v) => v.address === selectedKeyAddress),
+  );
+  const selectedColIndex =
+    selectedRowIndex >= 0
+      ? rowViews[selectedRowIndex]!.findIndex((v) => v.address === selectedKeyAddress)
+      : -1;
+  const selectedRightEdge =
+    selectedRowIndex >= 0 && selectedColIndex >= 0
+      ? rightEdgeUnits(geomRows[selectedRowIndex]!, selectedColIndex)
+      : null;
   const _selectedSubKeyEntry: BuilderSubKeyEntry | undefined =
     selectedKey !== undefined && subSel !== null
       ? subKeyEntriesOf(selectedKey)[subSel.kind].find((e) =>
@@ -642,7 +753,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
             {rowViews.map((row, r) => (
               <div key={r} style={{ display: "flex", alignItems: "stretch" }}>
                 {row.map(({ key, address }) => {
-                  const isSelected = address === selectedKeyAddress;
+                  const isSelected = selectedOnLayerSet.has(address);
                   const colors = spColor(key.sp);
                   const isSpacer = (key.sp ?? 0) === 10;
                   const widthUnits =
@@ -667,6 +778,27 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
                         e.stopPropagation();
                         if (trayLetter !== null) {
                           openPlacement(trayLetter, address);
+                        } else if (e.ctrlKey || e.metaKey) {
+                          // Ctrl/Cmd+click toggles this key in the
+                          // multi-selection (#2596 item 2). The anchor
+                          // becomes the toggled key when added; when
+                          // removed, the last remaining key (else null).
+                          const next = toggleKeySelection(selectedOnLayer, address);
+                          onSelectKeys(
+                            next,
+                            next.includes(address)
+                              ? address
+                              : (next[next.length - 1] ?? null),
+                          );
+                        } else if (e.shiftKey) {
+                          // Shift+click extends the selection from the
+                          // anchor, row-major inclusive.
+                          const next = rangeKeySelection(
+                            flatAddresses,
+                            selectedKeyAddress,
+                            address,
+                          );
+                          onSelectKeys(next, address);
                         } else {
                           onSelectKey(address);
                         }
@@ -683,7 +815,35 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          onSelectKey(address);
+                          if (e.ctrlKey || e.metaKey) {
+                            // Keyboard twin of Ctrl+click (spec 056: a
+                            // selection feature needs a keyboard path).
+                            const next = toggleKeySelection(selectedOnLayer, address);
+                            onSelectKeys(
+                              next,
+                              next.includes(address)
+                                ? address
+                                : (next[next.length - 1] ?? null),
+                            );
+                          } else if (e.shiftKey) {
+                            // Keyboard twin of Shift+click.
+                            const next = rangeKeySelection(
+                              flatAddresses,
+                              selectedKeyAddress,
+                              address,
+                            );
+                            onSelectKeys(next, address);
+                          } else {
+                            onSelectKey(address);
+                          }
+                        } else if (e.key === "Escape") {
+                          // Escape on a focused key clears the whole
+                          // multi-selection (the pane comment's promised
+                          // keyboard deselect, which had no handler).
+                          if (selectedOnLayer.length > 0) {
+                            e.preventDefault();
+                            onSelectKeys([], null);
+                          }
                         }
                       }}
                       onDragStart={(e) => {
@@ -833,6 +993,15 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
               </div>
             ))}
           </div>
+          {/* Multi-select hint (#2596 item 2): the modifiers are not
+              discoverable from the keys themselves. */}
+          <p style={{ margin: "8px 0 0", fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
+            {t({
+              id: "editor.assignLoop.touch.builder.multiSelectHint",
+              message:
+                "Ctrl+click (or Ctrl+Enter) adds a key to the selection; Shift+click selects a range.",
+            })}
+          </p>
     </>
   );
 
@@ -961,15 +1130,36 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
       {isNarrow && renderCanvas(false)}
 
       {/* Key section — fields, wedge controls, move-to-layer, and the nested
-          subkey child block. One op per commit (TIKE `saveOnce` semantics). */}
+          subkey child block. One op per commit (TIKE `saveOnce` semantics).
+          With ≥2 keys selected (#2596 item 2) the multi-key inspector
+          replaces the single-key inspector wholesale. */}
       {selectedOnActiveLayer !== undefined && selectedKey !== undefined && (
         <section
-          aria-label={t({
-            id: "editor.assignLoop.touch.builder.keySection",
-            message: "Key",
-          })}
+          aria-label={
+            showMulti
+              ? t({
+                  id: "editor.assignLoop.touch.builder.multiKeySection",
+                  message: "Multiple keys",
+                })
+              : t({
+                  id: "editor.assignLoop.touch.builder.keySection",
+                  message: "Key",
+                })
+          }
           style={sectionStyle}
         >
+          {showMulti ? (
+            <MultiKeyToolbar
+              entries={selectedEntriesOnLayer}
+              layerIds={layerIds}
+              layerOverrideOptions={_layerOverrideOptions}
+              fieldEpoch={fieldEpoch}
+              onInvalid={() => setFieldEpoch((n) => n + 1)}
+              commitBulk={handleBulkSet}
+              onClearSelection={() => onSelectKeys([], null)}
+            />
+          ) : (
+            <>
           <KeyToolbar
             address={selectedKeyAddress!}
             targetKey={selectedKey}
@@ -1021,11 +1211,59 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
           </div>
 
           {/* Move key to another layer — item 2. */}
-          <MoveKeyToLayer
+          <KeyToLayerControl
             currentLayerId={activeLayerId}
             layerIds={layerIds}
-            onMove={handleMoveKeyToLayer}
+            testIdPrefix="touch-builder-move-layer"
+            label={t({
+              id: "editor.assignLoop.touch.builder.moveKeyToLabel",
+              message: "Move key to…",
+            })}
+            placeholder={t({
+              id: "editor.assignLoop.touch.builder.moveKeyToPlaceholder",
+              message: "Select layer",
+            })}
+            applyLabel={t({
+              id: "editor.assignLoop.touch.builder.moveKeyToApply",
+              message: "Apply",
+            })}
+            onTransfer={handleMoveKeyToLayer}
           />
+
+          {/* Copy key to another layer — #2596 item 1: the whole key, subkeys
+              included, cloned onto the target layer; the original stays. */}
+          <KeyToLayerControl
+            currentLayerId={activeLayerId}
+            layerIds={layerIds}
+            testIdPrefix="touch-builder-copy-layer"
+            label={t({
+              id: "editor.assignLoop.touch.builder.copyKeyToLabel",
+              message: "Copy key to…",
+            })}
+            placeholder={t({
+              id: "editor.assignLoop.touch.builder.copyKeyToPlaceholder",
+              message: "Select layer",
+            })}
+            applyLabel={t({
+              id: "editor.assignLoop.touch.builder.copyKeyToApply",
+              message: "Apply",
+            })}
+            onTransfer={handleCopyKeyToLayer}
+          />
+
+          {/* Right-edge position (#2596 item 4): where this key ends in its
+              row, so rows line up without trial and error. */}
+          {selectedRightEdge !== null && (
+            <p
+              data-testid="touch-builder-right-edge"
+              style={{ margin: "12px 0 0", fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
+            >
+              {t({
+                id: "editor.assignLoop.touch.builder.rightEdge",
+                message: `Right edge: ${selectedRightEdge} units`,
+              })}
+            </p>
+          )}
 
           {/* Subkeys — item 3: a visually nested child of the Key section,
               the three groups side by side. */}
@@ -1047,6 +1285,8 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
               nested
             />
           </div>
+            </>
+          )}
         </section>
       )}
 
@@ -1091,6 +1331,13 @@ function KeyToolbar(props: {
     commitOp({ address, kind: "set", fields });
   };
   const inputKey = (field: string): string => `${address}:${field}:${fieldEpoch}`;
+
+  // Key-id suggestion (#2596 item 5): a fresh `T_new_N` key whose text is a
+  // single plain character can take its id from that text
+  // (`suggestKeyIdFromText` — combining marks and multi-character strings
+  // get no suggestion, per spec 104 FR-005).
+  const suggestedId =
+    /^T_new_\d+$/i.test(key.id) ? suggestKeyIdFromText(key.text ?? "") : null;
 
   const handleSpChange = (value: string): void => {
     const sp = parseInt(value, 10);
@@ -1138,7 +1385,8 @@ function KeyToolbar(props: {
           onCommit={(v) => {
             const n = parseInt(v, 10);
             if (!Number.isInteger(n) || n <= 0) { onInvalid(); return; }
-            set({ width: n });
+            // Snap to the 10-unit alignment grid (#2596 item 4).
+            set({ width: snapBuilderWidth(n) });
           }}
         />
         <LabeledInput
@@ -1181,6 +1429,23 @@ function KeyToolbar(props: {
             if (v !== key.id) commitOp({ address, kind: "rename", toId: v });
           }}
         />
+        {/* Suggest the key id from the keycap text (#2596 item 5). Offered
+            as a button, never auto-applied: identity changes are presented,
+            never silent. */}
+        {suggestedId !== null && suggestedId !== key.id && (
+          <button
+            type="button"
+            data-testid="touch-builder-suggest-id"
+            title={t({
+              id: "editor.assignLoop.touch.builder.suggestIdTitle",
+              message: `Suggest key ID ${suggestedId} from the keycap text`,
+            })}
+            onClick={() => commitOp({ address, kind: "rename", toId: suggestedId })}
+            style={{ ...ghostBtn, alignSelf: "end" }}
+          >
+            {t({ id: "editor.assignLoop.touch.builder.suggestId", message: "Suggest ID" })}
+          </button>
+        )}
         <label style={fieldStyle}>
           <span style={labelStyle}>
             {t({ id: "editor.assignLoop.touch.builder.nextLayerLabel", message: "Next layer" })}
@@ -1227,6 +1492,185 @@ function KeyToolbar(props: {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Multi-key toolbar (#2596 item 2, keymanapp/keyman#3611)
+// ---------------------------------------------------------------------------
+
+/**
+ * The bulk fields for several selected keys: the five attributes that are
+ * meaningful identical across keys (see `BulkKeyEditFields`). Text, hint,
+ * id, subkeys, and structural ops stay single-key. A field whose values
+ * disagree across the selection shows "Mixed" and commits only when the
+ * author types/chooses a value — never silently overwriting the differing
+ * values with a stale common one.
+ */
+function MultiKeyToolbar(props: {
+  entries: readonly { readonly address: string; readonly key: TouchKeyIR }[];
+  layerIds: readonly string[];
+  layerOverrideOptions: readonly string[];
+  fieldEpoch: number;
+  onInvalid: () => void;
+  commitBulk: (fields: BulkKeyEditFields) => void;
+  onClearSelection: () => void;
+}) {
+  const { t } = useLingui();
+  const { entries, layerIds, layerOverrideOptions, fieldEpoch, onInvalid, commitBulk, onClearSelection } = props;
+  const keys = entries.map((e) => e.key);
+  const inputKey = (field: string): string =>
+    `multi:${field}:${fieldEpoch}:${entries.map((e) => e.address).join(",")}`;
+  const mixedLabel = t({
+    id: "editor.assignLoop.touch.builder.mixedValues",
+    message: "Mixed values",
+  });
+
+  const width = commonFieldValue(keys.map((k) => k.width ?? BUILDER_DEFAULT_KEY_WIDTH));
+  const pad = commonFieldValue(keys.map((k) => k.pad));
+  const sp = commonFieldValue(keys.map((k) => k.sp ?? 0));
+  const nextlayer = commonFieldValue(keys.map((k) => k.nextlayer ?? ""));
+  const layer = commonFieldValue(keys.map((k) => k.layer ?? k.layerAnnotation ?? ""));
+
+  const handleSpChange = (value: string): void => {
+    if (value === "__mixed__") return;
+    const next = parseInt(value, 10);
+    if (next === 0 || next === 1 || next === 2 || next === 8 || next === 9 || next === 10) {
+      commitBulk({ sp: next as 0 | 1 | 2 | 8 | 9 | 10 });
+    }
+  };
+
+  return (
+    <>
+      <p
+        role="status"
+        aria-live="polite"
+        data-testid="touch-builder-multi-summary"
+        style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 600, color: TEXT_MAIN, fontFamily: FONT }}
+      >
+        {t({
+          id: "editor.assignLoop.touch.builder.multiSelected",
+          message: plural(entries.length, {
+            one: "# key selected",
+            other: "# keys selected",
+          }),
+        })}
+      </p>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <button
+          type="button"
+          data-testid="touch-builder-clear-selection"
+          onClick={onClearSelection}
+          style={ghostBtn}
+        >
+          {t({
+            id: "editor.assignLoop.touch.builder.clearSelection",
+            message: "Clear selection",
+          })}
+        </button>
+      </div>
+      <div style={fieldGridStyle}>
+        <LabeledInput
+          label={t({ id: "editor.assignLoop.touch.builder.widthLabel", message: "Width" })}
+          testId="touch-builder-multi-field-width"
+          inputKey={inputKey("width")}
+          defaultValue={width.mixed ? "" : String(width.value ?? "")}
+          placeholder={width.mixed ? mixedLabel : undefined}
+          inputMode="numeric"
+          onCommit={(v) => {
+            const n = parseInt(v, 10);
+            if (!Number.isInteger(n) || n <= 0) { onInvalid(); return; }
+            commitBulk({ width: n });
+          }}
+        />
+        <LabeledInput
+          label={t({ id: "editor.assignLoop.touch.builder.padLabel", message: "Left padding" })}
+          testId="touch-builder-multi-field-pad"
+          inputKey={inputKey("pad")}
+          defaultValue={pad.mixed || pad.value === undefined ? "" : String(pad.value)}
+          placeholder={pad.mixed ? mixedLabel : undefined}
+          inputMode="numeric"
+          onCommit={(v) => {
+            const n = parseInt(v, 10);
+            if (!Number.isInteger(n) || n < 0) { onInvalid(); return; }
+            commitBulk({ pad: n });
+          }}
+        />
+        <label style={fieldStyle}>
+          <span style={labelStyle}>
+            {t({ id: "editor.assignLoop.touch.builder.spLabel", message: "Key type" })}
+          </span>
+          <select
+            data-testid="touch-builder-multi-field-sp"
+            value={sp.mixed ? "__mixed__" : String(sp.value ?? 0)}
+            onChange={(e) => handleSpChange(e.target.value)}
+            style={selectStyle}
+          >
+            {sp.mixed && (
+              <option value="__mixed__" disabled>
+                {mixedLabel}
+              </option>
+            )}
+            <option value="0">{t({ id: "editor.assignLoop.touch.builder.spLetter", message: "Letter" })}</option>
+            <option value="1">{t({ id: "editor.assignLoop.touch.builder.spSpecial", message: "Special" })}</option>
+            <option value="2">{t({ id: "editor.assignLoop.touch.builder.spSpecialActive", message: "Special (active)" })}</option>
+            <option value="8">{t({ id: "editor.assignLoop.touch.builder.spDeadkey", message: "Deadkey" })}</option>
+            <option value="9">{t({ id: "editor.assignLoop.touch.builder.spBlank", message: "Blank" })}</option>
+            <option value="10">{t({ id: "editor.assignLoop.touch.builder.spSpacer", message: "Spacer" })}</option>
+          </select>
+        </label>
+        <label style={fieldStyle}>
+          <span style={labelStyle}>
+            {t({ id: "editor.assignLoop.touch.builder.nextLayerLabel", message: "Next layer" })}
+          </span>
+          <select
+            data-testid="touch-builder-multi-field-nextlayer"
+            value={nextlayer.mixed ? "__mixed__" : (nextlayer.value ?? "")}
+            onChange={(e) => {
+              if (e.target.value !== "__mixed__") commitBulk({ nextlayer: e.target.value });
+            }}
+            style={selectStyle}
+          >
+            {nextlayer.mixed && (
+              <option value="__mixed__" disabled>
+                {mixedLabel}
+              </option>
+            )}
+            <option value="">
+              {t({ id: "editor.assignLoop.touch.builder.noneOption", message: "None" })}
+            </option>
+            {layerIds.map((id) => (
+              <option key={id} value={id}>{id}</option>
+            ))}
+          </select>
+        </label>
+        <label style={fieldStyle}>
+          <span style={labelStyle}>
+            {t({ id: "editor.assignLoop.touch.builder.layerOverrideLabel", message: "Layer override" })}
+          </span>
+          <select
+            data-testid="touch-builder-multi-field-layer"
+            value={layer.mixed ? "__mixed__" : (layer.value ?? "")}
+            onChange={(e) => {
+              if (e.target.value !== "__mixed__") commitBulk({ layer: e.target.value });
+            }}
+            style={selectStyle}
+          >
+            {layer.mixed && (
+              <option value="__mixed__" disabled>
+                {mixedLabel}
+              </option>
+            )}
+            <option value="">
+              {t({ id: "editor.assignLoop.touch.builder.noneOption", message: "None" })}
+            </option>
+            {layerOverrideOptions.map((id) => (
+              <option key={id} value={id}>{id}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </>
+  );
+}
+
 /** Text/number input committing once per blur/Enter (TIKE `saveOnce`). */
 function LabeledInput(props: {
   label: string;
@@ -1234,11 +1678,13 @@ function LabeledInput(props: {
   inputKey: string;
   defaultValue: string;
   inputMode?: "numeric" | "text";
+  /** Placeholder shown instead of a value — the multi-inspector's "Mixed". */
+  placeholder?: string | undefined;
   /** When set, the input accepts glyphs and renders in this typeface. */
   glyphFont?: string;
   onCommit: (value: string) => void;
 }) {
-  const { label, testId, inputKey, defaultValue, inputMode, glyphFont, onCommit } = props;
+  const { label, testId, inputKey, defaultValue, inputMode, placeholder, glyphFont, onCommit } = props;
   return (
     <label style={fieldStyle}>
       <span style={labelStyle}>{label}</span>
@@ -1248,6 +1694,7 @@ function LabeledInput(props: {
         inputMode={inputMode}
         data-testid={testId}
         defaultValue={defaultValue}
+        placeholder={placeholder}
         onBlur={(e) => {
           if (e.target.value !== defaultValue) onCommit(e.target.value);
         }}
@@ -1263,16 +1710,25 @@ function LabeledInput(props: {
 }
 
 // ---------------------------------------------------------------------------
-// Move key to another layer (item 2)
+// Move / copy a key to another layer (item 2; copy is #2596 item 1)
 // ---------------------------------------------------------------------------
 
-function MoveKeyToLayer(props: {
+/**
+ * One layer-transfer control: a target-layer select + Apply. Shared by
+ * "Move key to…" and "Copy key to…" — same chrome, different op behind
+ * `onTransfer`. The dropdown resets whenever the selected key's layer
+ * changes.
+ */
+function KeyToLayerControl(props: {
   currentLayerId: string;
   layerIds: readonly string[];
-  onMove: (toLayer: string) => void;
+  testIdPrefix: string;
+  label: string;
+  placeholder: string;
+  applyLabel: string;
+  onTransfer: (toLayer: string) => void;
 }) {
-  const { t } = useLingui();
-  const { currentLayerId, layerIds, onMove } = props;
+  const { currentLayerId, layerIds, testIdPrefix, label, placeholder, applyLabel, onTransfer } = props;
   const [target, setTarget] = useState("");
   // The dropdown resets whenever the selected key's layer changes.
   useEffect(() => setTarget(""), [currentLayerId]);
@@ -1287,28 +1743,15 @@ function MoveKeyToLayer(props: {
         flexWrap: "wrap",
       }}
     >
-      <span style={labelStyle}>
-        {t({
-          id: "editor.assignLoop.touch.builder.moveKeyToLabel",
-          message: "Move key to…",
-        })}
-      </span>
+      <span style={labelStyle}>{label}</span>
       <select
-        data-testid="touch-builder-move-layer-select"
-        aria-label={t({
-          id: "editor.assignLoop.touch.builder.moveKeyToLabel",
-          message: "Move key to…",
-        })}
+        data-testid={`${testIdPrefix}-select`}
+        aria-label={label}
         value={target}
         onChange={(e) => setTarget(e.target.value)}
         style={selectStyle}
       >
-        <option value="">
-          {t({
-            id: "editor.assignLoop.touch.builder.moveKeyToPlaceholder",
-            message: "Select layer",
-          })}
-        </option>
+        <option value="">{placeholder}</option>
         {options.map((id) => (
           <option key={id} value={id}>
             {id}
@@ -1317,12 +1760,12 @@ function MoveKeyToLayer(props: {
       </select>
       <button
         type="button"
-        data-testid="touch-builder-move-layer-apply"
+        data-testid={`${testIdPrefix}-apply`}
         disabled={target === ""}
-        onClick={() => onMove(target)}
+        onClick={() => onTransfer(target)}
         style={ghostBtn}
       >
-        {t({ id: "editor.assignLoop.touch.builder.moveKeyToApply", message: "Apply" })}
+        {applyLabel}
       </button>
     </div>
   );
@@ -1696,7 +2139,7 @@ function SubkeyPanel(props: {
               </select>
             </label>
             {/* The `default` longpress preselect is readable but NOT writable
-                through the 8 op kinds (`default` is absent from
+                through the 10 op kinds (`default` is absent from
                 `EditableKeyFields`) — the checkbox reflects state and stays
                 disabled until the contract admits the field. */}
             {selectedEntry.kind === "sk" && (

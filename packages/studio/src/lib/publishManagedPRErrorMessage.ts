@@ -66,6 +66,12 @@ export function publishManagedPRErrorMessage(err: PublishManagedPRError, i18n?: 
         message: "Submission failed due to an upstream error. Please try again.",
       }));
     case "proxy-rejected":
+      if (err.httpStatus === 401) {
+        return resolveMessage(i18n, msg({
+          id: "output.submit.error.signInRequired",
+          message: "Please sign in with GitHub or Google (below) before submitting. If you already signed in, sign in again — your sign-in may have expired.",
+        }));
+      }
       return resolveMessage(i18n, msg({
         id: "output.submit.error.proxyRejected",
         message: `Submission was rejected (${{ httpStatus: err.httpStatus }}). Please check your details and try again.`,

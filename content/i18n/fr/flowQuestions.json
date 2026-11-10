@@ -188,6 +188,12 @@
   "content.flowQuestion.pb_use_case.option.messaging.label": "Messagerie et SMS au quotidien (la rapidité et les lettres courantes priment)",
   "content.flowQuestion.pb_use_case.option.official.label": "Documents officiels ou administratifs (l'exhaustivité prime)",
   "content.flowQuestion.pb_use_case.prompt": "À quoi ce clavier servira-t-il principalement — supports scolaires, messagerie quotidienne, ou documents officiels ?",
+  "content.flowQuestion.pf_body_parity.audit_label": "Texte des pages d’accueil et d’aide",
+  "content.flowQuestion.pf_body_parity.help_text": "Première différence — accueil : « {{body_parity_welcome}} » · aide : « {{body_parity_help}} »\n\nLes deux pages disent généralement la même chose. Choisissez le texte à conserver sur les deux pages, ou gardez-les différentes si chaque page a besoin de sa propre formulation.",
+  "content.flowQuestion.pf_body_parity.option.help.label": "Utiliser le texte de la page d’aide",
+  "content.flowQuestion.pf_body_parity.option.keep-different.label": "Les garder différentes",
+  "content.flowQuestion.pf_body_parity.option.welcome.label": "Utiliser le texte de la page d’accueil",
+  "content.flowQuestion.pf_body_parity.prompt": "La page d’accueil et la page d’aide ont des textes différents. Quel texte les deux pages doivent-elles porter ?",
   "content.flowQuestion.pf_canonical_order.help_text": "Lorsqu’une syllabe comporte plusieurs signes, la plupart des systèmes d’écriture exigent qu’ils soient placés dans un ordre bien précis, même si le clavier accepte n’importe quel ordre. Indiquer cet ordre est souvent l’information la plus utile d’une page d’aide, car cela évite que le texte, bien qu’il semble correct, ne soit pas reconnu ou ne fasse pas l’objet d’une recherche correcte. Écrivez-le sous forme d’une simple séquence séparée par des tirets ou des signes « plus ». Par exemple : « Consonne - Dagesh - Voyelle - Marques basses - Marques hautes » ou « Consonne + indice + modificateur de consonne + Voyelle + Diacritique ». Laissez ce champ vide si votre système d'écriture ne prévoit pas de convention de ce type.",
   "content.flowQuestion.pf_canonical_order.prompt": "Dans quel ordre faut-il saisir les accents sur une lettre de base ? (facultatif)",
   "content.flowQuestion.pf_contact_info.audit_label": "Contact communautaire",
@@ -261,10 +267,5 @@
   "content.flowQuestion.project_display_name.help_text": "Donnez à votre clavier un nom lisible, par exemple « Haoussa (QWERTY) » ou « Clavier ewondo ». Ce nom apparaît dans l'application Keyman et le dépôt de claviers. Il peut contenir des espaces, des accents et des caractères non ASCII.",
   "content.flowQuestion.project_display_name.prompt": "Quel est le nom d'affichage de votre nouveau clavier ?",
   "content.flowQuestion.project_keyboard_id.help_text": "L'identifiant du clavier est un court identifiant en minuscules utilisé comme nom de dossier dans le dépôt de claviers (par exemple « hausa_qwerty », « ewondo »). Il doit commencer par une lettre minuscule ou un tiret bas et ne peut contenir que des lettres minuscules, des chiffres et des tirets bas. 254 caractères au maximum. Une suggestion a été remplie à partir de votre nom d'affichage — modifiez-la si nécessaire.",
-  "content.flowQuestion.project_keyboard_id.prompt": "Confirmez l'identifiant du clavier",
-  "content.flowQuestion.track_choice.audit_label": "Approche de rédaction",
-  "content.flowQuestion.track_choice.help_text": "« Copier » crée un nouveau clavier indépendant que vous pouvez entièrement renommer et posséder. Pour mettre à jour un clavier existant sur place, ouvrez-le plutôt depuis l'écran d'accueil.",
-  "content.flowQuestion.track_choice.option.copy.label": "Copier — créer un nouveau clavier fondé sur cette disposition",
-  "content.flowQuestion.track_choice.option.copy.note": "Vous lui attribuerez un nouveau nom et un nouvel identifiant de clavier. L'original ne sera pas modifié.",
-  "content.flowQuestion.track_choice.prompt": "Comment voulez-vous travailler avec {{base_name}} ?"
+  "content.flowQuestion.project_keyboard_id.prompt": "Confirmez l'identifiant du clavier"
 }

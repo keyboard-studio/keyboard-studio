@@ -5,7 +5,7 @@
 // header line the codec keeps as-is, and the sibling file is not an IR concern.
 
 import type { VirtualFS } from "@keyboard-studio/contracts";
-import { parseKmnHeaderStores } from "@keyboard-studio/engine";
+import { parseKmnHeaderStores, rewriteKmwKeyboardSelectors } from "@keyboard-studio/engine";
 import { readVfsText } from "./vfsText.ts";
 import { isOskStylesheetPath } from "./oskStylesheetPath.ts";
 
@@ -46,10 +46,17 @@ export function readKeyboardCss(vfs: VirtualFS, keyboardId: string): KeyboardCss
 /**
  * Write the author's CSS into the projected VFS. `css === null` means "untouched" and changes nothing; "" means the author cleared
  * it, which removes the file and the `&KMW_EMBEDCSS` line (a store naming a missing file makes the KeymanWeb compile throw).
- * Returns warnings for the projection's channel.
+ * The stored text names the keyboard by its start id, as the start files do, so a later id change still relinks it; its
+ * `.kmw-keyboard-<startKeyboardId>` selectors become `keyboardId`'s on the way in. Returns warnings for the projection's channel.
  */
-export function applyCustomCssToVfs(vfs: VirtualFS, keyboardId: string, css: string | null): string[] {
-  if (css === null) return [];
+export function applyCustomCssToVfs(
+  vfs: VirtualFS,
+  keyboardId: string,
+  storedCss: string | null,
+  startKeyboardId: string = keyboardId,
+): string[] {
+  if (storedCss === null) return [];
+  const css = rewriteKmwKeyboardSelectors(storedCss, startKeyboardId, keyboardId);
   const kmnPath = `source/${keyboardId}.kmn`;
   const kmn = readVfsText(vfs, kmnPath);
   const existing = readKeyboardCss(vfs, keyboardId);

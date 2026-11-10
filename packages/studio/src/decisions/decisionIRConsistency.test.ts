@@ -74,6 +74,9 @@ const IR_LESS_DECISIONS: ReadonlySet<DecisionId> = new Set<DecisionId>([
   "indic-onset-vowels-wanted",
   "syllabic-finals-wanted",
   "help-welcome-paragraph",
+  // Issue #2530: the body-parity answer reaches the shipped pages through
+  // the doc-fix-proposals slice, not the IR.
+  "help-body-parity",
   "help-usage-tip-1",
   "help-usage-tip-2",
   "help-history-bullets",
@@ -111,6 +114,12 @@ const IR_LESS_DECISIONS: ReadonlySet<DecisionId> = new Set<DecisionId>([
   // #2485: the icon gallery module's apply is a no-op — the .ico is written
   // by the output pipeline from the step's own payload, never via IR paths.
   "icon",
+  // spec 113 (#2540): the trial and publish gallery modules' apply is a
+  // no-op — the test builds and reports live in the testingStore slice of
+  // the draft envelope, and the release is emitted by the output pipeline
+  // from the working copy, never via IR paths.
+  "trial",
+  "publish",
   "indic-conjuncts-wanted",
   "indic-nukta-detail",
   "indic-nukta-wanted",
@@ -164,6 +173,7 @@ const IR_LESS_DECISIONS: ReadonlySet<DecisionId> = new Set<DecisionId>([
   // rule-set left it at T034 (its apply splices additions into
   // groups/stores — decisionIRPaths maps it).
   "physical-layout",
+  "fallback-policy",
   "touch-seed-source",
   "touch-layout",
   "help-docs",

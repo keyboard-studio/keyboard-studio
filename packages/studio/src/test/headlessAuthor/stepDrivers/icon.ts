@@ -1,12 +1,13 @@
-// Icon step: keep the template icon, as the UI's Continue with no edits does.
+// Icon step: mirrors IconEditor's three options (2026-11-06).
+// Default is Keep when the template carries a usable .ico — the driver
+// passes the source bytes through unchanged, with the PNG from the
+// 48px preview pixels; with no source icon it is Create — the blank
+// white canvas re-encoded as [16, 32, 48].
 //
-// Mirrors IconEditor's load + Continue path with the DOM-free pieces: the
-// base .ico is read from the start VFS, decoded (BMP entries), resampled to
-// 256px and re-encoded; a base with no decodable .ico falls back to the
-// generated default, as the component does. The PNG data URL is the same
-// pixels encoded as a PNG — the component gets it from canvas.toDataURL,
-// which has no DOM-free equivalent, so the driver encodes it by hand
-// (zlib via fflate; see encodePngDataUrl).
+// Mirrors IconEditor's Continue path with the DOM-free pieces: the PNG
+// data URL is the same pixels encoded as a PNG — the component gets it
+// from canvas.toDataURL, which has no DOM-free equivalent, so the driver
+// encodes it by hand (zlib via fflate; see encodePngDataUrl).
 
 import { zlibSync } from "fflate";
 import {
@@ -17,7 +18,7 @@ import {
 } from "../../../editors/assignLoop/icoCodec.ts";
 import {
   ICON_SIZE,
-  generateDefaultIcon,
+  createBlankIcon,
   type PixelBuffer,
 } from "../../../editors/assignLoop/iconTools.ts";
 import { useWorkingCopyStore } from "../../../stores/workingCopyStore.ts";
@@ -101,40 +102,31 @@ export function encodePngDataUrl(
 
 export const iconDrivers: StepDrivers = {
   icon: async () => {
-    const wc = useWorkingCopyStore.getState();
-    // -- Load the base keyboard's icon as the starting point ---------------
-    let pixels: PixelBuffer | null = null;
-    const vfs = wc.startVfs;
-    if (vfs !== null) {
-      for (const p of vfs.list().filter((x) => x.toLowerCase().endsWith(".ico"))) {
-        const entry = vfs.get(p);
+    // -- Keep (the default when a source icon exists) ----------------------
+    const startVfs = useWorkingCopyStore.getState().startVfs;
+    if (startVfs) {
+      for (const p of startVfs
+        .list()
+        .filter((x) => x.toLowerCase().endsWith(".ico"))) {
+        const entry = startVfs.get(p);
         if (!entry || typeof entry.content === "string") continue;
         try {
           const decoded = await decodeIco(entry.content);
-          pixels =
-            decoded.width === ICON_SIZE && decoded.height === ICON_SIZE
-              ? decoded.pixels
-              : resample(decoded, ICON_SIZE, ICON_SIZE);
-          break;
+          const pixels48 = resample(decoded, ICON_SIZE, ICON_SIZE);
+          return {
+            iconIcoBase64: icoToBase64(entry.content),
+            iconPngDataUrl: encodePngDataUrl(pixels48, ICON_SIZE, ICON_SIZE),
+          };
         } catch {
           // Try the next .ico file.
         }
       }
     }
-    // -- Fallback: generated default from the keyboard name ----------------
-    if (pixels === null) {
-      const label =
-        wc.identity?.displayName ??
-        wc.identity?.languageName ??
-        wc.startKeyboard?.displayName ??
-        wc.startKeyboard?.id ??
-        "K";
-      pixels = generateDefaultIcon(label);
-    }
-    // -- Continue: the payload IconEditor hands to onComplete --------------
+    // -- Create: no source icon — blank white canvas, as the editor shows --
+    const pixels: PixelBuffer = createBlankIcon();
     const ico = encodeIco(
       { width: ICON_SIZE, height: ICON_SIZE, pixels },
-      [16, 32, 48, 256],
+      [16, 32, 48],
     );
     return {
       iconIcoBase64: icoToBase64(ico),

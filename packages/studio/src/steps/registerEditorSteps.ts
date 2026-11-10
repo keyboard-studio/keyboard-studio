@@ -29,18 +29,20 @@ import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
 import { TouchSeedSourceHost } from "../survey/touchSeedSource/TouchSeedSourceHost.tsx";
 import { OskEditorAdapter } from "../editors/adapters/oskAdapter.tsx";
+import { FallbackPolicyAdapter } from "../editors/adapters/fallbackPolicyAdapter.tsx";
 import { CssEditor } from "../editors/assignLoop/CssEditor.tsx";
 import { HtmlEditor } from "../editors/assignLoop/HtmlEditor.tsx";
 import { LanguageListHost } from "../survey/languageList/LanguageListHost.tsx";
 import { MissingLettersHost } from "../survey/openWalk/MissingLettersHost.tsx";
 import { UpgradesHost } from "../survey/openWalk/UpgradesHost.tsx";
 import { IconEditor } from "../editors/assignLoop/IconEditor.tsx";
+import { TrialStep } from "../editors/assignLoop/TrialStep.tsx";
+import { PublishStep } from "../editors/assignLoop/PublishStep.tsx";
 import {
   StartResolutionAdapter,
   IdentityLiteAdapter,
 } from "../editors/adapters/panelAdapters.tsx";
 import {
-  TrackStepFactoryComponent,
   AttributionStepFactoryComponent,
   ProjectNameStepFactoryComponent,
   PhaseFStepFactoryComponent,
@@ -106,7 +108,9 @@ export const layoutStep: EditorStep = step({
 
 /**
  * Choose-base step: StartResolution (keyboard base picker ONLY).
- * Track selection is a separate manifest step (trackStep).
+ * There is no track step anymore: the start screen records the track
+ * (New = copy, Open = adapt), and a walk that reaches the base choice
+ * without one defaults to copy when the base is confirmed.
  *
  * spec 080: this step also surfaces the documentation-completeness badge on
  * suggestion cards / MetadataCard (FR-008) — a DISPLAY-ONLY addition; it adds
@@ -121,23 +125,8 @@ export const chooseStartStep: EditorStep = step({
 });
 
 /**
- * Track step: TrackStepFactoryComponent (copy vs adapt choice).
- * Every author chooses a track.
- * Reads session-derived header.bcp47 + resolved base display name (header.name).
- * DEC-D2: branch selection only — no IR leaf in Phase 1, so writes is [].
- */
-export const trackStep: EditorStep = step({
-  id: "track",
-  title: "Authoring Track",
-  component: TrackStepFactoryComponent,
-  inputs: [irPath("header", "bcp47"), irPath("header", "name")],
-  specRef: ["§8", "specs/018-qu-wire-track"],
-  persistence: "answer-store",
-});
-
-/**
  * Attribution step: author name / email / copyright holder (#1901).
- * Asked AFTER the track choice, on both tracks — what the questions
+ * Asked AFTER the base choice, on both tracks — what the questions
  * propose is track-shaped (profile confirmation on copy; the base's
  * copyright holder seeded by the extraction pass on update). The
  * questions were the identity step's tail until #1901; their decisions
@@ -233,6 +222,20 @@ export const mechanismsStep: EditorStep = step({
   surface: "physical",
   writes: [...ADD_GALLERY_WRITES],
   specRef: ["§8", "specs/007-strategy-selection"],
+  persistence: "working-copy",
+});
+
+/**
+ * Fallback policy step (issue #2539): keys the template keyboard does not define
+ * may fall through to the typist's computer layout or be blocked — asked after
+ * Assign Mechanisms, before the OSK step.
+ */
+export const fallbackPolicyStep: EditorStep = step({
+  id: "fallback_policy",
+  title: "Fallback policy",
+  layout: "full",
+  component: FallbackPolicyAdapter,
+  specRef: ["specs/076-rule-behaviours", "specs/109-base-keyboard-fallback"],
   persistence: "working-copy",
 });
 
@@ -392,11 +395,10 @@ export const helpStep: EditorStep = step({
 // ---------------------------------------------------------------------------
 
 /**
- * HTML/Markdown editor step: edits the keyboard's `welcome.htm` documentation
- * file (Markdown despite the extension). This is the full user manual.
- *
- * `readme.htm`, `README.md`, and `.php` versions are generated exports from
- * this source — the output pipeline handles them, not this editor.
+ * HTML/Markdown editor step: edits the keyboard's documentation files
+ * (welcome.htm, readme.htm, README.md, and the help .php — all HTML except
+ * README.md, which is Markdown). This is the full user manual; author edits
+ * override the generated renders downstream (specs/html-editor).
  */
 export const htmlStep: EditorStep = step({
   id: "html",
@@ -424,6 +426,40 @@ export const iconStep: EditorStep = step({
   layout: "full",
   component: IconEditor,
   specRef: ["specs/icon-editor"],
+  persistence: "working-copy",
+});
+
+/**
+ * Trial step (spec 113, #2540): try the keyboard and get it to testers.
+ * Takes over the test-build, tester-report and revise-and-return parts of
+ * spec 094 that used to sit inside the Output screen. Optional — Continue
+ * to Publish is always available; with no test builds the step shows a
+ * nudge, never a gate. On Continue passes `{ buildsAtCompletion }` via
+ * onComplete (recorded in the decision audit; the builds themselves live
+ * in the testingStore slice of the draft envelope).
+ */
+export const trialStep: EditorStep = step({
+  id: "trial",
+  title: "Trial",
+  layout: "full",
+  component: TrialStep,
+  specRef: ["specs/113-trial-and-publish-steps"],
+  persistence: "working-copy",
+});
+
+/**
+ * Publish step (spec 113, #2540): get the finished keyboard out. Takes
+ * over the release checks, final downloads (.kmp / source .zip / LDML)
+ * and the managed GitHub PR that used to sit inside the Output screen.
+ * On Finish passes `{ submitted }` via onComplete (whether the project
+ * was submitted, i.e. testingStore `frozen`, at completion).
+ */
+export const publishStep: EditorStep = step({
+  id: "publish",
+  title: "Publish",
+  layout: "full",
+  component: PublishStep,
+  specRef: ["specs/113-trial-and-publish-steps"],
   persistence: "working-copy",
 });
 

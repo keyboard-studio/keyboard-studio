@@ -104,8 +104,7 @@ describe("gates", () => {
     for (const id of openHiddenScreens) {
       const gate = openScreenGates.get(id)!;
       expect(gate(open), id).toBe(false);
-      // The track step also hides on Copy: the start screen recorded the track.
-      expect(gate(decisionsFor("copy")), id).toBe(id !== "track");
+      expect(gate(decisionsFor("copy")), id).toBe(true);
       expect(gate(decisionsFor(null)), id).toBe(true);
     }
   });
@@ -230,9 +229,14 @@ describe("the Copy walk", () => {
     }
   });
 
-  it("ends at Output", () => {
+  it("ends at Publish, with no navigate (spec 113)", () => {
     expect(steps.at(-1)).toBe("done");
-    expect(navigate).toBe("output");
+    expect(steps.at(-2)).toBe("publish");
+    expect(steps).toContain("trial");
+    // publish -> done carries NO navigate — the author rests on the done
+    // terminal panel, whose copy points back at Publish. (The old
+    // `icon -> done + navigate:"output"` hop is gone with the Output screen.)
+    expect(navigate).toBeUndefined();
   });
 
   it("help holds Copy on unfinished letters, but not Open", () => {

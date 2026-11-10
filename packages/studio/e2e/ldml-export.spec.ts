@@ -20,13 +20,13 @@ import * as fs from "node:fs";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   driveAttributionStep,
   acceptProjectName,
   confirmPrefill,
   buildOneCharacterList,
   driveMechanismsGallery,
-  navigateToOutput,
+  navigateToPublish,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
 
@@ -63,13 +63,13 @@ test.describe("LDML export E2E", () => {
     // A cold dev server enumerates the whole local keyboards clone before the picker appears.
     await page.waitForSelector('[data-testid="base-picker"]', { timeout: 90_000 });
     await pickStartKeyboard(page, FIXTURE.startKeyboardId);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
     await buildOneCharacterList(page, FIXTURE.charToAdd);
     await finishGalleryWork(page);
-    await navigateToOutput(page);
+    await navigateToPublish(page);
 
     // The LDML panel is its own region with a labelled profile picker; 46 is the default.
     const panel = page.getByTestId("ldml-download-panel");

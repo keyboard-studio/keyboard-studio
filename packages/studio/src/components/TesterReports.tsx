@@ -68,7 +68,9 @@ export function TesterReports() {
   const openSection = (stepId: string) => {
     const outcome = jumpToLocation(
       { route: "survey", step: stepId as ActiveStepId },
-      { returnTo: { route: "output" } },
+      // spec 113 (#2540): revise-and-return now returns to the Trial step,
+      // which owns this list — the Output route is a redirect, not a home.
+      { returnTo: { route: "survey", step: "trial" } },
     );
     setJumpStatus(outcome.kind === "refused" ? unreachableReasonLabel(outcome.reason, i18n) : null);
   };

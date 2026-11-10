@@ -93,3 +93,44 @@ describe("projectionInputFromState — preview/download parity", () => {
     expect(input.suppressionExemptIds?.size).toBeGreaterThan(0);
   });
 });
+
+describe("projectionInputFromState — authored welcome path on a flat-convention base", () => {
+  const AUTHORED = "<html><body><p>AUTHORED-WELCOME</p></body></html>";
+  const KPS_PATH = `source/${basicKbdus.id}.kps`;
+
+  function seedFlat(track: "copy" | "open"): VirtualFS {
+    const ir = startIr();
+    const vfs = createVirtualFS([
+      { path: KMN_PATH, content: emitKmn(ir), isBinary: false },
+      { path: "source/welcome.htm", content: "<p>carried</p>", isBinary: false },
+      ...(track === "open" ? [{ path: KPS_PATH, content: "<Package></Package>\n", isBinary: false }] : []),
+    ]);
+    const wc = useWorkingCopyStore.getState();
+    if (track === "copy") wc.instantiateFromStart(basicKbdus, { vfs, ir });
+    else wc.instantiateFromExisting(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.setState({ startWelcomeConvention: "flat", authoredWelcomeHtm: AUTHORED });
+    return vfs;
+  }
+
+  it.each([
+    ["open", "source/welcome.htm"],
+    ["copy", "source/welcome/welcome.htm"],
+  ] as const)("%s: the preview and the download input name the same welcome path", (track, path) => {
+    seedFlat(track);
+    const state = useWorkingCopyStore.getState();
+    const input = projectionInputFromState(
+      { ...state, startIr: state.startIr! },
+      { vfs: createVirtualFS([]), keyboardId: basicKbdus.id, assignments: [], getPattern: () => undefined, identity: null, marksTreatment: undefined, capsHandling: undefined },
+    );
+    expect(input.welcomePath).toBe(path);
+  });
+
+  it("open: the OSK preview writes the edit over the carried flat page and adds no folder page", () => {
+    const startVfs = seedFlat("open");
+    const { result } = renderHook(() => useWorkingCopyTransform({ previewedStartId: basicKbdus.id }));
+    const vfs = createVirtualFS(startVfs.entries());
+    result.current!(vfs, basicKbdus.id);
+    expect(vfs.get("source/welcome.htm")?.content).toBe(AUTHORED);
+    expect(vfs.get("source/welcome/welcome.htm")).toBeUndefined();
+  });
+});

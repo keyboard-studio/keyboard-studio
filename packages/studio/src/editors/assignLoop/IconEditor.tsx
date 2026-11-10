@@ -1,21 +1,30 @@
 /**
  * IconEditor — keyboard icon editor step (after Documentation, before Package).
  *
- * A modern reimagining of TIKE's bitmap editor (not a port):
- * - Import-first: drag-drop or pick SVG/PNG/ICO, rasterized to the 256px
- *   working canvas (SVG <text> rasterizes as-is, per Matthew's ruling)
- * - Pixel editing at 256×256 with pen, eraser, line, fill, box, circle
+ * A modern reimagining of TIKE's bitmap editor (not a port). Three options,
+ * chosen up front — Keep is the default when the template has an icon:
+ * - Keep icon: the template's `.ico` passes through byte-for-byte
+ * - Edit source icon: the template's icon loaded into the pixel editor
+ * - Create icon: a blank white canvas to draw on
+ * The editor itself is a big pixel editor at 48×48 — the largest size an
+ * .ico entry ever needs — shown large with hard pixels (what you draw is
+ * what ships). Import-first for Edit/Create: drag-drop or pick SVG/PNG/ICO
+ * (SVG <text> rasterizes as-is, per Matthew's ruling).
+ * - Pixel editing with pen, eraser, line, fill, box, circle
  * - Text tool with a low-res-friendly monospace font (crisp at 16×16)
  * - Live multi-size preview (16 / 32 / 48 px)
  * - 1-bit transparency via the alpha channel + AND mask on ICO encode
  *
- * Matthew's rulings (2026-11-03):
- * - Unskippable step; changing nothing keeps the template's icon
- * - The base keyboard's icon is the starting point (loaded from startVfs)
+ * Matthew's rulings (2026-11-03, revised 2026-11-06):
+ * - Unskippable step; three options, Keep the default when a source icon
+ *   exists; the editor works at 48px — no high-res working canvas, just
+ *   big pixels
  * - Hand-rolled ICO codec (icoCodec.ts), no new dependencies
  *
  * On Continue: passes { iconIcoBase64, iconPngDataUrl } via onComplete.
- * The output pipeline writes the .ico file into the package.
+ * Keep passes the source bytes through; Edit/Create encode the working
+ * canvas at 16 / 32 / 48. The output pipeline writes the .ico file into
+ * the package.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -35,12 +44,12 @@ import {
   ICON_PALETTE,
   ICON_SIZE,
   type PixelBuffer,
+  createBlankIcon,
   drawCircle,
   drawLine,
   drawRect,
   drawText,
   floodFill,
-  generateDefaultIcon,
   getPixel,
   setPixel,
   type Rgba,
@@ -73,6 +82,15 @@ const TOOL_IDS: ToolId[] = [
   "text",
   "picker",
 ];
+
+/** The three options: keep, edit, or create. */
+type IconMode = "keep" | "edit" | "create";
+
+/** A usable source icon: original bytes + largest entry at 48×48. */
+type SourceIcon = {
+  bytes: Uint8Array;
+  pixels48: PixelBuffer;
+};
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -172,18 +190,21 @@ function SizePreview({
 export function IconEditor({ onComplete, onBack }: EditorStepProps) {
   const { t } = useLingui();
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
-  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
-  const identityName = useWorkingCopyStore((s) => s.identity?.displayName ?? s.identity?.languageName ?? null);
 
-  const [pixels, setPixels] = useState<PixelBuffer | null>(null);
+  // The three options — Keep is the default when the template has an icon.
+  // The source icon is found on mount; until then the step shows loading.
+  const [sourceIcon, setSourceIcon] = useState<SourceIcon | null>(null);
+  const [sourceChecked, setSourceChecked] = useState(false);
+  const [mode, setMode] = useState<IconMode>("create");
+  const [pixels, setPixels] = useState<PixelBuffer>(() => createBlankIcon());
   const [tool, setTool] = useState<ToolId>("pen");
   const [color, setColor] = useState<Rgba>([0, 0, 0, 255]);
-  const [textSize, setTextSize] = useState(24);
+  const [textSize, setTextSize] = useState(8);
   // Undo history kept as one atomic state (stack + index move together).
   const [history, setHistory] = useState<{
     stack: PixelBuffer[];
     index: number;
-  }>({ stack: [], index: -1 });
+  }>(() => ({ stack: [createBlankIcon()], index: 0 }));
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [dragSnapshot, setDragSnapshot] = useState<PixelBuffer | null>(null);
@@ -195,11 +216,26 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
 
-  // -- Load the base keyboard's icon as the starting point ------------------
+  // Focus the text input when the placement overlay opens.
+  useEffect(() => {
+    if (textDraft !== null) textInputRef.current?.focus();
+  }, [textDraft]);
+
+  // -- Paint the working buffer to the display canvas -----------------------
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = false;
+    ctx.putImageData(new ImageData(pixels, ICON_SIZE, ICON_SIZE), 0, 0);
+  }, [pixels]);
+
+  // -- Find the template's icon (decides which options exist) --------------
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // 1. Look for .ico files in the base keyboard's VFS snapshot.
+      let found: SourceIcon | null = null;
       if (startVfs) {
         try {
           const icoPaths = startVfs
@@ -210,27 +246,24 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
             if (!entry || typeof entry.content === "string") continue;
             try {
               const decoded = await decodeIco(entry.content);
-              const px = resample(decoded, ICON_SIZE, ICON_SIZE);
-              if (!cancelled) {
-                setPixels(px);
-                pushHistory(px);
-              }
-              return;
+              found = {
+                bytes: entry.content,
+                pixels48: resample(decoded, ICON_SIZE, ICON_SIZE),
+              };
+              break;
             } catch {
               // Try the next .ico file.
             }
           }
         } catch {
-          // Fall through to the generated default.
+          // No usable source icon — only Create is offered.
         }
       }
-      // 2. Fallback: generated default from the keyboard name.
-      if (!cancelled) {
-        const label =
-          identityName ?? startKeyboard?.displayName ?? startKeyboard?.id ?? "K";
-        const px = generateDefaultIcon(label);
-        setPixels(px);
-        pushHistory(px);
+      if (cancelled) return;
+      setSourceIcon(found);
+      setSourceChecked(true);
+      if (found) {
+        setMode("keep");
       }
     })();
     return () => {
@@ -239,26 +272,11 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Focus the text input when the placement overlay opens.
-  useEffect(() => {
-    if (textDraft !== null) textInputRef.current?.focus();
-  }, [textDraft]);
-
-  // -- Paint the working buffer to the display canvas -----------------------
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !pixels) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.imageSmoothingEnabled = false;
-    ctx.putImageData(new ImageData(pixels, ICON_SIZE, ICON_SIZE), 0, 0);
-  }, [pixels]);
-
   const pushHistory = useCallback((px: PixelBuffer) => {
     setHistory((h) => {
       const next = h.stack.slice(0, h.index + 1);
       next.push(clonePixels(px));
-      // Cap history at 30 snapshots (~7.5MB worst case).
+      // Cap history at 30 snapshots (~270KB worst case at 48×48).
       const trimmed =
         next.length > 30 ? next.slice(next.length - 30) : next;
       return { stack: trimmed, index: trimmed.length - 1 };
@@ -284,6 +302,22 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
     [pushHistory],
   );
 
+  // -- Option switching ------------------------------------------------------
+  // Each option starts from its own canvas; switching resets the canvas
+  // (and its undo history) to that option's start.
+  const selectMode = (next: IconMode) => {
+    setMode(next);
+    if (next === "edit" && sourceIcon) {
+      const start = clonePixels(sourceIcon.pixels48);
+      setPixels(start);
+      setHistory({ stack: [clonePixels(start)], index: 0 });
+    } else if (next === "create") {
+      const start = createBlankIcon();
+      setPixels(start);
+      setHistory({ stack: [clonePixels(start)], index: 0 });
+    }
+  };
+
   // -- Pointer handling ------------------------------------------------------
   const toPixel = (e: React.PointerEvent): { x: number; y: number } => {
     const canvas = canvasRef.current!;
@@ -295,7 +329,6 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    if (!pixels) return;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     const { x, y } = toPixel(e);
 
@@ -326,7 +359,7 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!dragging || !dragStart || !dragSnapshot || !pixels) return;
+    if (!dragging || !dragStart || !dragSnapshot) return;
     const { x, y } = toPixel(e);
     const c = tool === "eraser" ? ([0, 0, 0, 0] as Rgba) : color;
 
@@ -351,7 +384,7 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
   };
 
   const handlePointerUp = () => {
-    if (dragging && pixels) {
+    if (dragging) {
       // Commit the drag as one undo step.
       pushHistory(pixels);
     }
@@ -361,7 +394,7 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
   };
 
   const commitText = () => {
-    if (!pixels || textPos === null || !textDraft) {
+    if (textPos === null || !textDraft) {
       setTextDraft(null);
       setTextPos(null);
       return;
@@ -416,12 +449,32 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
   };
 
   const handleContinue = () => {
-    if (!pixels) return;
+    if (mode === "keep" && sourceIcon) {
+      // Keep: the template's .ico passes through byte-for-byte; the PNG
+      // comes from the 48px preview pixels.
+      const canvas = document.createElement("canvas");
+      canvas.width = ICON_SIZE;
+      canvas.height = ICON_SIZE;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.putImageData(
+          new ImageData(sourceIcon.pixels48, ICON_SIZE, ICON_SIZE),
+          0,
+          0,
+        );
+      }
+      onComplete({
+        iconIcoBase64: icoToBase64(sourceIcon.bytes),
+        iconPngDataUrl: canvas.toDataURL("image/png"),
+      });
+      return;
+    }
+    // Edit / Create: encode the working canvas at 16 / 32 / 48.
     const ico = encodeIco(
       { width: ICON_SIZE, height: ICON_SIZE, pixels },
-      [16, 32, 48, 256],
+      [16, 32, 48],
     );
-    // 256px PNG data URL for easy preview/storage downstream.
+    // 48px PNG data URL for easy preview/storage downstream.
     const canvas = document.createElement("canvas");
     canvas.width = ICON_SIZE;
     canvas.height = ICON_SIZE;
@@ -486,13 +539,12 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
     }
   };
 
-  if (!pixels) {
+  // Until the template's icon is found (or not), the options can't be
+  // chosen — show loading instead of the editor.
+  if (!sourceChecked) {
     return (
       <div style={{ padding: 24, color: "var(--app-text-muted)", fontSize: 14 }}>
-        {t({
-          id: "editor.assignLoop.icon.loading",
-          message: "Loading icon…",
-        })}
+        {t({ id: "editor.assignLoop.icon.loading", message: "Loading icon…" })}
       </div>
     );
   }
@@ -518,15 +570,92 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
         {t({ id: "editor.assignLoop.icon.title", message: "Keyboard icon" })}
       </h1>
       <p style={{ margin: 0, fontSize: 13, color: "var(--app-text-muted)" }}>
-        {t({
-          id: "editor.assignLoop.icon.description",
-          message:
-            "Design the icon for your keyboard. Start from the template's icon, import your own, or draw pixel by pixel — the preview shows how it looks at real sizes.",
-        })}
+        {sourceIcon
+          ? t({
+              id: "editor.assignLoop.icon.description",
+              message:
+                "Keep the template's icon, edit it pixel by pixel, or draw a new one from a blank white canvas — the preview shows how it looks at real sizes.",
+            })
+          : t({
+              id: "editor.assignLoop.icon.descriptionNoSource",
+              message:
+                "Draw a new icon for your keyboard from a blank white canvas, pixel by pixel — the preview shows how it looks at real sizes.",
+            })}
       </p>
 
-      <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-        {/* Editor column */}
+      {/* The three options — Keep is the default when a source icon exists. */}
+      <div
+        role="group"
+        aria-label={t({
+          id: "editor.assignLoop.icon.modeGroup",
+          message: "What to do with the icon",
+        })}
+        style={{ display: "flex", gap: 6, flexWrap: "wrap" }}
+      >
+        {sourceIcon && (
+          <ToolButton
+            active={mode === "keep"}
+            label={t({
+              id: "editor.assignLoop.icon.mode.keep",
+              message: "Keep icon",
+            })}
+            title={t({
+              id: "editor.assignLoop.icon.mode.keep",
+              message: "Keep icon",
+            })}
+            onClick={() => selectMode("keep")}
+          />
+        )}
+        {sourceIcon && (
+          <ToolButton
+            active={mode === "edit"}
+            label={t({
+              id: "editor.assignLoop.icon.mode.edit",
+              message: "Edit source icon",
+            })}
+            title={t({
+              id: "editor.assignLoop.icon.mode.edit",
+              message: "Edit source icon",
+            })}
+            onClick={() => selectMode("edit")}
+          />
+        )}
+        <ToolButton
+          active={mode === "create"}
+          label={t({
+            id: "editor.assignLoop.icon.mode.create",
+            message: "Create icon",
+          })}
+          title={t({
+            id: "editor.assignLoop.icon.mode.create",
+            message: "Create icon",
+          })}
+          onClick={() => selectMode("create")}
+        />
+      </div>
+
+      {mode === "keep" && sourceIcon ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--app-text-muted)" }}>
+            {t({
+              id: "editor.assignLoop.icon.keepNote",
+              message: "The template's icon will be kept unchanged.",
+            })}
+          </p>
+          <div style={{ display: "flex", gap: 16, alignItems: "flex-end" }}>
+            {PREVIEW_SIZES.map((s) => (
+              <SizePreview
+                key={s}
+                pixels={sourceIcon.pixels48}
+                size={s}
+                label={`${s}×${s}`}
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+          {/* Editor column */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {/* Toolbar */}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -576,9 +705,9 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
               })}
               <input
                 type="range"
-                min={8}
-                max={64}
-                step={4}
+                min={5}
+                max={16}
+                step={1}
                 value={textSize}
                 onChange={(e) => setTextSize(Number(e.target.value))}
               />
@@ -586,15 +715,15 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
             </label>
           )}
 
-          {/* Canvas */}
+          {/* Canvas: 48 working pixels shown 10×, so each pixel is big. */}
           <div
             style={{
               border: "1px solid var(--app-border)",
               borderRadius: 8,
               background:
                 "repeating-conic-gradient(var(--app-surface) 0% 25%, var(--app-backdrop) 0% 50%) 0 0 / 32px 32px",
-              width: 512,
-              height: 512,
+              width: 480,
+              height: 480,
               touchAction: "none",
               cursor: "crosshair",
               position: "relative",
@@ -608,8 +737,8 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
               style={{
-                width: 512,
-                height: 512,
+                width: 480,
+                height: 480,
                 display: "block",
                 imageRendering: "pixelated",
               }}
@@ -619,8 +748,8 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
               <div
                 style={{
                   position: "absolute",
-                  left: textPos.x * 2,
-                  top: textPos.y * 2,
+                  left: textPos.x * 10,
+                  top: textPos.y * 10,
                   background: "var(--app-surface)",
                   border: "1px solid var(--app-accent)",
                   borderRadius: 6,
@@ -674,7 +803,7 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
           </div>
 
           {/* Palette */}
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxWidth: 512 }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxWidth: 480 }}>
             {ICON_PALETTE.map((entry) => (
               <button
                 key={entry.name}
@@ -793,7 +922,8 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

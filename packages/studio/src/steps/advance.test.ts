@@ -1,9 +1,9 @@
 // advance.test.ts — unit tests for the pure advance policy (spec 028 T007).
 //
 // Covers every case in advance-and-stephost.contract.md §1:
-//   - copy/adapt fork at "attribution" (the track case forwards there
-//     since #1901 — the fork is evaluated after the post-track
-//     author/copyright questions are answered)
+//   - copy/adapt fork at "attribution" (since #1901 — the fork is evaluated
+//     after the author/copyright questions are answered; the track itself
+//     is recorded by the start screen, or defaults to copy)
 //   - project_name → characters (side-trail rejoin hop)
 //   - identity supported/unsupported (terminal branch)
 //   - help → done + navigate:"output"
@@ -30,8 +30,8 @@ import {
 // ---------------------------------------------------------------------------
 
 type WalkStep =
-  | "identity" | "layout" | "choose_base" | "track" | "attribution" | "project_name" | "open_languages" | "characters"
-  | "carve" | "deadkeys" | "rules" | "marks" | "punctuation" | "invisibles" | "convenience" | "mechanisms" | "osk" | "touch_seed_source" | "touch" | "help" | "done" | "unsupported";
+  | "identity" | "layout" | "choose_base" | "attribution" | "project_name" | "open_languages" | "characters"
+  | "carve" | "deadkeys" | "rules" | "marks" | "punctuation" | "invisibles" | "convenience" | "mechanisms" | "fallback_policy" | "osk" | "touch_seed_source" | "touch" | "help" | "done" | "unsupported";
 
 function walkSpine(
   ctx: { selectedTrack: "copy" | "adapt" | null; identitySupported: boolean },
@@ -115,12 +115,8 @@ describe("nextMainLineStepAfter", () => {
     expect(nextMainLineStepAfter("layout")).toBe("choose_base");
   });
 
-  it("choose_base → track", () => {
-    expect(nextMainLineStepAfter("choose_base")).toBe("track");
-  });
-
-  it("track → attribution (#1901: the post-track author/copyright step)", () => {
-    expect(nextMainLineStepAfter("track")).toBe("attribution");
+  it("choose_base → attribution (track question removed: choose_base routes straight to attribution)", () => {
+    expect(nextMainLineStepAfter("choose_base")).toBe("attribution");
   });
 
   it("attribution → the next spine screen, never the project_name side trail", () => {
@@ -164,8 +160,12 @@ describe("nextMainLineStepAfter", () => {
     expect(nextMainLineStepAfter("rules")).toBe("mechanisms");
   });
 
-  it("mechanisms → osk", () => {
-    expect(nextMainLineStepAfter("mechanisms")).toBe("osk");
+  it("mechanisms → fallback_policy (#2539: fallback policy step sits after mechanisms, before OSK)", () => {
+    expect(nextMainLineStepAfter("mechanisms")).toBe("fallback_policy");
+  });
+
+  it("fallback_policy → osk", () => {
+    expect(nextMainLineStepAfter("fallback_policy")).toBe("osk");
   });
 
   it("osk → touch (skips touch_seed_source which is a derived side trail)", () => {
@@ -188,8 +188,16 @@ describe("nextMainLineStepAfter", () => {
     expect(nextMainLineStepAfter("html")).toBe("icon");
   });
 
-  it("icon → done (package is reserved terminal)", () => {
-    expect(nextMainLineStepAfter("icon")).toBe("done");
+  it("icon → trial", () => {
+    expect(nextMainLineStepAfter("icon")).toBe("trial");
+  });
+
+  it("trial → publish", () => {
+    expect(nextMainLineStepAfter("trial")).toBe("publish");
+  });
+
+  it("publish → done (package is reserved terminal)", () => {
+    expect(nextMainLineStepAfter("publish")).toBe("done");
   });
 });
 
@@ -202,21 +210,25 @@ describe("nextMainLineStepAfter", () => {
 // ---------------------------------------------------------------------------
 
 describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
-  it("SR-1/SR-2 copy track: identity -> … -> mechanisms -> osk -> touch_seed_source -> touch -> help -> html -> icon -> done", () => {
+  it("SR-1/SR-2 copy track: identity -> … -> mechanisms -> fallback_policy -> osk -> touch_seed_source -> touch -> help -> html -> icon -> trial -> publish -> done", () => {
     const { sequence, navigateAtEnd } = walkSpine(copyCtx);
     expect(sequence).toEqual([
-      // No "track": the start screen recorded it, so the step is gated off.
+      // No "track": the question is removed; the start screen records the
+      // track (or it defaults to copy at instantiation).
       "identity", "layout", "choose_base", "attribution", "project_name", "characters",
-      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "osk", "touch_seed_source", "touch", "css", "help", "html", "icon", "done",
+      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "fallback_policy", "osk", "touch_seed_source", "touch", "css", "help", "html", "icon", "trial", "publish", "done",
     ]);
-    // "... -> done -> output": icon -> done carries navigate:"output".
-    expect(navigateAtEnd).toBe("output");
+    // Spec 113 (#2540): publish -> done carries NO navigate — the author
+    // rests on the `done` terminal panel, whose copy points back at
+    // Publish. (The old `icon -> done + navigate:"output"` hop is gone
+    // with the Output screen.)
+    expect(navigateAtEnd).toBeUndefined();
   });
 
   it("SR-2 adapt track (Open, spec 111): project_name is skipped, the language list joins, and the identity-first screens and galleries leave the walk", () => {
     const { sequence, navigateAtEnd } = walkSpine(adaptCtx);
     expect(sequence).toEqual([
-      "identity", "attribution", "open_languages", "open_missing_letters", "mechanisms", "osk", "touch", "css", "icon", "done",
+      "identity", "attribution", "open_languages", "open_missing_letters", "mechanisms", "fallback_policy", "osk", "touch", "css", "icon", "trial", "publish", "done",
     ]);
     expect(sequence).not.toContain("project_name");
     // Open ends at Review (the criteria view), whose Continue opens Output.
@@ -226,12 +238,14 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
   it("SR-5: the physical -> touch -> docs tail is never reordered (touch after osk, css after touch, help after css)", () => {
     const { sequence } = walkSpine(copyCtx);
     const mech = sequence.indexOf("mechanisms");
+    const fallback = sequence.indexOf("fallback_policy");
     const osk = sequence.indexOf("osk");
     const touch = sequence.indexOf("touch");
     const css = sequence.indexOf("css");
     const help = sequence.indexOf("help");
     expect(mech).toBeGreaterThan(-1);
-    expect(osk).toBeGreaterThan(mech);
+    expect(fallback).toBeGreaterThan(mech);
+    expect(osk).toBeGreaterThan(fallback);
     expect(touch).toBeGreaterThan(osk);
     expect(css).toBeGreaterThan(touch);
     expect(help).toBeGreaterThan(css);
@@ -252,8 +266,9 @@ describe("spec 034 SR-3 — osk advances to touch, never past it", () => {
     expect(advance("touch_seed_source", undefined, copyCtx).next).toBe("touch");
   });
 
-  it("advance(mechanisms) always lands on osk first", () => {
-    expect(advance("mechanisms", undefined, copyCtx).next).toBe("osk");
+  it("advance(mechanisms) always lands on fallback_policy first (then osk)", () => {
+    expect(advance("mechanisms", undefined, copyCtx).next).toBe("fallback_policy");
+    expect(advance("fallback_policy", undefined, copyCtx).next).toBe("osk");
   });
 
   it("touch is reached and advances onward to css (never bypassed)", () => {
@@ -276,10 +291,10 @@ describe("spec 034 SR-5 — validateManifestShape structural guard", () => {
   it("spine ids (spine !== false) are in the locked order", () => {
     const spineIds = manifest.filter((s) => STEP_TRAILS.get(s.id)?.spine !== false).map((s) => s.id);
     expect(spineIds).toEqual([
-      "identity", "layout", "choose_base", "track", "attribution",
+      "identity", "layout", "choose_base", "attribution",
       // Spec 111: Open's gated pages sit on the spine; Copy's gates skip them.
       "open_languages", "open_missing_letters", "open_upgrades", "characters",
-      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "osk", "touch", "css", "help", "html", "icon", "package",
+      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "fallback_policy", "osk", "touch", "css", "help", "html", "icon", "trial", "publish", "package",
     ]);
   });
 });
@@ -318,31 +333,13 @@ describe("advance: layout", () => {
 });
 
 describe("advance: choose_base", () => {
-  it("→ attribution when the start screen recorded the track (the track step is gated off)", () => {
+  it("→ attribution when the start screen recorded the track", () => {
     const { next } = advance("choose_base", undefined, copyCtx);
     expect(next).toBe("attribution");
   });
 
-  it("→ track for a draft with no track recorded (from before the start screen)", () => {
+  it("→ attribution even for a draft with no track recorded (copy is the default; StudioShell records it at instantiation)", () => {
     const { next } = advance("choose_base", undefined, { ...copyCtx, selectedTrack: null, decisions: {} });
-    expect(next).toBe("track");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// advance — track step → attribution; the copy/adapt fork lives at
-// "attribution" since #1901 (the fork is evaluated once the post-track
-// author/copyright questions are answered).
-// ---------------------------------------------------------------------------
-
-describe("advance: track → attribution (#1901)", () => {
-  it("copy track → attribution", () => {
-    const { next } = advance("track", undefined, copyCtx);
-    expect(next).toBe("attribution");
-  });
-
-  it("adapt track → attribution", () => {
-    const { next } = advance("track", undefined, adaptCtx);
     expect(next).toBe("attribution");
   });
 });
@@ -431,8 +428,12 @@ describe("advance: spine hops", () => {
     expect(advance("rules", undefined, copyCtx).next).toBe("mechanisms");
   });
 
-  it("mechanisms → osk", () => {
-    expect(advance("mechanisms", undefined, copyCtx).next).toBe("osk");
+  it("mechanisms → fallback_policy (#2539)", () => {
+    expect(advance("mechanisms", undefined, copyCtx).next).toBe("fallback_policy");
+  });
+
+  it("fallback_policy → osk", () => {
+    expect(advance("fallback_policy", undefined, copyCtx).next).toBe("osk");
   });
 
   it("osk → touch_seed_source when no fork choice is recorded (spec 035 R4/R12)", () => {
@@ -479,7 +480,8 @@ describe("advance: spine hops", () => {
 });
 
 // ---------------------------------------------------------------------------
-// advance — help → html; html → icon; icon → done + navigate:"output"
+// advance — help → html; html → icon; icon → trial; trial → publish;
+// publish → done (no navigate, spec 113)
 // ---------------------------------------------------------------------------
 
 describe("advance: help (gate open)", () => {
@@ -503,10 +505,26 @@ describe("advance: html", () => {
 });
 
 describe("advance: icon", () => {
-  it("icon → done with navigate:'output'", () => {
+  it("icon → trial (no navigate)", () => {
     const outcome = advance("icon", undefined, copyCtx);
+    expect(outcome.next).toBe("trial");
+    expect(outcome.navigate).toBeUndefined();
+  });
+});
+
+describe("advance: trial", () => {
+  it("trial → publish (no navigate)", () => {
+    const outcome = advance("trial", undefined, copyCtx);
+    expect(outcome.next).toBe("publish");
+    expect(outcome.navigate).toBeUndefined();
+  });
+});
+
+describe("advance: publish", () => {
+  it("publish → done with NO navigate (spec 113: the author rests on the done panel)", () => {
+    const outcome = advance("publish", undefined, copyCtx);
     expect(outcome.next).toBe("done");
-    expect(outcome.navigate).toBe("output");
+    expect(outcome.navigate).toBeUndefined();
   });
 });
 
@@ -546,24 +564,22 @@ describe("advance: terminals (idempotent, not called in practice)", () => {
 
 // ---------------------------------------------------------------------------
 // advance — attribution step: null selectedTrack recovery (P1-B invariant
-// guard; the guard moved with the fork at #1901 — it used to sit on the
-// track case, which now forwards unconditionally)
+// guard; the guard lives at the attribution fork — a null track defaults
+// to the copy path, and StudioShell records the copy default at
+// instantiation, so a walk normally never arrives here with null)
 // ---------------------------------------------------------------------------
 
 describe("advance: attribution — null selectedTrack recovery", () => {
-  it("the track case forwards to attribution even with a null track (no fork there)", () => {
-    const outcome = advance("track", undefined, { selectedTrack: null, identitySupported: true });
+  it("choose_base → attribution even with a null track (no track step to ask)", () => {
+    const outcome = advance("choose_base", undefined, { selectedTrack: null, identitySupported: true });
     expect(outcome.next).toBe("attribution");
   });
 
   it("null selectedTrack defaults to copy path (project_name), not adapt", () => {
-    // The track step's completion must always record the authoring-track
-    // decision before attribution is reached; null here is an invariant
-    // violation. The guard defaults to copy (project_name) — the safer
-    // fork, as it does not skip a step.
-    // Note: we do not assert console.error in this suite because vitest's spy
-    // setup would require importing vi and mocking before the module loads;
-    // the console.error call is documented in advance.ts and visible in test output.
+    // The start screen records the track (or StudioShell defaults it to
+    // copy at instantiation); null here is an invariant violation. The
+    // guard defaults to copy (project_name) — the safer fork, as it does
+    // not skip a step.
     const outcome = advance("attribution", undefined, { selectedTrack: null, identitySupported: true });
     expect(outcome.next).toBe("project_name");
   });
@@ -701,9 +717,9 @@ describe("spec 091 T021 — derived screens in the walk", () => {
   });
 
   it("a screen whose decisions are all gated off is skipped by advance (adapt skips project_name)", () => {
-    // The fork is evaluated at the attribution step (#1901): track
-    // forwards there on both tracks first.
-    expect(advance("track", undefined, adaptCtx).next).toBe("attribution");
+    // The fork is evaluated at the attribution step (#1901): choose_base
+    // routes there on both tracks first.
+    expect(advance("choose_base", undefined, adaptCtx).next).toBe("attribution");
     const outcome = advance("attribution", undefined, adaptCtx);
     expect(outcome.next).toBe("open_languages");
   });
@@ -727,7 +743,8 @@ describe("spec 091 T021 — derived screens in the walk", () => {
   });
 
   it("the touch_seed_source screen is walked while unrecorded and skipped once its decision exists", () => {
-    expect(advance("mechanisms", undefined, copyCtx).next).toBe("osk");
+    expect(advance("mechanisms", undefined, copyCtx).next).toBe("fallback_policy");
+    expect(advance("fallback_policy", undefined, copyCtx).next).toBe("osk");
     const unrecorded = advance("osk", undefined, copyCtx);
     expect(unrecorded.next).toBe("touch_seed_source");
     const recorded = advance("osk", undefined, {

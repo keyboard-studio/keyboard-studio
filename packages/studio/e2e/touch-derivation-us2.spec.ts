@@ -86,7 +86,7 @@ import { readFile } from "node:fs/promises";
 import {
   driveIdentityLite as driveIdentityLiteBase,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
@@ -95,6 +95,7 @@ import {
   driveMechanismsGallery,
   driveTouchGallery,
   driveHelpPhase,
+  goToPublishFromDone,
   seedReturningVisitor,
   switchTab,
   zipSourceEntry,
@@ -424,7 +425,7 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
 
     await driveIdentityLite(page, { autonym: "Piaroa", code: "pid", script: "Latn" });
     await pickStartKeyboard(page, PIAROA_START_ID);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -481,9 +482,10 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
       "Use Right Alt to type ä, ö, ü, and ñ.",
     );
 
-    await page.waitForURL(/#output$/, { timeout: 30_000 });
-    // 1.4.3 -- the Output screen's documented pre-existing contrast debt.
-    await expectNoSeriousAxeViolations(page, "output screen (US2 piaroa walk)", {
+    await expect(page.getByRole("heading", { name: "Survey complete" })).toBeVisible({ timeout: 30_000 });
+    await goToPublishFromDone(page);
+    // 1.4.3 -- the Publish step's documented pre-existing contrast debt.
+    await expectNoSeriousAxeViolations(page, "publish step (US2 piaroa walk)", {
       exclude: OUTPUT_SCREEN_DEBT,
     });
 
@@ -560,7 +562,7 @@ test.describe("Touch derivation US2-AS4 — explicit reseed discards a shipped t
 
     await driveIdentityLite(page, { autonym: "Bamanankan", code: "bm", script: "Latn" });
     await pickStartKeyboard(page, BAMBARA_START_ID);
-    await chooseTrackCopy(page);
+    await confirmCopyTrack(page);
     await driveAttributionStep(page);
     await acceptProjectName(page);
     await confirmPrefill(page);
@@ -579,9 +581,10 @@ test.describe("Touch derivation US2-AS4 — explicit reseed discards a shipped t
     await driveTouchGallery(page);
     await driveHelpPhase(page, "Welcome to the Bambara keyboard.", "Type ɛ, ɔ, and ŋ from the freshly reseeded touch layout.");
 
-    await page.waitForURL(/#output$/, { timeout: 30_000 });
-    // 1.4.3 -- the Output screen's documented pre-existing contrast debt.
-    await expectNoSeriousAxeViolations(page, "output screen (US2-AS4 bambara reseed walk)", {
+    await expect(page.getByRole("heading", { name: "Survey complete" })).toBeVisible({ timeout: 30_000 });
+    await goToPublishFromDone(page);
+    // 1.4.3 -- the Publish step's documented pre-existing contrast debt.
+    await expectNoSeriousAxeViolations(page, "publish step (US2-AS4 bambara reseed walk)", {
       exclude: OUTPUT_SCREEN_DEBT,
     });
 

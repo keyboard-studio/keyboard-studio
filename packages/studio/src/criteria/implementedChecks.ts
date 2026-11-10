@@ -119,6 +119,9 @@ export const IMPLEMENTED_LINT_CODES: ReadonlySet<string> = new Set([
   "KM_LINT_NUMERIC_REGION_NON_CONTRASTIVE",
   "KM_LINT_KPS_FONT_MISSING",
   "KM_LINT_MANDATED_CHAR_MISSING",
+  // Issue #2593 — 18.13 packaged-font glyph coverage (check-font-glyph-
+  // coverage.ts, run via runCriteriaChecks).
+  "KM_LINT_FONT_GLYPH_COVERAGE",
   // Spec 084 KPJ pair — one reader (check-kpj) pins the judged .kpj's
   // <Options><Version> to criterion 1.10's current format from both
   // directions. The constant was settled by Matthew's 2026-10-14

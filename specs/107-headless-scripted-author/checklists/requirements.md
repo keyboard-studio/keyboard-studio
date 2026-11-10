@@ -38,7 +38,7 @@
   open questions are left. FR-031 is resolved (a minimal curated PR set chosen by shape, with the wide
   sweep scheduled or on demand); the PR CI budget is SC-002 (whole PR run under 10 minutes, preferably
   under 5); walk zips stay off `main` and parity runs on spec 106's committed records plus records
-  produced on demand (FR-020); `fallbackPolicy` is tracked by #2366 (FR-060); stacking on
+  produced on demand (FR-020); `fallbackPolicy` is the `fallback-policy` decision, recorded and replayed (FR-060); stacking on
   `106-consistent-keyboard-output` is recorded under Dependencies.
 - Re-run 2026-10-30 after two further owner rulings: the PR lane is one step inside `build`, capped
   (SC-002; the "new job" question is closed), and the harness case definitions are committed as

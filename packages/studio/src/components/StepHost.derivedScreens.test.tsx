@@ -49,13 +49,13 @@ vi.mock("../steps/registerEditorSteps.ts", () => ({
   upgradesStep: trivialStep("open_upgrades"),
   layoutStep: trivialStep("layout"),
   chooseStartStep: trivialStep("choose_base"),
-  trackStep: trivialStep("track"),
   attributionStep: trivialStep("attribution"),
   projectNameStep: trivialStep("project_name"),
   carveStep: trivialStep("carve"),
   deadkeysStep: trivialStep("deadkeys"),
   rulesStep: trivialStep("rules"),
   mechanismsStep: trivialStep("mechanisms"),
+  fallbackPolicyStep: trivialStep("fallback_policy"),
   oskStep: trivialStep("osk"),
   touchSeedSourceStep: trivialStep("touch_seed_source"),
   touchStep: trivialStep("touch"),
@@ -63,6 +63,8 @@ vi.mock("../steps/registerEditorSteps.ts", () => ({
   helpStep: trivialStep("help"),
   htmlStep: trivialStep("html"),
   iconStep: trivialStep("icon"),
+  trialStep: trivialStep("trial"),
+  publishStep: trivialStep("publish"),
   packageStep: trivialStep("package"),
 }));
 

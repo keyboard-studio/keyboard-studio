@@ -13,7 +13,7 @@ vi.mock("../lib/navigate.ts", () => ({ navigateTo: vi.fn() }));
 function setTrack(value: "copy" | "adapt"): void {
   useDecisionStore.setState({
     decisions: {
-      "authoring-track": { id: "authoring-track", value, provenance: "asked", step: "track" },
+      "authoring-track": { id: "authoring-track", value, provenance: "asked", step: "start" },
     } as unknown as DecisionSet,
   });
 }

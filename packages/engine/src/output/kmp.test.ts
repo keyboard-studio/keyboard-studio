@@ -7,6 +7,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { createContext, runInContext } from "node:vm";
 import { unzipSync } from "fflate";
 import { createVirtualFS, type VirtualFS } from "@keyboard-studio/contracts";
 import { compile } from "../compiler/index.js";
@@ -184,6 +185,63 @@ describe("buildKmp() — real kmc-package against the bambara fixture", () => {
   }, 60_000);
 });
 
+describe("buildKmp() — foreign-realm bytes (spec 113)", () => {
+  it("packages a VirtualFS whose bytes come from another realm", async () => {
+    // A VirtualFS built in another realm (jsdom in the studio's headless-author
+    // corpus walk) hands kmc-package foreign Uint8Arrays, which its JSZip
+    // rejects — "Can't read the data of 'readme.htm'". A `node:vm` context is
+    // the same shape of foreignness without a jsdom dependency: its
+    // Uint8Array is a different constructor, so `instanceof` fails across it.
+    const foreign = createContext({});
+    const foreignBytes = (bytes: Uint8Array): Uint8Array =>
+      runInContext(`new Uint8Array([${[...bytes].join(",")}])`, foreign) as Uint8Array;
+    const foreignText = (text: string): Uint8Array =>
+      // Encode locally (a bare vm context has no TextEncoder), then move the
+      // bytes across: the foreignness that matters is the array's realm.
+      foreignBytes(new TextEncoder().encode(text));
+
+    const vfs = createVirtualFS([
+      { path: `source/${KBD}.kps`, content: foreignText(readText("source", `${KBD}.kps`)), isBinary: true },
+      { path: `source/${KBD}.kmn`, content: foreignText(readText("source", `${KBD}.kmn`)), isBinary: true },
+      { path: `source/${KBD}.kvks`, content: foreignText(readText("source", `${KBD}.kvks`)), isBinary: true },
+      { path: `source/${KBD}.ico`, content: foreignBytes(readFileSync(fx("source", `${KBD}.ico`))), isBinary: true },
+      {
+        path: `source/${KBD}.keyman-touch-layout`,
+        content: foreignText(readText("source", `${KBD}.keyman-touch-layout`)),
+        isBinary: true,
+      },
+      { path: "source/welcome.htm", content: foreignText(readText("source", "welcome.htm")), isBinary: true },
+      { path: "source/readme.htm", content: foreignText(readText("source", "readme.htm")), isBinary: true },
+      { path: "LICENSE.md", content: foreignText(readText("LICENSE.md")), isBinary: true },
+    ]);
+    const foreignArtifacts: KmpBuildArtifacts = {
+      kmx: foreignBytes(artifacts.kmx),
+      ...(artifacts.kvk !== undefined ? { kvk: foreignBytes(artifacts.kvk) } : {}),
+      ...(artifacts.js !== undefined ? { js: foreignBytes(artifacts.js) } : {}),
+    };
+
+    const result = await buildKmp(vfs, KBD, foreignArtifacts);
+
+    expect(
+      result.diagnostics.filter((d) => d.severity === "error" || d.severity === "fatal"),
+    ).toEqual([]);
+    expect(result.success).toBe(true);
+    expect(result.bytes.byteLength).toBeGreaterThan(0);
+    expect(Object.keys(unzipSync(result.bytes)).sort()).toEqual(
+      [
+        "kmp.inf",
+        "kmp.json",
+        "bambara.js",
+        "bambara.kmx",
+        "bambara.kvk",
+        "readme.htm",
+        "welcome.htm",
+        "LICENSE.md",
+      ].sort(),
+    );
+  }, 60_000);
+});
+
 describe("diagnostic mapping — severity is bit-packed in `code`, not a field", () => {
   it("formats codes the way kmc's own CLI prints them", () => {
     // Real kmc-package codes, computed from CompilerErrorNamespace.PackageCompiler
@@ -206,6 +264,10 @@ describe("diagnostic mapping — severity is bit-packed in `code`, not a field",
       expect(d.severity).toBe(severity);
       expect(d.code).toBe(expectedCode);
       expect(d.layer).toBe("A");
+      // Package-compiler findings are unowned: the platform tag is a
+      // kmc-kmn boundary concern (#2378), and an untagged diagnostic stays
+      // visible in every panel.
+      expect(d).not.toHaveProperty("platform");
     }
   });
 

@@ -78,6 +78,22 @@ export type LintCode =
  */
 export type LintFindingOrigin = "authored" | "upstream";
 
+/**
+ * Compile-target platform of a diagnostic.
+ *
+ * Set by the kmc-kmn compiler boundary (`packages/engine/src/compiler`) for
+ * diagnostics the compiler reports: `"desktop"` for the .kmn rules /
+ * desktop target, `"web"` for KeymanWeb/touch diagnostics (the KmwCompiler
+ * namespace `0x7000` plus web-only KmnCompiler codes, e.g. touch-layout and
+ * KeymanWeb-support codes). Absent means unowned / platform-agnostic
+ * (synthesized diagnostics, package-compiler findings): general panels MUST
+ * show these, and desktop panes show them too, excluding only explicitly
+ * `"web"` diagnostics. Never silently dropped.
+ *
+ * @see #2378
+ */
+export type DiagnosticPlatform = "desktop" | "web";
+
 export interface LintFinding {
   /**
    * Studio-namespaced lint code (e.g. `"KM_ERROR_DUPLICATE_STORE"`).
@@ -96,6 +112,12 @@ export interface LintFinding {
    * Default (absent) is `"authored"`.
    */
   origin?: LintFindingOrigin;
+  /**
+   * Compile-target platform, set by the kmc-kmn compiler boundary for
+   * diagnostics the compiler reports (see {@link DiagnosticPlatform}).
+   * Absent means unowned / platform-agnostic: show it in every panel.
+   */
+  platform?: DiagnosticPlatform;
   /**
    * /review only: whether the file the finding points at is part of the
    * judged pull request's changed paths (`"changed"`) or was already in

@@ -602,6 +602,23 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.e2e == 'true' }}
     runs-on: ubuntu-latest
+    # Playwright container image (#2367): the browsers AND their system
+    # libraries are preinstalled, so no `apt-get install` runs at all —
+    # the 13-minute stall on #2542 was apt fetching 18.9 MB from the
+    # Ubuntu mirror at 24.5 kB/s inside `--with-deps`. The image tag MUST
+    # track the Playwright version pinned in pnpm-lock.yaml (1.61.1);
+    # bump both in one PR. `--ipc=host --init` is Playwright's documented
+    # recommendation for Chromium in Docker (`--ipc=host`: without it
+    # Chromium can OOM on the container's 64 MB /dev/shm; `--init`: a
+    # PID-1 init reaps zombie browser processes). The image runs as root by
+    # default, so Chromium's sandbox is off — fine for these trusted
+    # first-party tests (per Playwright's Docker docs). The runner mounts
+    # the whole `/home/runner/work` tree into the job container, so the
+    # corpus step's `mv ... ../keyboards` (a sibling of the checkout)
+    # still works.
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble
+      options: --ipc=host --init
     continue-on-error: true
     timeout-minutes: 60
     permissions:
@@ -659,9 +676,15 @@ jobs:
       - name: Build studio's workspace dependencies
         run: pnpm --filter "@keyboard-studio/studio^..." build
 
+      # No `--with-deps`: the container image already ships the system
+      # libraries, and `--with-deps` is the apt call that stalled #2542
+      # for 13 min. A plain install only downloads the browser when the
+      # image's version drifts from the lockfile (CDN, seconds), and the
+      # timeout bounds even that.
       - name: Install Playwright Chromium
         working-directory: packages/studio
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 5
+        run: npx playwright install chromium
 
       # PR lane: the quick slice only, in ONE command so one results.json
       # feeds the summary step. The positional args pick the three spec
@@ -872,6 +895,12 @@ jobs:
     # Skip entirely when the diff cannot affect it (fails open on non-PR events).
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
+    # Playwright container image (#2367) — see e2e-desktop: browsers +
+    # system libraries preinstalled, no apt call, tag tracks the Playwright
+    # version pinned in pnpm-lock.yaml (1.61.1).
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble
+      options: --ipc=host --init
     continue-on-error: true
     timeout-minutes: 60
     permissions:
@@ -927,9 +956,13 @@ jobs:
       - name: Build studio's workspace dependencies
         run: pnpm --filter "@keyboard-studio/studio^..." build
 
+      # No `--with-deps` — see e2e-desktop: the container image ships the
+      # system libraries; a plain install only downloads the browser on
+      # version drift (CDN, seconds).
       - name: Install Playwright Chromium
         working-directory: packages/studio
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 5
+        run: npx playwright install chromium
 
       # Mobile adaptation, Phase 6 lane split: the mobile project (Pixel 7)
       # runs only the mobile-* specs (playwright.config.ts testMatch), as its
@@ -988,6 +1021,12 @@ jobs:
     # Skip entirely when the diff cannot affect it (fails open on non-PR events).
     if: needs.changes.outputs.golden == 'true'
     runs-on: ubuntu-latest
+    # Playwright container image (#2367) — see e2e-desktop: browsers +
+    # system libraries preinstalled, no apt call, tag tracks the Playwright
+    # version pinned in pnpm-lock.yaml (1.61.1).
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble
+      options: --ipc=host --init
     continue-on-error: true
     timeout-minutes: 60
     permissions:
@@ -1043,9 +1082,13 @@ jobs:
       - name: Build studio's workspace dependencies
         run: pnpm --filter "@keyboard-studio/studio^..." build
 
+      # No `--with-deps` — see e2e-desktop: the container image ships the
+      # system libraries; a plain install only downloads the browser on
+      # version drift (CDN, seconds).
       - name: Install Playwright Chromium
         working-directory: packages/studio
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 5
+        run: npx playwright install chromium
 
       # Spec 089 SC-001 golden walk (owner ruling 2026-10-06: store-level
       # gates in the sandbox; live captures run in CI). The baseline zip is
@@ -1077,7 +1120,13 @@ jobs:
           pnpm run codegen-charnames
           pnpm --filter "@keyboard-studio/studio^..." build
           cd packages/studio
-          npx playwright install --with-deps chromium
+          # No `--with-deps` — see e2e-desktop: the container image ships
+          # the system libraries; a plain install only downloads the
+          # browser on version drift (CDN, seconds). `timeout 300` is the
+          # 5-minute bound the standalone install steps get from
+          # `timeout-minutes` — this step also runs pnpm install, the
+          # build, and the walk, so it cannot carry that step timeout.
+          timeout 300 npx playwright install chromium
           GOLDEN_WALK_CAPTURE=1 npx playwright test e2e/golden-walk.spec.ts --project=desktop
           cp e2e/fixtures/golden-walk/basic-kbdfr-copy.zip "$GITHUB_WORKSPACE/packages/studio/e2e/fixtures/golden-walk/"
 

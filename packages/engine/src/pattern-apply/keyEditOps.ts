@@ -49,6 +49,8 @@
  */
 
 import {
+  DEFAULT_KEY_PAD_PCT,
+  DEFAULT_KEY_WIDTH_PCT,
   hasAnyBinding,
   isCustomTouchKeyId,
   isFrameKeyLabel,
@@ -179,9 +181,33 @@ export interface AddKeyOp extends KeyEditOperationBase {
   readonly key: NewKeySpec;
 }
 
+/**
+ * Remove a key from its row.
+ *
+ * - `"reflow"` — the key is gone and the freed width stays as trailing
+ *   padding at the end of the row, so the row keeps its total width and no
+ *   remaining key stretches (#2360) — except when the row's last remaining
+ *   key is a modifier key, which may absorb freed width up to (but not
+ *   reaching) 3x a regular key's width; only the excess beyond that cap
+ *   goes into the trailing spacer (PR #2583 follow-up, see
+ *   {@link modifierReflowSpacerWidth}).
+ * - `"redistribute"` — the key is gone and its freed width is shared
+ *   evenly across the row's remaining keys.
+ * - `"drop"` — the key is gone and its width goes with it: the row simply
+ *   has one fewer key and closes up. This is the OLD `reflow` behaviour,
+ *   kept as its own outcome for exactly one caller — the Code tab's diff
+ *   (`touchCodeDiff.ts`), whose whole-row-replacement anchor trick removes
+ *   keys as scaffolding, not as author deletions: the replacement keys
+ *   bring their own width, so leaving the old keys' width behind as
+ *   padding would double the row. No author-facing surface offers
+ *   `"drop"` (the RemoveKeyDialog's three-way choice is unchanged, and
+ *   the touch builder's Delete commits `"reflow"`), so a row only ever
+ *   shrinks through the diff's scaffolding — never through an author
+ *   deleting a key.
+ */
 export interface RemoveKeyOp extends KeyEditOperationBase {
   readonly kind: "remove";
-  readonly outcome: "reflow" | "redistribute";
+  readonly outcome: "reflow" | "redistribute" | "drop";
 }
 
 /**
@@ -282,10 +308,40 @@ export interface MoveToLayerOp extends KeyEditOperationBase {
 }
 
 /**
+ * Copy a key to a different layer on the same platform (touch-builder
+ * "Copy key to…", issue #2596 item 1), keeping the original where it is.
+ *
+ * The twin of `moveToLayer` with one difference: the target gains a CLONE,
+ * not the existing node. The clone carries the whole key — sub-keys (`sk`,
+ * `flick`, `multitap`), geometry, `provenance`, `keycapAuthored` — because a
+ * remove+add composition could not: `NewKeySpec` carries no sub-keys, so
+ * "copy with its longpress keys" is exactly what the op exists to express
+ * (FR-021's identity preservation, extended across layers to a copy). The
+ * clone is a NEW node occurrence, so the IR applier mints it a fresh
+ * `nodeId` (as `add` does); the id itself is KEPT — the same id on two
+ * layers is normal (e.g. `K_a` on default and shift) and keeps the key's
+ * `.kmn` rules covering the copy with no rule work (spec 104 FR-007).
+ *
+ * Refusals mirror `moveToLayer`: unknown target layer, own layer, and — the
+ * copy's own rule — id collision on the target layer (two keys with one id
+ * cannot be told apart; minting a fresh id instead would need a rule
+ * transplant per spec 104 FR-008, so the op refuses rather than half-apply).
+ * Anchor/append and `scope: "family"` rejection follow `moveToLayer`.
+ */
+export interface CopyToLayerOp extends KeyEditOperationBase {
+  readonly kind: "copyToLayer";
+  /** Target layer id on the key's platform. Must exist. */
+  readonly toLayer: string;
+  /** Optional anchor key address on the target layer for before/after insert. */
+  readonly anchorAddress?: string;
+  readonly position?: "before" | "after";
+}
+
+/**
  * A single committed key-level edit (contract §3). Row and layer operations
- * are deliberately NOT admitted — see the module docstring — with the one
- * exception of `moveToLayer`, which relocates a single key without touching
- * row/layer structure itself.
+ * are deliberately NOT admitted — see the module docstring — with the
+ * exceptions of `moveToLayer` and `copyToLayer`, which relocate / duplicate
+ * a single key without touching row/layer structure itself.
  */
 export type KeyEditOperation =
   | SetKeyOp
@@ -296,7 +352,8 @@ export type KeyEditOperation =
   | SuppressKeyOp
   | SetSubKeyOp
   | RemoveSubKeyOp
-  | MoveToLayerOp;
+  | MoveToLayerOp
+  | CopyToLayerOp;
 
 
 // ---------------------------------------------------------------------------
@@ -308,12 +365,12 @@ export type KeyEditOperation =
  * its own fields — no layout lookup, no resolver. `undefined` (never `""`)
  * when the operation carries no declared output of its own.
  *
- * Exactly three of the nine kinds ever author `output` directly:
+ * Exactly three of the ten kinds ever author `output` directly:
  * - `add` — a brand-new key's `key.output`;
  * - `set` / `setSubKey` — a patch that happens to touch `fields.output`.
  *
- * The other six — `rename`, `remove`, `move`, `moveToLayer`, `suppress`,
- * `removeSubKey` — name
+ * The other seven — `rename`, `remove`, `move`, `moveToLayer`,
+ * `copyToLayer`, `suppress`, `removeSubKey` — name
  * an EXISTING key or sub-entry by address/sub-ref only; they never repeat its
  * content, so this function returns `undefined` for them even though the key
  * they touch may well produce a character. That gap is deliberate: this
@@ -546,6 +603,202 @@ export function proposeSuppressFields(
     : { spClass: 10, sentinelId: "T_SPACER" };
 }
 
+// ---------------------------------------------------------------------------
+// The shared remove+reflow modifier narrowing (#2360 follow-up, PR #2583)
+// ---------------------------------------------------------------------------
+
+/**
+ * The key ids that count as modifier keys for the `reflow` narrowing
+ * (Matthew's ruling on PR #2583: "When the last button is a modifier key,
+ * it can be larger, as long as it's less than 3x a regular key").
+ *
+ * There is no pre-existing predicate to reuse: the only canonical list in
+ * the codebase, the private `MODIFIER_KEY_IDS` in contracts'
+ * `touchLayerRules.ts`, covers only Ctrl/Alt (`K_LCONTROL`, `K_RCONTROL`,
+ * `K_CONTROL`, `K_ALT`, `K_RALT`, `K_LALT`) — no Shift, no `K_CTRL`
+ * spellings, no `K_CAPS` — and it is label-gated to that module's
+ * patching job. This set is that list widened to the full Shift/Ctrl/Alt
+ * family, including the `K_CTRL`/`K_LCTRL`/`K_RCTRL` and `K_LMENU`/
+ * `K_RMENU` alias spellings the Keyman processor accepts, and `K_CAPS`:
+ * Caps is a state key, not a strict modifier (simulator/layer-a-prime say
+ * so), but every neighbouring list files it with the modifiers, it
+ * essentially never occurs as a top-level touch key, and including it is
+ * the defensive choice — a caps-last row is narrowed the same way a
+ * shift-last row is, rather than left to stretch without bound.
+ *
+ * Deliberately NOT here: `K_BKSP`, `K_ENTER`, `K_SPACE`, `K_TAB`,
+ * `K_NUMLOCK`, `K_SYMBOLS`, `K_LOPT` — frame/layer-switch keys, not
+ * modifiers. Rows ordinarily END in `K_BKSP`/`K_ENTER`, so admitting them
+ * would narrow nearly every row and defeat the distinction (this is why
+ * `isTouchFrameKey` must not be reused for this either).
+ */
+export const TOUCH_MODIFIER_KEY_IDS: ReadonlySet<string> = new Set([
+  "K_SHIFT",
+  "K_LSHIFT",
+  "K_RSHIFT",
+  "K_CONTROL",
+  "K_LCONTROL",
+  "K_RCONTROL",
+  "K_CTRL",
+  "K_LCTRL",
+  "K_RCTRL",
+  "K_ALT",
+  "K_LALT",
+  "K_RALT",
+  "K_ALTGR",
+  "K_LMENU",
+  "K_RMENU",
+  "K_CAPS",
+]);
+
+/**
+ * A `nextlayer` target counts as a modifier layer when it names a modifier
+ * fragment — the same loose-substring convention contracts'
+ * `isTouchShiftLayerId`/`isTouchCapsLayerId` already use for layer ids
+ * (`.includes("shift")`, `.includes("caps")`). `ctrl` covers `leftctrl`/
+ * `rightctrl`, `alt` covers `leftalt`/`rightalt`/`altgr`; `control` is
+ * listed separately because it does not contain `ctrl`.
+ */
+const MODIFIER_LAYER_FRAGMENT = /shift|caps|ctrl|control|alt/i;
+
+/**
+ * True when a touch key is a modifier key — by id
+ * ({@link TOUCH_MODIFIER_KEY_IDS}, case-insensitive, as `isTouchFrameKey`
+ * does) or by behaviour: its `nextlayer` opens a modifier layer. The
+ * behavioural arm is what catches the `T_` modifiers, which no id set can
+ * see: `T_ks_rightalt_toggle` (nextlayer `rightalt`), `T_UPPER` (nextlayer
+ * `caps`), `T_ks_specials` (nextlayer `rightalt`). A bare `nextlayer` is
+ * NOT enough on its own — the target must name a modifier fragment, so
+ * `K_NUMLOCK` → `numeric` and `K_SYMBOLS`/`K_LOWER` → `symbol`/`default`
+ * stay non-modifiers, as do `sp: 1`/`2` keys generally (a frame class
+ * alone says nothing: scaffolded `K_SHIFT`, `K_BKSP` and `K_ENTER` are
+ * all `sp: 1`).
+ */
+export function isTouchModifierKey(key: {
+  readonly id: string;
+  readonly nextlayer?: string | null;
+}): boolean {
+  if (TOUCH_MODIFIER_KEY_IDS.has(key.id.toUpperCase())) return true;
+  const target = key.nextlayer;
+  return target !== undefined && target !== null && MODIFIER_LAYER_FRAGMENT.test(target);
+}
+
+/**
+ * The minimal key shape the reflow narrowing reads: an id, a key class, a
+ * declared geometry, and the layer the key opens. Both appliers speak it —
+ * Case A passes `TouchKeyIR` straight through (its `sp`/`width`/`pad` are
+ * already numbers), Case B maps each wire key through `toWireNumber`
+ * first, so a wire `"100"` and an IR `100` mean the same thing here.
+ */
+export interface ReflowKeyGeometry {
+  readonly id: string;
+  readonly sp?: number;
+  readonly width?: number;
+  readonly pad?: number;
+  readonly nextlayer?: string | null;
+}
+
+/** A row total in the 100-unit model, mirroring `computeRowMetrics`'s
+ *  `rowTotal`: Σ (`width` ?? 100) + (`pad` ?? 15). */
+function reflowRowTotal(keys: readonly ReflowKeyGeometry[]): number {
+  let total = 0;
+  for (const key of keys) {
+    total += (key.width ?? DEFAULT_KEY_WIDTH_PCT) + (key.pad ?? DEFAULT_KEY_PAD_PCT);
+  }
+  return total;
+}
+
+/**
+ * "A regular key" for the `<3x` cap: the modal (most frequent) width among
+ * the row's remaining non-spacer, non-modifier keys, with the removed key
+ * itself counted when it was one (so a row left with only its modifier
+ * still has a regular width to measure against). Ties break to the
+ * smallest width — the conservative choice, since a smaller regular width
+ * tightens the cap. No sample at all (a row of only modifiers) falls back
+ * to the standard key width (100). Blanks (`sp: 9`) count as regular keys:
+ * they render a keycap outline at a real width; only true spacers
+ * (`sp: 10`, the `proposeSuppressFields("spacer")` class) are excluded.
+ */
+function regularKeyWidth(
+  remainingKeys: readonly ReflowKeyGeometry[],
+  removedKey: ReflowKeyGeometry,
+): number {
+  const { spClass } = proposeSuppressFields("spacer");
+  const counts = new Map<number, number>();
+  const sample = (key: ReflowKeyGeometry): void => {
+    if (key.sp === spClass || isTouchModifierKey(key)) return;
+    const width = key.width ?? DEFAULT_KEY_WIDTH_PCT;
+    counts.set(width, (counts.get(width) ?? 0) + 1);
+  };
+  for (const key of remainingKeys) sample(key);
+  sample(removedKey);
+  let best: number | undefined;
+  let bestCount = 0;
+  for (const [width, count] of counts) {
+    if (count > bestCount || (count === bestCount && (best === undefined || width < best))) {
+      best = width;
+      bestCount = count;
+    }
+  }
+  return best ?? DEFAULT_KEY_WIDTH_PCT;
+}
+
+/**
+ * The ONE place the `reflow` modifier narrowing is computed (PR #2583
+ * follow-up to #2360): how wide a trailing spacer a `remove` + `"reflow"`
+ * must leave when the row's last remaining key is a modifier key, so that
+ * key's RENDERED width stays strictly below 3x a regular key's width.
+ * Both appliers call THIS function rather than each re-deriving the cap —
+ * the same "shared, exactly once" rule that keeps `suppress` from drifting
+ * between them (contract §5) — and the T047 twin test holds them to it.
+ *
+ * Returns `undefined` when the row's last remaining key is NOT a modifier:
+ * the caller keeps the existing behaviour (the freed width goes entirely
+ * into the trailing spacer, full stop). Otherwise returns the spacer width
+ * in row-total units — `0` when the modifier absorbs all the freed width
+ * and no spacer is needed at all.
+ *
+ * The cap is on the RENDERED width — declared width plus the slack the
+ * renderers add to the last key of an under-full row (KeyGrid per FR-012 /
+ * ADR 0002, the builder canvas, Keyman Web). Slack is the layer maximum
+ * minus this row's total, so the reference is the max row total among the
+ * layer's OTHER rows, in live state — NOT this row's own pre-removal
+ * total, which already reflects slack absorbed by earlier reflows in the
+ * same overlay: measuring against it would let a second reflow push the
+ * modifier past the cap (two 115-unit reflows against a 199-unit headroom
+ * render the modifier at 330, i.e. 3.3x). The layer maximum is stable
+ * across ops in one overlay, so the cap holds no matter how many keys are
+ * reflowed out in sequence. When the layer has no other rows, the row IS
+ * the maximum, its last key never stretches, and no spacer is ever needed
+ * — `0` outright. Pre-existing slack counts too: a row that was already
+ * under-full has its over-cap slack padded as well, so the modifier ends
+ * below 3x after the operation whatever it rendered before it.
+ *
+ * The `+ 1` is one geometry unit: the cap is STRICTLY below 3x, so the
+ * spacer is sized to leave the modifier rendered at most `3R − 1`. A
+ * result within float noise of zero counts as zero, so an exact-cap case
+ * never mints a hairline spacer.
+ */
+export function modifierReflowSpacerWidth(
+  remainingKeys: readonly ReflowKeyGeometry[],
+  removedKey: ReflowKeyGeometry,
+  otherRowsKeys: readonly (readonly ReflowKeyGeometry[])[],
+): number | undefined {
+  const last = remainingKeys[remainingKeys.length - 1];
+  if (last === undefined || !isTouchModifierKey(last)) return undefined;
+  const regularWidth = regularKeyWidth(remainingKeys, removedKey);
+  const modifierWidth = last.width ?? DEFAULT_KEY_WIDTH_PCT;
+  const rowTotal = reflowRowTotal(remainingKeys);
+  let othersMax: number | undefined;
+  for (const rowKeys of otherRowsKeys) {
+    const total = reflowRowTotal(rowKeys);
+    if (othersMax === undefined || total > othersMax) othersMax = total;
+  }
+  if (othersMax === undefined) return 0;
+  const required = othersMax + modifierWidth - 3 * regularWidth + 1 - rowTotal;
+  return required <= 1e-9 ? 0 : required;
+}
+
 /** Why {@link applySuppressSemantics} rejected a `suppress` op. */
 export type SuppressRejectionReason = "sentinel-not-reserved";
 
@@ -683,6 +936,7 @@ export type UnsequencedKeyEditOperation =
   | Omit<RemoveKeyOp, "seq">
   | Omit<MoveKeyOp, "seq">
   | Omit<MoveToLayerOp, "seq">
+  | Omit<CopyToLayerOp, "seq">
   | Omit<SuppressKeyOp, "seq">
   | Omit<SetSubKeyOp, "seq">
   | Omit<RemoveSubKeyOp, "seq">;

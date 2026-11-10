@@ -14,7 +14,7 @@
 import { test, expect, type Page } from "playwright/test";
 import {
   acceptProjectName,
-  chooseTrackCopy,
+  confirmCopyTrack,
   confirmPrefill,
   driveAttributionStep,
   driveIdentityLite,
@@ -37,7 +37,7 @@ async function establishWorkingCopy(page: Page): Promise<void> {
   await pickStartKeyboard(page, OWN_BASE);
   // The full instantiation sequence (the copy-edit walk's own order):
   // track choice → attribution → project name, then the base instantiates.
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page);
   await acceptProjectName(page);
   await confirmPrefill(page);

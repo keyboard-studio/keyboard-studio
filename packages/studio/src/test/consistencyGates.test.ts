@@ -137,6 +137,22 @@ describe("G4: one output form", () => {
     const r = await gate("G4", { vfs: vfsOf(body), decisions: plusMark });
     expect(r.pass).toBe(false);
   });
+  it("passes a match-only normalization store holding the pasted form (US6)", async () => {
+    // The step's head stores must hold the pasted alternates (the keyboard's
+    // other form) to match them; they never reach the output.
+    const body =
+      "store(generated_cn_0) U+00E1\ngroup(main) using keys\n+ any(generated_cn_0) + [K_A] > 'a'\n";
+    const r = await gate("G4", { vfs: vfsOf(body), decisions: plusMark });
+    expect(r.pass).toBe(true);
+  });
+  it("exempts a normalization store even when it feeds an output (US6)", async () => {
+    // The step's produced-form stores repackage the keyboard's own repertoire
+    // (policed at its source); they are lookup tables, not new production.
+    const body =
+      "store(generated_cn_0) U+00E1\ngroup(main) using keys\n+ any(generated_cn_0) + [K_A] > index(generated_cn_0, 1)\n";
+    const r = await gate("G4", { vfs: vfsOf(body), decisions: plusMark });
+    expect(r.pass).toBe(true);
+  });
   it("reports, but does not fail, a starting rule kept by carve", async () => {
     const body = "group(main) using keys\n+ [K_A] > U+00E1\n";
     const r = await gate("G4", { vfs: vfsOf(body), decisions: plusMark, startIr: irOf(body) });

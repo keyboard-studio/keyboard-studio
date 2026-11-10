@@ -33,26 +33,13 @@
     "storeMutations": [
       "setLocalStart",
       "record",
-      "advance"
+      "advance",
+      "record"
     ],
     "workingCopyMutations": [],
     "decisionMutations": [
+      "record",
       "record"
-    ],
-    "navigateTo": []
-  },
-  {
-    "stepId": "track",
-    "applyStepCompletion": [],
-    "storeMutations": [
-      "recordAll",
-      "advance"
-    ],
-    "workingCopyMutations": [
-      "recordPhase"
-    ],
-    "decisionMutations": [
-      "recordAll"
     ],
     "navigateTo": []
   },
@@ -204,6 +191,16 @@
     "navigateTo": []
   },
   {
+    "stepId": "fallback_policy",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "decisionMutations": [],
+    "navigateTo": []
+  },
+  {
     "stepId": "osk",
     "applyStepCompletion": [],
     "storeMutations": [
@@ -288,8 +285,26 @@
     ],
     "workingCopyMutations": [],
     "decisionMutations": [],
-    "navigateTo": [
-      "output"
-    ]
+    "navigateTo": []
+  },
+  {
+    "stepId": "trial",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "decisionMutations": [],
+    "navigateTo": []
+  },
+  {
+    "stepId": "publish",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "decisionMutations": [],
+    "navigateTo": []
   }
 ]

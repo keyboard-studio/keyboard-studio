@@ -234,11 +234,6 @@ const SESSION: ReadonlyArray<{ stepId: string; result: unknown; act: () => void 
     },
   },
   {
-    stepId: "track",
-    result: { track: "copy" },
-    act: () => {},
-  },
-  {
     stepId: "characters",
     result: phaseResult([{ questionId: "b_inventory", answerType: "char-list", value: ["ɓ"] }]),
     act: () => {

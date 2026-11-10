@@ -57,4 +57,10 @@ describe("applyCustomCssToVfs", () => {
     expect(vfs.get("source/kb.css")).toBeUndefined();
     expect(vfs.get("source/t.kmn")?.content).not.toContain("KMW_EMBEDCSS");
   });
+
+  it("relinks the start keyboard's wrapper class when the VFS already carries the new id", () => {
+    const vfs = vfsOf({ "source/newkb.kmn": KMN_WITH_CSS, "source/kb.css": ".a {}" });
+    applyCustomCssToVfs(vfs, "newkb", ".kmw-keyboard-t .kmw-key { color: red; } .kmw-keyboard-t-alt {}", "t");
+    expect(vfs.get("source/kb.css")?.content).toBe(".kmw-keyboard-newkb .kmw-key { color: red; } .kmw-keyboard-t-alt {}");
+  });
 });

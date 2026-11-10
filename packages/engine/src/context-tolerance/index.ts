@@ -51,6 +51,7 @@ export {
   normalizationStepFingerprint,
   NORMALIZATION_GROUP,
   NORMALIZATION_STEP_GENERATOR_VERSION,
+  NORMALIZATION_STORE_PREFIX,
   proposeNormalizationStep,
   removeNormalizationStep,
   type NormalizationMap,

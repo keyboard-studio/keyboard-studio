@@ -20,7 +20,7 @@ import type { NormalizationRefusalReason } from "@keyboard-studio/contracts";
 
 import { FacetTransformPanel } from "../../components/facet-transform/FacetTransformPanel.tsx";
 import { ToleranceGapCases } from "../../lint/ContextToleranceNotice.tsx";
-import { mutedParaFlush } from "../surveyStyles.ts";
+import { mutedParaFlush, sectionHeading } from "../surveyStyles.ts";
 import { NormalizationExamples, type NormalizationExample } from "./NormalizationExamples.tsx";
 import { decisionFromProposal } from "./contextToleranceProposal.ts";
 
@@ -139,6 +139,30 @@ function DisclosureRows({
   );
 }
 
+// One heading for every path (step, per-rule fallback, prior decision), styled
+// and phrased like the series' other stations.
+function StationHeading() {
+  return (
+    <h3 style={sectionHeading}>
+      <Trans id="marks.contextTolerance.heading">Should your keys also work on letters stored the other way?</Trans>
+    </h3>
+  );
+}
+
+// The problem, stated before either fix is offered: both paths answer it.
+function Explainer() {
+  return (
+    <p style={{ ...mutedParaFlush, marginBottom: 6 }}>
+      <Trans id="marks.contextTolerance.explainer">
+        A letter with a mark can be stored as one character, or as the letter followed by a separate mark. Both look
+        the same, but your keyboard's rules only match one of them. If the text before the cursor is stored the other
+        way, for example because it was pasted from elsewhere, keys that build on that letter may not give the result
+        you expect.
+      </Trans>
+    </p>
+  );
+}
+
 function FallbackReasonLine({ reason }: { reason: FallbackReason }) {
   const { t } = useLingui();
   const text = {
@@ -194,24 +218,23 @@ export function ContextToleranceStation({
   const priorStillValid = prior !== undefined && prior.fingerprint === fingerprint;
   const [changing, setChanging] = useState(false);
   const siteCount = proposal.affectedSites.length;
+  // Spec 106 FR-060: with gap findings and no decision recorded, the
+  // normalization is pre-accepted — shown as the default, with a change
+  // control to revisit it. Nothing is recorded here: the step records the
+  // default decision on Continue (Art. X).
+  const isDefaultAccepted = prior === undefined && gapFindings !== undefined && gapFindings.length > 0;
 
   if (priorStillValid && !changing) {
     const accepted = prior.acceptedSiteIds.length;
     return (
       <div data-testid="context-tolerance-station" data-prior={prior.decision} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <h3 style={{ margin: 0 }}>
-          {step !== undefined ? (
-            <Trans id="marks.contextTolerance.step.heading">Letters and diacritics written in a different form</Trans>
-          ) : (
-            <Trans id="marks.contextTolerance.station.heading">Diacritics typed as separate characters</Trans>
-          )}
-        </h3>
+        <StationHeading />
         <p style={mutedParaFlush}>
           {step !== undefined
             ? prior.decision === "accept"
               ? t({
                   id: "marks.contextTolerance.step.prior.accepted",
-                  message: "You chose to add the step that converts pasted letters and diacritics to the form this keyboard produces.",
+                  message: "You chose to add the step that converts pasted letters and marks to the form this keyboard produces.",
                 })
               : t({
                   id: "marks.contextTolerance.station.prior.declined",
@@ -221,8 +244,8 @@ export function ContextToleranceStation({
             ? t({
                 id: "marks.contextTolerance.station.prior.accepted",
                 message: plural(accepted, {
-                  one: "You chose to fix # rule so it also works when the letter and its diacritic are separate characters.",
-                  other: "You chose to fix # rules so they also work when the letter and its diacritic are separate characters.",
+                  one: "You chose to fix # rule so it also works when the letter and its mark are separate characters.",
+                  other: "You chose to fix # rules so they also work when the letter and its mark are separate characters.",
                 }),
               })
             : prior.decision === "partial"
@@ -245,6 +268,31 @@ export function ContextToleranceStation({
     );
   }
 
+  if (isDefaultAccepted && !changing) {
+    return (
+      <div data-testid="context-tolerance-station" data-default="accepted" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <StationHeading />
+        <p style={mutedParaFlush}>
+          {step !== undefined
+            ? t({
+                id: "marks.contextTolerance.step.default.accepted",
+                message: "The step that converts pasted letters and marks to the form this keyboard produces is included by default.",
+              })
+            : t({
+                id: "marks.contextTolerance.station.default.accepted",
+                message: plural(siteCount, {
+                  one: "# rule is fixed by default so it also works when the letter and its mark are separate characters.",
+                  other: "# rules are fixed by default so they also work when the letter and its mark are separate characters.",
+                }),
+              })}
+        </p>
+        <button type="button" data-testid="context-tolerance-change" onClick={() => setChanging(true)} style={{ alignSelf: "flex-start" }}>
+          <Trans id="marks.contextTolerance.station.prior.change">Change this decision</Trans>
+        </button>
+      </div>
+    );
+  }
+
   if (step !== undefined) {
     const { ruleCount } = step;
     return (
@@ -254,15 +302,14 @@ export function ContextToleranceStation({
           hideSiteControls
           heading={
             <>
-              <h3 style={{ margin: 0 }}>
-                <Trans id="marks.contextTolerance.step.heading">Letters and diacritics written in a different form</Trans>
-              </h3>
+              <StationHeading />
+              <Explainer />
               <p style={mutedParaFlush}>
                 {t({
                   id: "marks.contextTolerance.step.intro",
                   message: plural(ruleCount, {
-                    one: "Adds # rule. None of your rules change.",
-                    other: "Adds # rules. None of your rules change.",
+                    one: "This step converts that text to the form your keyboard uses, so those keys work either way. It adds # rule; none of your rules change.",
+                    other: "This step converts that text to the form your keyboard uses, so those keys work either way. It adds # rules; none of your rules change.",
                   }),
                 })}
               </p>
@@ -270,8 +317,8 @@ export function ContextToleranceStation({
           }
           confirmLabel={<Trans id="marks.contextTolerance.step.action.accept">Add this step</Trans>}
           cancelLabel={<Trans id="marks.contextTolerance.station.decline">Leave my keyboard as it is</Trans>}
-          onConfirm={(confirmed) => onDecide(decisionFromProposal(confirmed, fingerprint))}
-          onCancel={() => onDecide(declineDecision(proposal, fingerprint))}
+          onConfirm={(confirmed) => onDecide({ ...decisionFromProposal(confirmed, fingerprint), origin: "asked" })}
+          onCancel={() => onDecide({ ...declineDecision(proposal, fingerprint), origin: "asked" })}
         >
           <h4 style={{ margin: "4px 0 0 0", fontSize: 13 }}>
             <Trans id="marks.contextTolerance.step.examples.heading">Examples of text it converts</Trans>
@@ -293,15 +340,14 @@ export function ContextToleranceStation({
         proposal={proposal}
         heading={
           <>
-            <h3 style={{ margin: 0 }}>
-              <Trans id="marks.contextTolerance.station.heading">Diacritics typed as separate characters</Trans>
-            </h3>
+            <StationHeading />
+            <Explainer />
             <p style={mutedParaFlush}>
               {t({
                 id: "marks.contextTolerance.station.intro",
                 message: plural(siteCount, {
-                  one: "# of your keyboard's rules only works when the diacritic is already joined to the letter. The tool can add rules so it works both ways. Typing with joined diacritics stays exactly as it is.",
-                  other: "# of your keyboard's rules only work when the diacritic is already joined to the letter. The tool can add rules so they work both ways. Typing with joined diacritics stays exactly as it is.",
+                  one: "# of your keyboard's rules only works when the mark is already joined to the letter. The tool can add rules so it works both ways. Typing with joined marks stays exactly as it is.",
+                  other: "# of your keyboard's rules only work when the mark is already joined to the letter. The tool can add rules so they work both ways. Typing with joined marks stays exactly as it is.",
                 }),
               })}
             </p>
@@ -309,8 +355,8 @@ export function ContextToleranceStation({
         }
         confirmLabel={<Trans id="marks.contextTolerance.station.confirm">Add these rules</Trans>}
         cancelLabel={<Trans id="marks.contextTolerance.station.decline">Leave my keyboard as it is</Trans>}
-        onConfirm={(confirmed) => onDecide(decisionFromProposal(confirmed, fingerprint))}
-        onCancel={() => onDecide(declineDecision(proposal, fingerprint))}
+        onConfirm={(confirmed) => onDecide({ ...decisionFromProposal(confirmed, fingerprint), origin: "asked" })}
+        onCancel={() => onDecide({ ...declineDecision(proposal, fingerprint), origin: "asked" })}
       >
         {fallbackReason !== undefined && <FallbackReasonLine reason={fallbackReason} />}
         <DisclosureRows proposal={proposal} disclosures={disclosures} ruleLines={ruleLines} />

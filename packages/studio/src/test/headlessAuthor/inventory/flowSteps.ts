@@ -28,7 +28,6 @@ export const flowStepsInventory: readonly InventoryEntry[] = [
   { fn: "flowSources", module: "steps/flowSources.ts", callers: [FLOW_FACTORY] },
   { fn: "loadFlowSourceDef", module: "steps/flowSources.ts", callers: [FLOW_FACTORY] },
   // --- The per-flow options records the factory components are built from ---
-  { fn: "trackOptions", module: OPTION_RECORDS, callers: [FLOW_OPTIONS] },
   { fn: "attributionOptions", module: OPTION_RECORDS, callers: [FLOW_OPTIONS] },
   { fn: "projectNameOptions", module: OPTION_RECORDS, callers: [FLOW_OPTIONS] },
   // --- Identity (IdentityLite and the name picker) ---

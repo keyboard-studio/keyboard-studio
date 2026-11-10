@@ -15,7 +15,7 @@ import { test, expect, type Page } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   acceptProjectName,
   driveAttributionStep,
   confirmPrefill,
@@ -54,7 +54,7 @@ async function startToCharacters(page: Page): Promise<void> {
     script: FIXTURE.targetScript,
   });
   await pickStartKeyboard(page, FIXTURE.startKeyboardId);
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page);
   await acceptProjectName(page);
   await confirmPrefill(page);
@@ -186,7 +186,7 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     expect(await row.isVisible()).toBe(true);
 
     await driveHelpPhase(page);
-    await page.waitForURL(/#output$/);
+    await expect(page.getByRole("heading", { name: "Survey complete" })).toBeVisible({ timeout: 30_000 });
   });
 
   test("a real reproposal (marks) shows the FR-016 notice and a live badge, which clears once resolved", async ({

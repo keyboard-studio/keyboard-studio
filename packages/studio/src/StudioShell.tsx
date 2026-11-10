@@ -10,8 +10,10 @@
 //                         no path from this tab into the working copy
 //                         (spec 057 US2). The route token stays `preview`
 //                         while the tab is labelled "Compare".
-//   #output             — OutputScreen: "ship it" — Download .zip +
-//                         SignUpPanel (no interactive OSK)
+//   #output             — OutputRedirect (spec 113): the Output tab lands
+//                         in the Trial/Publish tail (Trial normally,
+//                         Publish when the walk is done, Start with no
+//                         project). The Output screen itself is retired.
 //   #criteria           — CriteriaScreen: the criteria compliance page
 //                         (spec 084) — every catalog criterion judged
 //                         against the keyboard Output would ship.
@@ -96,6 +98,7 @@ import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
 import { useOpenInventorySeed } from "./hooks/useOpenInventorySeed.ts";
 import { useOe2SoleSourceFindings } from "./hooks/useOe2SoleSourceFindings.ts";
 import { useLdmlFindings } from "./hooks/useLdmlFindings.ts";
+import { useFontGlyphCoverageFindings } from "./hooks/useFontGlyphCoverageFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
 import { useContextToleranceApply } from "./hooks/useContextToleranceApply.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
@@ -105,7 +108,7 @@ import { FlowMapView } from "./dashboard/DashboardView.tsx";
 import { runCompleteness } from "./dashboard/completeness.ts";
 import { CompareScreen } from "./components/CompareScreen.tsx";
 import { StudioFooter } from "./components/StudioFooter.tsx";
-import { OutputScreen } from "./components/OutputScreen.tsx";
+import { OutputRedirect } from "./components/OutputRedirect.tsx";
 import { CriteriaScreen } from "./components/CriteriaScreen.tsx";
 import { AfterApplySuggestions } from "./components/AfterApplySuggestions.tsx";
 import { useLingui } from "@lingui/react/macro";
@@ -275,7 +278,7 @@ function useRoute(): RouteId {
 // by the SurveyRunner, legitimately not promoted to manifest steps).
 //
 // Derived main line (FR-012; pinned by steps/stepOrder.parity.test.ts):
-//   identity → layout → choose_base → track → characters → marks →
+//   identity → layout → choose_base → attribution → characters → marks →
 //   punctuation → invisibles → convenience → carve → deadkeys → rules →
 //   mechanisms[lock:physical] → touch[lock:touch] → help → package[reserved]
 //   (sequences build inline in the mechanism gallery — no spine step)
@@ -285,9 +288,11 @@ function useRoute(): RouteId {
 //   touch_seed_source — touch-seed fork; rejoins at "touch"
 //
 // Track/project_name routing (#1901: the attribution step sits between
-// track and the fork — author/copyright are asked after the track choice):
-//   copy-track:  choose_base → track → attribution → project_name → characters
-//   adapt-track: choose_base → track → attribution → (skip project_name) → characters
+// choose_base and the fork — author/copyright are asked after the base
+// choice, and the track is recorded on the start screen, defaulting to
+// copy when a walk reaches the base choice without one):
+//   copy-track:  choose_base → attribution → project_name → characters
+//   adapt-track: choose_base → attribution → (skip project_name) → characters
 //
 // Characters internal flow (intra-phase — not manifest steps):
 //   prefill → B-questions
@@ -1155,6 +1160,9 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   //     through the gallery host, which has already synchronously resolved
   //     any rebase-confirm question via confirmRebaseTo BEFORE recording —
   //     F1 fix)
+  //   - the authoring track is recorded — the start screen records it
+  //     (New = copy, Open = adapt); a walk without one defaults to copy,
+  //     recorded here with provenance "default" (see the effect body).
   //   - the compile pipeline has actually settled for THAT SAME base
   //     (`pendingArtifactRef`, filled by `onInstantiate` above).
   //
@@ -1182,10 +1190,20 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
     if (decisionId === undefined) return;
     // Spec 092 FR-004: the setup decision requires the authoring track as
     // well as the base — do not instantiate until both are recorded. The
-    // track step follows choose_base in the flow, so on a fresh walk this
-    // gate is what moves instantiation from the base confirmation (track
-    // still null — the G7 hazard) to the track's completion.
-    if (authoringTrackDecision === undefined) return;
+    // start screen records the track (New = copy, Open = adapt), so on a
+    // fresh walk it is already there. A walk that reaches here without one
+    // (a legacy draft, a deep link) defaults to copy — the track question
+    // is gone, and copy is the only track the walk itself can start.
+    // Recorded with provenance "default", so the trail shows it was the
+    // studio's default, not the author's choice.
+    if (authoringTrackDecision === undefined) {
+      useDecisionStore.getState().record({
+        id: "authoring-track",
+        value: "copy",
+        provenance: "default",
+        step: "choose_base",
+      });
+    }
     const art = pendingArtifactRef.current;
     const lb = useSurveySessionStore.getState().localStart;
     if (art && lb && art.base.id === lb.id && lb.id === decisionId) {
@@ -1228,12 +1246,32 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
   // The LDML export's A/N warnings and hints ride the same array on the same terms (spec 108):
   // a memoised synchronous hook over the published preview projection. They never gate an output.
   const ldmlFindings = useLdmlFindings();
+  // Issue #2593: the packaged-font glyph-coverage warning (18.13) rides
+  // the same array on the same terms — a memoised synchronous hook over
+  // the working copy's VFS + IR. It has no owning question, so it renders
+  // as an unmapped finding on the Output screen.
+  const fontGlyphCoverageFindings = useFontGlyphCoverageFindings();
   const findings = useMemo(
     () =>
-      documentationFindings.length === 0 && oe2Findings.length === 0 && ldmlFindings.length === 0
+      documentationFindings.length === 0 &&
+      oe2Findings.length === 0 &&
+      ldmlFindings.length === 0 &&
+      fontGlyphCoverageFindings.length === 0
         ? validatorFindingsOnly
-        : [...validatorFindingsOnly, ...documentationFindings, ...oe2Findings, ...ldmlFindings],
-    [validatorFindingsOnly, documentationFindings, oe2Findings, ldmlFindings],
+        : [
+            ...validatorFindingsOnly,
+            ...documentationFindings,
+            ...oe2Findings,
+            ...ldmlFindings,
+            ...fontGlyphCoverageFindings,
+          ],
+    [
+      validatorFindingsOnly,
+      documentationFindings,
+      oe2Findings,
+      ldmlFindings,
+      fontGlyphCoverageFindings,
+    ],
   );
   // spec-014 US5/T034 — publish the SINGLE debounced `useValidator` findings to
   // the store so the sibling `StudioShell` can feed C4 spine-prefix shippability
@@ -1785,10 +1823,10 @@ function StudioShellContent() {
 
   // ---------------------------------------------------------------------------
   // Output nav-link UX signal (P0 fix) — NOT the authoritative enforcement
-  // (that is OutputScreen's canDownload gate via usePreviewArtifact, which
+  // (that is the Publish step's canDownload gate via usePreviewArtifact, which
   // still applies regardless of how #output was reached). This is purely so
   // the block is visible on the tab itself before the click. Same shared hook
-  // (hooks/useInventoryCoverageGate.ts) as StepHost/PhaseFGate/OutputScreen —
+  // (hooks/useInventoryCoverageGate.ts) as StepHost/PhaseFGate/PublishStep —
   // do not re-derive the desktop-always/touch-only-if-applicable booleans
   // here. IMPORTANT (mechanism-gallery-progression invariant): this is the
   // IMPLEMENTED-ONLY gate — a mark-for-later-review character is still
@@ -1815,7 +1853,7 @@ function StudioShellContent() {
     (s) => s.backToUnfinishedGallery,
   );
   // A BACK action (backToUnfinishedGallery), not the forward-push `advance` —
-  // mirrors OutputScreen.tsx's handleGoToGallery / PhaseFGate.tsx's
+  // mirrors OutputGateBanners' handleGoToGallery / PhaseFGate.tsx's
   // handleGoBack exactly (see backToUnfinishedGallery's own docstring for the
   // P0 history-corruption regression a forward-push here would reproduce).
   // Also switches routes to #survey — unlike those two call sites, this
@@ -1969,7 +2007,7 @@ function StudioShellContent() {
       content = <CompareScreen />;
       break;
     case "output":
-      content = <OutputScreen />;
+      content = <OutputRedirect />;
       break;
     case "flowmap":
       content = (
@@ -2108,8 +2146,14 @@ function StudioShellContent() {
       )}
       {/* Spec 111 US5: consistency suggestions raised by an applied change.
           Always mounted (it watches the working copy); the list shows only
-          off the criteria page, which lists them itself. */}
-      <AfterApplySuggestions showPanel={route !== "criteria"} />
+          off the criteria page, which lists them itself. #2528: on the
+          survey route the panel withholds fixes owned by a later step. */}
+      <AfterApplySuggestions
+        showPanel={route !== "criteria"}
+        route={route}
+        activeStepId={surveyActiveStepId}
+        stepOrder={manifest.map((s) => s.id)}
+      />
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{content}</div>
       {/* Spec 057 US4/US6 (T052, FR-040): the narrow journey footer. Mounted
           unconditionally rather than per-route because `StudioFooter` returns

@@ -119,7 +119,6 @@ describe("spec-022 demotion — phase_a_identity is proposed and unwalked", () =
 describe("screenIdForFlow (spec 091 T020)", () => {
   it("maps each live flow to the screen holding its modules", () => {
     expect(screenIdForFlow("identity_lite")).toBe("identity");
-    expect(screenIdForFlow("track")).toBe("track");
     expect(screenIdForFlow("project_name")).toBe("project_name");
     // Intra-step flows name their enclosing custom screen.
     expect(screenIdForFlow("phase_b_characters")).toBe("characters");

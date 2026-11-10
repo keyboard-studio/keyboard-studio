@@ -1219,7 +1219,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     onBack !== undefined
       ? {
           back: {
-            label: t({ id: 'editor.carve.backButton', message: '← Back' }),
+            label: t({ id: 'editor.carve.backButton', message: 'Back' }),
             onClick: onBack,
             testId: 'carve-back',
           },
