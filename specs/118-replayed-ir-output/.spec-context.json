@@ -2,8 +2,8 @@
   "workflow": "companion",
   "specName": "Output from the replayed keyboard",
   "branch": "118-replayed-ir-output",
-  "currentStep": "plan",
-  "status": "planned",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
   "history": [
     {
       "step": "specify",
@@ -39,6 +39,27 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-10T22:03:35.834Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-10T22:04:03.465Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T22:05:27.693Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T22:05:28.144Z"
     }
   ],
   "unattended": true,
@@ -68,7 +89,130 @@
     "plan": {
       "summary": "Six landable phases: defects, emit+modes, pattern on model, touch/kvks, ordering edges, projection reduced",
       "key_finding": "Phase 5 depends on spec 105 phases; phase 2 on spec 117"
+    },
+    "tasks": {
+      "summary": "40 tasks: setup 2, foundational 9 defects in 3 waves, 5 story phases in waves, polish 3"
     }
   },
-  "approach": "Replay becomes the only producer: decisions apply to the keyboard model incl. touch layout; one engine emit(state, mode) writes all outputs; projection reduced to file-level work; defects fixed first."
+  "approach": "Replay becomes the only producer: decisions apply to the keyboard model incl. touch layout; one engine emit(state, mode) writes all outputs; projection reduced to file-level work; defects fixed first.",
+  "coverage": {
+    "FR-001": {
+      "title": "Work follows the 2026-11-10 rulings: every apply returns the keyboard; output folds into the model",
+      "tasks": [
+        "T032",
+        "T037"
+      ]
+    },
+    "FR-002": {
+      "title": "Responsibility split between spec 105 surfaces and this spec",
+      "tasks": [
+        "T037",
+        "T039"
+      ]
+    },
+    "FR-010": {
+      "title": "Keyboard is a function of starting point and decisions only",
+      "tasks": [
+        "T034",
+        "T031"
+      ]
+    },
+    "FR-011": {
+      "title": "Every output-changing decision transforms the model during replay",
+      "tasks": [
+        "T022",
+        "T023",
+        "T024",
+        "T025",
+        "T026",
+        "T037"
+      ]
+    },
+    "FR-012": {
+      "title": "Pattern application merges into the model with the six merge rules",
+      "tasks": [
+        "T018",
+        "T019",
+        "T020",
+        "T021"
+      ]
+    },
+    "FR-013": {
+      "title": "Ordering is declared as requires edges; gate fails on output change",
+      "tasks": [
+        "T028",
+        "T029",
+        "T030",
+        "T031"
+      ]
+    },
+    "FR-014": {
+      "title": "One output stage used by preview, download, archive, PR and LDML",
+      "tasks": [
+        "T012",
+        "T014",
+        "T015",
+        "T016",
+        "T017",
+        "T035"
+      ]
+    },
+    "FR-015": {
+      "title": "Original text preserved only in the three named cases",
+      "tasks": [
+        "T010",
+        "T013",
+        "T011"
+      ]
+    },
+    "FR-016": {
+      "title": "Touch layout: hand-set only when changed; unknown members kept",
+      "tasks": [
+        "T022"
+      ]
+    },
+    "FR-017": {
+      "title": "Validation checks the replayed keyboard in the single cycle",
+      "tasks": [
+        "T004",
+        "T032"
+      ]
+    },
+    "FR-020": {
+      "title": "Nine defects each fixed behind a failing test",
+      "tasks": [
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T007",
+        "T008",
+        "T009",
+        "T010",
+        "T011"
+      ]
+    },
+    "FR-030": {
+      "title": "Each phase byte-identical on golden fixtures except defect fixes",
+      "tasks": [
+        "T001",
+        "T017",
+        "T012"
+      ]
+    },
+    "FR-031": {
+      "title": "Incremental and from-scratch builds give the same model for every surface",
+      "tasks": [
+        "T034"
+      ]
+    },
+    "FR-032": {
+      "title": "Each replay-changing phase re-measures rebuild time",
+      "tasks": [
+        "T001",
+        "T017",
+        "T038"
+      ]
+    }
+  }
 }
