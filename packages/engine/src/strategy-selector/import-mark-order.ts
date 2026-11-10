@@ -75,6 +75,7 @@ import {
   ruleHasNulContext,
   ruleKeystrokeLoose,
   rulePreContext,
+  withoutOutsStores,
 } from "@keyboard-studio/contracts";
 import {
   getCategory,
@@ -237,8 +238,10 @@ export function isBaseToMarkedRemap(
  * @see spec.md §7.2 rule 3a
  */
 export function detectMarkInputOrderFromImport(
-  ir: KeyboardIR,
+  source: KeyboardIR,
 ): AxisFill | undefined {
+  // Pairs stores by position: read without outs() stores (see withoutOutsStores).
+  const ir = withoutOutsStores(source);
   for (const group of ir.groups) {
     for (const rule of group.rules) {
       const refs = postfixMarkSequenceRefs(rule);

@@ -192,8 +192,12 @@ describe("buildLdmlExport: Story 1", () => {
       const rows = report.split("\n").filter((l) => l.startsWith(`| source/all_opaque.kmn:${line} |`));
       expect(rows, `line ${line}`).toHaveLength(1);
     }
+    // Only the `<>` guard stays a fragment (spec 103); set, reset and call are typed rules
+    // and still give one item at their line (rows 3.18 and 1.12).
     const frags = r.classification.items.filter((i) => i.nodeKey.startsWith("fragment#"));
-    expect(frags).toHaveLength(4);
+    expect(frags).toHaveLength(1);
+    const typedRows = r.classification.items.filter((i) => i.nodeKey.startsWith("group:main#") && (i.rowId === "3.18" || i.rowId === "1.12"));
+    expect(typedRows.map((i) => [i.line, i.rowId]).sort()).toEqual([[11, "3.18"], [12, "3.18"], [14, "1.12"]]);
   });
 
   it("profile 49 writes its namespace and conformsTo", async () => {

@@ -65,7 +65,7 @@ export function cleanedContext(rule: IRRule): ContextElement[] | null {
   const cleaned: ContextElement[] = [];
   for (const el of ruleContextElements(rule)) {
     if (isPlusSeparator(el)) continue;
-    if (el.kind === "raw") return null;
+    if (el.kind === "raw" || el.kind === "platform") return null; // a typed platform was raw
     cleaned.push(el);
   }
   return cleaned;

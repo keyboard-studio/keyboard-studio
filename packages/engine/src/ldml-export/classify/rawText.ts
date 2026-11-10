@@ -5,8 +5,14 @@
 // The set is: `use(g)`, `layer('x')`, `platform('...')`, `set(&layer='x')`, plus two
 // patterns row 6.2 admits because the codec keeps them as `raw` context elements:
 // the bare token `nul` (row 3.24) and a bracketed key `[MODS K_X]` (row 2.22).
+//
+// `layer`, `platform` and `set` are typed IR members now (spec 116), and the
+// element readers below (`layerOf`, `platformOf`, `setLayerOf`) read the typed
+// member first. The raw-text reading stays only for IR written before the typed
+// members existed (persisted drafts), which still holds `raw` elements.
 
 import { classifyRawElement } from "@keyboard-studio/contracts";
+import type { ContextElement, OutputElement } from "@keyboard-studio/contracts";
 import { OPAQUE_REASONS } from "../../codec/opaque-reasons.js";
 import type { RowId } from "../types.js";
 
@@ -34,6 +40,32 @@ export function parsePlatformCall(text: string): string | null {
 export function parseSetLayer(text: string): string | null {
   const c = classifyRawElement(text);
   return c.kind === "setLayer" ? c.value : null;
+}
+
+/** The layer a `layer('x')` output element names: the typed member, or a `raw` one from an older draft. */
+export function layerOf(el: OutputElement): string | null {
+  if (el.kind === "layer") return el.value;
+  return el.kind === "raw" ? parseLayerCall(el.text) : null;
+}
+
+/** The platform string of a `platform('x')` context element: typed, or `raw` from an older draft. */
+export function platformOf(el: ContextElement): string | null {
+  if (el.kind === "platform") return el.value;
+  return el.kind === "raw" ? parsePlatformCall(el.text) : null;
+}
+
+/** The layer a `set(&layer = 'x')` output element names: typed, or `raw` from an older draft. */
+export function setLayerOf(el: OutputElement): string | null {
+  if (el.kind === "set") {
+    if (el.storeRef.toLowerCase() !== "&layer") return null;
+    let text = "";
+    for (const v of el.value) {
+      if (v.kind !== "char") return null;
+      text += v.value;
+    }
+    return text;
+  }
+  return el.kind === "raw" ? parseSetLayer(el.text) : null;
 }
 
 /** The bare `nul` token the codec keeps as a context element (row 3.24). */

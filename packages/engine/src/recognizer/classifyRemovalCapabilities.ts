@@ -14,6 +14,11 @@
  *
  * Classification decision order (first match wins, per km-strategy):
  *   1. not-removable:opaque           -- node is a RawKmnFragment (in ir.raw)
+ *  1a. not-removable:opaque           -- rule output holds a set / save / reset /
+ *                                        call / return statement (spec 116 typed
+ *                                        these; such a rule was a whole-rule
+ *                                        fragment before, so it keeps that
+ *                                        posture).
  *  1b. not-removable:opaque           -- rule contains a name-carrying deadkey
  *                                        element (#2238 guard, km-lead ruling:
  *                                        named-deadkey rules keep the posture
@@ -111,13 +116,18 @@
  * Touch-layout (S-13) nodes are not classified and receive no map entry.
  */
 
-import type { IRRule, KeyboardIR, Pattern } from "@keyboard-studio/contracts";
+import type { IRRule, KeyboardIR, OutputElement, Pattern } from "@keyboard-studio/contracts";
 import { ruleContextElements } from "../shared/rule-shape.js";
 import type { RemovalCapability } from "@keyboard-studio/contracts";
-import { isNamedDeadkeyElement } from "@keyboard-studio/contracts";
+import { isNamedDeadkeyElement, storeHasOuts, withoutOutsStores } from "@keyboard-studio/contracts";
 import { isS01 } from "./rules/s01-simple-swap.js";
 import { isBody } from "./rules/s02-deadkey-single-tap.js";
 import { isParallelIndexFanOut } from "./rules/parallel-index-fanout.js";
+
+/** An option-store or call/return statement in output position (typed by spec 116). */
+function isStatementElement(el: OutputElement): boolean {
+  return el.kind === "set" || el.kind === "save" || el.kind === "reset" || el.kind === "call" || el.kind === "return";
+}
 import { isS06FanOutMember } from "./s06-families.js";
 
 /** Resolve the RemovalCapability for an owning pattern by strategyId. */
@@ -144,12 +154,18 @@ function isContextSensitive(rule: IRRule): boolean {
  * @param ir  The KeyboardIR produced by parse() + recognizePatterns().
  * @returns   Classification map (see module-level keying contract above).
  */
-export function classifyRemovalCapabilities(ir: KeyboardIR): Map<string, RemovalCapability> {
+export function classifyRemovalCapabilities(source: KeyboardIR): Map<string, RemovalCapability> {
   const result = new Map<string, RemovalCapability>();
+  // Stores holding `outs()` were opaque fragments before spec 116 typed them: they carry
+  // the opaque label below, and the walk reads the IR without them (as it always has).
+  const ir = withoutOutsStores(source);
 
   // --- Decision 1: opaque fragments ---
   for (const frag of ir.raw) {
     result.set(frag.nodeId, "not-removable:opaque");
+  }
+  for (const store of source.stores) {
+    if (storeHasOuts(store)) result.set(store.nodeId, "not-removable:opaque");
   }
 
   // Build a lookup: patternId -> Pattern (for ownedByPattern resolution).
@@ -171,6 +187,14 @@ export function classifyRemovalCapabilities(ir: KeyboardIR): Map<string, Removal
           : undefined;
       const ownedByS06 = owningPattern?.strategyId === "S-06";
       const s06FanOut = ownedByS06 && isS06FanOutMember(rule);
+
+      // Decision 1a: an option-store or call/return statement in the output. The
+      // codec kept such a rule whole as an opaque fragment (labelled above); typed,
+      // it keeps the posture it had.
+      if (rule.output.some(isStatementElement)) {
+        result.set(rule.nodeId, "not-removable:opaque");
+        continue;
+      }
 
       // Decision 1b (#2238 guard): a rule containing a name-carrying deadkey
       // element in context or output keeps the not-removable:opaque posture

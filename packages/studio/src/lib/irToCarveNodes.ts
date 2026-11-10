@@ -306,6 +306,8 @@ export function contextToKeys(context: ContextElement[]): string[] {
         // The condition itself is surfaced by precedingContextLabel and
         // buildCondition, not dropped from the rule.
         break;
+      case 'platform':
+        break; // a platform condition is no key, as the raw element it replaces was not
       case 'raw':
         break;
       default:
@@ -861,6 +863,7 @@ function precedingContextLabel(elements: ContextElement[]): string {
       case 'context':    parts.push('context'); break;
       case 'baselayout': parts.push('base layout char'); break;
       case 'if':         parts.push(`when ${el.store} is '${el.value}'`); break;
+      case 'platform':   parts.push('specific input'); break; // the label its raw element had
       case 'raw':
         // Skip structural KMN syntax tokens ('+' separator) — they're codec artifacts, not meaningful context
         if (el.text.trim() !== '+') parts.push('specific input');
@@ -880,6 +883,12 @@ const PLATFORM_GUARD_RE = /^\s*platform\s*\(\s*'(\w+)'\s*\)/i;
 function extractPlatformGuard(elements: ContextElement[]): { guard: string | null; filtered: ContextElement[] } {
   let guard: string | null = null;
   const filtered = elements.filter((el) => {
+    if (el.kind === 'platform') {
+      // Same reading as the raw text it replaces: a single-quoted word is a guard.
+      if (!/^\w+$/.test(el.value)) return true;
+      guard = el.value;
+      return false;
+    }
     if (el.kind !== 'raw') return true;
     const m = PLATFORM_GUARD_RE.exec(el.text);
     if (m) {
@@ -1406,7 +1415,7 @@ export function keySequenceLabel(
   // resolved via findDeadkeyTrigger and rendered as one ordered chord step;
   // if ANY deadkey's trigger can't be found, the whole sequence is
   // unresolvable — return undefined rather than fabricating a step.
-  const effCtx = ctx.filter((el) => el.kind !== 'raw');
+  const effCtx = ctx.filter((el) => el.kind !== 'raw' && el.kind !== 'platform');
   if (effCtx.length > 0 && effCtx.every((el) => el.kind === 'deadkey')) {
     const steps: string[] = [];
     for (const el of effCtx) {
@@ -1517,6 +1526,7 @@ function buildCondition(preceding: readonly ContextElement[], ir: KeyboardIR): C
       case 'deadkey':
       case 'namedDeadkey':
       case 'index':
+      case 'platform':
       case 'raw':
         return { kind: 'unrenderable' };
       default:

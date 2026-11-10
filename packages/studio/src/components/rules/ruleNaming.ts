@@ -85,6 +85,8 @@ function contextElementText(el: ContextElement): string {
       return `baselayout(${el.value})`;
     case "if":
       return `if(${el.store} = '${el.value}')`;
+    case "platform":
+      return `platform('${el.value}')`;
     case "raw":
       return el.text;
   }
@@ -110,6 +112,18 @@ function outputElementText(el: OutputElement): string {
       return `outs(${el.storeRef})`;
     case "useGroup":
       return `use(${el.groupName})`;
+    case "layer":
+      return `layer('${el.value}')`;
+    case "set":
+      return `set(${el.storeRef} = ${el.value.map(outputElementText).join(" ")})`;
+    case "save":
+      return `save(${el.storeRef})`;
+    case "reset":
+      return `reset(${el.storeRef})`;
+    case "call":
+      return `call(${el.storeRef})`;
+    case "return":
+      return "return";
     case "raw":
       return el.text;
   }

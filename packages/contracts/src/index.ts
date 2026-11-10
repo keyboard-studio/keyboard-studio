@@ -83,6 +83,8 @@ export * from "./ir/usBaseLayout";
 export * from "./ir/producedSet";
 export * from "./ir/outputRepertoire";
 export * from "./ir/storeItemText";
+export * from "./ir/resolveStoreItems";
+export * from "./ir/outsStores";
 export { assertNever } from "./assert-never";
 // The reachability-aware sibling view (spec 063). Deliberately a separate
 // function, not an option on buildProducedSet - see both module headers.

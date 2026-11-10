@@ -101,7 +101,7 @@ begin Unicode > use(main)
 group(main) using keys
 
 + [K_A] > 'a' U+0301
-+ [K_Z] > 'z' set(opt = '1')
++ [K_Z] > 'z' outs(opt)
 `;
 
 // ---------------------------------------------------------------------------

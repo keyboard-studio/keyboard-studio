@@ -32,7 +32,8 @@ import {
   type Keystroke,
   type ResolveContext,
 } from "./keystrokes.js";
-import { isNulToken, parseLayerCall, parsePlatformCall } from "./rawText.js";
+import { isNulToken, layerOf, platformOf, setLayerOf } from "./rawText.js";
+import { OPAQUE_REASONS } from "../../codec/opaque-reasons.js";
 
 /** Cap on transforms from one rule (cartesian expansion); the lowering exports the same value. */
 export const MAX_TRANSFORMS_PER_RULE = 1000;
@@ -97,8 +98,8 @@ export function findStore(ir: KeyboardIR, name: string): IRStore | undefined {
 
 /** True for context elements that produce no text: guards, anchors, conditions. */
 export function isGuardElement(el: ContextElement): boolean {
-  if (el.kind === "if" || el.kind === "baselayout") return true;
-  if (el.kind === "raw") return isNulToken(el.text) || parsePlatformCall(el.text) !== null;
+  if (el.kind === "if" || el.kind === "baselayout" || el.kind === "platform") return true;
+  if (el.kind === "raw") return isNulToken(el.text) || platformOf(el) !== null;
   return false;
 }
 
@@ -218,6 +219,23 @@ export function analyseRule(
     return plan;
   };
 
+  // --- Option-store statements and call/return (rows 3.18, 1.12) ---------------------------------
+  // The codec once kept such a rule whole as a fragment, which routed to these rows by reason
+  // (`routeFragmentReason`, still used for fragments in older drafts). Typed, the rule reaches
+  // here and takes the same row and reason, whatever else it holds.
+  const layerGroup = facts.role === "newContext" || facts.role === "postKeystroke";
+  for (const el of rule.output) {
+    if (el.kind === "set" || el.kind === "save" || el.kind === "reset") {
+      // A `set(&layer = 'x')` in a PostKeystroke/NewContext group is read as a layer
+      // effect (layerRules.ts, row 1.4a), as the raw form of it was, and is not reported here.
+      if (layerGroup && setLayerOf(el) !== null) continue;
+      return reject("3.18", { params: { reason: OPAQUE_REASONS.OPTION_STORE_DIRECTIVE } });
+    }
+    if (el.kind === "call" || el.kind === "return") {
+      return reject("1.12", { params: { reason: OPAQUE_REASONS.CALL_RETURN } });
+    }
+  }
+
   // --- Role of the group (rows 1.3, 1.4, 1.11) ---------------------------------------------------
   // Layer groups are evaluated as a whole (layerRules.ts), which reports their behaviours.
   if (facts.role === "newContext" || facts.role === "postKeystroke") {
@@ -231,7 +249,7 @@ export function analyseRule(
     const calls = ruleCalls(rule);
     plan.calls = calls;
     const only = rule.output.length === 1 ? rule.output[0] : undefined;
-    if (only?.kind === "raw" && parseLayerCall(only.text) !== null) return reject("3.21");
+    if (only !== undefined && layerOf(only) !== null) return reject("3.21");
     if (calls.length > 0 && rule.output.length === calls.length) {
       // An edge in the call graph, classified by the target's reach.
       const reaches = calls.map((c) => env.graph.facts.get(env.ir.groups.find((g) => g.name.toLowerCase() === c.toLowerCase()) as IRGroup));
@@ -409,13 +427,20 @@ export function analyseRule(
         if (!baselayoutTruth(el.value, env.baseLayout)) plan.lower = false;
         break;
       }
+      case "platform": {
+        const t = platformTruth(el.value);
+        if (t.hardware !== t.touch) n("3.19", { status: "A", params: { platform: el.value } });
+        else n("3.19", { status: "M", params: { platform: el.value } });
+        if (!t.hardware) plan.lower = false;
+        break;
+      }
       case "raw": {
         if (isNulToken(el.text)) {
           plan.anchorStart = true;
           n("3.24");
           break;
         }
-        const plat = parsePlatformCall(el.text);
+        const plat = platformOf(el);
         if (plat !== null) {
           const t = platformTruth(plat);
           if (t.hardware !== t.touch) n("3.19", { status: "A", params: { platform: plat } });
@@ -477,8 +502,17 @@ export function analyseRule(
       case "useGroup":
         plan.calls.push(el.groupName);
         break;
+      case "layer":
+        return reject("3.21");
+      case "set":
+      case "save":
+      case "reset":
+        return reject("3.18", { params: { reason: OPAQUE_REASONS.OPTION_STORE_DIRECTIVE } });
+      case "call":
+      case "return":
+        return reject("1.12", { params: { reason: OPAQUE_REASONS.CALL_RETURN } });
       case "raw": {
-        if (parseLayerCall(el.text) !== null) return reject("3.21");
+        if (layerOf(el) !== null) return reject("3.21");
         return reject("6.2", { params: { reason: "output-raw", element: el.text } });
       }
       default:

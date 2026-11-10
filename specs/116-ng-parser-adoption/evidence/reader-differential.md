@@ -176,3 +176,43 @@ comment is the text the legacy split gives.
 | release/m/me_en/source/me_en.kmn | `glued-calls` | 3 |
 | release/t/taigi_viet_telex/source/taigi_viet_telex.kmn | `glued-calls` | 15 |
 | release/v/vietnam/source/vietnam.kmn | `glued-calls` | 23 |
+
+## Phase 6 (US3)
+
+Recorded 2026-11-10 (spec 116 T058, SC-005). Phase 6b types `layer`, `set`/`save`/`reset`,
+`call`/`return` and `platform` (output and context) and store `outs()` in the IR, so the rules
+and stores that were opaque only because of those constructs import as typed. Same corpus, same
+fixtures, same pin as the tables above. `reader-regression.corpus.test.ts` reads the After column
+of the two tables below.
+
+### Phase 6 fragment reasons
+
+| Reason | Before | After |
+|---|---|---|
+| `call-return` | 47 | 0 |
+| `if-option-store` | 160 | 160 |
+| `malformed-range` | 16 | 16 |
+| `menu-store-syntax` | 409 | 409 |
+| `option-store-directive` | 313 | 0 |
+| `outs-expansion` | 2170 | 1813 |
+| `removed-statement` | 2 | 2 |
+| `unknown-pre-begin` | 9 | 9 |
+
+- `call-return` and `option-store-directive` fall to zero: no rule in the corpus is opaque only
+  because of `set`, `save`, `reset`, `call` or `return`.
+- `outs-expansion` drops by 357: the store declarations whose body held `outs()`. The 1813 that
+  remain are `outs()` in a rule's output or context, which this spec does not type (FR-020 names
+  store items only); they are not a regression.
+- No reason rises, and `if-option-store` is unchanged (FR-025: `<>` and non-head `if()` stay opaque).
+
+### Phase 6 comments by anchor
+
+| Anchor | Before | After |
+|---|---|---|
+| `freestanding` | 10582 | 10582 |
+| `leading` | 14238 | 14238 |
+| `trailing` | 14155 | 14171 |
+
+The 16 extra `trailing` comments are the trailing comments of rules that were whole-rule fragments
+(`set`, `call`, `return` lines): the comment used to sit inside the fragment's source text and now
+anchors to the typed rule. No comment is lost; the total across anchors rises by 16.

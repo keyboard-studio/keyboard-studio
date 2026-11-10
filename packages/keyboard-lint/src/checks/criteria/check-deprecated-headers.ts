@@ -105,10 +105,19 @@ function unusedStores(
         if (el.kind === "if") {
           note(el.store);
         } else if ("storeRef" in el && typeof el.storeRef === "string") {
+          // Covers `set` / `save` / `reset` / `call` as well as any / index / outs.
           note(el.storeRef);
+        }
+        // A `set()` value can expand another store with outs().
+        if (el.kind === "set") {
+          for (const v of el.value) if (v.kind === "outs") note(v.storeRef);
         }
       }
     }
+  }
+  // A store body that expands another store with outs() uses it.
+  for (const store of ir.stores) {
+    for (const item of store.items) if (item.kind === "outs") note(item.storeRef);
   }
   const unused: string[] = [];
   for (const store of ir.stores) {

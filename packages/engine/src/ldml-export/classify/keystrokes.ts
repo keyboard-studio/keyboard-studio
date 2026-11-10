@@ -10,6 +10,7 @@ import {
   rulePreContext,
 } from "@keyboard-studio/contracts";
 import { assertNever } from "@keyboard-studio/contracts";
+import { fmtContextElement } from "../../codec/emit.js";
 import type { ContextElement, IRRule, IRStore, StoreItem } from "@keyboard-studio/contracts";
 import { FORM_ONLY_KEYS, FORM_ROWS, type LdmlForm } from "../lower/positions.js";
 import type { LdmlBaseLayout, RowId } from "../types.js";
@@ -129,6 +130,9 @@ function toKeystroke(el: ContextElement): Keystroke {
     case "baselayout":
     case "if":
       return { kind: "opaque", text: el.kind };
+    case "platform":
+      // A platform() in the keystroke slot was a raw element with this text.
+      return { kind: "opaque", text: fmtContextElement(el) };
     default:
       return assertNever(el, "toKeystroke");
   }

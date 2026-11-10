@@ -1,5 +1,6 @@
 import type { IRStore, KeyboardIR, OutputElement } from "../keyboard-ir.js";
 import { ruleConditions, ruleHasNulContext, ruleKeystroke, rulePreContext } from "../rule-shape.js";
+import { withoutOutsStores } from "./outsStores.js";
 
 /**
  * caseCounterpart — deterministic case-pair helper for the shift-layer
@@ -210,9 +211,11 @@ export function capsPlaneOutputs(ir: KeyboardIR): Map<string, Partial<Record<Pla
 }
 
 function collectPlaneOutputs(
-  ir: KeyboardIR,
+  source: KeyboardIR,
   planeFor: (modifiers: readonly string[]) => Plane | null,
 ): Map<string, Partial<Record<Plane, string>>> {
+  // Pairs `any(keys)` with `index(chars, n)` by position: read without outs() stores.
+  const ir = withoutOutsStores(source);
   const out = new Map<string, Partial<Record<Plane, string>>>();
   const put = (vkey: string, plane: Plane, ch: string): void => {
     const row = out.get(vkey) ?? {};

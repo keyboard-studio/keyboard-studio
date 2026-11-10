@@ -35,6 +35,7 @@ import {
 } from "../rule-shape.js";
 import { decodeUnicodeKeyId } from "../touch-coverage.js";
 import { US_BASE_LAYOUT } from "./usBaseLayout.js";
+import { withoutOutsStores } from "./outsStores.js";
 
 export interface BuildOutputRepertoireOptions {
   /** Polled during the closure; when it returns true the closure stops early. */
@@ -264,6 +265,12 @@ function expandRule(
         case "beep":
         case "nul":
         case "useGroup":
+        case "layer":
+        case "set":
+        case "save":
+        case "reset":
+        case "call":
+        case "return":
         case "raw":
           break; // no text
         default:
@@ -354,7 +361,8 @@ export function buildOutputRepertoire(
   ir: KeyboardIR,
   options?: BuildOutputRepertoireOptions,
 ): OutputRepertoire {
-  const stores = buildStoreMap(ir);
+  // Pairs stores by position: read without outs() stores (see withoutOutsStores).
+  const stores = buildStoreMap(withoutOutsStores(ir));
   const unresolvedRaw = new Map<string, string>();
   const truncation = new Set<string>();
   const instances: Instance[] = [];

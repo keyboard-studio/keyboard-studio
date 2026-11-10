@@ -55,6 +55,7 @@ import {
   contextHasDirectBackspace,
   elementAtOffset,
   ruleKeystroke,
+  withoutOutsStores,
 } from "@keyboard-studio/contracts";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { parse } from "../codec/parse.js";
@@ -145,7 +146,9 @@ function collectTouchKeyGlyphs(key: TouchKeyIR, addRoute: (glyph: string, route:
  * The glyphs (single NFC codepoints, sorted by codepoint) that the given IR
  * produces ONLY via the oe2 key. See the module doc for the exact definition.
  */
-export function findOe2SoleSourceGlyphs(ir: KeyboardIR): string[] {
+export function findOe2SoleSourceGlyphs(source: KeyboardIR): string[] {
+  // Pairs stores by position: read without outs() stores (see withoutOutsStores).
+  const ir = withoutOutsStores(source);
   const storeMap = new Map<string, IRStore>(ir.stores.map((s) => [s.name, s]));
   const routes = new Map<string, GlyphRoutes>();
   const addRoute = (glyph: string, route: RouteKind): void => {

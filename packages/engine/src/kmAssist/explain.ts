@@ -27,6 +27,7 @@ import {
 } from "./classify.js";
 import { ruleLhsKind } from "@keyboard-studio/contracts";
 import { getCategory, getName } from "./unicodeAdapter.js";
+import { fmtContextElement, fmtOutputElement } from "../codec/emit.js";
 
 /** Short modifier labels for author-language key descriptions. */
 const MODIFIER_LABELS: Record<string, string> = {
@@ -113,6 +114,9 @@ function describeContextElement(el: ContextElement): string {
       return `the "${el.value}" base layout`;
     case "if":
       return `the "${el.store}" store is set to "${el.value}"`;
+    case "platform":
+      // Shown as written, exactly as the raw element it replaces was.
+      return fmtContextElement(el);
     case "raw":
       return el.text;
   }
@@ -148,6 +152,14 @@ function describeOutputElement(el: OutputElement): string {
       return `every character in the "${el.storeRef}" store`;
     case "useGroup":
       return `a jump to the "${el.groupName}" group`;
+    case "layer":
+    case "set":
+    case "save":
+    case "reset":
+    case "call":
+    case "return":
+      // Shown as written, exactly as the raw element or fragment they replace was.
+      return fmtOutputElement(el);
     case "raw":
       if (isNulOutput(el)) return "nothing";
       if (isBareContextOutput(el)) return "the existing text, unchanged";
@@ -253,6 +265,15 @@ function describeOpaqueRule(rule: IRRule): string {
       ? "When a rule in this group has matched"
       : "When nothing else in this group matched";
     return `${when}, processing moves to the ${name} group — a group transition, not a keystroke rule.`;
+  }
+  // Rules the codec used to keep as option-store / call-return fragments get the
+  // sentence those fragments had.
+  const out = shapeOutput(rule);
+  if (out.some((el) => el.kind === "set" || el.kind === "save" || el.kind === "reset")) {
+    return OPAQUE_REASON_LANGUAGE["option-store-directive"] as string;
+  }
+  if (out.some((el) => el.kind === "call" || el.kind === "return")) {
+    return OPAQUE_REASON_LANGUAGE["call-return"] as string;
   }
   return "This rule has a shape the assist layer doesn't recognise yet — it is shown as written.";
 }

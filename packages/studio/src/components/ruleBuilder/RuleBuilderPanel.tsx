@@ -133,6 +133,9 @@ function fmtContextElement(el: ContextElement): string {
     case "if":
       // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
       return `if(${el.store} = '${el.value}')`;
+    case "platform":
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
+      return `platform('${el.value}')`;
     case "raw":
       return el.text;
   }
@@ -159,6 +162,23 @@ function fmtOutputElement(el: OutputElement): string {
       return `outs(${el.storeRef})`;
     case "useGroup":
       return `use(${el.groupName})`;
+    case "layer":
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
+      return `layer('${el.value}')`;
+    case "set":
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
+      return `set(${el.storeRef} = ${el.value.map(fmtOutputElement).join(" ")})`;
+    case "save":
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
+      return `save(${el.storeRef})`;
+    case "reset":
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
+      return `reset(${el.storeRef})`;
+    case "call":
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
+      return `call(${el.storeRef})`;
+    case "return":
+      return "return";
     case "raw":
       return el.text;
   }

@@ -73,6 +73,7 @@
 import type { KeyboardIR, IRStore, OutputElement } from "../keyboard-ir.js";
 import { contextHasDirectBackspace } from "./backspaceContext.js";
 import { ruleContextElements } from "../rule-shape.js";
+import { storeHasOuts } from "./outsStores.js";
 
 // ---------------------------------------------------------------------------
 // Options
@@ -143,6 +144,9 @@ function flushRun(run: string[], collector: Set<string>, includeSpace: boolean):
 
 /** Expand all char items from a store into the collector (individual, no run-merge). */
 function expandStore(store: IRStore, collector: Set<string>, includeSpace: boolean): void {
+  // A store holding `outs(other)` was an opaque fragment before spec 116 typed it, so
+  // this walk never expanded it. THIS VIEW IS FROZEN (see the header): it still does not.
+  if (storeHasOuts(store)) return;
   for (const item of store.items) {
     if (item.kind === "char") {
       // Store items are individual entries (lookup table); NFC each one alone.
@@ -153,7 +157,7 @@ function expandStore(store: IRStore, collector: Set<string>, includeSpace: boole
         }
       }
     }
-    // vkey, deadkey, namedDeadkey, any, raw — not literal output glyphs; skip
+    // vkey, deadkey, namedDeadkey, any, outs, raw — not literal output glyphs; skip
   }
 }
 
@@ -236,6 +240,18 @@ export function collectFromElements(
 
       case "useGroup":
         // Group transition — control flow, not a glyph. Flush buffered run.
+        flushRun(run, collector, includeSpace);
+        break;
+
+      case "layer":
+      case "set":
+      case "save":
+      case "reset":
+      case "call":
+      case "return":
+        // Layer switch, store statement, call/return (spec 116): control or
+        // state, not a glyph. These were `raw` elements before they were
+        // typed, and `raw` flushes the run, so flush here too.
         flushRun(run, collector, includeSpace);
         break;
 

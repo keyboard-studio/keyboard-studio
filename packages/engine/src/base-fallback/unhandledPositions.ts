@@ -11,6 +11,7 @@
 // give AltGr). Rules in every `using keys` group count, reachable or not.
 
 import { US_BASE_LAYOUT, ruleKeystroke, ruleLhsKind } from "@keyboard-studio/contracts";
+import { withoutOutsStores } from "@keyboard-studio/contracts";
 import type { KeyboardIR, StoreItem } from "@keyboard-studio/contracts";
 
 export type PositionState = "none" | "shift" | "altgr" | "shiftAltgr";
@@ -69,7 +70,9 @@ function coverItem(covered: Set<string>, el: { kind: string; name?: string; valu
  * `ir` names, in `vkeys` order, then state order. Case of a vkey is ignored (`K_oE2` is
  * `K_OE2`).
  */
-export function enumerateUnhandledPositions(ir: KeyboardIR, vkeys: Iterable<string>): UnhandledPosition[] {
+export function enumerateUnhandledPositions(source: KeyboardIR, vkeys: Iterable<string>): UnhandledPosition[] {
+  // Reads `any(store)` items by position: read without outs() stores (see withoutOutsStores).
+  const ir = withoutOutsStores(source);
   const covered = new Set<string>();
   for (const g of ir.groups) {
     if (!g.usingKeys) continue;

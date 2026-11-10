@@ -3,8 +3,9 @@
  * (specs/116-ng-parser-adoption/evidence/reader-differential.md, spec 116 T045),
  * so later drift fails. Over every corpus .kmn (root: env KS_KEYBOARDS, else
  * the sibling `keyboards` checkout) and every engine `.kmn` fixture:
- *   1. the fragment count per opaque reason equals the report's "New" column;
- *   2. the comment count per anchor equals the report's "New" column;
+ *   1. the fragment count per opaque reason equals the report's "Phase 6 (US3)" After column
+ *      (the final comparison's New column, moved by the typed members of spec 116 phase 6);
+ *   2. the comment count per anchor equals the report's "Phase 6 (US3)" After column;
  *   3. every rule line the grammar rejects is an allow-list.json entry, and
  *      every entry is still used;
  *   4. no file fails to import.
@@ -32,9 +33,9 @@ const allowList = JSON.parse(fs.readFileSync(path.join(EVIDENCE_DIR, "allow-list
 };
 const report = fs.readFileSync(path.join(EVIDENCE_DIR, "reader-differential.md"), "utf8");
 
-/** The "New" column of the report table under `heading`, keyed by its first column. */
+/** The last column of the report table under the heading line `heading` (hashes included), keyed by its first column. */
 function reportColumn(heading: string): Map<string, number> {
-  const section = report.split(`## ${heading}`)[1]?.split("\n## ")[0] ?? "";
+  const section = report.split(`\n${heading}\n`)[1]?.split("\n#")[0] ?? "";
   const out = new Map<string, number>();
   for (const m of section.matchAll(/^\| `([^`]+)` \| \d+ \| (\d+) \|$/gm)) {
     if (m[2] !== "0") out.set(m[1]!, Number(m[2]));
@@ -108,8 +109,8 @@ describe(".kmn reader holds the final comparison's numbers (corpus and fixtures)
 
     expect(failures).toEqual([]);
     if (rootExists) {
-      expect(sorted(reasons)).toEqual(sorted(reportColumn("Fragment reasons, old against new")));
-      expect(sorted(anchors)).toEqual(sorted(reportColumn("Comments by anchor, old against new")));
+      expect(sorted(reasons)).toEqual(sorted(reportColumn("### Phase 6 fragment reasons")));
+      expect(sorted(anchors)).toEqual(sorted(reportColumn("### Phase 6 comments by anchor")));
     }
   }, 900_000);
 });

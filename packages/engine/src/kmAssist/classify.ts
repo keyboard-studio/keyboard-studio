@@ -77,12 +77,17 @@ export function isIndexedContextOutput(el: OutputElement): boolean {
 
 /** Context-side `platform('…')` guard — a platform modifier, not shape. */
 export function isPlatformGuard(el: ContextElement): boolean {
-  return el.kind === "raw" && hasRawCallPrefix(rawText(el), "platform");
+  return el.kind === "platform" || (el.kind === "raw" && hasRawCallPrefix(rawText(el), "platform"));
 }
 
 /** Output-side `layer('…')` directive — a touch-layer modifier, not shape. */
 export function isLayerDirective(el: OutputElement): boolean {
-  return el.kind === "raw" && hasRawCallPrefix(rawText(el), "layer");
+  return el.kind === "layer" || (el.kind === "raw" && hasRawCallPrefix(rawText(el), "layer"));
+}
+
+/** Output-side `set` / `save` / `reset` / `call` / `return` — option-store and flow statements. */
+export function isOptionStoreOrCallOutput(el: OutputElement): boolean {
+  return el.kind === "set" || el.kind === "save" || el.kind === "reset" || el.kind === "call" || el.kind === "return";
 }
 
 /**
@@ -169,6 +174,9 @@ export function classifyRuleKind(rule: IRRule): RuleKind {
   }
   // `use(group)` in output is a control-flow jump, not produced output.
   if (out.some((el) => el.kind === "useGroup")) return "opaque";
+  // Option-store statements and call/return were whole-rule opaque fragments
+  // before they were typed; the assist layer still cannot describe them.
+  if (out.some(isOptionStoreOrCallOutput)) return "opaque";
 
   // An empty output side is malformed — nothing honest to say about it.
   if (out.length === 0) return "opaque";

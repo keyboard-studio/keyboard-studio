@@ -92,6 +92,12 @@ function firstProducedCodepoint(
       case "nul":
       case "context":
       case "useGroup":
+      case "layer":
+      case "set":
+      case "save":
+      case "reset":
+      case "call":
+      case "return":
       case "raw":
         return undefined;
       default:

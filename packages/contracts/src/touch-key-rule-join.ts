@@ -224,7 +224,9 @@ export function classifyTouchRuleRole(output: readonly { kind: string; text?: st
   );
   if (allWiring) return "transitions";
 
-  if (output.some((el) => el.kind === "raw")) return "opaque";
+  // A typed `layer` and the option-store / call statements were raw elements or
+  // whole-rule fragments before they were typed; they classify as opaque still.
+  if (output.some((el) => el.kind === "raw" || el.kind === "layer" || el.kind === "set" || el.kind === "save" || el.kind === "reset" || el.kind === "call" || el.kind === "return")) return "opaque";
 
   return "produces";
 }

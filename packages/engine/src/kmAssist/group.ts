@@ -55,6 +55,7 @@ import type {
   OutputElement,
 } from "@keyboard-studio/contracts";
 import { assertNever } from "@keyboard-studio/contracts";
+import { fmtContextElement } from "../codec/emit.js";
 import { isPlusSeparator, ruleKeystrokeLoose } from "@keyboard-studio/contracts";
 import {
   classifyRuleKind,
@@ -127,6 +128,8 @@ function guardToken(el: ContextElement): string {
       return `baselayout:${el.value}`;
     case "if":
       return `if:${el.store}=${el.value}`;
+    case "platform":
+      return `raw:${fmtContextElement(el)}`; // the token its raw element had
     case "vkey":
       return `vkey:${el.name}`;
     case "raw":
@@ -155,6 +158,8 @@ function displayGuard(el: ContextElement): string {
       return `baselayout('${el.value}')`;
     case "if":
       return `if(${el.store} = '${el.value}')`;
+    case "platform":
+      return fmtContextElement(el);
     case "vkey":
       return `[${el.name}]`;
     case "raw":
@@ -185,6 +190,8 @@ function describeGuards(guards: ContextElement[]): string {
           return `the “${el.value}” base layout`;
         case "if":
           return `the “${el.store}” store is set to “${el.value}”`;
+        case "platform":
+          return fmtContextElement(el);
         case "vkey":
           return describeKey(el.name, el.modifiers);
         case "raw":
@@ -222,6 +229,13 @@ function outputToken(el: OutputElement): string {
       return "outs";
     case "useGroup":
       return "useGroup";
+    case "layer":
+    case "set":
+    case "save":
+    case "reset":
+    case "call":
+    case "return":
+      return "raw"; // the shape token their raw elements had
     case "raw":
       if (isNulOutput(el)) return "nul";
       if (isBareContextOutput(el)) return "context";

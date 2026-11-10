@@ -7,7 +7,7 @@
 
 import type { ContextElement, KeyboardIR, OutputElement, StoreItem } from "@keyboard-studio/contracts";
 
-import { isNamedDeadkeyName, hasRawCallPrefix } from "@keyboard-studio/contracts";
+import { isNamedDeadkeyName, hasRawCallPrefix, classifyRawElement } from "@keyboard-studio/contracts";
 
 import { OPAQUE_REASONS, type OpaqueReason } from "./opaque-reasons.js";
 
@@ -235,6 +235,63 @@ export function parseBaselayout(tok: string): string | null {
 /** Parse outs(storeName) → storeName, or null. */
 export const parseOuts = makeStoreParser("outs");
 
+/** Parse save(storeName) → storeName, or null. */
+export const parseSave = makeStoreParser("save");
+
+/** Parse reset(storeName) → storeName, or null. */
+export const parseReset = makeStoreParser("reset");
+
+/** Parse call(storeName) → storeName, or null. */
+export const parseCall = makeStoreParser("call");
+
+/** Whether a token is the bare `return` statement. */
+export function isReturnToken(tok: string): boolean {
+  return /^return$/i.test(tok);
+}
+
+/** Parse layer('name') (a quoted literal argument only) → name, or null. */
+export function parseLayer(tok: string): string | null {
+  const c = classifyRawElement(tok);
+  return c.kind === "layer" ? c.value : null;
+}
+
+/** Parse platform('name') (a quoted literal argument only) → name, or null. */
+export function parsePlatform(tok: string): string | null {
+  const c = classifyRawElement(tok);
+  return c.kind === "platform" ? c.value : null;
+}
+
+const SET_RE = new RegExp(String.raw`^set\s*\(\s*(${KMN_IDENT})\s*=\s*([\s\S]*?)\s*\)$`, "i");
+
+/**
+ * Parse set(store = value) → {storeRef, value}, or null. The value is the
+ * grammar's `text+`: quoted strings, U+ codepoints, deadkeys and outs(store).
+ * Anything else in the value (or no value at all) is not typed: null.
+ */
+export function parseSet(tok: string): { storeRef: string; value: OutputElement[] } | null {
+  const m = SET_RE.exec(tok);
+  if (!m) return null;
+  const parts = splitTokens(m[2] ?? "");
+  if (parts.length === 0) return null;
+  const value: OutputElement[] = [];
+  for (const part of parts) {
+    const cp = parseCodepoint(part);
+    if (cp !== null) { value.push({ kind: "char", value: cp }); continue; }
+    if (isQuoted(part)) {
+      for (const ch of unquote(part)) value.push({ kind: "char", value: ch });
+      continue;
+    }
+    const named = parseNamedDk(part);
+    if (named !== null) { value.push({ kind: "namedDeadkey", name: named }); continue; }
+    const dk = parseDk(part);
+    if (dk !== null) { value.push({ kind: "deadkey", id: dk }); continue; }
+    const outs = parseOuts(part);
+    if (outs !== null) { value.push({ kind: "outs", storeRef: outs }); continue; }
+    return null;
+  }
+  return { storeRef: m[1] ?? "", value };
+}
+
 // Compiled once — parseIfGuard runs on every if(...) context token.
 /** Parse `if(store = 'value')` (equality form only) → {store, value}, or null. */
 export const IF_GUARD_RE = new RegExp(
@@ -252,7 +309,7 @@ export function parseIfGuard(tok: string): { store: string; value: string } | nu
  * True when every element parsed so far belongs to a rule's head cluster —
  * the only position a guard may be typed in (spec 103): leading guards
  * themselves, a `baselayout` head element, or a `platform(...)` head element
- * (which the codec carries as a raw element). A guard after any content
+ * (typed, or raw when its argument is not a quoted literal). A guard after any content
  * element or after the `+` keystroke separator (also a raw element) is not
  * typed; the caller keeps the rule opaque.
  */
@@ -261,6 +318,7 @@ export function isHeadClusterSoFar(elements: ContextElement[]): boolean {
     (el) =>
       el.kind === "if" ||
       el.kind === "baselayout" ||
+      el.kind === "platform" ||
       (el.kind === "raw" && hasRawCallPrefix(el.text, "platform")),
   );
 }
@@ -486,15 +544,16 @@ export function parseStoreItems(
       i++;
       continue;
     }
-    // outs(store) — inline expansion of another store's content. The typed
-    // store-item model can't represent it, so (like parseOutputElements, which
-    // classifies the same token as OPAQUE_REASONS.OUTS_EXPANSION) mark the whole
-    // store opaque. Checked before the raw fallback so "outs(...)" is preserved
-    // verbatim as a RawKmnFragment rather than emitted as literal store content
-    // — which would produce broken .kmn once the store is referenced via
-    // any()/notany().
-    if (parseOuts(tok) !== null) {
-      return { items, opaqueReason: OPAQUE_REASONS.OUTS_EXPANSION };
+    // outs(store) — inline expansion of another store's content, kept as a
+    // typed reference (spec 116); resolveStoreItems expands it where an
+    // analysis needs the content. Checked before the raw fallback so
+    // "outs(...)" is never emitted as literal store content, which would
+    // produce broken .kmn once the store is referenced via any()/notany().
+    const storeOuts = parseOuts(tok);
+    if (storeOuts !== null) {
+      items.push({ kind: "outs", storeRef: storeOuts });
+      i++;
+      continue;
     }
     // if(...) / save|set|reset(...) / call(...) / return — option-store and
     // flow directives. These are not valid store-body content, but a malformed
@@ -598,7 +657,9 @@ export function sketchStoreItems(
  */
 export function parseContextElements(
   toks: string[],
-  opaqueOut: { reason: string | null }
+  opaqueOut: { reason: string | null },
+  /** Context elements already read before these tokens (head-position checks look at them too). */
+  prior: readonly ContextElement[] = [],
 ): ContextElement[] | null {
   const elements: ContextElement[] = [];
   for (const tok of toks) {
@@ -691,7 +752,7 @@ export function parseContextElements(
     // the existing reason (FR-003): never mistyped, never dropped.
     if (/^if\s*\(/i.test(tok)) {
       const guard = parseIfGuard(tok);
-      if (guard !== null && isHeadClusterSoFar(elements)) {
+      if (guard !== null && isHeadClusterSoFar([...prior, ...elements])) {
         elements.push({ kind: "if", store: guard.store, value: guard.value });
         continue;
       }
@@ -707,6 +768,13 @@ export function parseContextElements(
     if (/^call\s*\(/i.test(tok) || /^return$/i.test(tok)) {
       opaqueOut.reason = OPAQUE_REASONS.CALL_RETURN;
       return null;
+    }
+    // platform('x') — typed in head position only, with a quoted literal
+    // argument; anywhere else (or malformed) it stays a raw element.
+    const platformValue = parsePlatform(tok);
+    if (platformValue !== null && isHeadClusterSoFar([...prior, ...elements])) {
+      elements.push({ kind: "platform", value: platformValue });
+      continue;
     }
     // unknown — wrap as raw
     elements.push({ kind: "raw", text: tok });
@@ -838,21 +906,47 @@ export function parseOutputElementsCore(
       elements.push({ kind: "useGroup", groupName: useRef });
       continue;
     }
-    // save/set/reset — opaque; not producible content (the quoted value stays
-    // inside the paren-group token, so it cannot leak as a char element).
+    // layer('x') — typed in strict mode (spec 116). The lenient sketch keeps
+    // the raw placeholder it always had, so a fragment's producedOutput is unchanged.
+    if (mode === "strict") {
+      const layerValue = parseLayer(tok);
+      if (layerValue !== null) {
+        elements.push({ kind: "layer", value: layerValue });
+        continue;
+      }
+    }
+    // save/set/reset — typed in strict mode (spec 116); not producible content
+    // (the quoted value stays inside the paren-group token, so it cannot leak
+    // as a char element). A form the typed members cannot hold stays opaque
+    // under the same reason as before.
     if (/^(?:save|set|reset)\s*\(/i.test(tok)) {
       if (mode === "strict") {
-        opaqueOut.reason = OPAQUE_REASONS.OPTION_STORE_DIRECTIVE;
-        return null;
+        const saveRef = parseSave(tok);
+        const resetRef = parseReset(tok);
+        const setRef = parseSet(tok);
+        if (saveRef !== null) elements.push({ kind: "save", storeRef: saveRef });
+        else if (resetRef !== null) elements.push({ kind: "reset", storeRef: resetRef });
+        else if (setRef !== null) elements.push({ kind: "set", storeRef: setRef.storeRef, value: setRef.value });
+        else {
+          opaqueOut.reason = OPAQUE_REASONS.OPTION_STORE_DIRECTIVE;
+          return null;
+        }
+        continue;
       }
       elements.push({ kind: "raw", text: tok });
       continue;
     }
-    // call/return — opaque; not producible content
+    // call/return — typed in strict mode (spec 116); not producible content
     if (/^call\s*\(/i.test(tok) || /^return$/i.test(tok)) {
       if (mode === "strict") {
-        opaqueOut.reason = OPAQUE_REASONS.CALL_RETURN;
-        return null;
+        const callRef = parseCall(tok);
+        if (callRef !== null) elements.push({ kind: "call", storeRef: callRef });
+        else if (isReturnToken(tok)) elements.push({ kind: "return" });
+        else {
+          opaqueOut.reason = OPAQUE_REASONS.CALL_RETURN;
+          return null;
+        }
+        continue;
       }
       elements.push({ kind: "raw", text: tok });
       continue;

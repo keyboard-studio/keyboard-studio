@@ -81,13 +81,15 @@ function isNulElement(el: RuleElementLike): boolean {
 
 /**
  * A head-cluster condition: an `if()` guard, a `baselayout()` element or a
- * `platform(...)` element (carried by the codec as a raw element). These
+ * `platform(...)` element (typed, or a raw element when its argument is not
+ * a quoted literal or it is not in head position). These
  * produce no context character and are never the keystroke.
  */
 function isConditionElement(el: RuleElementLike): boolean {
   return (
     el.kind === "if" ||
     el.kind === "baselayout" ||
+    el.kind === "platform" ||
     (el.kind === "raw" && hasRawCallPrefix(el.text ?? "", "platform"))
   );
 }

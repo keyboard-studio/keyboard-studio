@@ -17,7 +17,7 @@ import type { ContextElement, IRGroup, IRRule, KeyboardIR } from "@keyboard-stud
 import { ruleConditions, ruleHasNulContext, ruleLhsKind, rulePreContext } from "@keyboard-studio/contracts";
 import type { CallGraph } from "./callGraph.js";
 import type { ItemSink } from "./items.js";
-import { parseLayerCall, parsePlatformCall, parseSetLayer, parseUseCall, isNulToken } from "./rawText.js";
+import { layerOf, platformOf, setLayerOf, parseUseCall, isNulToken } from "./rawText.js";
 import { findStore, platformTruth, storeLiterals } from "./ruleElements.js";
 
 /** A KMN layer name's modifier state on a hardware keyboard (one place, shared with the touch lowering). */
@@ -142,8 +142,8 @@ function classifyRule(
         guards.push(el);
         if (el.value !== "") falseGuard = true;
       } else guards.push(el);
-    } else if (el.kind === "raw" && parsePlatformCall(el.text) !== null) {
-      const t = platformTruth(parsePlatformCall(el.text) as string);
+    } else if (platformOf(el) !== null) {
+      const t = platformTruth(platformOf(el) as string);
       guards.push(el);
       if (!t.touch) falseGuard = true;
     } else if (el.kind === "baselayout") {
@@ -189,13 +189,11 @@ function outcomeOf(
         cur = [...next];
         continue;
       }
-      if (el.kind === "raw") {
-        const l = parseLayerCall(el.text) ?? parseSetLayer(el.text);
-        if (l !== null) {
-          cur = [l];
-          continue;
-        }
-      }
+    }
+    const l = layerOf(el) ?? setLayerOf(el);
+    if (l !== null) {
+      cur = [l];
+      continue;
     }
     // Any other output element is not a layer effect; a readonly group cannot output text.
   }

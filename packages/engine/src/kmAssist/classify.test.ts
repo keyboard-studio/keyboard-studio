@@ -130,7 +130,7 @@ describe("classifyRuleKind — sil_cameroon_qwerty shapes", () => {
 
   it("platform-guarded touch rule is context, not opaque", () => {
     const r = mustFind(rules, "platform touch", (fr) =>
-      fr.rule.context.some((el) => el.kind === "raw" && /platform/i.test(el.text ?? "")),
+      fr.rule.context.some((el) => el.kind === "platform" || (el.kind === "raw" && /platform/i.test(el.text ?? ""))),
     );
     expect(classifyRuleKind(r.rule)).toBe("context");
   });

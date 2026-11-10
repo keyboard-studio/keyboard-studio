@@ -317,7 +317,8 @@ function lowerContextNode(node: ASTNode, l: NgLine, out: ContextElement[], opaqu
       break;
   }
   // No fast path: read the element's exact source slice with the legacy reader.
-  const els = parseContextElements(splitTokens(nodeSlice(node, l), true), opaque);
+  // `out` is passed as the prior context so a head-position check (platform) sees the whole rule so far.
+  const els = parseContextElements(splitTokens(nodeSlice(node, l), true), opaque, out);
   if (els === null) return false;
   for (const e of els) out.push(e);
   return true;
@@ -696,7 +697,13 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
           if (currentGroup !== null) frag.groupNodeId = currentGroup.nodeId;
           rawFragments.push(frag);
         } else {
-          knownStoreItems.set(parsed.name.toLowerCase(), items);
+          // A store holding `outs()` references is typed, but later fragment sketches
+          // flatten through it: keep the flattened items, as the sketch of the
+          // fragment this store used to be.
+          const flat = items.some((it) => it.kind === "outs")
+            ? sketchStoreItems(parsed.rawValue, knownStoreItems)
+            : items;
+          if (flat !== undefined) knownStoreItems.set(parsed.name.toLowerCase(), flat);
           const irStore: IRStore = { nodeId: storeNodeId, name: parsed.name, items, isSystem: parsed.isSystem, sourceLine: tok.line };
           if (tok.targetSelector !== undefined) irStore.targetSelector = tok.targetSelector;
           if (parsed.trailingComment !== undefined) irStore.trailingComment = parsed.trailingComment;

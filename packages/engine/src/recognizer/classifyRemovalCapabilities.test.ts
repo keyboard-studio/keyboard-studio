@@ -688,11 +688,17 @@ describe("classifyRemovalCapabilities — §7.5 regression canaries", () => {
       recognizePatterns(ir);
       const map = classifyRemovalCapabilities(ir);
 
-      // sil_yoruba8 uses if()/set() directives → RawKmnFragment entries.
-      // At least one fragment must be labeled not-removable:opaque.
-      expect(ir.raw.length).toBeGreaterThan(0);
+      // sil_yoruba8 uses if()/set() directives. They were RawKmnFragment entries;
+      // spec 116 types set(), so those rules are typed and must keep the posture.
+      const statementRules = ir.groups
+        .flatMap((g) => g.rules)
+        .filter((r) => r.output.some((el) => el.kind === "set" || el.kind === "save" || el.kind === "reset" || el.kind === "call" || el.kind === "return"));
+      expect(ir.raw.length + statementRules.length).toBeGreaterThan(0);
       for (const frag of ir.raw) {
         expect(map.get(frag.nodeId)).toBe("not-removable:opaque");
+      }
+      for (const rule of statementRules) {
+        expect(map.get(rule.nodeId)).toBe("not-removable:opaque");
       }
     },
   );
@@ -951,5 +957,35 @@ describe("classifyRemovalCapabilities — named deadkey guard (#2238)", () => {
     expect(postDeleted).not.toContain("dk(acute");
     expect(postDeleted).toContain("store(acuteOut) 'áé'");
     expect(postDeleted).toContain("+ [K_B] > U+0062");
+  });
+});
+
+// Spec 116: set / save / reset / call / return are typed output elements. Such a rule was
+// a whole-rule RawKmnFragment (labelled not-removable:opaque) before, and keeps that label.
+describe("classifyRemovalCapabilities — typed statements keep the opaque posture", () => {
+  const SRC = [
+    "store(&NAME) 'T'",
+    "store(&VERSION) '14.0'",
+    "store(&TARGETS) 'any'",
+    "store(opt) '0'",
+    "begin Unicode > use(main)",
+    "group(main) using keys",
+    "+ [K_A] > 'a'",
+    "+ [K_B] > 'b' set(opt = '1')",
+    "+ [K_C] > save(opt)",
+    "+ [K_D] > reset(opt)",
+    "+ [K_E] > call(cb)",
+    "+ [K_F] > return",
+    "",
+  ].join("\n");
+
+  it("labels each statement rule not-removable:opaque, and leaves a plain rule alone", () => {
+    const { ir } = parse(SRC, "stmt");
+    expect(ir.raw).toEqual([]);
+    const map = classifyRemovalCapabilities(ir);
+    const rules = ir.groups.flatMap((g) => g.rules);
+    expect(rules).toHaveLength(6);
+    expect(map.get(rules[0]!.nodeId)).not.toBe("not-removable:opaque");
+    for (const rule of rules.slice(1)) expect(map.get(rule.nodeId)).toBe("not-removable:opaque");
   });
 });

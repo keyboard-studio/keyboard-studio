@@ -227,6 +227,10 @@ function outputElementsEqual(a: readonly OutputElement[], b: readonly OutputElem
     if (other === undefined || el.kind !== other.kind) return false;
     if (el.kind === "char" && other.kind === "char") return el.value === other.value;
     if (el.kind === "raw" && other.kind === "raw") return el.text === other.text;
+    // The typed layer / store / call statements were raw elements, compared by text.
+    if (el.kind === "layer" || el.kind === "set" || el.kind === "save" || el.kind === "reset" || el.kind === "call") {
+      return JSON.stringify(el) === JSON.stringify(other);
+    }
     return true;
   });
 }

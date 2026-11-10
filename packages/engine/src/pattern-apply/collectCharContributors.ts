@@ -101,6 +101,7 @@
 
 import type { ContextElement, IRRule, KeyboardIR, StoreItem } from "@keyboard-studio/contracts";
 import { collectFromElements, contextHasDirectBackspace, isBackspaceVkeyName } from "@keyboard-studio/contracts";
+import { withoutOutsStores } from "@keyboard-studio/contracts";
 import { elementAtOffset, isDeadkeyOnlyOutput, ruleContextElements } from "../shared/rule-shape.js";
 import { makeSlotId } from "./slotId.js";
 import { buildProducerIndex } from "./producerIndex.js";
@@ -545,6 +546,7 @@ function contextElementTokenDisplay(
     case 'index':
     case 'baselayout':
     case 'if':
+    case 'platform':
       // A guard produces no character, so it has no contributor token —
       // explicitly invisible here, never a dropped condition: this switch
       // only renders characters a context element contributes.
@@ -1869,9 +1871,11 @@ function setTaintScope(
 }
 
 export function collectTaintedContributors(
-  ir: KeyboardIR,
+  source: KeyboardIR,
   carved: ReadonlySet<string>,
 ): CharContributors {
+  // Pairs stores by position: read without outs() stores (see withoutOutsStores).
+  const ir = withoutOutsStores(source);
   // Normalize the carved set to NFC so comparisons are canonical.
   const R = new Set([...carved].map((g) => g.normalize('NFC')));
   const carvedDiagnostics = [...R].map((grapheme) => ({
@@ -1910,9 +1914,11 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
  * instead of once per character.
  */
 export function collectCharContributorsBatched(
-  ir: KeyboardIR,
+  source: KeyboardIR,
   targetChars: ReadonlySet<string>,
 ): Map<string, CharContributors> {
+  // Pairs stores by position: read without outs() stores (see withoutOutsStores).
+  const ir = withoutOutsStores(source);
   // Normalize targets to NFC so comparisons are canonical (mirrors
   // collectTaintedContributors' R normalization).
   const keys = [...new Set([...targetChars].map((c) => c.normalize('NFC')))];

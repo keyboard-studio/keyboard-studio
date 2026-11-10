@@ -155,7 +155,7 @@ describe("FR-009 vectors — typed guards round-trip", () => {
 
   // -------------------------------------------------------------------------
   // V3 — platform(...)-preceded guard (verbatim, khmer_angkor). The
-  // platform head element is carried as a raw element by the codec; both
+  // platform head element is a typed `platform` member (spec 116); both
   // guards after it are typed, in source order.
   // -------------------------------------------------------------------------
 
@@ -168,7 +168,7 @@ describe("FR-009 vectors — typed guards round-trip", () => {
     const ir = expectCleanGuardRoundTrip(text, "v3-khmer");
     const rule = allRules(ir)[0]!;
     expect(rule.context).toEqual([
-      { kind: "raw", text: "platform('touch')" },
+      { kind: "platform", value: "touch" },
       { kind: "if", store: "&newLayer", value: "" },
       { kind: "if", store: "&layer", value: "numeric" },
       { kind: "any", storeRef: "digit" },

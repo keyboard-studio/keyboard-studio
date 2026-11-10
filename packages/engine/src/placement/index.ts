@@ -83,6 +83,7 @@ function extractVkey(
       case "deadkey":
       case "namedDeadkey":
       case "baselayout":
+      case "platform":
       case "raw":
         // These can appear as pre-context chars (lookahead) — allow them but do
         // not prevent extraction if we already have a vkey.
@@ -128,7 +129,7 @@ function extractOutput(
       return { char: el.value, mechanism: "direct" };
     }
     if (el.kind === "beep") return null; // beep is not a character placement
-    if (el.kind === "outs" || el.kind === "raw") {
+    if (el.kind === "outs" || el.kind === "raw" || el.kind === "layer" || el.kind === "set" || el.kind === "save" || el.kind === "reset" || el.kind === "call" || el.kind === "return") {
       // Opaque — will be dropped downstream (SMP/PUA filter).
       return { char: "\0", mechanism: "opaque" };
     }

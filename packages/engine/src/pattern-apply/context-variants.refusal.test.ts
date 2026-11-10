@@ -235,7 +235,7 @@ describe("FR-010 refusal completeness", () => {
       HEADER,
       "group(main) using keys",
       "",
-      "'x' + 'y' > 'z' set(opt = '1')",
+      "'x' + 'y' > 'z' outs(opt)",
       "store(base) U+00E0",
       "store(key.act) ']'",
       "any(base) + any(key.act) > 'q'",
