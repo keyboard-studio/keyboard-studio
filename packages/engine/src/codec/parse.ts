@@ -1,9 +1,9 @@
 /**
  * KMN parser entry point: text -> KeyboardIR.
  *
- * For now this is the legacy reader (parse-legacy.ts). Spec 116 T040
- * switches it to the vendored Keyman parser front end plus lowering
- * (lower.ts); callers keep this import path and signature.
+ * Reads .kmn with the vendored Keyman parser front end and lowers the syntax
+ * tree to the IR (lower.ts, spec 116). The legacy reader (parse-legacy.ts) is
+ * kept only for the comparison suite until spec 116 US2 retires it.
  */
-export { parseLegacy as parse } from "./parse-legacy.js";
-export type { ParseResult } from "./parse-legacy.js";
+export { lower as parse } from "./lower.js";
+export type { ParseResult } from "./parse-shared.js";

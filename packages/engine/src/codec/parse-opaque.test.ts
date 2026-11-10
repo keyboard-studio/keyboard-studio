@@ -8,7 +8,9 @@ import { OPAQUE_REASONS } from "./opaque-reasons.js";
 //   2. outs(otherStore)    -> outs-expansion
 //   3. context(0)          -> indexed-context (degenerate offset; FR-004 types
 //                              context(N) with N > 1 in context position)
-//   4. U+1F600            -> smp-literal
+//   4. U+1F600            -> typed char (spec 116: the Keyman lexer reads SMP
+//                              literals as characters; smp-literal is no longer
+//                              produced and stays defined for persisted drafts)
 const OPAQUE_KMN = `store(&VERSION) '10.0'
 store(&NAME) 'Opaque Test'
 store(myFlag) 'x'
@@ -44,10 +46,16 @@ describe("parse opaque features", () => {
     expect(reasons).toContain(OPAQUE_REASONS.INDEXED_CONTEXT);
   });
 
-  it("produces RawKmnFragment for SMP literal U+1F600", () => {
+  // DELIBERATE FLIP (spec 116, allow-list class smp-literal-typed): the
+  // legacy reader opaqued SMP literals as smp-literal; the Keyman lexer reads
+  // U+1F600 as a character, so the rule is typed and no fragment exists.
+  it("types an SMP literal U+1F600 as a char — no smp-literal fragment (spec 116 flip)", () => {
     const { ir } = parse(OPAQUE_KMN, "opaque-test");
     const reasons = ir.raw.map(r => r.reason);
-    expect(reasons).toContain(OPAQUE_REASONS.SMP_LITERAL);
+    expect(reasons).not.toContain(OPAQUE_REASONS.SMP_LITERAL);
+    const main = ir.groups.find(g => g.name === "main");
+    const rule = main?.rules.find(r => r.context.some(c => c.kind === "vkey" && c.name === "K_D"));
+    expect(rule?.output).toEqual([{ kind: "char", value: "\u{1F600}" }]);
   });
 
   it("preserves sourceText verbatim in RawKmnFragment", () => {
@@ -65,12 +73,12 @@ describe("parse opaque features", () => {
 
   it("opaqueFeatures inventory reflects the counts", () => {
     const { opaqueFeatures } = parse(OPAQUE_KMN, "opaque-test");
-    // At least the 4 opaque reasons should appear
+    // The 3 opaque reasons should appear (the SMP literal is typed, spec 116)
     const features = opaqueFeatures.map(f => f.feature);
     expect(features).toContain(OPAQUE_REASONS.OPTION_STORE_DIRECTIVE);
     expect(features).toContain(OPAQUE_REASONS.OUTS_EXPANSION);
     expect(features).toContain(OPAQUE_REASONS.INDEXED_CONTEXT);
-    expect(features).toContain(OPAQUE_REASONS.SMP_LITERAL);
+    expect(features).not.toContain(OPAQUE_REASONS.SMP_LITERAL);
   });
 
   it("non-opaque rules are NOT in raw fragments", () => {
@@ -123,7 +131,7 @@ group(main) using keys
 });
 
 // ---------------------------------------------------------------------------
-// P1-D: System store with SMP content becomes RawKmnFragment
+// P1-D: System store with SMP content (typed since spec 116)
 // ---------------------------------------------------------------------------
 
 describe("parse opaque — SMP in system store (P1-D)", () => {
@@ -137,10 +145,14 @@ group(main) using keys
 + [K_A] > U+0061
 `;
 
-  it("produces RawKmnFragment (not a corrupted system store) for store(&NAME) U+1F600", () => {
+  // DELIBERATE FLIP (spec 116, class smp-literal-typed): the store was an
+  // smp-literal fragment; now it is a typed system store whose item is the
+  // astral character itself, never a corrupted (surrogate-split) value.
+  it("types store(&NAME) U+1F600 as a system store with one astral char item (spec 116 flip)", () => {
     const { ir } = parse(SMP_SYS_STORE_KMN, "smp-sys-store-test");
-    const reasons = ir.raw.map(r => r.reason);
-    expect(reasons).toContain(OPAQUE_REASONS.SMP_LITERAL);
+    expect(ir.raw.map(r => r.reason)).not.toContain(OPAQUE_REASONS.SMP_LITERAL);
+    const name = ir.stores.find(st => st.isSystem && st.name === "NAME");
+    expect(name?.items).toEqual([{ kind: "char", value: "\u{1F600}" }]);
   });
 });
 

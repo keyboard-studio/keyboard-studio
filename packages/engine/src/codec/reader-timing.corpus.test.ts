@@ -55,6 +55,9 @@ describe.skipIf(!rootExists)("reader timing baseline (parse)", () => {
 
 const BUDGET_SLOWEST_MS = 300;
 const BUDGET_FACTOR = 2;
+/** Full reader path (T040): owner-accepted total factor and per-MB file cap. */
+const FULL_PATH_FACTOR = 2.5;
+const FULL_PATH_MS_PER_MB = 150;
 
 /** The recorded baseline total (ms), from the evidence file. */
 function recordedBaselineTotalMs(): number {
@@ -95,5 +98,24 @@ describe.skipIf(!rootExists || !perfRun)("reader speed budget (lex + per-line pa
     );
     expect(t.totalMs).toBeLessThanOrEqual(BUDGET_FACTOR * baseline);
     expect(t.slowest.ms).toBeLessThanOrEqual(BUDGET_SLOWEST_MS);
+  }, 300_000);
+
+  // T040: the full reader path, parse() = lex + parse + lower. Owner rulings
+  // (2026-11-10): a missed per-file cap scales by size, so each file's cap is
+  // max(300 ms, 150 ms per MB); and the measured total (2.5-2.6 s under vitest,
+  // about 2.3x baseline) was accepted as close enough, so the full path's total
+  // budget is 2.5x baseline. See research R1.
+  it("the full reader (parse) stays within 2.5x baseline total and the per-MB file cap", () => {
+    const baseline = recordedBaselineTotalMs();
+    const t = timeReader(ROOT, (text, id) => parse(text, id));
+    const capFor = (file: string): number =>
+      Math.max(BUDGET_SLOWEST_MS, FULL_PATH_MS_PER_MB * (fs.statSync(path.join(ROOT, file)).size / 1_000_000));
+    const over = t.perFile.filter((p) => p.ms > capFor(p.file)).map((p) => `${p.file} ${p.ms.toFixed(0)} ms (cap ${capFor(p.file).toFixed(0)} ms)`);
+    console.log(
+      `[OK] parse() full path: ${t.totalMs.toFixed(0)} ms total (baseline ${baseline} ms, budget ${(FULL_PATH_FACTOR * baseline).toFixed(0)} ms), ` +
+        `slowest ${t.slowest.file} ${t.slowest.ms.toFixed(1)} ms (cap ${capFor(t.slowest.file).toFixed(0)} ms)`,
+    );
+    expect(t.totalMs).toBeLessThanOrEqual(FULL_PATH_FACTOR * baseline);
+    expect(over).toEqual([]);
   }, 300_000);
 });

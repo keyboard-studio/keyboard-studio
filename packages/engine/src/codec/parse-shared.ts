@@ -6,11 +6,17 @@
  * Moved verbatim from parse.ts (spec 116 T032); no behaviour change.
  */
 
-import type { ContextElement, OutputElement, StoreItem } from "@keyboard-studio/contracts";
+import type { ContextElement, KeyboardIR, OutputElement, StoreItem } from "@keyboard-studio/contracts";
 
 import { isNamedDeadkeyName } from "@keyboard-studio/contracts";
 
 import { OPAQUE_REASONS, type OpaqueReason } from "./opaque-reasons.js";
+
+/** What a .kmn reader returns: the IR and its opaque-feature inventory. */
+export interface ParseResult {
+  ir: KeyboardIR;
+  opaqueFeatures: Array<{ feature: string; count: number }>;
+}
 
 /** Parse a codepoint literal U+XXXX → string character, or return null. */
 export function parseCodepoint(tok: string): string | null {

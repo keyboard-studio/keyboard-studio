@@ -53,12 +53,15 @@ describe("parse — producedOutput sketch on rule-opaque fragments", () => {
     expect(buildProducedSet(ir).has("Z")).toBe(false);
   });
 
+  // Spec 116: an SMP literal alone no longer opaques a rule (it is typed), so
+  // the rule is made opaque by an option-store directive after it.
   it("SMP literal RHS decodes to a single astral char element", () => {
-    const { ir } = parseKmn(`+ [K_D] > U+1F600`);
+    const { ir } = parseKmn(`+ [K_D] > U+1F600 set(opt = '1')`);
     expect(ir.raw).toHaveLength(1);
-    expect(ir.raw[0]!.reason).toBe(OPAQUE_REASONS.SMP_LITERAL);
+    expect(ir.raw[0]!.reason).toBe(OPAQUE_REASONS.OPTION_STORE_DIRECTIVE);
     expect(ir.raw[0]!.producedOutput).toEqual([
       { kind: "char", value: "\u{1F600}" },
+      { kind: "raw", text: "set(opt = '1')" },
     ]);
   });
 
@@ -129,7 +132,8 @@ U+1402`,
   it("store-opaque fragments get no producedOutput (rule fragments only)", () => {
     const { ir } = parseKmn(
       `+ [K_A] > U+0061`,
-      `store(smp) U+10D24
+      // A bracketed menu literal stays opaque (an SMP store is typed since spec 116).
+      `store(menu) '[1ae 2a]'
 `,
     );
     expect(ir.raw).toHaveLength(1);

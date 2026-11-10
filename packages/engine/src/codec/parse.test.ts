@@ -274,12 +274,14 @@ describe("store-body range notation (spec 042)", () => {
       ]);
     });
 
-    it("C10: a standalone astral singleton keeps its existing smp-literal opaque handling", () => {
+    // DELIBERATE FLIP (spec 116, class smp-literal-typed): a standalone astral
+    // singleton was an smp-literal fragment; the Keyman lexer reads it as a
+    // character, so the store is typed with that one astral item.
+    it("C10: a standalone astral singleton is a typed char item (spec 116 flip)", () => {
       const { ir, opaqueFeatures } = parse(kmnWithStore("store(x) U+11680"), "single");
-      expect(ir.stores.some((s) => s.name === "x")).toBe(false);
-      const frag = ir.raw.find((f) => f.sourceText.includes("store(x)"));
-      expect(frag?.reason).toBe("smp-literal");
-      expect(opaqueFeatures).toContainEqual({ feature: "smp-literal", count: 1 });
+      const store = ir.stores.find((s) => s.name === "x");
+      expect(store?.items).toEqual([{ kind: "char", value: String.fromCodePoint(0x11680) }]);
+      expect(opaqueFeatures.some((f) => f.feature === "smp-literal")).toBe(false);
     });
   });
 

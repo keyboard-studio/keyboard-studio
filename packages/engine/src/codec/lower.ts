@@ -64,7 +64,7 @@ import {
   isReservedEntryGroup,
   parseBeginLine,
 } from "./parse-shared.js";
-import type { ParseResult } from "./parse-legacy.js";
+import type { ParseResult } from "./parse-shared.js";
 
 export type { ParseResult };
 
@@ -626,15 +626,19 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
     const lineStart = start;
     start = ti + 1;
 
-    // Raw source of the line (token columns index into it, BOM included).
-    const withBreak = nl.line ?? "";
-    const raw = withBreak.slice(0, withBreak.length - nl.text.length);
-    const unbommed = firstLine && raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
+    // Raw source of the line, final line break included (token columns index
+    // into it, BOM included; slices never reach the break). classifyLine trims,
+    // so a single physical line needs no copy.
+    const raw = nl.line ?? "";
+    const end = raw.length - nl.text.length;
+    const bom = firstLine && raw.charCodeAt(0) === 0xfeff ? 1 : 0;
     firstLine = false;
     let span = 1;
-    let joined = unbommed;
-    if (/[\r\n]/.test(unbommed)) {
-      const pieces = unbommed.split(LINE_BREAK_RE);
+    let joined = bom === 0 ? raw : raw.slice(1);
+    const cr = raw.indexOf("\r");
+    const lf = raw.indexOf("\n");
+    if ((cr >= 0 && cr < end) || (lf >= 0 && lf < end)) {
+      const pieces = raw.slice(bom, end).split(LINE_BREAK_RE);
       span = pieces.length;
       joined = joinPhysical(pieces);
     }

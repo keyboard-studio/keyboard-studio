@@ -104,7 +104,7 @@ describe("proposeContextVariants (spec 062, US1)", () => {
       HEADER,
       "group(main) using keys",
       "",
-      "U+1F600 + 'y' > 'z'",
+      "'x' + 'y' > 'z' set(opt = '1')",
       "store(base) U+00E0",
       "store(acute) U+00E2",
       "store(key.act) ']'",

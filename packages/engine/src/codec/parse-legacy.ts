@@ -44,16 +44,11 @@ import {
   isReservedEntryGroup,
   parseBeginLine,
 } from "./parse-shared.js";
+import type { ParseResult } from "./parse-shared.js";
+
+export type { ParseResult };
 
 
-// ---------------------------------------------------------------------------
-// Public types
-// ---------------------------------------------------------------------------
-
-export interface ParseResult {
-  ir: KeyboardIR;
-  opaqueFeatures: Array<{ feature: string; count: number }>;
-}
 
 // ---------------------------------------------------------------------------
 // Helpers

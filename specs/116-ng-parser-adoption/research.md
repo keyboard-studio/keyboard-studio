@@ -165,6 +165,13 @@ characters in Phase 2. Keys with modifiers in stores are left for the follow-on.
   flat 300 ms on the largest keyboards at T040, the per-file cap becomes a per-MB budget, so large
   keyboards are judged in proportion (the total stays at 2× baseline).
 
+- **T040 full-path budget (owner, 2026-11-10: "close enough on timing").** With `parse()` switched to
+  `lower()`, the full path (lex + parse + lower) measures 2,515-2,598 ms over the corpus under vitest
+  (about 2.3x the 1,104 ms baseline; the 2x budget is 2,208 ms), slowest `vietnamese_telex` (2.8 MB)
+  345-377 ms. The owner accepted the total as close enough: the full-path assertion is 2.5x baseline
+  (2,760 ms). The per-file cap scales by size as decided earlier: max(300 ms, 150 ms per MB), which
+  gives `vietnamese_telex` 415 ms. Both run opt-in under `KS_CORPUS_PERF=1` in their own CI step.
+
 - **Decision (comments, revising R2):** one lexer pass. The comment side-channel is a callback on
   non-emitted tokens, added in the same local lexer patch as the performance work. The two-pass wrap
   is rejected on the trial-run evidence.

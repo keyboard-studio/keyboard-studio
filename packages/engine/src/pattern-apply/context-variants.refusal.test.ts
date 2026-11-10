@@ -39,6 +39,39 @@ async function analyse(kmn: string, id: string) {
 
 describe("FR-010 refusal completeness", () => {
   it("refuses a compound key part (more than one element after '+')", async () => {
+    // Since spec 116 the codec preserves a multi-element keystroke as an opaque
+    // fragment, so the typed shape is built directly to keep this refusal covered.
+    const kmn = [
+      HEADER,
+      "group(main) using keys",
+      "",
+      "store(base) U+00E0",
+      "",
+      "+ 'a' > 'a'",
+      "",
+    ].join("\n");
+    const { ir } = parse(kmn, "refusal_compound_key");
+    ir.groups[0]!.rules.push({
+      nodeId: "rule#compound",
+      context: [
+        { kind: "any", storeRef: "base" },
+        { kind: "raw", text: "+" },
+        { kind: "char", value: "y" },
+        { kind: "char", value: "z" },
+      ],
+      output: [{ kind: "char", value: "q" }],
+    });
+    const report = await computeContextTolerance(ir);
+    const { variants } = await proposeContextVariants(ir, report);
+    const diacriticVariants = variants.filter((v) => !v.sourceRuleId.startsWith(BACKSPACE_UNWRAP_RULE_PREFIX));
+
+    const finding = report.findings.find((f) => f.notAnalysedReason?.includes("compound key part"));
+    expect(finding).toBeDefined();
+    expect(finding?.status).toBe("not-analysed");
+    expect(diacriticVariants).toHaveLength(0);
+  }, 30_000);
+
+  it("a compound key part in source is preserved opaque by the codec and never touched", async () => {
     const kmn = [
       HEADER,
       "group(main) using keys",
@@ -48,12 +81,10 @@ describe("FR-010 refusal completeness", () => {
       "any(base) + 'y' 'z' > 'q'",
       "",
     ].join("\n");
-    const { report, diacriticVariants } = await analyse(kmn, "refusal_compound_key");
+    const { ir, variants } = await analyse(kmn, "refusal_compound_key_source");
 
-    const finding = report.findings.find((f) => f.notAnalysedReason?.includes("compound key part"));
-    expect(finding).toBeDefined();
-    expect(finding?.status).toBe("not-analysed");
-    expect(diacriticVariants).toHaveLength(0);
+    expect(ir.raw.map((f) => f.reason)).toEqual(["multi-element-keystroke"]);
+    expect(variants.some((v) => v.sourceRuleId === ir.raw[0]!.nodeId)).toBe(false);
   }, 30_000);
 
   it("refuses notany() in the preceding context", async () => {
@@ -204,7 +235,7 @@ describe("FR-010 refusal completeness", () => {
       HEADER,
       "group(main) using keys",
       "",
-      "U+1F600 + 'y' > 'z'",
+      "'x' + 'y' > 'z' set(opt = '1')",
       "store(base) U+00E0",
       "store(key.act) ']'",
       "any(base) + any(key.act) > 'q'",
