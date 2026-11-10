@@ -61,24 +61,24 @@ splitter, an offset accessor that matches kmcmplib, and a lint guard (FR-032 to 
 
 ### Tests for User Story 5
 
-- [ ] T003 [P] [US5] Write unit tests in `packages/contracts/src/rule-shape.test.ts` for every reader in [contracts/rule-shape.md](contracts/rule-shape.md). Cover:
+- [x] T003 [P] [US5] Write unit tests in `packages/contracts/src/rule-shape.test.ts` for every reader in [contracts/rule-shape.md](contracts/rule-shape.md). Cover:
   - a rule with an inline `+`; one without; one with two `+`; a vkey before the `+`;
   - `any()` as the keystroke; a group that is not `using keys`; `match`/`nomatch`;
   - a leading `nul`; head `if()` guards; a non-head `if()` (stays in pre-context);
   - `elementAtOffset` on `if(...) any(s) + "k" > index(t,2)`, which must resolve 2 to the `any(s)` element.
-- [ ] T004 [P] [US5] Write unit tests in `packages/contracts/src/rule-shape.test.ts` for `makeRule` and `withRuleParts`. For each reader shape in T003, `makeRule(parts)` produces the exact rule object the current codec `parse()` produces for the same source. Use small `.kmn` snippets parsed through the engine codec in an engine-side test `packages/engine/src/shared/rule-shape-builders.test.ts`, because contracts cannot import the engine.
+- [x] T004 [P] [US5] Write unit tests in `packages/contracts/src/rule-shape.test.ts` for `makeRule` and `withRuleParts`. For each reader shape in T003, `makeRule(parts)` produces the exact rule object the current codec `parse()` produces for the same source. Use small `.kmn` snippets parsed through the engine codec in an engine-side test `packages/engine/src/shared/rule-shape-builders.test.ts`, because contracts cannot import the engine.
 
 ### Implementation for User Story 5
 
-- [ ] T005 [US5] Implement the readers in `packages/contracts/src/rule-shape.ts`: `ruleLhsKind`, `ruleHasNulContext`, `ruleConditions`, `rulePreContext`, `ruleKeystroke`, `ruleKeystrokeLoose`, `ruleExtraKeystrokeElements`, `elementAtOffset`. Build them by extracting the struck-key logic from `packages/contracts/src/touch-key-rule-join.ts` (lines ~311–420, 548–640), then apply the kmcmplib rule from research R5a:
+- [x] T005 [US5] Implement the readers in `packages/contracts/src/rule-shape.ts`: `ruleLhsKind`, `ruleHasNulContext`, `ruleConditions`, `rulePreContext`, `ruleKeystroke`, `ruleKeystrokeLoose`, `ruleExtraKeystrokeElements`, `elementAtOffset`. Build them by extracting the struck-key logic from `packages/contracts/src/touch-key-rule-join.ts` (lines ~311–420, 548–640), then apply the kmcmplib rule from research R5a:
   - the keystroke is the one element after the separator, or the last element when there is no separator;
   - there is no keystroke outside `using keys` groups;
   - offsets are 1-based over `[nul?, ...conditions, ...preContext, keystroke?]`.
 
   The readers use structural types only, as the file header requires. Make T003 pass.
-- [ ] T006 [US5] Implement `makeRule` and `withRuleParts` in `packages/contracts/src/rule-shape.ts`, per [contracts/rule-shape.md](contracts/rule-shape.md) §Writers. The separator is written only when there is a pre-context or conditions **and** a keystroke in a `using keys` group. Make T004 pass.
-- [ ] T007 [US5] Re-export the new functions from `packages/engine/src/shared/rule-shape.ts`, as `isPlusSeparator` is re-exported today.
-- [ ] T008 [US5] Write the equivalence corpus test `packages/engine/src/shared/rule-shape-equivalence.corpus.test.ts`. Copy the **current inline logic** of each of the five splitters into the test, as reference functions that never ship:
+- [x] T006 [US5] Implement `makeRule` and `withRuleParts` in `packages/contracts/src/rule-shape.ts`, per [contracts/rule-shape.md](contracts/rule-shape.md) §Writers. The separator is written only when there is a pre-context or conditions **and** a keystroke in a `using keys` group. Make T004 pass.
+- [x] T007 [US5] Re-export the new functions from `packages/engine/src/shared/rule-shape.ts`, as `isPlusSeparator` is re-exported today.
+- [x] T008 [US5] Write the equivalence corpus test `packages/engine/src/shared/rule-shape-equivalence.corpus.test.ts`. Copy the **current inline logic** of each of the five splitters into the test, as reference functions that never ship:
   - `touch-key-rule-join.ts` struck key;
   - `ldml-export/classify/keystrokes.ts` `splitRule`;
   - `kmAssist/group.ts` `splitGuards`;
@@ -86,7 +86,7 @@ splitter, an offset accessor that matches kmcmplib, and a lint guard (FR-032 to 
   - `base-fallback/unhandledPositions.ts`.
 
   Parse every corpus `.kmn`. For each rule, compare each reference with `ruleKeystroke`/`rulePreContext`, and write every disagreement (file, line, rule text, splitter, old answer, new answer) to `specs/116-ng-parser-adoption/evidence/splitter-disagreements.md`. The test fails only on a disagreement that research R5a's kmcmplib rule does not explain. Commit the evidence file.
-- [ ] T009 [US5] Replace the 6 inline copies of the `+` predicate with `isPlusSeparator` or the accessors, in:
+- [x] T009 [US5] Replace the 6 inline copies of the `+` predicate with `isPlusSeparator` or the accessors, in:
   - `packages/studio/src/lib/docContent.ts:200`
   - `packages/studio/src/components/ruleBuilder/RuleBuilderPanel.tsx:175`
   - `packages/engine/src/pattern-apply/carveSuppression.ts:236,355`
@@ -95,11 +95,11 @@ splitter, an offset accessor that matches kmcmplib, and a lint guard (FR-032 to 
   - `packages/engine/src/validator/layer-a-prime.ts:784`
 
   Run each file's tests.
-- [ ] T010 [US5] Migrate `packages/contracts/src/touch-key-rule-join.ts` onto the accessors. Its struck-key and offset code becomes calls to `ruleKeystroke` and `elementAtOffset`. Keep its exported behaviour except for disagreements recorded in T008. Update `packages/contracts/src/touch-key-rule-join.test.ts` expectations only for those recorded rules.
-- [ ] T011 [P] [US5] Migrate the LDML classifier readers onto the accessors. Delete `splitRule`'s private splitting (FR-034 single splitter) in `packages/engine/src/ldml-export/classify/keystrokes.ts`. Also migrate `packages/engine/src/ldml-export/classify/ruleElements.ts` (the offset sites at 149–169, 246–247, 342, 490 use `elementAtOffset`), `packages/engine/src/ldml-export/classify/layerRules.ts:100` and `packages/engine/src/ldml-export/lower/transforms.ts:126–212`. LDML classifier fixtures must produce identical output, except for recorded disagreements.
-- [ ] T012 [P] [US5] Migrate kmAssist onto the accessors, deleting the duplicated splitters, in `packages/engine/src/kmAssist/group.ts` (~233, 411), `packages/engine/src/kmAssist/explain.ts` (173–187) and `packages/engine/src/kmAssist/classify.ts` (85–96).
-- [ ] T013 [P] [US5] Migrate the contracts IR utilities: `packages/contracts/src/ir/outputRepertoire.ts` (135–241; replace `splitContext`), `packages/contracts/src/ir/deadkeys.ts:170`, `packages/contracts/src/ir/casedKeys.ts:224` and `packages/contracts/src/keyBudget.ts:94`.
-- [ ] T014 [P] [US5] Migrate the engine readers:
+- [x] T010 [US5] Migrate `packages/contracts/src/touch-key-rule-join.ts` onto the accessors. Its struck-key and offset code becomes calls to `ruleKeystroke` and `elementAtOffset`. Keep its exported behaviour except for disagreements recorded in T008. Update `packages/contracts/src/touch-key-rule-join.test.ts` expectations only for those recorded rules.
+- [x] T011 [P] [US5] Migrate the LDML classifier readers onto the accessors. Delete `splitRule`'s private splitting (FR-034 single splitter) in `packages/engine/src/ldml-export/classify/keystrokes.ts`. Also migrate `packages/engine/src/ldml-export/classify/ruleElements.ts` (the offset sites at 149–169, 246–247, 342, 490 use `elementAtOffset`), `packages/engine/src/ldml-export/classify/layerRules.ts:100` and `packages/engine/src/ldml-export/lower/transforms.ts:126–212`. LDML classifier fixtures must produce identical output, except for recorded disagreements.
+- [x] T012 [P] [US5] Migrate kmAssist onto the accessors, deleting the duplicated splitters, in `packages/engine/src/kmAssist/group.ts` (~233, 411), `packages/engine/src/kmAssist/explain.ts` (173–187) and `packages/engine/src/kmAssist/classify.ts` (85–96).
+- [x] T013 [P] [US5] Migrate the contracts IR utilities: `packages/contracts/src/ir/outputRepertoire.ts` (135–241; replace `splitContext`), `packages/contracts/src/ir/deadkeys.ts:170`, `packages/contracts/src/ir/casedKeys.ts:224` and `packages/contracts/src/keyBudget.ts:94`.
+- [x] T014 [P] [US5] Migrate the engine readers:
   - `packages/engine/src/deadkey-lifecycle/cluster.ts` (44–101)
   - `packages/engine/src/base-fallback/unhandledPositions.ts` (48–53)
   - `packages/engine/src/osk/generate-kvks.ts:104`
@@ -107,7 +107,7 @@ splitter, an offset accessor that matches kmcmplib, and a lint guard (FR-032 to 
   - `packages/engine/src/placement/filters.ts:183`
   - `packages/engine/src/caps/compareCaps.ts:91`
   - `packages/engine/src/scaffolder/scaffoldTouchLayout.ts` (248–490)
-- [ ] T015 [P] [US5] Migrate the engine offset readers onto `elementAtOffset`:
+- [x] T015 [P] [US5] Migrate the engine offset readers onto `elementAtOffset`:
   - `packages/engine/src/pattern-apply/collectCharContributors.ts` (595–598)
   - `packages/engine/src/pattern-apply/applyStoreSlotRemovals.ts` (378, 494–510)
   - `packages/engine/src/pattern-apply/applyCarveKeycapRemovalsToVfs.ts` (169–176)
@@ -116,8 +116,8 @@ splitter, an offset accessor that matches kmcmplib, and a lint guard (FR-032 to 
   - `packages/engine/src/recognizer/s02-families.ts` (67, 169)
   - `packages/engine/src/recognizer/s06-families.ts` (75, 100)
   - `packages/engine/src/strategy-selector/import-mark-order.ts` (94, 117)
-- [ ] T016 [US5] **Own commit.** Migrate the two recognizer rules that read raw, unfiltered offsets, `packages/engine/src/recognizer/rules/parallel-index-fanout.ts:41` and `packages/engine/src/recognizer/rules/s02-deadkey-single-tap.ts:31`, onto `elementAtOffset`/`rulePreContext`. These rules will now match rules containing a `+` (research R5b). List the newly recognised corpus rules in the commit message, and update recognizer test expectations only for those.
-- [ ] T017 [P] [US5] Migrate the studio readers:
+- [x] T016 [US5] **Own commit.** Migrate the two recognizer rules that read raw, unfiltered offsets, `packages/engine/src/recognizer/rules/parallel-index-fanout.ts:41` and `packages/engine/src/recognizer/rules/s02-deadkey-single-tap.ts:31`, onto `elementAtOffset`/`rulePreContext`. These rules will now match rules containing a `+` (research R5b). List the newly recognised corpus rules in the commit message, and update recognizer test expectations only for those.
+- [x] T017 [P] [US5] Migrate the studio readers:
   - `packages/studio/src/lib/irToCarveNodes.ts` (887, 1152, 1237, 1322, 1345, 1540, 1571, 1644, 1667–1677, 1765–1768)
   - `packages/studio/src/lib/irToCharacterView.ts` (404–407)
   - `packages/studio/src/lib/claimedInputs.ts:123`
@@ -125,7 +125,7 @@ splitter, an offset accessor that matches kmcmplib, and a lint guard (FR-032 to 
   - `packages/studio/src/survey/slotOccupancy.ts:148`
   - `packages/studio/src/lib/carvedCombo.ts:45`
   - `packages/studio/src/editors/deadkey/deadkeyWrite.ts` (131, 628)
-- [ ] T018 [P] [US5] Migrate the keyboard-lint readers onto the contracts accessors: `packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.ts:43`, `packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.ts:25`, and any other check that reads `.context` (grep `packages/keyboard-lint/src` for `.context`).
+- [x] T018 [P] [US5] Migrate the keyboard-lint readers onto the contracts accessors: `packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.ts:43`, `packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.ts:25`, and any other check that reads `.context` (grep `packages/keyboard-lint/src` for `.context`).
 - [ ] T019 [US5] Migrate the engine rule writers onto `makeRule`/`withRuleParts`:
   - `packages/engine/src/deadkey-lifecycle/mutations.ts` (223–246)
   - `packages/engine/src/pattern-apply/mark-guards.ts` (203, 296–446, 595)

@@ -22,5 +22,5 @@
 ## parse() timing baseline
 
 - files timed: 1036
-- total: 813 ms
-- slowest: release/h/hakka/source/hakka.kmn (139.9 ms)
+- total: 1104 ms
+- slowest: release/h/hakka/source/hakka.kmn (176.7 ms)
