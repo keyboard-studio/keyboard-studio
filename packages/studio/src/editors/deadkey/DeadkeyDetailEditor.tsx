@@ -46,6 +46,7 @@ import {
   withMergedDeadkeyPairs,
   withDeadkeyAuthorName,
   withRepointedDeadkeyRefs,
+  stabilizeRepointReferrers,
   readDeadkeyPairs,
   findTriggerRules,
   deleteNamedDeadkey,
@@ -633,7 +634,7 @@ export function DeadkeyDetailEditor({
     }
     commitAndRecord(committed.ir, [
       ...(merged ? [{ kind: "merge-pairs" as const, fromId: from, toId: to }] : []),
-      { kind: "repoint", fromId: from, toId: to, referrers },
+      { kind: "repoint", fromId: from, toId: to, referrers: stabilizeRepointReferrers(ir, referrers) },
       { kind: "delete", id: from },
     ]);
     setDialog(null);

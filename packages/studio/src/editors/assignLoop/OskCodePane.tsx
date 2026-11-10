@@ -23,6 +23,7 @@ import type { KvksIR } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { isOpenMode } from "../../lib/openMode.ts";
 import { readVfsText } from "../../lib/vfsText.ts";
+import { replaceStartingPointAndReplay } from "../../lib/replaceStartingPoint.ts";
 import {
   lintOskCodeText,
   type OskCodeMarker,
@@ -209,7 +210,7 @@ export function OskCodePane({
     onApply(after);
     if (openText !== undefined && openPath !== null) {
       // After onApply so the author's text, not a re-emit, is what the file holds.
-      const result = useWorkingCopyStore.getState().replaceStartingPointFromText(openPath, current);
+      const result = replaceStartingPointAndReplay(openPath, current);
       if (!result.ok) {
         setApplyError(result.error);
         return;

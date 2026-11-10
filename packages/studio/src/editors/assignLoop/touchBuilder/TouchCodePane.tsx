@@ -35,6 +35,7 @@ import {
 import { useWorkingCopyStore } from "../../../stores/workingCopyStore.ts";
 import { isOpenMode } from "../../../lib/openMode.ts";
 import { readVfsText } from "../../../lib/vfsText.ts";
+import { replaceStartingPointAndReplay } from "../../../lib/replaceStartingPoint.ts";
 import {
   lintTouchLayoutText,
   type TouchCodeMarker,
@@ -266,7 +267,7 @@ export function TouchCodePane({ layout }: { layout: TouchLayoutIR | null }) {
     if (openText !== undefined && openPath !== null) {
       // Open: a formatting-only change is still a change to the file.
       if (current === canonical) return;
-      const result = useWorkingCopyStore.getState().replaceStartingPointFromText(openPath, current);
+      const result = replaceStartingPointAndReplay(openPath, current);
       if (!result.ok) {
         setApplyError(result.error);
         return;

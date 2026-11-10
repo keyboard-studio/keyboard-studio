@@ -91,6 +91,9 @@ interface GroupBlock {
   headerLine: string;
   /** Lines inside the group body (NOT including the header line). */
   bodyLines: string[];
+  /** True for the synthetic block holding a fragment's bare rules; it is
+   *  merged into the starting keyboard's entry group, whatever it is named. */
+  bare?: true;
 }
 
 /**
@@ -212,6 +215,22 @@ function findLastIndex<T>(arr: T[], pred: (item: T) => boolean): number {
 function storeNameOf(trimmedLine: string): string | null {
   const m = /^store\s*\(\s*([^)]+?)\s*\)/i.exec(trimmedLine);
   return m ? (m[1] ?? null) : null;
+}
+
+/**
+ * Name of the group the keyboard enters first: the target of the
+ * `begin Unicode > use(X)` line (any `begin` line when there is no Unicode
+ * one). Falls back to "main" when the header has no begin line.
+ */
+function entryGroupName(headerLines: string[]): string {
+  let fallback: string | null = null;
+  for (const line of headerLines) {
+    const m = /^\s*begin\s+(\w+)?\s*>\s*use\s*\(\s*([^)\s]+)\s*\)/i.exec(line.trim());
+    if (!m) continue;
+    if ((m[1] ?? "").toLowerCase() === "unicode") return m[2] ?? "main";
+    fallback ??= m[2] ?? null;
+  }
+  return fallback ?? "main";
 }
 
 /**
@@ -345,6 +364,7 @@ function parseFragment(fragmentText: string): ParsedFragment {
         name: "main",
         headerLine: "group(main) using keys",
         bodyLines: bareRules,
+        bare: true,
       });
     }
   }
@@ -811,8 +831,19 @@ export function applyAssignments(
   }
 
   // Step 5: merge group blocks from all fragments into the base.
+  const entryGroup = entryGroupName(baseParsed.headerLines);
   for (const frag of allFragments) {
-    for (const fragGroup of frag.groups) {
+    for (const rawGroup of frag.groups) {
+      // Bare rules go to the entry group; a fragment's own `group(main)` is
+      // an explicit group and keeps its name.
+      const fragGroup: GroupBlock =
+        rawGroup.bare === true
+          ? {
+              name: entryGroup,
+              headerLine: `group(${entryGroup}) using keys`,
+              bodyLines: rawGroup.bodyLines,
+            }
+          : rawGroup;
       const baseGroupIdx = baseParsed.groups.findIndex(
         (g) => sameGroupName(g.name, fragGroup.name)
       );

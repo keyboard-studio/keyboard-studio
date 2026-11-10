@@ -11,6 +11,8 @@ import { parseKmn } from "@keyboard-studio/engine";
 import {
   deleteNamedDeadkey,
   retargetNamedDeadkey,
+  stabilizeRepointReferrers,
+  withRepointedDeadkeyRefs,
   withRepairedDuplicateTriggerIds,
 } from "./deadkeyWrite.ts";
 
@@ -257,5 +259,47 @@ describe("retargetNamedDeadkey — typed era (#2238)", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.ir.raw[0]?.sourceText).toBe("+ [K_Y] > dk(acute)");
+  });
+});
+
+describe("withRepointedDeadkeyRefs - stable referrer references", () => {
+  const KMN = [
+    "store(&VERSION) '10.0'",
+    "begin Unicode > use(main)",
+    "group(main) using keys",
+    "+ 'a' > dk(0001)",
+    "dk(0001) + 'x' > 'one'",
+    "dk(0001) + 'y' > 'two'",
+    "",
+  ].join("\n");
+
+  function rulesOf(ir: KeyboardIR) {
+    return ir.groups.flatMap((g) => g.rules);
+  }
+
+  it("rewrites the same rule after the rule node ids re-mint", () => {
+    const ir = parseKmn(KMN, "stable-ref-test").ir;
+    const rules = rulesOf(ir);
+    const target = rules.length - 1; // the last dk(0001) context rule
+    expect(target).toBeGreaterThanOrEqual(0);
+    const group = ir.groups.find((g) => g.rules.includes(rules[target]!))!;
+    const recorded = stabilizeRepointReferrers(ir, [
+      `group "${group.name}" rule "${rules[target]!.nodeId}" — dk(0001) in context`,
+    ]);
+
+    // The carve re-parse mints ids afresh: shift every rule id.
+    const reminted = structuredClone(ir);
+    for (const g of reminted.groups) g.rules.forEach((r, i) => { r.nodeId = `r#re${i}`; });
+    const result = withRepointedDeadkeyRefs(reminted, 1, 2, recorded);
+
+    expect(result.unparsed).toEqual([]);
+    const after = rulesOf(result.ir);
+    after.forEach((r, i) => {
+      const had = r.context.some((el) => el.kind === "deadkey" && el.id === 1);
+      const now = r.context.some((el) => el.kind === "deadkey" && el.id === 2);
+      expect(now).toBe(i === target);
+      if (i !== target) expect(now).toBe(false);
+      void had;
+    });
   });
 });

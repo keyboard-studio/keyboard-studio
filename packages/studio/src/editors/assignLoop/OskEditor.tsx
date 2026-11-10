@@ -34,6 +34,7 @@ import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { isOpenMode } from "../../lib/openMode.ts";
 import { readVfsText } from "../../lib/vfsText.ts";
+import { replaceStartingPointAndReplay } from "../../lib/replaceStartingPoint.ts";
 
 /**
  * The base keyboard (the OS layout) whose characters "Display underlying"
@@ -221,7 +222,7 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
         setKvks(prev);
         setError(null);
         if (openKvksPath !== null && openKvksText !== undefined) {
-          useWorkingCopyStore.getState().replaceStartingPointFromText(openKvksPath, emitKvks(prev));
+          replaceStartingPointAndReplay(openKvksPath, emitKvks(prev));
         }
       }
       return h.slice(0, -1);
@@ -304,7 +305,7 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
     setError(null);
     // Open: an edit lands in the existing file (a missing file is not created).
     if (openKvksPath !== null && openKvksText !== undefined) {
-      useWorkingCopyStore.getState().replaceStartingPointFromText(openKvksPath, emitKvks(next));
+      replaceStartingPointAndReplay(openKvksPath, emitKvks(next));
     }
   };
 

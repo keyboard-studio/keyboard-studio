@@ -9,7 +9,15 @@ import {
   useWorkingCopyStore,
   type ReplaceStartingPointResult,
 } from "../stores/workingCopyStore.ts";
-import { recalculateForStartingPointChangeFromStores } from "../decisions/rebuildWorkingCopy.ts";
+
+// The replay lives in decisions/rebuildWorkingCopy.ts, which reaches the editors
+// through the survey registry. Importing it here would close a cycle, so it
+// registers itself on load instead.
+let replay: (() => unknown) | null = null;
+
+export function registerStartingPointReplay(fn: () => unknown): void {
+  replay = fn;
+}
 
 export function replaceStartingPointAndReplay(
   path: string,
@@ -17,7 +25,11 @@ export function replaceStartingPointAndReplay(
 ): ReplaceStartingPointResult {
   const result = useWorkingCopyStore.getState().replaceStartingPointFromText(path, text);
   if (result.ok && path.endsWith(".kmn")) {
-    recalculateForStartingPointChangeFromStores();
+    if (replay === null) {
+      console.warn("[replaceStartingPoint] no replay registered; the .kmn change was not replayed");
+    } else {
+      replay();
+    }
   }
   return result;
 }

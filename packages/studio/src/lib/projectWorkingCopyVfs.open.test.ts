@@ -20,13 +20,24 @@ const KMN = [
   "",
 ].join("\r\n");
 
+const KMN_WITHOUT_B = [
+  "c a hand-written comment",
+  "store(&NAME) 'Tiny'",
+  "store(&VERSION) '10.0'",
+  "begin Unicode > use(main)",
+  "group(main) using keys",
+  "+ [K_A] > 'a'",
+  "",
+].join("\r\n");
+
 function run(opts: { stripSourceLine?: boolean; consent?: boolean }) {
   const vfs = createVirtualFS();
-  vfs.set(`source/${ID}.kmn`, KMN, false);
+  // A stripped file is the text an earlier step changed out from under the starting keyboard:
+  // its rule count no longer matches, so spans cannot be re-read.
+  vfs.set(`source/${ID}.kmn`, opts.stripSourceLine === true ? KMN_WITHOUT_B : KMN, false);
   const startIr = parseKmn(KMN, ID).ir;
   const group = startIr.groups.find((g) => !g.readonly)!;
   const rule = group.rules[0]!;
-  if (opts.stripSourceLine === true) delete (rule as { sourceLine?: number }).sourceLine;
   const input: ProjectWorkingCopyVfsInput = {
     vfs,
     keyboardId: ID,
@@ -55,7 +66,7 @@ describe("projectWorkingCopyVfs: Open mode", () => {
     const { result, text } = run({ stripSourceLine: true });
     expect(result.reformatRequired).toEqual([`source/${ID}.kmn`]);
     expect(result.warnings.some((w) => w.startsWith("[open]") && w.includes(`source/${ID}.kmn`))).toBe(true);
-    expect(text).toBe(KMN);
+    expect(text).toBe(KMN_WITHOUT_B);
   });
 
   it("re-emits the file once the author agrees", () => {

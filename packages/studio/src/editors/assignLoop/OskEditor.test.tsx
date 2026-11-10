@@ -24,7 +24,8 @@ vi.mock("../../stores/workingCopyStore.ts", () => ({
 }));
 
 // Mock the engine module — only the functions OskEditor uses.
-vi.mock("@keyboard-studio/engine", () => ({
+vi.mock("@keyboard-studio/engine", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@keyboard-studio/engine")>()),
   generateKvksFromIR: () => ({
     kbdname: "TestKeyboard",
     layers: [

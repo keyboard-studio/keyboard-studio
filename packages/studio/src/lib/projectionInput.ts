@@ -58,6 +58,7 @@ export type ProjectionState = Pick<
   | "fallbackPolicy"
   | "carveTouchKeepInert"
   | "deadkeyOverlay"
+  | "keyEditOverlay"
   | "contextToleranceOverlay"
   | "touchLayoutJson"
   | "customCss"
@@ -156,6 +157,9 @@ export function projectionInputFromState(
       ? { carveTouchKeepInert: new Set(state.carveTouchKeepInert) }
       : {}),
     keyEditOps: liveLayoutOverride?.keyEditOps ?? [],
+    // The committed ops' layout half is already in `touchLayoutJson`; their rule
+    // half (a rename's vkey rewrite on the rules) is not, so it rides separately.
+    keyEditRuleOps: state.keyEditOverlay.ops,
     deadkeyOps: state.deadkeyOverlay.ops,
     touchLayoutJson,
     customCss: liveCssOverride !== undefined ? liveCssOverride : state.customCss,

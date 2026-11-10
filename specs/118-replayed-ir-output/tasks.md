@@ -30,25 +30,25 @@ story phases.
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T003** [P] [US1] Defect (b): rebuild keeps the `docFixProposals` channel that `foldPatch` and `installRebuiltState` drop · `packages/studio/src/decisions/replayKeyboard.ts` + `replayKeyboard.docFixProposals.test.ts` (new)
-- [ ] **T004** [P] [US3] Defect (c): the D3 validator checks the replayed keyboard's emitted text, not the unedited `startVfs` · `packages/studio/src/StudioShell.tsx` (lines near 1223) + `StudioShell.validationInput.test.ts` (new)
-- [ ] **T005** [P] [US1] Defect (f): `OskCodePane`, `TouchCodePane`, `OskEditor` and `docRegenerationFix` replace starting-point files through the replay wrapper · the four files named in the defect, located by grep + one regression test per editor (new test files beside each)
-- [ ] **T006** [P] [US2] Defect (i): bare pattern rules target the entry group, not a group literally named `main`; additions to a group the starting keyboard lacks are kept · `packages/engine/src/pattern-apply/applyAssignments.ts` + `applyAssignments.entryGroup.test.ts` (new)
-- [ ] **T007** [P] [US2] Defect (g): dead-key `repoint` ops store rule node ids that re-mint after carve re-parse; store a stable reference · `packages/engine/src/pattern-apply/keyEditOps.ts` + `keyEditOps.repoint.test.ts` (new)
+- [x] **T003** [P] [US1] Defect (b): rebuild keeps the `docFixProposals` channel that `foldPatch` and `installRebuiltState` drop · `packages/studio/src/decisions/replayKeyboard.ts` + `replayKeyboard.docFixProposals.test.ts` (new)
+- [x] **T004** [P] [US3] Defect (c): the D3 validator checks the replayed keyboard's emitted text, not the unedited `startVfs` · `packages/studio/src/StudioShell.tsx` (lines near 1223) + `StudioShell.validationInput.test.ts` (new)
+- [x] **T005** [P] [US1] Defect (f): `OskCodePane`, `TouchCodePane`, `OskEditor` and `docRegenerationFix` replace starting-point files through the replay wrapper · the four files named in the defect, located by grep + one regression test per editor (new test files beside each)
+- [x] **T006** [P] [US2] Defect (i): bare pattern rules target the entry group, not a group literally named `main`; additions to a group the starting keyboard lacks are kept · `packages/engine/src/pattern-apply/applyAssignments.ts` + `applyAssignments.entryGroup.test.ts` (new)
+- [x] **T007** [P] [US2] Defect (g): dead-key `repoint` ops store rule node ids that re-mint after carve re-parse; store a stable reference · `packages/studio/src/editors/deadkey/deadkeyWrite.ts` + `deadkeyWrite.test.ts` (as built: the `repoint` op lives in the studio deadkey editor, not the engine `keyEditOps.ts`)
 
 **⟶ Wait for Wave 1 to finish, then:**
 
 **Wave 2 — independent (different files):**
 
-- [ ] **T008** [P] [US1] Defect (a): a touch-key rename's rule half reaches the download; `keyEditOps` is non-empty on the output path · `packages/studio/src/lib/projectionInput.ts` (line near 158) + `projectionInput.touchRename.test.ts` (new). Needs T007.
-- [ ] **T009** [P] [US1] Defect (e): an opened keyboard's preview passes `openMode`, so preview and download agree · the preview compile path (located by grep for `openMode`) + `preview.openMode.test.ts` (new)
+- [x] **T008** [P] [US1] Defect (a): a touch-key rename's rule half reaches the download; `keyEditOps` is non-empty on the output path · `packages/studio/src/lib/projectionInput.ts` (line near 158) + `projectionInput.touchRename.test.ts` (new). Needs T007.
+- [x] **T009** [P] [US1] Defect (e): an opened keyboard's preview passes `openMode`, so preview and download agree · the preview compile path (located by grep for `openMode`) + `preview.openMode.test.ts` (new)
 
 **⟶ Wait for Wave 2 to finish, then:**
 
 **Wave 3 — one file, sequential (`projectWorkingCopyVfs.ts`):**
 
-- [ ] **T010** [US1] Defect (d): direct `emitKmn` calls in projection steps 2.8 and 4 go through `writeKmn`, so Open mode keeps byte identity · `packages/studio/src/lib/projectWorkingCopyVfs.ts` + `projectWorkingCopyVfs.unchangedGate.test.ts` (new)
-- [ ] **T011** [US2] Defect (h): Open-mode splices use line spans re-read after step 0b, not stale `startIr` spans · `packages/studio/src/lib/projectWorkingCopyVfs.ts`, `packages/studio/src/lib/openMode.ts` + `openMode.styleLine.test.ts` (new). Runs after T010.
+- [x] **T010** [US1] Defect (d): direct `emitKmn` calls in projection steps 2.8 and 4 go through `writeKmn`, so Open mode keeps byte identity · `packages/studio/src/lib/projectWorkingCopyVfs.ts` + `projectWorkingCopyVfs.unchangedGate.test.ts` (new)
+- [x] **T011** [US2] Defect (h): Open-mode splices use line spans re-read after step 0b, not stale `startIr` spans · `packages/studio/src/lib/projectWorkingCopyVfs.ts`, `packages/studio/src/lib/openMode.ts` + `openMode.styleLine.test.ts` (new). Runs after T010.
 
 **Checkpoint**: all nine regression tests (SC-003) green on the phase's own tests; golden fixtures byte-identical except where a fix changed them on purpose (FR-030). Full gate runs here (`packages/studio` and `packages/engine` touched).
 

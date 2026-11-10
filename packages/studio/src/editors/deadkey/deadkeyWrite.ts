@@ -303,6 +303,36 @@ const REFERRER_STORE_RE =
 const REFERRER_STORE_REF_RE =
   /^group "[^"]*" rule "([^"]+)" — references entity store "([^"]+)"$/;
 
+/**
+ * Stable rule reference inside a referrer string: `@<group>.<rule>`, the
+ * zero-based position of the rule in the IR the referrer was described
+ * against. A rule node id is minted by position in the whole file, so it
+ * re-mints when the carve re-parses the text; the group/rule position
+ * does not depend on the id counter. A recorded `repoint` op carries
+ * referrers in this form (see {@link stabilizeRepointReferrers}).
+ */
+/**
+ * Rewrite each rule-bearing referrer string so its rule id is the stable
+ * `@<group>.<rule>` reference, resolved against `ir` (the IR the conflict
+ * was computed on). Strings with no resolvable rule id pass through
+ * unchanged, so replay reports them as `unparsed` exactly as before.
+ */
+export function stabilizeRepointReferrers(
+  ir: KeyboardIR,
+  referrers: readonly string[],
+): string[] {
+  const position = new Map<string, string>();
+  ir.groups.forEach((group, gi) => {
+    group.rules.forEach((rule, ri) => position.set(rule.nodeId, `@${gi}.${ri}`));
+  });
+  return referrers.map((ref) =>
+    ref.replace(/(rule \u0022)([^\u0022]+)(\u0022)/, (whole, open: string, id: string, close: string) => {
+      const stable = position.get(id);
+      return stable === undefined ? whole : `${open}${stable}${close}`;
+    }),
+  );
+}
+
 export interface RepointResult {
   ir: KeyboardIR;
   /** Referrer descriptions that matched no known format — never silently skipped. */
@@ -334,9 +364,12 @@ export function withRepointedDeadkeyRefs(
   const toHex = toId.toString(16).padStart(4, "0");
 
   const ruleById = new Map<string, IRRule>();
-  for (const group of next.groups) {
-    for (const rule of group.rules) ruleById.set(rule.nodeId, rule);
-  }
+  next.groups.forEach((group, gi) => {
+    group.rules.forEach((rule, ri) => {
+      ruleById.set(rule.nodeId, rule);
+      ruleById.set(`@${gi}.${ri}`, rule);
+    });
+  });
 
   const rewriteDeadkeyElements = (rule: IRRule) => {
     for (const el of rule.context) {

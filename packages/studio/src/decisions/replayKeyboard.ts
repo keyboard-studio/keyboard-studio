@@ -105,7 +105,8 @@ export function foldPatch(state: ReplayState, patch: WorkingCopyPatch, writes: r
     patch.identity === undefined &&
     patch.attribution === undefined &&
     patch.helpDocs === undefined &&
-    patch.historyEntryState === undefined
+    patch.historyEntryState === undefined &&
+    patch.docFixProposals === undefined
   ) {
     return ir === state.ir ? state : { ir, overlay: state.overlay };
   }
@@ -114,6 +115,7 @@ export function foldPatch(state: ReplayState, patch: WorkingCopyPatch, writes: r
   if (patch.attribution !== undefined) overlay.attribution = patch.attribution;
   if (patch.helpDocs !== undefined) overlay.helpDocs = patch.helpDocs;
   if (patch.historyEntryState !== undefined) overlay.historyEntryState = patch.historyEntryState;
+  if (patch.docFixProposals !== undefined) overlay.docFixProposals = patch.docFixProposals;
   return { ir, overlay };
 }
 
@@ -212,6 +214,7 @@ export function replayKeyboard(
             writes,
             decisions,
             currentHistoryEntryState: state.overlay.historyEntryState ?? null,
+            currentDocFixProposals: state.overlay.docFixProposals ?? null,
           };
           const patch = mod.apply(value as string | string[] | undefined, ctx);
           // A3: the whole patch is authorized before any channel folds.

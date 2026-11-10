@@ -77,6 +77,7 @@ import type { KeyEditOperation } from "@keyboard-studio/engine";
 import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
+import { isOpenedWithDescriptor } from "../lib/openMode.ts";
 import { capsHandlingFromDecisions, marksGuardsFromValue, projectionInputFromState } from "../lib/projectionInput.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
@@ -346,6 +347,8 @@ export function useWorkingCopyTransform(
   // in-progress gallery state, so there is no live-layout distinction to
   // draw here — unlike keyEditOps above).
   const deadkeyOps = useWorkingCopyStore((s) => s.deadkeyOverlay.ops);
+  // The committed key-edit ops: only their rule half is projected from here.
+  const committedKeyEditOverlay = useWorkingCopyStore((s) => s.keyEditOverlay);
 
   // Derive the current physical assignments from phaseResults.
   const sessionAssignments = useMemo(
@@ -539,6 +542,7 @@ export function useWorkingCopyTransform(
             fallbackPolicy,
             carveTouchKeepInert: carveTouchKeepInertChars,
             deadkeyOverlay: { ops: deadkeyOps },
+            keyEditOverlay: committedKeyEditOverlay,
             contextToleranceOverlay: storeContextToleranceOverlay,
             touchLayoutJson: storeTouchLayoutJson,
             customCss,
@@ -562,6 +566,20 @@ export function useWorkingCopyTransform(
             ...(storeStartDisplayName !== null ? { baseDisplayName: storeStartDisplayName } : {}),
             ...(storeStartKeyboardId !== null ? { startKeyboardId: storeStartKeyboardId } : {}),
             ...(liveLayoutOverride !== undefined ? { liveLayoutOverride } : {}),
+            // Open mode, as the download passes it, so the preview and the
+            // download splice the author's text the same way.
+            ...(isOpenedWithDescriptor(instantiationMode, startVfs, keyboardId)
+              ? {
+                  openMode: {
+                    kps: {
+                      nameEdited:
+                        identity?.displayName !== undefined &&
+                        identity.displayName !== storeStartDisplayName,
+                      ...(identity?.languages !== undefined ? { languages: identity.languages } : {}),
+                    },
+                  },
+                }
+              : {}),
           },
         ),
       );
@@ -590,6 +608,7 @@ export function useWorkingCopyTransform(
     patternMap,
     touchLayoutJson,
     keyEditOpsKey,
+    committedKeyEditOverlay,
     deadkeyOpsKey,
     storeContextToleranceOverlay,
     marksGuardsKey,
@@ -601,6 +620,7 @@ export function useWorkingCopyTransform(
     authoredHelpPhp,
     instantiationMode,
     startVfs,
+    identity,
     startWelcomeConvention,
   ]);
 }

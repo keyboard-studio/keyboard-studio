@@ -145,6 +145,7 @@ import { formViolations, outputFormWarning } from "./outputFormUniformity.ts";
 import { claimedInputRuleIds } from "./claimedInputs.ts";
 import { deriveCasedKeys } from "./casedKeysDerivation.ts";
 import type { CapsHandlingValue } from "../decisions/decisionTypes.ts";
+import { withCurrentSpans } from "./openMode.ts";
 
 /** Violation scan that never throws: an unparseable .kmn is reported elsewhere. */
 function safeFormViolations(
@@ -289,6 +290,11 @@ export interface ProjectWorkingCopyVfsInput {
    * there is no key-edit overlay yet.
    */
   keyEditOps?: readonly KeyEditOperation[];
+  /**
+   * The committed overlay ops whose layout half is already in the layout text.
+   * Only the rule half (step 1.7b) reads them, and only when `keyEditOps` is empty.
+   */
+  keyEditRuleOps?: readonly KeyEditOperation[];
   /**
    * The committed deadkey lifecycle overlay (spec 083): every define /
    * rename / delete / retarget / pair / name-token mutation the Deadkeys
@@ -546,6 +552,7 @@ export function projectWorkingCopyVfs(
     carveLoud = false,
     carveTouchKeepInert,
     keyEditOps = [],
+    keyEditRuleOps = [],
     deadkeyOps = [],
     assignments,
     getPattern,
@@ -825,7 +832,7 @@ export function projectWorkingCopyVfs(
       // the changed nodes into the file as it stands, never a whole re-emit.
       const carveKmnPath = `source/${keyboardId}.kmn`;
       const carveKmnText = readVfsText(vfs, carveKmnPath);
-      if (carveKmnText !== undefined) writeKmn(carveKmnPath, carveKmnText, startIr, mergedSeamIr);
+      if (carveKmnText !== undefined) writeKmn(carveKmnPath, carveKmnText, withCurrentSpans(startIr, carveKmnText, keyboardId), mergedSeamIr);
       carveResult = { warnings: [] };
     } else {
       carveResult = applyCarveToVfs(vfs, keyboardId, mergedSeamIr, EMPTY_DELETION_SET, {
@@ -995,7 +1002,7 @@ export function projectWorkingCopyVfs(
       }
     }
   }
-  const renameOps = keyEditOps.filter((op): op is RenameKeyOp => {
+  const renameOps = (keyEditOps.length > 0 ? keyEditOps : keyEditRuleOps).filter((op): op is RenameKeyOp => {
     if (op.kind !== "rename") return false;
     if (additionBoundIds.has(op.toId.toUpperCase())) {
       warnings.push(
@@ -1268,6 +1275,8 @@ export function projectWorkingCopyVfs(
     if (kmnTextForCaps !== undefined) {
       try {
         const parsedForCaps = parseKmn(kmnTextForCaps, keyboardId).ir;
+        // The unedited parse: writeKmn needs the file as it stands to splice on Open.
+        const currentForCaps = parseKmn(kmnTextForCaps, keyboardId).ir;
         const bcp47 = identity?.bcp47 !== undefined && identity.bcp47 !== "" ? identity.bcp47 : undefined;
         if (capsHandling.mode === "cased-keys") {
           const set = deriveCasedKeys(parsedForCaps, { ...(bcp47 !== undefined ? { bcp47 } : {}) });
@@ -1279,7 +1288,7 @@ export function projectWorkingCopyVfs(
         }
         // explicit-rules leaves the copy exactly as it was: nothing to emit.
         if (capsHandling.mode !== "explicit-rules") {
-          vfs.set(kmnPathForCaps, emitKmn(parsedForCaps), false);
+          writeKmn(kmnPathForCaps, kmnTextForCaps, currentForCaps, parsedForCaps);
         }
         // Touch caps: the same decision gives the touch layout its caps layer
         // (R8). Runs on the projected touch file, after the clean-touch clone
@@ -1455,6 +1464,7 @@ export function projectWorkingCopyVfs(
     if (kmnText !== undefined) {
       try {
         const parsed = parseKmn(kmnText, keyboardId);
+        const currentForRename = parseKmn(kmnText, keyboardId).ir;
         // The release version is the overlay's (serializeWorkingCopy always sets
         // it to the shipped version, spec 102 FR-009) or resetIdentity's "1.0"
         // default; the start keyboard's own version is never carried over.
@@ -1471,7 +1481,7 @@ export function projectWorkingCopyVfs(
             ? { copyright: identity.copyright }
             : {}),
         });
-        vfs.set(kmnPath, emitKmn(parsed.ir), false);
+        writeKmn(kmnPath, kmnText, currentForRename, parsed.ir);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         warnings.push(

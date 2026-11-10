@@ -49,6 +49,7 @@ import {
   providerFromModules,
   type ReplayState,
 } from "./replayKeyboard.ts";
+import { registerStartingPointReplay } from "../lib/replaceStartingPoint.ts";
 
 /**
  * The derived order of decision ids: the registry's modules in
@@ -292,6 +293,11 @@ function installRebuiltState(state: ReplayState): void {
   if (overlay.historyEntryState !== undefined) {
     wc.setHistoryEntryState(overlay.historyEntryState);
   }
+  if (overlay.docFixProposals !== undefined) {
+    // Sibling proposals the replay did not fold (pagename, imageWidth)
+    // stay as the author left them; the replayed keys win.
+    wc.setDocFixProposals({ ...(wc.docFixProposals ?? {}), ...overlay.docFixProposals });
+  }
   if (overlay.carve !== undefined) {
     // The carve slice installs wholesale — the persist-restore pattern
     // (the store's carve actions are per-item UI gestures; there is no
@@ -433,3 +439,5 @@ export function recalculateForStartingPointChangeFromStores(): RebuildOutcome | 
   }
   return outcome;
 }
+
+registerStartingPointReplay(recalculateForStartingPointChangeFromStores);

@@ -99,7 +99,7 @@ import { useOpenInventorySeed } from "./hooks/useOpenInventorySeed.ts";
 import { useOe2SoleSourceFindings } from "./hooks/useOe2SoleSourceFindings.ts";
 import { useLdmlFindings } from "./hooks/useLdmlFindings.ts";
 import { useFontGlyphCoverageFindings } from "./hooks/useFontGlyphCoverageFindings.ts";
-import { findKmnPath } from "./lib/findKmnPath.ts";
+import { selectValidationSource } from "./lib/validationSource.ts";
 import { useContextToleranceApply } from "./hooks/useContextToleranceApply.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
 import { OUTPUT_FORM_SEAM_PATTERN_IDS } from "@keyboard-studio/engine";
@@ -1222,14 +1222,13 @@ export function SurveyView({ startKeyboard }: SurveyViewProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startKeyboardDecision, authoringTrackDecision, artifactStage]);
 
-  // Derive KMN source from the working copy's base VFS for the validator.
-  const kmnSource = useMemo(() => {
-    if (!startVfs) return null;
-    const path = findKmnPath(startVfs);
-    if (!path) return null;
-    const raw = startVfs.get(path)?.content ?? null;
-    return typeof raw === "string" ? raw : null;
-  }, [startVfs]);
+  // The validator checks the replayed keyboard's emitted text once a preview
+  // projection exists, else the starting point's own text (spec 118 FR-017).
+  const previewProjection = useWorkingCopyStore((s) => s.previewProjection);
+  const kmnSource = useMemo(
+    () => selectValidationSource(previewProjection, startVfs),
+    [previewProjection, startVfs],
+  );
   const { findings: validatorFindingsOnly } = useValidator(kmnSource);
   // spec 080 FR-019 (research R7): the Layer C documentation checks ride the
   // SAME findings array — a memoised synchronous hook, no second timer (D3) —

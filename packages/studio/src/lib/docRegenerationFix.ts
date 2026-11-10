@@ -8,7 +8,7 @@ import { DOC_GENERATED_END, DOC_GENERATED_START, replaceGeneratedBlock } from "@
 import { docMemberPath, type DocMemberId } from "@keyboard-studio/contracts";
 
 import type { SuggestedFix } from "./consistencySuggestions.ts";
-import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { replaceStartingPointAndReplay } from "./replaceStartingPoint.ts";
 
 export interface DocRegenerationInput {
   member: DocMemberId;
@@ -84,5 +84,5 @@ export function docRegenerationFixes(input: DocRegenerationProducerInput): Sugge
 export function applyDocRegeneration(fix: SuggestedFix): boolean {
   const preview = fix.preview[0];
   if (fix.kind !== "docs" || preview === undefined) return false;
-  return useWorkingCopyStore.getState().replaceStartingPointFromText(preview.file, preview.after).ok;
+  return replaceStartingPointAndReplay(preview.file, preview.after).ok;
 }
