@@ -336,9 +336,19 @@ export interface DerivedAxes {
  * vector BEFORE `defaultFillAxes` runs, so the prior only ever fills axes
  * with no IR evidence (A5 multi-mode, and any axis whose derivation found
  * nothing). A3 (phonetic intuition) is a survey judgment with no direct IR
- * read; the corpus heuristic is: strong when the keyboard's content is
- * Latin-script (the typist's spelling IS Latin) or the layout declares
- * &MNEMONICLAYOUT, weak otherwise — recorded in `evidence` as a heuristic.
+ * read; the corpus heuristic is positive-evidence only — strong when the
+ * layout declares &MNEMONICLAYOUT, or when the postfix mark-input shape is
+ * detected on an alphabetic keyboard (A3a is gated on A3=strong AND
+ * A2=alphabetic in §7.1, so a detected postfix shape on such a keyboard
+ * presupposes it; the same shape on a syllabic keyboard is syllabic
+ * sequencing, not Latin mark-input order — the bj_cree family, #2278),
+ * weak otherwise. Latin-script content alone is NOT
+ * evidence for strong: A3 is the typist's input mental model, not the
+ * output script, and a Latin-target typist types the native orthography
+ * with deadkey composition — the spec's weak disjunct ("a modifier + base
+ * key"). Deriving strong from Latin content routed 86 deadkey-Latin
+ * keyboards to S-05 via rule 5 (issue #2278, cluster 1). The heuristic is
+ * recorded in `evidence` as a heuristic.
  */
 export function deriveAxes(ir: KeyboardIR): DerivedAxes {
   const evidence: Record<string, string> = {};
@@ -359,23 +369,34 @@ export function deriveAxes(ir: KeyboardIR): DerivedAxes {
 
   const partial: Partial<DiscoveryAxisVector> = { scale, scriptClass };
 
-  // A3 (heuristic — see header comment)
-  const mnemonic = isMnemonicLayout(ir);
-  partial.phoneticIntuition = script === "Latn" || mnemonic ? "strong" : "weak";
-  evidence.phoneticIntuition =
-    script === "Latn"
-      ? "heuristic: Latin-script content → strong"
-      : mnemonic
-        ? "heuristic: &MNEMONICLAYOUT declared → strong"
-        : "heuristic: non-Latin, positional → weak";
-
   // A3a — the engine's import detector (postfix evidence only; it never
   // guesses prefix, so a non-detection leaves the axis for the prior).
+  // Detected BEFORE the A3 assignment below: a detected postfix shape is
+  // positive evidence for A3=strong (A3a is gated on A3=strong in §7.1).
   const markFill = detectMarkInputOrderFromImport(ir);
-  if (markFill !== undefined && markFill.value === "postfix") {
+  const postfix = markFill !== undefined && markFill.value === "postfix";
+  if (postfix) {
     partial.markInputOrder = "postfix";
     evidence.markInputOrder = "postfix sequence-replace shape detected in IR";
   }
+
+  // A3 (heuristic — see header comment). Positive evidence only: the
+  // &MNEMONICLAYOUT declaration, or a detected postfix mark-input shape
+  // on an alphabetic keyboard (A3a's elicitation gate is A2=alphabetic AND
+  // A3=strong; the same shape on a syllabic keyboard is syllabic
+  // sequencing, not Latin mark-input order — ungated it stole the bj_cree
+  // family into rule 5, #2278). Latin-script content is deliberately NOT
+  // evidence — it routed 86 deadkey-Latin keyboards to S-05 via rule 5.
+  const mnemonic = isMnemonicLayout(ir);
+  const postfixEvidence = postfix && scriptClass === "alphabetic";
+  partial.phoneticIntuition = mnemonic || postfixEvidence ? "strong" : "weak";
+  evidence.phoneticIntuition = mnemonic
+    ? "heuristic: &MNEMONICLAYOUT declared → strong"
+    : postfixEvidence
+      ? "heuristic: postfix mark-input shape detected (alphabetic) → strong"
+      : postfix
+        ? "heuristic: postfix shape detected but non-alphabetic — not A3 evidence → weak (#2278)"
+        : "heuristic: no mnemonic/postfix evidence → weak (Latin-script content alone is not phonetic intuition; #2278)";
 
   // A4 — deadkey families + cycling (marks-station family counting:
   // 0 families → none, 1 → stacking-combining, ≥2 → multi-family;

@@ -148,6 +148,75 @@ U+0306 + '*' > U+0307
   });
 });
 
+describe("A3 phonetic-intuition derivation (#2278)", () => {
+  it("a Latin-content keyboard derives A3 weak — Latin content alone is not phonetic intuition", () => {
+    // Before #2278 this derived "strong" from the Latin dominant script,
+    // routing Latin keyboards to S-05 via rule 5; the recognizer reads S-02.
+    const derived = deriveAxes(irOf(SWAP_KMN));
+    expect(derived.dominantScript).toBe("Latn");
+    expect(derived.axes.phoneticIntuition).toBe("weak");
+  });
+
+  it("a Latin deadkey keyboard derives A3 weak", () => {
+    // The deadkey fixture's produced set carries no script evidence at all
+    // (deadkey/index outputs only), so this also pins weak-by-default.
+    expect(deriveAxes(irOf(DEADKEY_KMN)).axes.phoneticIntuition).toBe("weak");
+  });
+
+  it("a &MNEMONICLAYOUT declaration derives A3 strong", () => {
+    const mnemonicKmn = `store(&VERSION) '10.0'
+store(&NAME) 'Test'
+store(&TARGETS) 'any'
+store(&MNEMONICLAYOUT) '1'
+begin Unicode > use(main)
+group(main) using keys
++ [K_E] > U+025B
++ [K_O] > U+0254
++ [K_A] > 'a'
+`;
+    expect(deriveAxes(irOf(mnemonicKmn)).axes.phoneticIntuition).toBe("strong");
+  });
+
+  it("a postfix shape on a NON-alphabetic keyboard does NOT derive A3 strong (#2278)", () => {
+    // The bj_cree family carries the postfix index shape over Canadian
+    // Aboriginal syllabics; that is syllabic sequencing, not Latin
+    // mark-input order, and must not imply phonetic intuition. The
+    // detection itself is still recorded (markInputOrder postfix) — only
+    // its promotion to A3 is gated on the alphabetic script class.
+    const cansPostfixKmn = `store(&VERSION) '10.0'
+store(&NAME) 'Test'
+store(&TARGETS) 'any'
+store(base) U+1401 U+1402 U+1403
+store(marked) U+1404 U+1405 U+1406
+begin Unicode > use(Unicode)
+group(Unicode) using keys
+if(option_key = '') any(base) + "x" > index(marked,2)
+`;
+    const derived = deriveAxes(irOf(cansPostfixKmn));
+    expect(derived.axes.markInputOrder).toBe("postfix");
+    expect(derived.axes.scriptClass).toBe("syllabary");
+    expect(derived.axes.phoneticIntuition).toBe("weak");
+  });
+
+  it("a detected postfix mark-input shape derives A3 strong (with markInputOrder postfix)", () => {
+    // Trimmed sil_ipa shape: any(base) + trigger > index(marked, 1).
+    // A3a is gated on A3=strong in §7.1, so a detected postfix shape
+    // presupposes strong — without it rule 3a could never fire here.
+    const postfixKmn = `store(&VERSION) '10.0'
+store(&NAME) 'Test'
+store(&TARGETS) 'any'
+store(equalD) "b" "d" "g"
+store(equalU) U+0253 U+0257 U+0260
+begin Unicode > use(Unicode)
+group(Unicode) using keys
+any(equalD) + "=" > index(equalU,1)
+`;
+    const derived = deriveAxes(irOf(postfixKmn));
+    expect(derived.axes.phoneticIntuition).toBe("strong");
+    expect(derived.axes.markInputOrder).toBe("postfix");
+  });
+});
+
 describe("deriveAxes completeness", () => {
   it("always returns a complete vector (prior fills the underived axes)", () => {
     const derived = deriveAxes(irOf(SWAP_KMN));
