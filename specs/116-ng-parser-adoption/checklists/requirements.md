@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -34,6 +34,6 @@
 - This is an engine/contract spec, so "users" include IR consumers. Naming the parser's source
   (Keyman's next-generation compiler, pinned commit) and the `KeyboardIR` contract is scope, not
   implementation leakage: the feature *is* adopting that parser and extending that contract.
-- One open marker, FR-041: whether Tier B (breaking IR restructure) stays in this spec behind the
-  joint-session gate or splits into a follow-on spec. Resolve it with `/speckit-clarify` before
-  `/speckit-plan`.
+- FR-041's open marker was resolved 2026-11-10 by a KM crew ruling (option A): breaking IR changes go to a
+  follow-on spec in the order B3, B1, B2. B4 is replaced by the importer-report policy (FR-029b). This spec
+  gains the non-breaking rule-shape accessors (FR-032 to FR-038). Ready for `/speckit-plan`.

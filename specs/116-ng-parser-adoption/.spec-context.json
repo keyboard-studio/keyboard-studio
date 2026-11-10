@@ -12,5 +12,10 @@
       "by": "extension",
       "at": "2026-11-10T10:28:25.661Z"
     }
+  ],
+  "decisions": [
+    {
+      "decision": "{\"id\":\"tier-b-split\",\"summary\":\"Option A: breaking IR changes (B3 modifiers, B1 keystroke, B2 typed LHS) move to a follow-on spec; B4 replaced by importer-report policy; prep accessors FR-032..038 land in 116\",\"by\":\"km-lead ruling, owner accepted 2026-11-10\"}"
+    }
   ]
 }

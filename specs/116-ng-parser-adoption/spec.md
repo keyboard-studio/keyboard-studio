@@ -213,24 +213,40 @@ is added without a row.
 
 ---
 
-### User Story 5 - Breaking IR restructure, by decision (Priority: P3)
+### User Story 5 - Rule-shape accessors now, so the breaking restructure is contained later (Priority: P2)
 
 Some changes the grammar makes possible are breaking contract changes. The most valuable is giving
 each rule an explicit keystroke instead of hiding it after a synthetic `+` separator in its context.
-These are planned in this spec with a full inventory of the consumers they affect. They are carried
-out only once the decision below is ruled on.
+By ruling (see "Tier B ruling" below), those changes move to a follow-on spec. This spec does the
+non-breaking preparation that makes them small:
 
-**Why this priority**: These changes have the highest long-term value for multi-target export, but
-they break about 48 consumers and need a joint session and a major contract version bump.
+- Consumers stop reading a rule's raw shape and go through shared accessors (to read) and helpers (to
+  build or change rules).
+- A lint guard keeps new code from going back to the raw shape.
+- The follow-on then changes the accessors' internals, the codec, the schema and saved drafts, instead
+  of every consumer.
 
-**Independent Test**: The consumer inventory lists every file that reads each affected shape, with
-the change it needs, in the style of spec 103's `consumer-review.md`.
+**Why this priority**: Without it, the follow-on is a rewrite of about 50 files across engine, studio
+and keyboard-lint. With it, the follow-on is a contained decision. It also removes a duplicate rule
+splitter that already exists.
+
+**Independent Test**:
+- Every rule reader in contracts, engine, studio and keyboard-lint gets the keystroke, pre-context,
+  conditions, left-hand-side kind and `index()`-offset target from the shared accessors.
+- Every rule writer builds rules through the shared helpers.
+- The lint guard fails on a new direct read of a rule's context array outside the allow-listed files.
+- All existing tests pass unchanged.
 
 **Acceptance Scenarios**:
 
-1. **Given** the ruling on this story, **When** planning proceeds, **Then** either the breaking
-   changes are tasked here behind the joint-session gate, or they are split into their own spec, and
-   this spec ships Stories 1–4 alone.
+1. **Given** a rule written with an inline `+`, without one, as `match`/`nomatch`, with a leading
+   `nul`, or with head `if()`/`platform()` guards, **When** any accessor reads it, **Then** it returns
+   the same answer the consumer computed by hand before.
+2. **Given** a consumer that resolves an `index(store, N)` offset, **When** it uses the shared
+   offset accessor, **Then** N is taken as written in the source and counts `nul`, conditions, context
+   and keystroke positions exactly as Keyman's compiler does.
+3. **Given** new code that reads a rule's context array directly, **When** lint runs, **Then** it fails
+   and points to the accessor.
 
 ---
 
@@ -360,6 +376,8 @@ the change it needs, in the style of spec 103's `consumer-review.md`.
   - **LDML Keyboard 3.0** (input and output): export cells cross-link spec 108's mapping contract;
     import cells cover #2624.
   - **MSKLC `.klc`**, **XKB symbols**, **Apple `.keylayout`** (input and output).
+
+  Import cells may say **"reported, not mapped"** (see FR-029b).
 - **FR-028**: An automated check MUST fail in either of two cases:
   - an IR element kind or typed node field has no row in the capability table;
   - a row's KMN export status is not "mapped".
@@ -369,6 +387,46 @@ the change it needs, in the style of spec 103's `consumer-review.md`.
 - **FR-029a**: The table MUST also list each source-format construct that has **no** IR home today
   (for example LDML reorders and markers, `.keylayout` action states, XKB levels beyond four). Each
   entry says whether it should get one (a Tier A or Tier B candidate) or stay reported at import.
+- **FR-029b (importer policy; replaces candidate B4)**: An importer for a format other than KMN MUST
+  NOT create `RawKmnFragment`s. A fragment's `sourceText` is KMN by contract, and emit, carve splicing
+  and analysis read it as KMN. A source construct that has no IR home MUST instead be recorded in that
+  import's report (the `ImportReport` and import-attribution record), with the construct and its
+  location. Its capability cell then reads "reported, not mapped". The IR MUST NOT gain a format field
+  on fragments under this spec.
+
+  If an importer later shows that preserving foreign constructs is needed, that is a new contract
+  proposal with one fixed condition: emit skips non-KMN fragments and raises a finding. It MUST never
+  write them into `.kmn` as comments, because that would make KMN emit lossy, break the I2 round-trip
+  and the "KMN always mapped" rule, and carry foreign text into PR trees (criteria SS1).
+
+**Rule-shape accessors (Story 5, preparation for Tier B: non-breaking)**
+
+- **FR-032**: The contracts package MUST provide shared read accessors for a rule's parts:
+  - keystroke;
+  - pre-context (the context before the keystroke);
+  - head conditions (`if`, `platform`, `baselayout` in head position);
+  - left-hand-side kind (`match`, `nomatch` or input), including a leading `nul`;
+  - the element an `index()`/`context()` offset points at.
+
+  Each accessor MUST read every representation the IR uses today: the synthetic `+` separator or its
+  absence, `matchKind`, `nul` in context, and guards in context. Accessors live in contracts so that
+  keyboard-lint, which cannot import the engine, can use them. The engine re-exports them.
+- **FR-033**: Offsets MUST stay as written in the source. The offset accessor counts positions the way
+  Keyman's compiler does (`CheckStatementOffsets`): a leading `nul`, each head condition, each context
+  element, then the keystroke at the next position. No consumer may compute this by hand.
+- **FR-034**: The keystroke accessor MUST be built from the existing struck-key logic in the touch
+  key↔rule join and MUST absorb the separate splitter in the LDML classifier. Afterwards there is
+  exactly one rule splitter in the codebase.
+- **FR-035**: The contracts package MUST provide rule-building and rule-patching helpers, which
+  construct a rule from its parts and change one part of an existing rule. Every rule writer in
+  pattern-apply, rule packs, deadkey lifecycle, the touch scaffolder, caps, facet migrations, studio
+  rule synthesis and the IR test builders MUST use them.
+- **FR-036**: Every rule reader and writer in contracts, engine, studio and keyboard-lint MUST move
+  onto FR-032 and FR-035, except the codec itself.
+- **FR-037**: A lint rule MUST fail on a direct read or write of a rule's context array, or of
+  `matchKind`, outside the codec and the accessor module itself.
+- **FR-038**: FR-032 to FR-037 MUST NOT change the `KeyboardIR` contract, emitted output or any test
+  expectation.
 
 **Gates**
 
@@ -386,27 +444,52 @@ the change it needs, in the style of spec 103's `consumer-review.md`.
   comparing which lines it rejects with which lines the current reader makes opaque. Its findings size
   FR-006, FR-007 and the allow-list.
 
-**Breaking IR restructure (Story 5, Tier B)**
+**Tier B ruling: breaking IR restructure moves to a follow-on spec**
 
-- **FR-040**: The plan MUST inventory the breaking IR changes the grammar enables, with every
-  affected consumer and the change each one needs. At least these:
-  - **B1**: an explicit keystroke on each rule (the grammar's `keystroke` production), replacing the
-    synthetic `+` separator in the rule's context;
-  - **B2**: the grammar's left-hand-side shape (`match`/`nomatch` or an input block with leading
-    `nul` and condition statements) as one typed field, replacing today's split representation;
-  - **B3**: any further reshaping the format-capability table (FR-027) shows is needed so a
-    rule's physical key and modifier state can be read without KMN knowledge.
-  - **B4**: a format-neutral opaque node. Today `RawKmnFragment` holds KMN source text and is stamped
-    `origin: "imported"`. An importer reading LDML, `.klc`, XKB or `.keylayout` has no faithful way to
-    preserve a construct it can't map. The candidate change is a fragment that records its source
-    format and source text, so non-KMN importers can preserve and report instead of dropping. This
-    change interacts with KMN emit, because a non-KMN fragment can't be emitted to KMN verbatim; the
-    plan must say how emit and the capability table's KMN invariant treat it.
-- **FR-041**: Tier B changes MUST NOT be implemented without the ruling recorded below and a joint
-  engine and content session, with a major version bump of the contracts package.
-  [NEEDS CLARIFICATION: Should Tier B (explicit rule keystroke, typed left-hand side) be scheduled
-  inside this spec behind the joint-session gate, or split into its own follow-on spec once Stories 1–4
-  have shipped?]
+Ruled 2026-11-10 by a KM crew design review: km-keyman, km-author, km-synthesis and km-output, with
+km-lead deciding. The owner accepted the ruling the same day. The breaking changes are **not**
+implemented in this spec. They go to a follow-on spec, whose number is reserved when this spec's plan
+lands. This spec records the shapes and gates the follow-on inherits.
+
+- **FR-040**: The follow-on spec carries these changes, **in this order**. Line references are to
+  Keyman's `kmcmplib` `Compiler.cpp`.
+  1. **B3, modifier set.** A rule keystroke's modifiers become an unordered set over exactly the nine
+     names the compiler accepts: NCAPS, LALT, LCTRL, RALT, RCTRL, ALT, CTRL, CAPS, SHIFT
+     (Compiler.cpp:2512–2554, case-insensitive). CTRL and LCTRL stay distinct. Mixing left and right
+     modifiers stays representable (it only warns, :2556). There is no NUMLOCK, SCROLL or ALTGR
+     spelling. A key map that any format can read is a **derived** engine accessor, never stored in
+     the IR.
+  2. **B1, explicit keystroke.** The keystroke becomes its own field on each rule, and the context
+     holds only the pre-context. The keystroke is **one** element. kmcmplib uses only the first
+     element and warns on more (:1745), so a multi-element keystroke stays an opaque fragment, even
+     though Keyman's newer grammar accepts several. The forms are:
+     - a virtual key with modifiers;
+     - a quoted character with modifiers, `[SHIFT 'a']` (:2587–2608);
+     - a bare character, which must be in the Basic Multilingual Plane (:1740);
+     - `any(store)`.
+
+     `outs()` is not a keystroke form.
+  3. **B2, typed left-hand side.** One field: `match`, `nomatch`, or input. Input has an optional
+     leading `nul`, the **head run** of conditions (`if`, `platform`, `baselayout`), the pre-context
+     and the keystroke.
+     - A condition or `nul` that is not at the head is legal KMN (it only warns, :1514, :1520) and
+       stays an in-context element, as spec 103 does today.
+     - B2 moves head guards out of the context, which conflicts with spec 103's ratified shape. It
+       MUST NOT start without an explicit revision request against spec 103 citing this evidence.
+- **FR-041**: The follow-on spec MUST carry these gates:
+  - a joint engine and content session, and a major version bump of the contracts package;
+  - **saved-draft migration.** Drafts store the starting-point IR (`startIr`). The follow-on MUST bump
+    the draft envelope version and re-derive `startIr` by re-parsing the saved starting-point files,
+    then re-seed the working IR from it. Discarding drafts on a version mismatch is not acceptable;
+  - rule-level runtime schemas, because the IR schema passes rule shapes through unchecked today, so
+    the existing drift guards would not catch a shape change;
+  - offsets unchanged as written (FR-033), with tests on guarded rules of the `if(...) any(s) + "k" >
+    index(t,2)` shape.
+- **FR-042**: The rejected alternatives MUST stay recorded:
+  - B4, a format field on opaque fragments: replaced by the importer policy in FR-029b;
+  - keeping B1–B3 in this spec: rejected, so the reader swap ships and can be bisected separately from
+    the contract change;
+  - re-basing `index()` offsets: rejected (FR-033).
 
 ### Key Entities
 
@@ -423,6 +506,9 @@ the change it needs, in the style of spec 103's `consumer-review.md`.
 - **Format-capability table**: one row per typed IR construct, giving import and export status per
   format: KMN (export always mapped), legacy CLDR (import only), LDML, MSKLC, XKB and `.keylayout`.
   It also lists source-format constructs that have no IR home yet.
+- **Rule-shape accessors and helpers**: the shared read accessors (keystroke, pre-context, head
+  conditions, left-hand-side kind, offset target) and the rule-building and rule-patching helpers.
+  They are the only sanctioned way to read or build a rule's parts outside the codec.
 - **Corpus comparison evidence**: per-keyboard import status, per-reason opaque counts and comment
   counts under both readers, plus the allow-list.
 
@@ -448,6 +534,10 @@ the change it needs, in the style of spec 103's `consumer-review.md`.
   The check that enforces this passes.
 - **SC-008**: The reader's grammar is the same grammar Keyman's own next-generation compiler uses. Any
   local change to the vendored parser is listed and has been offered upstream.
+- **SC-009**: Zero direct reads of a rule's raw context array or `matchKind` remain outside the codec
+  and the accessor module, the lint guard enforces it, and exactly one rule splitter exists.
+- **SC-010**: No importer for a format other than KMN creates an opaque fragment. Every unmapped source
+  construct appears in its import report.
 
 ## Assumptions
 
