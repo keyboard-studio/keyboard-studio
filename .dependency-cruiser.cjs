@@ -20,9 +20,10 @@ module.exports = {
         'Type-only cycles are allowed: TypeScript erases them (e.g. the ' +
         'Pattern <-> KeyboardIR type cross-reference in contracts). The vendored ' +
         'Keyman parser (codec/ng) has upstream rule-class cycles between its ' +
-        'analyzer files; they are resolved lazily at construction time.',
+        'analyzer files; they are resolved lazily at construction time. The built ' +
+        'copy under dist/ carries the same cycles.',
       severity: 'error',
-      from: { pathNot: '^packages/engine/src/codec/ng/' },
+      from: { pathNot: '^packages/engine/(src|dist)/codec/ng/' },
       to: { circular: true, dependencyTypesNot: ['type-only'] },
     },
     {
