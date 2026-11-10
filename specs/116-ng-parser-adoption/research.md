@@ -118,6 +118,20 @@ characters in Phase 2. Keys with modifiers in stores are left for the follow-on.
   tokenizer in front of Keyman's parser rules (does not remove the parser cost), or relaxing the
   budget for a parse that runs once per import.
 
+- **Parser-stage patch (owner: "optimize what you can, move forward").** Local patch 3 in
+  `PROVENANCE.md`: FIRST-set prediction in the combinators of `recursive-descent.ts`, plus a
+  copy-free child transfer in `tree-construction.ts`. The grammar rule files (`kmn-analyzer.ts`,
+  `statement-analyzer.ts`, `store-analyzer.ts`) stay untouched. Results, standalone `tsx` bench,
+  same corpus: lex + per-line parse **4,415 ms → 2,197 ms** total (budget 2,208 ms), slowest file
+  **625 ms → 330 ms** (`hakka`, 2.5 MB; `vietnamese_telex`, 2.8 MB, is 330–370 ms between runs;
+  budget 300 ms). The per-line AST digest is identical before and after, and
+  `parser-equivalence.corpus.test.ts` checks the same thing in CI. Profile after the patch:
+  combinator `parse` 30% self, GC 19%, lexer `matchToken` 14%, `ast-rebuild` `apply` 5%. The total
+  now sits at the budget line and the slowest file just over it, so T031 stays unchecked and its
+  assertion stays `it.fails`. Next candidates, not yet done: write into the parent node and
+  truncate on failure instead of allocating a temporary `ASTNode` per attempt (the GC share); avoid
+  the per-line `tokens.slice` in the line loop.
+
 - **Decision (comments, revising R2):** one lexer pass. The comment side-channel is a callback on
   non-emitted tokens, added in the same local lexer patch as the performance work. The two-pass wrap
   is rejected on the trial-run evidence.

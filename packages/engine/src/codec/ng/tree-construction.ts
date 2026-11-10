@@ -65,6 +65,20 @@ export class ASTNode {
   }
 
   /**
+   * LOCAL PATCH 3 (performance): add all of another node's children, in order,
+   * without the defensive copy `addChildren(other.getChildren())` makes.
+   *
+   * @param other the node whose children to add
+   * @returns this
+   */
+  public addChildrenOf(other: ASTNode): ASTNode {
+    for (const child of other.children) {
+      this.children.push(child);
+    }
+    return this;
+  }
+
+  /**
    * Add a new child node by type with optional token.
    *
    * @param nodeType the node type to add
