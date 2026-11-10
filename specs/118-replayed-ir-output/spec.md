@@ -21,12 +21,37 @@ the IR, but the typed IR is not what carries an author's work to the output.
   `.kmn` text. Pattern application and several projection steps break this today.
 - **Spec 105** (derived working copy, ruled 2026-10-19, Phase 0 shipped in #2292). 105 makes the
   working copy a pure function of the starting point and the decisions. This spec is its output
-  side: it makes the *files* a pure function of that same replayed state. Where 105 folds a surface
-  into replay, this spec requires the fold to land **in the IR**, not in an overlay slice that a
-  separate projection re-applies to text.
+  side: it makes the *files* a pure function of that same replayed state. 105 keeps its per-surface
+  phases (2-7). This spec amends what those phases fold into (see Rulings this revises).
 - **Spec 116** (typed IR members, PR #2637) and **spec 117** (IR restructure, handoff in
   `specs/116-ng-parser-adoption/evidence/follow-on-handoff.md`): this spec depends on 116 and is
   sequenced with 117 (Q6).
+
+## Rulings this revises (explicit revision request)
+
+This spec reopens resolved decisions. Per the revision policy, each is named with the original
+ruling and the new evidence. None takes effect until ruled.
+
+- **D-090-24** (`specs/_archive/090-gallery-decision-modules/research.md:1193-1240`) kept carve out
+  of the replayed IR for three reasons, and rejected option (c), carve's `apply` returning the carved
+  IR. This spec asks for option (c), for every surface.
+  - *Reason 1, no patch channel:* spec 089's contract had no carve channel. Folding into the IR needs
+    none: the IR is the channel.
+  - *Reason 2, `ApplyContext` cannot reproduce the projection's inputs* (the effective item-id union,
+    entry-group deferral, the rule-additions splice): answered by FR-204. Those inputs become
+    decisions or explicit `requires` edges, not projection-local state.
+  - *Reason 3, one producer only:* this is the strongest argument **for** the change. Today there are
+    already two producers: replay writes the working IR, and the projection writes the files from
+    other inputs. Defect D1 (a rename that reaches the preview but probably not the download) is the
+    result. This spec removes the projection's role as a producer and leaves replay as the only one.
+- **D-090-30/31** (carve, dead keys and rules recorded from the working copy at completion) and
+  **D-090-39/40** (physical and touch layout recorded, with `apply` a no-op): revised in the same
+  way. The recorded values stay; their `apply` stops being a no-op.
+- **Spec 105 FR-007** permits a surface to fold "into the derived working copy, including overlay
+  channels (090: overlays as decision values)", and its Assumptions cite D-090-24 as the carve
+  precedent. This spec amends FR-007: a surface's fold MUST land in the IR or the touch/kvks models.
+  An overlay channel is allowed only for state that no output file carries (attribution, help-doc
+  answers).
 
 ## Current state (evidence, 2026-11-10)
 
@@ -35,9 +60,9 @@ Read from the spec 116 branch by four research passes; file references are to th
 - **Replay exists and is sound.** `decisions/replayKeyboard.ts` folds decisions over the starting
   IR. Checkpoints hold `{ ir, overlay }`. `applyDeterminism.ts` rejects impure applies.
   `replayDeterminism.test.ts` proves incremental equals full replay, byte for byte.
-- **Little of the authoring reaches the replayed IR.** About 8 `apply` sites patch the IR: the rule
-  set, defined dead keys, standard letters and the reserve header fields. 21 gallery modules have
-  `apply: () => ({})`. Carve folds into an overlay slice, not the IR.
+- **Little of the authoring reaches the replayed IR.** Three live modules patch the IR: the rule
+  set, defined dead keys and standard letters. Four `reserve/*` modules also do, but no flow uses
+  them. 21 gallery modules have `apply: () => ({})`. Carve folds into an overlay slice, not the IR.
 - **The output never comes from the replayed IR.** `lib/projectWorkingCopyVfs.ts` (1,602 lines)
   starts from the starting point's files and runs about 14 ordered steps over about 20 store inputs.
   Its own comment: "the working IR is never emitted into the artifact". Every output (download,
@@ -116,9 +141,9 @@ migration's equivalence gates compare against correct output.
 
 | ID | Defect | Status |
 |---|---|---|
-| D1 | A touch-key rename's rule half (vkey bindings) probably never reaches the download: `keyEditOps` is `[]` on the output path (`projectionInput.ts:158`), and the rename writes only the working IR with no `rulesStepAdded` stamp. | From reading; needs a reproduction test |
+| D1 | A touch-key rename's rule half (vkey bindings) probably never reaches the download: `keyEditOps` is `[]` on the output path (`projectionInput.ts:158`), and the rename writes only the working IR with no `rulesStepAdded` stamp. `TouchGallery.tsx:2864-2870` acknowledges step 1.7 is inert on output and calls it "its own finding"; no issue exists. | From reading; needs a reproduction test |
 | D2 | Replay drops the `docFixProposals` channel (`help-body-parity`): `foldPatch` and `installRebuiltState` ignore it, so apply and replay disagree (Art III). | From reading |
-| D3 | The D3 validator checks the unedited `startVfs` `.kmn` (`StudioShell.tsx:1223-1231`). Author changes are only checked by the preview compile. | Verified |
+| D3 | The D3 validator checks the unedited `startVfs` `.kmn` (`StudioShell.tsx:1223-1231`). Author changes are only checked by the preview compile. This contradicts spec.md Scenario D ("Validator blocks invalid emission") and D3's premise that the TS check and the WASM oracle check the same input. | Verified |
 | D4 | Projection steps 2.8 (caps) and 4 (id rename) call `emitKmn` directly, bypassing `writeKmn`, so Open mode loses byte identity. Step 2.8 has no "unchanged" gate. | From reading |
 | D5 | The preview never passes `openMode`, so an opened keyboard's preview is a full re-emit while its download is a splice. | From reading |
 | D6 | `OskCodePane`, `TouchCodePane`, `OskEditor` and `docRegenerationFix` replace starting-point files without the replay wrapper. | From reading |
@@ -141,9 +166,10 @@ migration's equivalence gates compare against correct output.
 - **FR-105**: The ~85 tests pinned to `applyAssignments` text MUST move to IR assertions, or to
   emitted-text assertions through `emit`, with no loss of coverage.
 
-### W2 - Every surface folds into the IR during replay
+### W2 - Amendment to spec 105: every surface folds into the IR
 
-This is spec 105 Phases 2-7, with one added requirement: the fold target is the IR.
+Spec 105 Phases 2-7 stay 105's and keep its gates. This section is the amendment to their fold
+target (see Rulings this revises); it adds no phases of its own.
 
 - **FR-201**: Each surface's decision `apply` MUST transform the IR (or the touch/kvks model), not
   write an overlay slice for a later projection step:
@@ -158,6 +184,12 @@ This is spec 105 Phases 2-7, with one added requirement: the fold target is the 
   carry the computed result, so replay stays synchronous and pure (Q5).
 - **FR-203**: `deriveRuleAdditions`, `spliceRuleAdditions` and the `rulesStepAdded` marker MUST be
   retired: additions arrive as decisions, not as a diff of the working IR.
+- **FR-204**: Every ordering constraint the projection enforces by step position MUST become an
+  explicit `requires` edge in the decision registry, so replay order is derived, not implied. The
+  comments in `projectWorkingCopyVfs.ts` are the inventory. Examples: mark guards after assignments
+  (they must see assignment rules) and before context tolerance (which repoints the entry group);
+  dead keys before assignments (their ops were validated without assignments). The equivalence gate
+  MUST fail when the derived order differs from the projection's step order for the same surfaces.
 
 ### W3 - Touch layout and visual keyboard in the replayed state
 
@@ -207,22 +239,26 @@ This is spec 105 Phases 2-7, with one added requirement: the fold target is the 
 
 ## Phasing (sketch)
 
-| Phase | Content | Lines up with |
+This spec's own phases. The per-surface folds stay spec 105's phases, under the W2 amendment; the
+"needs" column names which of them must land first.
+
+| Phase | Content | Needs |
 |---|---|---|
-| 0 | W0 defect fixes, each its own PR | - |
-| 1 | Emit modes and a state-in, files-out `emit` beside the projection (no behaviour change) | - |
-| 2 | Identity, custom CSS, caps, mark guards as IR applies | 105 Phase 7 |
-| 3 | Dead keys over the carved IR | 105 Phase 2 |
-| 4 | Carve as an IR apply | 105 Phase 3 |
-| 5 | Pattern application on the IR (W1) | 105 Phase 4 |
-| 6 | Touch layout and `.kvks` in the state (W3), key edits and renames | 105 Phases 5-6 |
-| 7 | Projection reduced to emit; D3 validates the replayed state (W4, W5) | - |
+| 0 | W0 defect fixes, each its own `fix(...)` PR | - |
+| 1 | Emit modes and a state-in, files-out `emit` beside the projection; no behaviour change | - |
+| 2 | Pattern application on the IR (W1) | spec 117 B1 (Q6) |
+| 3 | Touch layout and `.kvks` models with fidelity-preserving emit (W3) | - |
+| 4 | Ordering edges (FR-204) and the order-equivalence gate | - |
+| 5 | Projection reduced to emit; D3 validates the replayed state (W4, W5) | 105 Phases 2-7 with the W2 amendment; phases 2-4 here |
 
 ## Open questions (need rulings)
 
-- **Q1 - One spec or two?** Amend spec 105 so its phases fold into the IR, or keep this as a separate
-  output-side spec cross-referenced with 105? *Recommendation: separate.* 105 is about what is
-  stored; this is about what produces the files. They meet at the fold target.
+- **Q0 - The revisions.** Accept option (c) of D-090-24 (and the matching D-090-30/31/39/40 changes)
+  and the spec 105 FR-007 amendment? Everything else depends on this.
+- **Q1 - Scope split.** As drafted, 105 keeps its per-surface phases and this spec amends their fold
+  target and owns the defects, pattern application, the touch/kvks models, the emit and validation.
+  The alternative is to fold all of this into 105 as new phases. *Recommendation: as drafted.* 105
+  is about what is stored; this is about what produces the files.
 - **Q2 - Drafts.** 105 FR-002 (decisions-only drafts) conflicts with Art III ("decisions-only drafts
   are not the shipped model, and no plan may assume them"), which predates 105 and was never
   amended. This spec does not need decisions-only drafts and works with today's snapshot envelope.
