@@ -5,10 +5,100 @@ considered. Evidence paths are repo-relative, or into the local Keyman checkout 
 
 ## R1 — Corpus trial run of Keyman's parser (FR-031)
 
-*Status: running. Results are added here before `/speckit-tasks`.* This entry sizes the reason
-catalogue (contracts/lowering.md §3), the allow-list and the performance assumption.
+Run 2026-11-10 over `../keyboards` at the corpus checkout. Keyman's parser was extracted at
+`fb7afff889` and run under `tsx` with no stubs, because it is self-contained. Lines were parsed one at
+a time through the exported `LineRule`. The codec under comparison is identical to `origin/main`'s.
+Raw results are in the session scratchpad (`ng-spike/results.json`, `summary.md`) and are not
+committed. Phase 2 regenerates them as the comparison report.
 
-## R2 — How comments are captured: wrap the lexer, don't patch it (FR-011, FR-014)
+**Coverage**
+
+| Measure | Result |
+|---|---|
+| Files | 1,044 `.kmn` (1,008 with a BOM). The current reader throws on none |
+| Content lines | 510,086, of which Keyman's grammar **accepts 510,084** |
+| Lines rejected | **2**, one class: the bare `fix` statement removed in Keyman 19, at `experimental/gff/gff_geez_emufi/extras/gff_geez_emufi-pua.kmn:1342,1346` (`+ [K_TAB] > ''  fix`) |
+| Codec opaque fragments | 5,324, **all on lines the grammar accepts**. No line is both opaque and rejected |
+| `$kmfl:` / `$weaver:` lines | 0 (`$keymanonly:` 624, `$keymanweb:` 146, `$keyman:` 7, all accepted) |
+
+**Potential lift.** These are ceilings, not commitments. The grammar checks syntax only: it accepted
+`if(&bogus='x')`, `context(99)` and a backwards range.
+
+| Codec reason today | Count | This spec |
+|---|---|---|
+| `smp-literal` | 2,308 | the lexer reads SMP `U+XXXXX` as a character → typed **in Phase 2**, no IR change |
+| `outs-expansion` | 2,144 | Phase 4 `StoreItem.outs` |
+| `menu-store-syntax` | 410 | stays opaque. The grammar sees only a string; the menu meaning is ours |
+| `option-store-directive` | 196 | Phase 4 `set`/`save`/`reset` |
+| `if-option-store` | 187 | stays opaque (spec 103 FR-003; a candidate for the follow-on) |
+| `call-return` | 46 | Phase 4 `call`/`return` |
+| `unknown-pre-begin` | 17 | old-style headers (`HOTKEY "^%A"`). Lowering maps them as `parse.ts` does, or keeps them opaque (R6) |
+| `malformed-range` | 16 | stays opaque. A semantic check that lowering keeps |
+
+There is a further 11,741 already-typed rules (in 429 files) that still hold `raw` elements other than
+the `+`: layers, platform conditions, named constants and keys with modifiers in stores. Phase 4
+covers layers and platform. Named constants are typed by the lexer (`NAMED_CONSTANT`) and lowered to
+characters in Phase 2. Keys with modifiers in stores are left for the follow-on.
+
+**Findings that change the plan**
+
+1. **Lowering must keep every semantic check the current reader makes.** The grammar accepts things
+   the IR can't model faithfully, such as `context(0)`, backwards ranges and the menu-store syntax.
+   contracts/lowering.md already says "lowering finds a construct the IR can't model → fragment with
+   today's reason". This confirms it's load-bearing: the reason catalogue is driven by lowering, not by
+   grammar rejections.
+2. **The rejection catalogue is tiny.**
+   - `removed-statement` has 2 corpus lines.
+   - `foreign-compile-target` has 0 corpus lines, and is kept so the class has a name if one appears.
+   - `multi-element-keystroke` is a lowering check, not a grammar rejection.
+3. **Do not use upstream's whole-file `Parser.parse()`.** It silently truncates a file at the first
+   failing line: `gff_geez_emufi-pua.kmn` is cut at line 1342, keeping 51,249 of 69,424 characters,
+   with no diagnostic. The per-line loop (R4) is required, not a nicety. This is reported upstream as
+   an issue.
+4. **The current reader has a fidelity bug on that same line.** It types `fix` as a raw output
+   element, drops the `''`, and re-emits `+ [K_TAB] > fix`. The new reader makes the line a
+   `removed-statement` fragment and emits it verbatim. That file moves from Clean to CleanWithOpaque,
+   which is the one allow-list entry so far. The status gets worse on paper but fidelity improves;
+   the entry's reason says so.
+5. **Performance: the main risk.** One run each, Node, whole corpus:
+
+   | Reader | Corpus total | Slowest file |
+   |---|---|---|
+   | Current codec | 0.95 s | `hakka` 152 ms |
+   | Keyman lexer | 8.3 s | |
+   | Keyman per-line parse | 3.3 s | `vietnamese_telex` 1.73 s (lex + parse) |
+   | Keyman whole-file (lex + parse) | 12.4 s | `vietnamese_telex` 1.96 s |
+
+   That is about 13 times slower overall, with lexing at about two thirds of it. Nearly 2 s for one
+   large keyboard is too slow for the studio, where `parse()` runs when a keyboard is opened or copied,
+   in the browser, on slower machines than this one. A second lexer pass for comments (R2's first
+   choice) would double the dominant cost.
+
+- **Decision (performance):**
+  1. **Budget.** The reader (lex + parse + lower + comments) must take at most 2 times the current
+     codec's time over the corpus, and at most 300 ms on the slowest corpus file, in Node, on CI.
+     This replaces the spec's "no slower than today" assumption, which the trial run shows is
+     unreachable without changes and which isn't needed: imports are one-shot, not per-keystroke.
+     The spec assumption is updated to match.
+  2. **Profile first.** Phase 2 starts by profiling the vendored lexer before any lowering work. The
+     likely causes, to be confirmed by the profile: every recogniser is tried in table order at each
+     position (about 200 sticky regexes per token), and the line buffer is rebuilt by string
+     concatenation.
+  3. **Fix as a local patch, offered upstream.** For example, dispatch recognisers on the first
+     character and keep keyword recognisers behind one identifier match. Each patch is listed in
+     `PROVENANCE.md` with an upstream issue or PR (FR-014). The grammar file and the parser rules stay
+     untouched.
+  4. **Escalation.** If profiling and patching can't reach the budget, Phase 2 stops and the finding
+     goes to the owner before any lowering lands. The options would be a larger lexer rewrite offered
+     upstream, or keeping the current tokenizer in front of Keyman's parser rules.
+- **Decision (comments, revising R2):** one lexer pass. The comment side-channel is a callback on
+  non-emitted tokens, added in the same local lexer patch as the performance work. The two-pass wrap
+  is rejected on the trial-run evidence.
+
+## R2 — How comments are captured (FR-011, FR-014). **Superseded by R1, finding 5:** one pass with a local lexer callback
+
+*The text below records the original two-pass reasoning. R1's timing rejects it: the lexer is about
+two thirds of reader time, so a second pass would double the dominant cost.*
 
 - **Facts:**
   - Upstream `scan-recognizer.ts` marks `COMMENT`, `WHITESPACE` and `CONTINUATION` as `emit:false`.

@@ -560,8 +560,14 @@ lands. This spec records the shapes and gates the follow-on inherits.
   this spec covers `.kmn` only.
 - Validation keeps using the WASM `kmcmplib` oracle. The adopted parser is a reader for the IR, not a
   compiler or validator, and adds no step to the D3 debounce cycle.
-- Reading a keyboard that is mostly opaque today does not need to get faster. A performance target
-  is "no slower than today's reader on the largest corpus keyboard", checked in the plan phase.
+- Performance: importing is a one-time step per keyboard, not part of the per-keystroke cycle. The
+  budget is that the new reader takes at most 2 times the current reader's time over the corpus, and
+  at most 300 ms on the slowest corpus keyboard.
+
+  The plan-phase corpus run measured Keyman's unpatched front end at about 13 times slower than
+  today's reader: 1.96 s on the slowest keyboard against 152 ms. Meeting the budget needs local lexer
+  patches, which are offered upstream. If they can't meet it, the work stops for an owner decision
+  before the reader is swapped (research R1).
 - Importers and exporters for formats other than KMN are owned by their own issues or specs:
   - legacy CLDR: #2599 (open PR #2625, which already builds IR and emits `.kmn`);
   - LDML: import #2624, export spec 108;

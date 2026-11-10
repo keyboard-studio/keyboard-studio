@@ -23,6 +23,14 @@
   - removal of imports from excluded files.
 
   Any behavioural patch is a local patch and needs the FR-014 upstream offer.
+- **Expected local patches** (research R1, finding 5), both to `lexer.ts` and/or
+  `scan-recognizer.ts`, neither touching the grammar or the parser rules:
+  1. **Performance:** recogniser dispatch, and removing the line-buffer concatenation, as the profile
+     directs. Target: the reader budget in [plan.md](../plan.md).
+  2. **Trivia callback:** `onTrivia` for `emit:false` tokens (contracts/comment-channel.md).
+
+  Also file an upstream issue for the silent truncation in `Parser.parse()` (research R1, finding 3).
+  We don't patch it locally, because we don't call it.
 - **Boundary.** A depcruise rule forbids importing `packages/engine/src/codec/ng/**` from anywhere
   except `packages/engine/src/codec/*.ts`. The codec barrel exports nothing from `ng/`.
 - **Lint.** `ng/` is excluded from the repo's style lint rules. It is still type-checked, and still

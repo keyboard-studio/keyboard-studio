@@ -21,18 +21,16 @@ The `c` keyword is recognised only where the upstream recogniser matches it. Thi
 quote-aware and key-name-aware by construction, because quoted strings and `[K_C]` are consumed by
 earlier recognisers. That replaces `stripTrailingComment`'s hand-written scan.
 
-## How it is captured (decision: research R2)
+## How it is captured (decision: research R1, finding 5)
 
-The lexer is **wrapped, not modified**. A thin `captureTrivia(source)` pass runs the vendored
-recognisers in `emitAll` mode with `handleContinuation: false` and collects only the three record
-kinds. A second, ordinary lexer pass with the upstream defaults produces the tokens the grammar
-consumes.
+**One lexer pass with a local patch.** `Lexer` gains an optional `onTrivia(token)` callback, which
+fires for every token the recogniser table marks `emit:false`: comments, whitespace and
+continuations. It fires in source order with the token's line and column, and it doesn't change which
+tokens are emitted. Default behaviour, with no callback, is identical to upstream.
 
-Upstream documents that `emitAll` excludes continuation handling. Running two passes avoids needing
-both from one pass, so the vendored lexer stays byte-identical to upstream. If the corpus trial run
-shows the cost of two passes breaks the performance assumption, the fallback is a single local patch
-to `lexer.ts`: a callback for non-emitted tokens. That patch would be listed in `PROVENANCE.md` and
-offered upstream (FR-014).
+The patch ships together with the lexer performance work. It is listed in `PROVENANCE.md` and offered
+upstream as an opt-in hook (FR-014). The two-pass wrap was rejected because the corpus trial run
+shows lexing is about two thirds of reader time, and a second pass would double it.
 
 ## Anchoring (unchanged rules, new input)
 

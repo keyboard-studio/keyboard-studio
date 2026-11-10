@@ -57,8 +57,13 @@ The vendored parser must run in both: it may not use Node built-ins. To be verif
 **Project Type**: A library change inside the monorepo: contracts, engine codec, consumers across
 engine, studio and keyboard-lint.
 
-**Performance Goals**: The new reader is no slower than the current one on the largest corpus keyboard
-and over the whole corpus (assumption in spec). Measured by the corpus trial run (research R1).
+**Performance Goals**: The full reader (lex, parse, lower and comments) takes at most 2 times the
+current codec's time over the corpus (about 0.95 s today), and **at most 300 ms on the slowest corpus
+file**, in Node on CI.
+
+Unpatched, Keyman's front end measured 12.4 s over the corpus and 1.96 s on `vietnamese_telex`
+(research R1, finding 5). Meeting the budget therefore needs local lexer patches, offered upstream.
+Phase 2 profiles first, and stops to escalate if the budget can't be reached.
 
 **Constraints**:
 - **Art II**: the syntax tree never leaves the codec.
@@ -165,7 +170,7 @@ specs/116-ng-parser-adoption/evidence/   # Phase 3: committed comparison report 
 | Phase | Stories / FRs | Gate to close (all green, then commit + push) |
 |---|---|---|
 | 1. Rule-shape accessors | US5, FR-032 to FR-038 | Every reader and writer migrated, including the 6 inline copies of the `+` predicate (research R5b). Lint guard on. `pnpm lint` and `pnpm -r test` pass. Test expectations change only for recorded splitter disagreements (FR-038, R5a). The two recognizer rules that read raw offsets are migrated in their own commit. One splitter remains. |
-| 2. Reader swap (comparison) | US1, FR-001 to FR-008, FR-030/031 | Vendored parser builds in browser and Node. The comparison suite shows import status and per-reason counts not worse (allow-list committed). Emit is identical for every corpus file. The comparison runs with comments compared **as a known gap**. |
+| 2. Reader swap (comparison) | US1, FR-001 to FR-008, FR-030/031 | **2a first:** profile the vendored lexer, apply the performance and trivia patches (listed in `PROVENANCE.md`, offered upstream), and meet the reader budget on a timing test. If the budget is missed, stop and escalate (research R1, finding 5). **2b:** vendored parser builds in browser and Node. The comparison suite shows import status and per-reason counts not worse (allow-list committed). Emit is identical for every corpus file. The comparison runs with comments compared **as a known gap**. |
 | 3. Comments | US2, FR-010 to FR-014 | Comment text and anchors identical to the old reader across corpus and fixtures. Comparison fully green. **Old reader deleted (FR-008).** The comparison report is committed under `evidence/`. |
 | 4. Additive IR members | US3, FR-020 to FR-026 | **4a hardening first** (R5c): every non-exhaustive kind switch made exhaustive; store-item ternaries replaced by one exhaustive `storeItemText`; text recognisers routed through one `classifyRawElement`. Then **4b**: new members in the contract and schema. Every exhaustive switch handles them. Round-trip passes. The LDML classifier reads them, with identical output on its fixtures. Mapping-contract rows in spec 108 updated. Corpus count of `option-store-directive`/`call-return`/`outs-expansion` fragments drops as SC-005 says. |
 | 5. Capability table | US4, FR-027 to FR-029b, SC-007/010 | Table covers every IR kind and node field, with KMN export "mapped" on every row. The check is wired into the contracts tests. The importer policy is stated in the table and cross-linked from epic #2584's issues via PR body. |
@@ -179,6 +184,7 @@ comes after Phase 3. Phase 5 needs Phase 4's members in order to list them.
 | Exception | Why needed | Simpler alternative rejected because |
 |---|---|---|
 | Vendored third-party source in the engine | Keyman has not published the parser (unmerged branch, milestone 20.0) | Waiting for a release blocks the LDML work and the import epic for an unknown time. Re-implementing the grammar ourselves forfeits upstream alignment, which is the point of the change. |
+| Local patches to vendored lexer (performance + trivia callback) | Unpatched front end is about 13 times slower than today's reader, and it drops comments | A second lexer pass doubles the dominant cost. Keeping our tokenizer in front of Keyman's rules forfeits half the upstream alignment. Both patches are opt-in and offered upstream |
 | Two readers alive at once (Phases 2–3) | The comparison gate (FR-030) needs the reference reader | Switching in one step makes any regression look like a codec bug with no baseline. The legacy file is deleted in Phase 3, the same phase that proves the gate. |
 
 ## Post-design Constitution re-check

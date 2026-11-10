@@ -45,10 +45,17 @@ lex(text) → per-logical-line token slices → parse `line` rule → ASTNode �
 |---|---|---|
 | existing reasons | kept | same constructs as today |
 | `smp-literal` | expected to stop being produced | the upstream lexer reads SMP `U+XXXXX` as `U_CHAR`. The reason is kept in the catalogue for persisted drafts |
-| `foreign-compile-target` | new | `$kmfl:` / `$weaver:` line |
-| `removed-statement` | new | `clearcontext`, `fix`, `switch`, `key`: statements Keyman 19 removed |
-| `multi-element-keystroke` | new | more than one keystroke element |
-| further classes | new, as the corpus trial run finds them | one reason per rejection class in research R1; never a catch-all |
+| `foreign-compile-target` | new | `$kmfl:` / `$weaver:` line (0 lines in the corpus; kept so the class has a name) |
+| `removed-statement` | new | `clearcontext`, `fix`, `switch`, `key`: statements Keyman 19 removed. The only grammar-rejection class in the corpus (2 lines, research R1) |
+| `multi-element-keystroke` | new | more than one keystroke element (a lowering check, not a grammar rejection) |
+| `grammar-reject` | **forbidden** | no catch-all. A future rejection with no class fails the comparison suite until it is named |
+
+Research R1 shows the grammar rejects almost nothing, so **lowering's semantic checks are what keep
+today's reasons alive**. `context(0)`, backwards ranges, menu-store syntax, `if(… <> …)` and non-head
+`if()` all parse, and lowering must still make them fragments with their current reasons.
+
+Do **not** call upstream's whole-file `Parser.parse()`. It silently truncates at the first failing
+line (research R1, finding 3). The per-line loop in §1 is the only entry point.
 
 A reason name never changes meaning. Persisted drafts and the carve gallery key on these strings.
 
