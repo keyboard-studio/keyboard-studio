@@ -39,3 +39,7 @@
 ## Follow-ups and open issues
 - Code `@see` citations into archived contract files: `contracts/src/touch-coverage.ts:22`, `engine/.../applyDesktopModifications.ts:32`, `touchCoverage.ts:41`, `applyTouchAssignments.ts:22`, `keyboard-lint/.../check-18-6-touch-coverage.ts:5`, `studio/src/lib/deriveDesktopModifications.ts:7`, and E2E headers citing `quickstart.md` (`touch-derivation-us1/us2.spec.ts`). Retarget or leave; the folder stub does not hold those files.
 - `docs/spec-trace.json` unit `specs/035-mobile-touch-derivation` is cited as a `specRef` by `registerEditorSteps.ts` and `manifest.specref.json`; retiring orphans it.
+
+## Later rulings
+- **2026-11-10 (Matthew): R9 revised, gated.** R9 required Case B replay to splice raw JSON and never round-trip through the IR. Its original reason (the IR dropped per-key `layer`, `displayUnderlying`, `font`/`fontsize` and string-or-int `sp`/`width`/`pad`) no longer holds since the full-fidelity touch codec. The reasons that remain are provenance stamping and members the model does not describe. The IR round trip is now allowed once the touch-layout emit meets [spec 118](../118-replayed-ir-output/spec.md) FR-016, proven by the existing twin-equivalence tests. Until then, the raw-JSON splice stays.
+- R13 (single artifact writer) stands in spirit. Under spec 118, the single writer of the touch side-car is the one output stage that emits from the replayed keyboard.

@@ -43,6 +43,23 @@ into line with both. It is the output side of spec 105 (derived working copy), d
   phases (moving editor state into decisions), under the amended FR-007. This spec owns the defect
   fixes, pattern application, the touch and visual-keyboard models, the single output stage and
   validation.
+- Q: Revise spec 063 R10.2, which put touch-key rule synthesis in its own output pass because the
+  working IR never reached the artifact? → A (Matthew): **Revise.** Rule synthesis runs inside the
+  touch-layout decision's `apply`, and the separate pass retires with this spec. Recorded in spec
+  063's AS-BUILT.
+- Q: Revise spec 035 R9 (touch layouts must not round-trip through the IR) and spec 063 §6.2 (every
+  layout operation has an IR twin and a raw-JSON twin)? → A (Matthew): **Revise, gated.** The IR
+  round trip is allowed once the touch emit meets FR-016, proven by the existing twin-equivalence
+  tests. The raw-JSON twins then retire; until then both stay. Recorded in the 035 and 063 AS-BUILTs.
+- Q: Spec 105 FR-002 (decisions-only drafts) conflicts with Constitution Art III. Which way? → A
+  (Matthew): **Amend 105.** Drafts keep a working-copy snapshot as a cache, never a truth: replay
+  must reproduce everything in it, and replay wins on disagreement. No constitution change. Recorded
+  in spec 105 FR-002, FR-006 and the envelope entity.
+- Context: these rulings restore the end state of the spec 088 "Decision Spine" proposal: overlays
+  become decision values that `apply` turns into the keyboard model at rebuild time, and
+  "the keyboard can never disagree with its decisions". D-090-24 had departed from that intent.
+  The proposal's own risk note ("resume may need a disposable cache that is thrown away whenever it
+  disagrees with the decisions") is the 105 amendment.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -261,9 +278,8 @@ that spec 105 introduced.
 
 ## Assumptions
 
-- **Drafts:** they keep today's saved envelope, which includes a working-copy snapshot. This spec
-  does not depend on spec 105's decisions-only drafts. Those conflict with Constitution Art III, and
-  that conflict belongs to spec 105.
+- **Drafts:** they keep the saved envelope with a working-copy snapshot, as a cache that replay must
+  reproduce (spec 105 FR-002 as amended 2026-11-10, consistent with Constitution Art III).
 - **Pattern de-duplication:** keeps today's scope, where a rule identical to one anywhere in the
   keyboard is not added again.
 - **Context tolerance:** its result needs a compile and a simulation to compute. Its decision records

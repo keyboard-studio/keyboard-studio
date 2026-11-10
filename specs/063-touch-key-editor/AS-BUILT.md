@@ -45,3 +45,7 @@
 ## Follow-ups and open issues
 - Stale relative links for km-doc: `docs/adr/0002-touch-grid-renders-the-last-key-stretched.md:8`, `docs/design-notes/touch-editor-glossary.md:8,111` link `../../specs/063-touch-key-editor/spec.md`, which moves to the archive.
 - Code comments citing `specs/063-.../contracts/*.md` and `data-model.md` (contracts/src/touch-key-rule-join.ts, touch-key-diagnostics.ts; engine keyEditOps/keyIdMinting/layerFamilies/touchRuleSynthesis.test; studio keyGridViewModel, useModeContextCarry) now resolve into `../_archive/`.
+
+## Later rulings
+- **2026-11-10 (Matthew): R10.2 revised.** R10.2 put touch-key rule synthesis (ensure/remove/rename) in its own output-projection pass, because the working IR never reached the artifact. Under the D-090-24 revision (spec 118), replay is the only producer of output, so rule synthesis runs inside the touch-layout decision's `apply` on the replayed keyboard. The separate projection pass is retired when spec 118 lands. See [spec 118](../118-replayed-ir-output/spec.md).
+- **2026-11-10 (Matthew): the §6.2 applier-twin rule revised, gated.** Every layout operation needed both an IR applier and a raw-JSON applier, because spec 035 R9 forbade the IR round trip. Once the touch-layout emit meets spec 118 FR-016 (no spurious hand-set marks; members the model does not describe are kept), proven by the existing twin-equivalence tests, the IR applier is the only applier and the raw-JSON twins retire. Until then, both stay.

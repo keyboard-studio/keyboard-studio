@@ -229,6 +229,16 @@ is absent and the deltas are reported in the AS-BUILT.
   set, and the decision log (a decision record), plus only explicitly
   non-truth session data. It MUST NOT contain a working-copy slice, a
   saved-answers slice, or any materialised keyboard state.
+  *Amended 2026-11-10 (Matthew; resolves the conflict with Constitution
+  Art III, which since v2.0.0 says decisions-only drafts are not the
+  shipped model):* the envelope KEEPS a working-copy snapshot, as a cache
+  and never as a source of truth. Decisions remain the only truth: every
+  fact in the snapshot MUST be reproducible by replay from the starting
+  point and the decisions, and draft-load equivalence (FR-010) MUST prove
+  the snapshot equals replay. The "MUST NOT contain a working-copy slice
+  or any materialised keyboard state" clause is withdrawn. The
+  saved-answers slice is unaffected and stays under the in-flight-answers
+  open question (Assumptions).
 - **FR-003**: The incremental-apply path (089) MUST cease to be a rival
   writer: apply runs as part of replay (the fold), not as a separate
   incremental mutation later overwritten by a rebuild. One completion,
@@ -245,6 +255,10 @@ is absent and the deltas are reported in the AS-BUILT.
   current job) MUST be re-expressed in decision terms (persist the draft
   envelope, or the decision set + starting point) — not by snapshotting
   the derived cache.
+  *Amended 2026-11-10 (with FR-002):* the snapshot/restore path stays, as
+  a cache of the derived working copy. It MUST NOT be a write path for
+  author intent (FR-001): a restored snapshot is checked against replay,
+  and if they disagree, replay wins and the difference is reported.
 
 **Decision representation for editor state**
 
@@ -353,7 +367,9 @@ is absent and the deltas are reported in the AS-BUILT.
   a gate failure, not a default.
 - **Draft envelope v3**: the persisted shape of FR-002 / 093 FR-004 —
   starting-point id + decision set + decision log (+ non-truth session
-  data only). Successor to v2 (`DRAFT_VERSION` 2 → 3).
+  data only). Successor to v2 (`DRAFT_VERSION` 2 → 3). *Amended
+  2026-11-10:* plus a working-copy snapshot as a cache (FR-002
+  amendment).
 
 ## Assumptions
 

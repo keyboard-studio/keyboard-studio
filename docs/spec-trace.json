@@ -1127,7 +1127,7 @@
     },
     "specs/105-derived-working-copy": {
       "title": "Feature Specification: Derived working copy — finish the 088–093 migration",
-      "hash": "sha256:86d1185a076ff075",
+      "hash": "sha256:f3868b1772ac68a5",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -1231,7 +1231,7 @@
     },
     "specs/118-replayed-ir-output": {
       "title": "Feature Specification: Output from the replayed keyboard",
-      "hash": "sha256:4dd9d2eb0f813742",
+      "hash": "sha256:482680f821577613",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
