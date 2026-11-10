@@ -1,5 +1,5 @@
 {
-  "$comment": "Differences between the legacy reader (parse-legacy.ts) and the new reader (lower.ts) that reader-differential.corpus.test.ts accepts. Entries name one line; classes name a kind of difference, each checked by the suite's own verifier, with per-file counts in reader-differential.md.",
+  "$comment": "Differences between the legacy reader (parse-legacy.ts) and the new reader (lower.ts) that the comparison suite (reader-differential.corpus.test.ts, deleted with the legacy reader in T045) accepted. Entries name one line; classes name a kind of difference, each checked by that suite's own verifier, with per-file counts in reader-differential.md. reader-regression.corpus.test.ts still requires every grammar-rejected line to be an entry here.",
   "entries": [
     {
       "file": "experimental/gff/gff_geez_emufi/extras/gff_geez_emufi-pua.kmn",

@@ -6,25 +6,25 @@ which follow the kmcmplib rule from research R5a. Separator elements are removed
 pre-context answer before comparing (the new API never counts the `+`).
 
 - corpus files parsed: 1036 of 1036
-- rules compared: 476973
-- disagreements: 915399
+- rules compared: 479085
+- disagreements: 915785
 - unexplained disagreements: 0
 
 ## Summary by splitter, field and explanation
 
 | Splitter | Field | Explanation | Count |
 |---|---|---|---|
-| touch-key-rule-join (struck key) | keystroke | old splitter recognised only vkey/any keystrokes | 222791 |
-| kmAssist splitGuards | keystroke | old splitter recognised only vkey keystrokes | 222791 |
-| kmAssist splitGuards | pre-context | old splitter recognised only vkey keystrokes | 222791 |
+| touch-key-rule-join (struck key) | keystroke | old splitter recognised only vkey/any keystrokes | 222937 |
+| kmAssist splitGuards | keystroke | old splitter recognised only vkey keystrokes | 222937 |
+| kmAssist splitGuards | pre-context | old splitter recognised only vkey keystrokes | 222937 |
 | ldml-export splitRule | pre-context | head run (nul/conditions) is not pre-context | 39900 |
 | outputRepertoire splitContext | pre-context | head run (nul/conditions) is not pre-context | 39900 |
 | touch-key-rule-join (struck key) | keystroke | head run (nul/conditions) is not pre-context + old splitter recognised only vkey/any keystrokes | 39334 |
 | kmAssist splitGuards | keystroke | head run (nul/conditions) is not pre-context + old splitter recognised only vkey keystrokes | 39334 |
 | kmAssist splitGuards | pre-context | head run (nul/conditions) is not pre-context + old splitter recognised only vkey keystrokes | 39334 |
-| kmAssist splitGuards | keystroke | any() as the keystroke + old splitter recognised only vkey keystrokes | 20214 |
-| kmAssist splitGuards | pre-context | any() as the keystroke + old splitter recognised only vkey keystrokes | 20214 |
-| unhandledPositions keystrokeElement | keystroke | group is not using keys + no + with a multi-element left-hand side | 2476 |
+| kmAssist splitGuards | keystroke | any() as the keystroke + old splitter recognised only vkey keystrokes | 20283 |
+| kmAssist splitGuards | pre-context | any() as the keystroke + old splitter recognised only vkey keystrokes | 20283 |
+| unhandledPositions keystrokeElement | keystroke | group is not using keys + no + with a multi-element left-hand side | 2477 |
 | touch-key-rule-join (struck key) | pre-context | any() as the keystroke + head run (nul/conditions) is not pre-context | 705 |
 | ldml-export splitRule | pre-context | any() as the keystroke + head run (nul/conditions) is not pre-context | 705 |
 | kmAssist splitGuards | keystroke | any() as the keystroke + head run (nul/conditions) is not pre-context + old splitter recognised only vkey keystrokes | 705 |
@@ -32,25 +32,17 @@ pre-context answer before comparing (the new API never counts the `+`).
 | outputRepertoire splitContext | pre-context | any() as the keystroke + head run (nul/conditions) is not pre-context | 705 |
 | touch-key-rule-join (struck key) | pre-context | head run (nul/conditions) is not pre-context | 566 |
 | kmAssist splitGuards | pre-context | head run (nul/conditions) is not pre-context | 566 |
-| ldml-export splitRule | pre-context | group is not using keys + head run (nul/conditions) is not pre-context | 180 |
-| kmAssist splitGuards | pre-context | group is not using keys + head run (nul/conditions) is not pre-context | 180 |
-| outputRepertoire splitContext | pre-context | group is not using keys + head run (nul/conditions) is not pre-context | 180 |
-| unhandledPositions keystrokeElement | keystroke | group is not using keys + head run (nul/conditions) is not pre-context | 180 |
-| ldml-export splitRule | pre-context | group is not using keys + head run (nul/conditions) is not pre-context + no + with a multi-element left-hand side | 162 |
-| kmAssist splitGuards | pre-context | group is not using keys + head run (nul/conditions) is not pre-context + no + with a multi-element left-hand side | 162 |
-| outputRepertoire splitContext | pre-context | group is not using keys + head run (nul/conditions) is not pre-context + no + with a multi-element left-hand side | 162 |
-| unhandledPositions keystrokeElement | keystroke | group is not using keys + head run (nul/conditions) is not pre-context + no + with a multi-element left-hand side | 162 |
+| ldml-export splitRule | pre-context | group is not using keys + head run (nul/conditions) is not pre-context | 182 |
+| kmAssist splitGuards | pre-context | group is not using keys + head run (nul/conditions) is not pre-context | 182 |
+| outputRepertoire splitContext | pre-context | group is not using keys + head run (nul/conditions) is not pre-context | 182 |
+| unhandledPositions keystrokeElement | keystroke | group is not using keys + head run (nul/conditions) is not pre-context | 182 |
+| ldml-export splitRule | pre-context | group is not using keys + head run (nul/conditions) is not pre-context + no + with a multi-element left-hand side | 164 |
+| kmAssist splitGuards | pre-context | group is not using keys + head run (nul/conditions) is not pre-context + no + with a multi-element left-hand side | 164 |
+| outputRepertoire splitContext | pre-context | group is not using keys + head run (nul/conditions) is not pre-context + no + with a multi-element left-hand side | 164 |
+| unhandledPositions keystrokeElement | keystroke | group is not using keys + head run (nul/conditions) is not pre-context + no + with a multi-element left-hand side | 164 |
 | unhandledPositions keystrokeElement | keystroke | group is not using keys | 68 |
-| touch-key-rule-join (struck key) | keystroke | extra keystroke elements + old splitter recognised only vkey/any keystrokes | 59 |
-| kmAssist splitGuards | keystroke | extra keystroke elements + old splitter recognised only vkey keystrokes | 59 |
-| kmAssist splitGuards | pre-context | extra keystroke elements + old splitter recognised only vkey keystrokes | 59 |
 | touch-key-rule-join (struck key) | keystroke | group is not using keys | 10 |
 | touch-key-rule-join (struck key) | pre-context | group is not using keys | 10 |
-| touch-key-rule-join (struck key) | keystroke | no + with a multi-element left-hand side + old splitter recognised only vkey/any keystrokes | 6 |
-| kmAssist splitGuards | keystroke | no + with a multi-element left-hand side + old splitter recognised only vkey keystrokes | 6 |
-| kmAssist splitGuards | pre-context | no + with a multi-element left-hand side + old splitter recognised only vkey keystrokes | 6 |
-| outputRepertoire splitContext | keystroke | no + with a multi-element left-hand side | 6 |
-| outputRepertoire splitContext | pre-context | no + with a multi-element left-hand side | 6 |
 
 ## Disagreements (all counted above; at most 12 example rows per group below)
 
@@ -227,9 +219,6 @@ is listed in full.
 | release/b/bu_phonetic/source/bu_phonetic.kmn:2277 | kmAssist splitGuards | keystroke | nul + any(InvisibleTrigger) > 1 output element(s) | (none) | any(InvisibleTrigger) | any() as the keystroke; head run (nul/conditions) is not pre-context; old splitter recognised only vkey keystrokes |
 | release/b/bu_phonetic/source/bu_phonetic.kmn:2277 | kmAssist splitGuards | pre-context | nul + any(InvisibleTrigger) > 1 output element(s) | nul any(InvisibleTrigger) | (empty) | any() as the keystroke; head run (nul/conditions) is not pre-context; old splitter recognised only vkey keystrokes |
 | release/b/bu_phonetic/source/bu_phonetic.kmn:2277 | outputRepertoire splitContext | pre-context | nul + any(InvisibleTrigger) > 1 output element(s) | nul | (empty) | any() as the keystroke; head run (nul/conditions) is not pre-context |
-| release/b/burushaski_girminas/source/burushaski_girminas.kmn:32 | touch-key-rule-join (struck key) | keystroke | "," + any (consonants) > 1 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey/any keystrokes |
-| release/b/burushaski_girminas/source/burushaski_girminas.kmn:32 | kmAssist splitGuards | keystroke | "," + any (consonants) > 1 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/b/burushaski_girminas/source/burushaski_girminas.kmn:32 | kmAssist splitGuards | pre-context | "," + any (consonants) > 1 output element(s) | "," any (consonants) | "," | extra keystroke elements; old splitter recognised only vkey keystrokes |
 | release/bj/bj_cree_east/source/bj_cree_east.kmn:270 | ldml-export splitRule | pre-context | if(option_key=) "ᐧ" any(C_ef) > 1 output element(s) | if(option_key=) "ᐧ" any(C_ef) | "ᐧ" any(C_ef) | group is not using keys; head run (nul/conditions) is not pre-context; no + with a multi-element left-hand side |
 | release/bj/bj_cree_east/source/bj_cree_east.kmn:270 | kmAssist splitGuards | pre-context | if(option_key=) "ᐧ" any(C_ef) > 1 output element(s) | if(option_key=) "ᐧ" any(C_ef) | "ᐧ" any(C_ef) | group is not using keys; head run (nul/conditions) is not pre-context; no + with a multi-element left-hand side |
 | release/bj/bj_cree_east/source/bj_cree_east.kmn:270 | outputRepertoire splitContext | pre-context | if(option_key=) "ᐧ" any(C_ef) > 1 output element(s) | if(option_key=) "ᐧ" any(C_ef) | "ᐧ" any(C_ef) | group is not using keys; head run (nul/conditions) is not pre-context; no + with a multi-element left-hand side |
@@ -364,39 +353,6 @@ is listed in full.
 | release/el/el_dinka/source/el_dinka.kmn:159 | kmAssist splitGuards | keystroke | platform("touch") + any(diaeresisLongTouch) > 2 output element(s) | (none) | any(diaeresisLongTouch) | any() as the keystroke; head run (nul/conditions) is not pre-context; old splitter recognised only vkey keystrokes |
 | release/el/el_dinka/source/el_dinka.kmn:159 | kmAssist splitGuards | pre-context | platform("touch") + any(diaeresisLongTouch) > 2 output element(s) | platform("touch") any(diaeresisLongTouch) | (empty) | any() as the keystroke; head run (nul/conditions) is not pre-context; old splitter recognised only vkey keystrokes |
 | release/el/el_dinka/source/el_dinka.kmn:159 | outputRepertoire splitContext | pre-context | platform("touch") + any(diaeresisLongTouch) > 2 output element(s) | platform("touch") | (empty) | any() as the keystroke; head run (nul/conditions) is not pre-context |
-| release/fv/fv_denesuline_epsilon/source/fv_denesuline_epsilon.kmn:145 | touch-key-rule-join (struck key) | keystroke | any(HasAcute) + any (overaccentkey) > 2 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey/any keystrokes |
-| release/fv/fv_denesuline_epsilon/source/fv_denesuline_epsilon.kmn:145 | kmAssist splitGuards | keystroke | any(HasAcute) + any (overaccentkey) > 2 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_denesuline_epsilon/source/fv_denesuline_epsilon.kmn:145 | kmAssist splitGuards | pre-context | any(HasAcute) + any (overaccentkey) > 2 output element(s) | any(HasAcute) any (overaccentkey) | any(HasAcute) | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:392 | touch-key-rule-join (struck key) | keystroke | ";" "=" + any (let) > 3 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey/any keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:392 | kmAssist splitGuards | keystroke | ";" "=" + any (let) > 3 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:392 | kmAssist splitGuards | pre-context | ";" "=" + any (let) > 3 output element(s) | ";" "=" any (let) | ";" "=" | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:393 | touch-key-rule-join (struck key) | keystroke | "=" ";" + any (let) > 3 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey/any keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:393 | kmAssist splitGuards | keystroke | "=" ";" + any (let) > 3 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:393 | kmAssist splitGuards | pre-context | "=" ";" + any (let) > 3 output element(s) | "=" ";" any (let) | "=" ";" | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:395 | touch-key-rule-join (struck key) | keystroke | ";" "=" "," + any (let) > 4 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey/any keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:395 | kmAssist splitGuards | keystroke | ";" "=" "," + any (let) > 4 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:395 | kmAssist splitGuards | pre-context | ";" "=" "," + any (let) > 4 output element(s) | ";" "=" "," any (let) | ";" "=" "," | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:396 | touch-key-rule-join (struck key) | keystroke | "=" ";" "," + any (let) > 4 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey/any keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:396 | kmAssist splitGuards | keystroke | "=" ";" "," + any (let) > 4 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:396 | kmAssist splitGuards | pre-context | "=" ";" "," + any (let) > 4 output element(s) | "=" ";" "," any (let) | "=" ";" "," | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:397 | touch-key-rule-join (struck key) | keystroke | ";" "," "=" + any (let) > 4 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey/any keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:397 | kmAssist splitGuards | keystroke | ";" "," "=" + any (let) > 4 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:397 | kmAssist splitGuards | pre-context | ";" "," "=" + any (let) > 4 output element(s) | ";" "," "=" any (let) | ";" "," "=" | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:398 | touch-key-rule-join (struck key) | keystroke | "=" "," ";" + any (let) > 4 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey/any keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:398 | kmAssist splitGuards | keystroke | "=" "," ";" + any (let) > 4 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:398 | kmAssist splitGuards | pre-context | "=" "," ";" + any (let) > 4 output element(s) | "=" "," ";" any (let) | "=" "," ";" | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:399 | touch-key-rule-join (struck key) | keystroke | "," ";" "=" + any (let) > 4 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey/any keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:399 | kmAssist splitGuards | keystroke | "," ";" "=" + any (let) > 4 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:399 | kmAssist splitGuards | pre-context | "," ";" "=" + any (let) > 4 output element(s) | "," ";" "=" any (let) | "," ";" "=" | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:400 | touch-key-rule-join (struck key) | keystroke | "," "=" ";" + any (let) > 4 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey/any keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:400 | kmAssist splitGuards | keystroke | "," "=" ";" + any (let) > 4 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_gwichin/source/fv_gwichin.kmn:400 | kmAssist splitGuards | pre-context | "," "=" ";" + any (let) > 4 output element(s) | "," "=" ";" any (let) | "," "=" ";" | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_han/source/fv_han.kmn:609 | touch-key-rule-join (struck key) | keystroke | ";" "=" + any (let) > 3 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey/any keystrokes |
-| release/fv/fv_han/source/fv_han.kmn:609 | kmAssist splitGuards | keystroke | ";" "=" + any (let) > 3 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_han/source/fv_han.kmn:609 | kmAssist splitGuards | pre-context | ";" "=" + any (let) > 3 output element(s) | ";" "=" any (let) | ";" "=" | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_han/source/fv_han.kmn:610 | touch-key-rule-join (struck key) | keystroke | "=" ";" + any (let) > 3 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey/any keystrokes |
-| release/fv/fv_han/source/fv_han.kmn:610 | kmAssist splitGuards | keystroke | "=" ";" + any (let) > 3 output element(s) | (none) | any | extra keystroke elements; old splitter recognised only vkey keystrokes |
-| release/fv/fv_han/source/fv_han.kmn:610 | kmAssist splitGuards | pre-context | "=" ";" + any (let) > 3 output element(s) | "=" ";" any (let) | "=" ";" | extra keystroke elements; old splitter recognised only vkey keystrokes |
 | release/g/gondi_dev/source/gondi_dev.kmn:16 | touch-key-rule-join (struck key) | keystroke | platform('hardware') + "=" > 1 output element(s) | (none) | "=" | head run (nul/conditions) is not pre-context; old splitter recognised only vkey/any keystrokes |
 | release/g/gondi_dev/source/gondi_dev.kmn:16 | kmAssist splitGuards | keystroke | platform('hardware') + "=" > 1 output element(s) | (none) | "=" | head run (nul/conditions) is not pre-context; old splitter recognised only vkey keystrokes |
 | release/g/gondi_dev/source/gondi_dev.kmn:16 | kmAssist splitGuards | pre-context | platform('hardware') + "=" > 1 output element(s) | platform('hardware') "=" | (empty) | head run (nul/conditions) is not pre-context; old splitter recognised only vkey keystrokes |
@@ -441,33 +397,3 @@ is listed in full.
 | release/sil/sil_korda_latin/source/sil_korda_latin.kmn:212 | touch-key-rule-join (struck key) | pre-context | any(jungseongSK) > 1 output element(s) | (empty) | any(jungseongSK) | group is not using keys |
 | release/sil/sil_korda_latin/source/sil_korda_latin.kmn:261 | touch-key-rule-join (struck key) | keystroke | any(jungseong) > 2 output element(s) | any(jungseong) | (none) | group is not using keys |
 | release/sil/sil_korda_latin/source/sil_korda_latin.kmn:261 | touch-key-rule-join (struck key) | pre-context | any(jungseong) > 2 output element(s) | (empty) | any(jungseong) | group is not using keys |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:53 | touch-key-rule-join (struck key) | keystroke | any (no_disp) > 1 output element(s) | (none) | (no_disp) | no + with a multi-element left-hand side; old splitter recognised only vkey/any keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:53 | kmAssist splitGuards | keystroke | any (no_disp) > 1 output element(s) | (none) | (no_disp) | no + with a multi-element left-hand side; old splitter recognised only vkey keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:53 | kmAssist splitGuards | pre-context | any (no_disp) > 1 output element(s) | any (no_disp) | any | no + with a multi-element left-hand side; old splitter recognised only vkey keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:53 | outputRepertoire splitContext | keystroke | any (no_disp) > 1 output element(s) | any | (no_disp) | no + with a multi-element left-hand side |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:53 | outputRepertoire splitContext | pre-context | any (no_disp) > 1 output element(s) | (empty) | any | no + with a multi-element left-hand side |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:54 | touch-key-rule-join (struck key) | keystroke | any (Osubst1) > 2 output element(s) | (none) | (Osubst1) | no + with a multi-element left-hand side; old splitter recognised only vkey/any keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:54 | kmAssist splitGuards | keystroke | any (Osubst1) > 2 output element(s) | (none) | (Osubst1) | no + with a multi-element left-hand side; old splitter recognised only vkey keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:54 | kmAssist splitGuards | pre-context | any (Osubst1) > 2 output element(s) | any (Osubst1) | any | no + with a multi-element left-hand side; old splitter recognised only vkey keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:54 | outputRepertoire splitContext | keystroke | any (Osubst1) > 2 output element(s) | any | (Osubst1) | no + with a multi-element left-hand side |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:54 | outputRepertoire splitContext | pre-context | any (Osubst1) > 2 output element(s) | (empty) | any | no + with a multi-element left-hand side |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:55 | touch-key-rule-join (struck key) | keystroke | any (Euyir) > 2 output element(s) | (none) | (Euyir) | no + with a multi-element left-hand side; old splitter recognised only vkey/any keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:55 | kmAssist splitGuards | keystroke | any (Euyir) > 2 output element(s) | (none) | (Euyir) | no + with a multi-element left-hand side; old splitter recognised only vkey keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:55 | kmAssist splitGuards | pre-context | any (Euyir) > 2 output element(s) | any (Euyir) | any | no + with a multi-element left-hand side; old splitter recognised only vkey keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:55 | outputRepertoire splitContext | keystroke | any (Euyir) > 2 output element(s) | any | (Euyir) | no + with a multi-element left-hand side |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:55 | outputRepertoire splitContext | pre-context | any (Euyir) > 2 output element(s) | (empty) | any | no + with a multi-element left-hand side |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:56 | touch-key-rule-join (struck key) | keystroke | any (EstrL) > 2 output element(s) | (none) | (EstrL) | no + with a multi-element left-hand side; old splitter recognised only vkey/any keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:56 | kmAssist splitGuards | keystroke | any (EstrL) > 2 output element(s) | (none) | (EstrL) | no + with a multi-element left-hand side; old splitter recognised only vkey keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:56 | kmAssist splitGuards | pre-context | any (EstrL) > 2 output element(s) | any (EstrL) | any | no + with a multi-element left-hand side; old splitter recognised only vkey keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:56 | outputRepertoire splitContext | keystroke | any (EstrL) > 2 output element(s) | any | (EstrL) | no + with a multi-element left-hand side |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:56 | outputRepertoire splitContext | pre-context | any (EstrL) > 2 output element(s) | (empty) | any | no + with a multi-element left-hand side |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:57 | touch-key-rule-join (struck key) | keystroke | any (EstrGr) > 2 output element(s) | (none) | (EstrGr) | no + with a multi-element left-hand side; old splitter recognised only vkey/any keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:57 | kmAssist splitGuards | keystroke | any (EstrGr) > 2 output element(s) | (none) | (EstrGr) | no + with a multi-element left-hand side; old splitter recognised only vkey keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:57 | kmAssist splitGuards | pre-context | any (EstrGr) > 2 output element(s) | any (EstrGr) | any | no + with a multi-element left-hand side; old splitter recognised only vkey keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:57 | outputRepertoire splitContext | keystroke | any (EstrGr) > 2 output element(s) | any | (EstrGr) | no + with a multi-element left-hand side |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:57 | outputRepertoire splitContext | pre-context | any (EstrGr) > 2 output element(s) | (empty) | any | no + with a multi-element left-hand side |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:68 | touch-key-rule-join (struck key) | keystroke | any (Eukar1) > 3 output element(s) | (none) | (Eukar1) | no + with a multi-element left-hand side; old splitter recognised only vkey/any keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:68 | kmAssist splitGuards | keystroke | any (Eukar1) > 3 output element(s) | (none) | (Eukar1) | no + with a multi-element left-hand side; old splitter recognised only vkey keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:68 | kmAssist splitGuards | pre-context | any (Eukar1) > 3 output element(s) | any (Eukar1) | any | no + with a multi-element left-hand side; old splitter recognised only vkey keystrokes |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:68 | outputRepertoire splitContext | keystroke | any (Eukar1) > 3 output element(s) | any | (Eukar1) | no + with a multi-element left-hand side |
-| release/t/thamizha_new_typewriter/source/thamizha_new_typewriter.kmn:68 | outputRepertoire splitContext | pre-context | any (Eukar1) > 3 output element(s) | (empty) | any | no + with a multi-element left-hand side |

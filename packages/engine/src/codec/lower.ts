@@ -11,14 +11,15 @@
  * file at the first failing line (research R1, finding 3). The per-line loop is
  * the only entry point, so a rejected line costs only that line.
  *
- * Lowering keeps the IR, node ids and opaque reasons of the legacy reader
- * (parse-legacy.ts); the comparison suite (reader-differential.corpus.test.ts)
- * is the specification. Line kinds, target selectors, comments and the store /
- * group / begin lines go through the same line-level readers as the legacy
- * reader (parse-shared.ts, tokenize.ts classifyLine), which are cheap and rare.
+ * Lowering kept the IR, node ids, opaque reasons and comments of the reader it
+ * replaced, proven by a side-by-side comparison over the corpus
+ * (specs/116-ng-parser-adoption/evidence/reader-differential.md);
+ * reader-regression.corpus.test.ts holds it to those numbers. Line kinds, target selectors, comments and the store /
+ * group / begin lines go through the old line-level readers
+ * (parse-shared.ts, tokenize.ts classifyLine), which are cheap and rare.
  * Rule lines, the bulk of every keyboard, are lowered from the syntax tree:
  * each element node takes a typed fast path, and any element without one is
- * read from its exact source slice by the legacy element reader, so its
+ * read from its exact source slice by the old element reader, so its
  * meaning cannot drift.
  */
 
@@ -37,7 +38,8 @@ import type {
 
 import { isNamedDeadkeyName } from "@keyboard-studio/contracts";
 
-import { Lexer, type Token as NgToken } from "./ng/lexer.js";
+import type { Token as NgToken } from "./ng/lexer.js";
+import { lexWithComments, type CommentRecord } from "./comment-channel.js";
 import { TokenBuffer } from "./ng/token-buffer.js";
 import { LineRule } from "./ng/kmn-analyzer.js";
 import { ASTNode } from "./ng/tree-construction.js";
@@ -88,7 +90,6 @@ const LINE_BREAK_RE = /\r\n|\n|\r/;
 const CONTINUATION_TAIL_RE = /\\\s*$/;
 
 const lineRule = new LineRule();
-const COMMENT_TRIVIA: ReadonlySet<TokenType> = new Set([TokenType.COMMENT]);
 
 /** Legacy line text: physical lines joined the way codec/continuation.ts joins them. */
 function joinPhysical(pieces: string[]): string {
@@ -430,14 +431,14 @@ function productionOf(root: ASTNode): { lhs: ASTNode; rhs: ASTNode } | null {
  * The legacy split only recognises a lower-case `c` after whitespace, on the
  * output side.
  */
-function commentAgrees(l: NgLine, comment: NgToken, rhs: ASTNode): boolean {
-  if (!comment.text.startsWith("c") || l.span !== 1) return false;
-  const prev = l.raw[comment.charNum - 2];
+function commentAgrees(l: NgLine, comment: CommentRecord, rhs: ASTNode): boolean {
+  if (l.span !== 1 || l.raw[comment.column - 1] !== "c") return false;
+  const prev = l.raw[comment.column - 2];
   if (prev === undefined || !/\s/.test(prev)) return false;
   // The comment must follow every output element.
   const b = rhs.getTokenBounds();
   if (b.lastLine === null || b.lastChar === null) return true;
-  return b.lastLine < comment.lineNum || (b.lastLine === comment.lineNum && b.lastChar <= comment.charNum);
+  return b.lastLine < comment.line || (b.lastLine === comment.line && b.lastChar <= comment.column);
 }
 
 /** lower()'s result plus the lines the grammar rejected (for the comparison suite). */
@@ -462,11 +463,8 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
   const minter = new NodeIdMinter();
   const rejectedLines: number[] = [];
 
-  // Lex once; remember which physical lines carry a comment token.
-  const comments_ = new Map<number, NgToken>();
-  const ngTokens = new Lexer(text, undefined, (t) => {
-    comments_.set(t.lineNum, t);
-  }, COMMENT_TRIVIA).parse();
+  // Lex once; the comment channel records the comment on each physical line.
+  const { tokens: ngTokens, comments: commentRecords } = lexWithComments(text);
 
   const stores: IRStore[] = [];
   const groups: IRGroup[] = [];
@@ -557,7 +555,8 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
   /** A rule line the grammar accepted, lowered from its syntax tree. */
   function astRule(tok: LineToken, l: NgLine, root: ASTNode, ruleNodeId: string): void {
     const prod = productionOf(root);
-    const comment = comments_.get(l.line + l.span - 1);
+    const found = commentRecords.get(l.line + l.span - 1);
+    const comment = found?.kind === "trailing" ? found : undefined;
     if (prod === null || (comment !== undefined && !commentAgrees(l, comment, prod.rhs))) {
       legacyRule(tok, ruleNodeId);
       return;
@@ -611,7 +610,7 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
       pushRuleFragment(tok, ruleNodeId, opaque.reason ?? "unknown", producedOutputOf(rhs, l));
       return;
     }
-    const trailingComment = comment !== undefined ? comment.text.slice(1).trim() || undefined : undefined;
+    const trailingComment = comment !== undefined ? comment.text || undefined : undefined;
     pushRule(tok, ruleNodeId, context, output, trailingComment);
   }
 
@@ -656,9 +655,11 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
         flushCommentsFreestanding();
         break;
 
-      case "comment":
-        pendingComments.push({ text: tok.text, line: tok.line });
+      case "comment": {
+        const rec = commentRecords.get(tok.line);
+        pendingComments.push({ text: rec?.kind === "line" ? rec.text : tok.text, line: tok.line });
         break;
+      }
 
       case "begin": {
         const parsed = parseBeginLine(tok.text);

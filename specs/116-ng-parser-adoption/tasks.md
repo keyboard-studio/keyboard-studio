@@ -233,23 +233,23 @@ legacy anchoring gap, which US2 closes.
 **Independent Test**: the comparison suite with comments **included** shows zero differences in
 `ir.comments` and in every `trailingComment`. `parse-legacy.ts` is gone.
 
-- [ ] T042 [US2] Implement `packages/engine/src/codec/comment-channel.ts`. It turns `onTrivia` tokens plus line structure into `CommentRecord`, `ContinuationRecord` and `BlankLineRecord`, per [contracts/comment-channel.md](contracts/comment-channel.md). `text` is the body after `c` and its single separating space, and a bare `c` gives `""`. Unit-test it in `packages/engine/src/codec/comment-channel.test.ts`, including `[K_C]`, a quoted `"c "`, and a comment on a `\`-continued line.
-- [ ] T043 [US2] Implement anchoring in `packages/engine/src/codec/lower.ts`, using the rules of [contracts/comment-channel.md](contracts/comment-channel.md) §Anchoring:
+- [x] T042 [US2] Implement `packages/engine/src/codec/comment-channel.ts`. It turns `onTrivia` tokens plus line structure into `CommentRecord`, `ContinuationRecord` and `BlankLineRecord`, per [contracts/comment-channel.md](contracts/comment-channel.md). `text` is the body after `c` and its single separating space, and a bare `c` gives `""`. Unit-test it in `packages/engine/src/codec/comment-channel.test.ts`, including `[K_C]`, a quoted `"c "`, and a comment on a `\`-continued line.
+- [x] T043 [US2] Implement anchoring in `packages/engine/src/codec/lower.ts`, using the rules of [contracts/comment-channel.md](contracts/comment-channel.md) §Anchoring:
   - a trailing comment becomes `trailingComment` on the rule or store;
   - leading runs become `IRComment{anchor:"leading", anchorRef}`;
   - blank lines flush pending comments as freestanding;
   - otherwise the comment is freestanding with `sourceLine`.
 
   For comments on continued lines, reproduce whatever `parse-legacy.ts` does; the comparison suite is the specification.
-- [ ] T044 [US2] Remove the comments exclusion from `reader-differential.corpus.test.ts` and iterate on T043 until comments show zero differences across corpus and fixtures. A comment difference may **not** be allow-listed (SC-003).
-- [ ] T045 [US2] Regenerate and commit `specs/116-ng-parser-adoption/evidence/reader-differential.md`, the final comparison report (FR-030). Then **delete** `packages/engine/src/codec/parse-legacy.ts` (FR-008). Convert `reader-differential.corpus.test.ts` into `packages/engine/src/codec/reader-regression.corpus.test.ts`: it asserts per-reason fragment counts and comment counts against the committed report's numbers, so later drift fails. Delete the test-only legacy references. `grep -rn "parseLegacy\|parse-legacy" packages` must print nothing.
-- [ ] T046 [US2] Write the upstream-offer texts (they are **not** filed; filing is outward-facing and needs owner approval) in `specs/116-ng-parser-adoption/evidence/upstream-offers.md`:
+- [x] T044 [US2] Remove the comments exclusion from `reader-differential.corpus.test.ts` and iterate on T043 until comments show zero differences across corpus and fixtures. A comment difference may **not** be allow-listed (SC-003).
+- [x] T045 [US2] Regenerate and commit `specs/116-ng-parser-adoption/evidence/reader-differential.md`, the final comparison report (FR-030). Then **delete** `packages/engine/src/codec/parse-legacy.ts` (FR-008). Convert `reader-differential.corpus.test.ts` into `packages/engine/src/codec/reader-regression.corpus.test.ts`: it asserts per-reason fragment counts and comment counts against the committed report's numbers, so later drift fails. Delete the test-only legacy references. `grep -rn "parseLegacy\|parse-legacy" packages` must print nothing.
+- [x] T046 [US2] Write the upstream-offer texts (they are **not** filed; filing is outward-facing and needs owner approval) in `specs/116-ng-parser-adoption/evidence/upstream-offers.md`:
   1. the lexer performance patch;
   2. the opt-in `onTrivia` hook;
   3. the bug report that `Parser.parse()` silently truncates at the first failing line, with the `gff_geez_emufi-pua.kmn:1342` repro.
 
   Link it from `PROVENANCE.md`.
-- [ ] T047 [US2] Gate:
+- [x] T047 [US2] Gate:
   1. `pnpm lint`, `pnpm typecheck` and `pnpm -r test`, plus the corpus suites.
   2. Tick T042–T047 and commit as `feat(engine): keep .kmn comments through the new reader; retire the legacy reader (spec 116 T042-T047)`.
   3. Push explicitly.

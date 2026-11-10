@@ -39,6 +39,11 @@ specifiers carry the `.js` suffix (already so upstream). Type-only fixes our str
 
 ## Local patches
 
+Patches 1 and 2 are drafted as upstream offers, together with the bug report that whole-file
+`Parser.parse()` silently truncates at the first failing line, in
+[upstream-offers.md](../../../../../specs/116-ng-parser-adoption/evidence/upstream-offers.md).
+They are not filed yet: filing needs the owner's approval.
+
 | # | File | Purpose | Offered upstream |
 |---|---|---|---|
 | 1 | `lexer.ts` | Performance: dispatch on the first character (per-character candidate list, built lazily from the recognizer table, in table order); the line buffer is a slice of the source from the line start instead of per-token concatenation; `matchToken` becomes `matchTokenWith` taking its three flags positionally (no options object per token); a sticky `regExp.test()` plus `buffer.slice(offset, lastIndex)` replaces `exec()[0]` (no match array per token). Throws at load if a recognizer has no first-character rule. Token stream proven identical by `lexer-equivalence.corpus.test.ts` against `lexer-reference.testkit.ts` (the unpatched lexer) | not yet |
@@ -49,5 +54,6 @@ specifiers carry the `.js` suffix (already so upstream). Type-only fixes our str
 
 1. Run `node scripts/vendor-ng-parser.mjs <keyman-checkout> <new-commit>`; it records the commit.
 2. Re-apply the type-only adaptations and local patches listed above.
-3. Run the comparison suite and the corpus suites. Any new allow-list entry needs a reason.
+3. Run the corpus suites, `reader-regression.corpus.test.ts` among them. Any new allow-list entry
+   or changed count needs a reason, recorded in `specs/116-ng-parser-adoption/evidence/`.
 4. Commit as `chore(engine): re-sync vendored Keyman KMN parser to <sha>`.

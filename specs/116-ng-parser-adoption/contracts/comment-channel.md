@@ -51,3 +51,17 @@ Lowering applies the current reader's rules, keyed on logical lines:
 Across corpus and fixtures, the comparison suite compares `ir.comments` (text, anchor, anchorRef
 target, sourceLine) and every node's `trailingComment` between the two readers. Phase 3 closes only
 at zero differences.
+
+## As built (T042-T045, 2026-11-10)
+
+- `codec/comment-channel.ts` `lexWithComments()` lexes once and returns the tokens plus one
+  `CommentRecord` per physical line. `text` is trimmed, as the old reader trimmed it (the
+  comparison suite is the target); a bare `c` gives `""`.
+- `ContinuationRecord` and `BlankLineRecord` were not built. The reader's line loop reads both
+  from the NEWLINE tokens it already walks, so the records would have no consumer.
+- A rule on continued physical lines that carries a comment goes through the old line reader, so
+  its comment anchoring is the old reader's by construction.
+- The comparison found one source of comment difference: smp-literal lines, which the old reader
+  kept as fragments with the comment inside `sourceText`. The new reader types them, so the
+  comment becomes a `trailing` record. The suite checked each against the old reader's own
+  `stripTrailingComment` split rather than allow-listing it.

@@ -1,7 +1,6 @@
 /**
- * Element- and store-level .kmn readers shared by the legacy reader
- * (parse-legacy.ts) and the lowering of the vendored Keyman parser's AST
- * (lower.ts): codepoints, quoting, token splitting, deadkeys, virtual keys,
+ * Element- and store-level .kmn readers used by the lowering of the vendored
+ * Keyman parser's AST (lower.ts): codepoints, quoting, token splitting, deadkeys, virtual keys,
  * store items and sketches, ranges, context and output elements.
  * Moved verbatim from parse.ts (spec 116 T032); no behaviour change.
  */
