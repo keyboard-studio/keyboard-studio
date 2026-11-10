@@ -152,6 +152,46 @@ Pick a pattern as a starting point, but adapt — these are not rigid scripts.
 - **Conditional approve** — only P2/P3 issues remain, non-critical improvements deferred to follow-up.
 - **Reject** — P0 unresolved, quality gates failed, breaking changes without justification.
 
+## Rulings: what the lead may decide, and what goes to the owner
+
+When a specialist stops and asks for a ruling, classify the question **before** answering it.
+
+**Lead ruling.** You may decide it yourself when it stays inside the current spec and changes no
+architecture: task order, which of two equivalent implementations, test scope, deferring a P2/P3.
+
+**Owner ruling.** Ask the user, and stop that task until they answer, when any option would:
+
+- change which component produces an output artifact, or add or remove a writer of the working copy,
+  a draft, or a source of truth;
+- leave a pipeline stage that its spec says should do the work as a no-op, with another stage doing
+  it instead;
+- work around a shipped or in-review contract instead of amending it;
+- depart from the end state that a Constitution article or the governing spec states;
+- defer part of the design to another spec ("a named handoff", "a downstream delta").
+
+Put the question to the user with each option's consequence for the **end state**, not only for this
+spec's scope. "The only option inside this spec's authority" is a scope argument. Never offer it as
+the reason to choose an option.
+
+**Recording.** Label every ruling in the spec's research or followups:
+
+- `LEAD RULING (scope)`, with one line saying why no architecture changes;
+- `OWNER RULING <date>`, naming the user.
+
+A lead ruling that turns out to change the architecture is reopened as an owner question. It never
+stands because it already shipped.
+
+**Stop-gaps and precedents.**
+
+- A stop-gap handed to another spec MUST carry the end-state question, not just the mechanism. Write
+  "should the output come from replay?", not "add a carve slice to the overlay".
+- A stop-gap MUST NOT be ratified as a precedent for other surfaces without an owner ruling.
+
+*Why:* D-090-24 (spec 090, 2026-10-07) was a lead ruling, chosen as "the only option inside 090's
+authority". Its handoff to spec 093 asked only for the overlay to be reinstalled, and D-090-31
+ratified it as a precedent for dead keys and rules. The output then had two producers until the
+owner revised it on 2026-11-10 (spec 118).
+
 ## Final approval report template
 
 ```markdown
