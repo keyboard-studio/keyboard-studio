@@ -31,22 +31,6 @@ export function normalizeRegionSubtag(region: string): string {
 }
 
 /**
- * Whether `script` is the script langtags declares as `lang`'s default — the
- * suppress-script relationship BCP47 canonical form elides.
- *
- * Reads the ALREADY-RESOLVED module synchronously (see `getLoadedLangtags`):
- * this is a pure composer with no async seam, and an uncanonical tag is a better
- * failure than a composer that blocks on a fetch. Returns `false` when the
- * langtags chunk has not loaded this session (FR-011 keeps it lazy), which
- * composes the script subtag exactly as it did before this rule existed.
- */
-function isSuppressedScript(lang: string, script: string): boolean {
-  const defaultScript = getLoadedLangtags()?.getLanguageDefaults(lang)?.defaultScript;
-  if (defaultScript === undefined || defaultScript === "") return false;
-  return defaultScript.toLowerCase() === script.toLowerCase();
-}
-
-/**
  * Map a confirmed language code to its canonical BCP47 primary language
  * subtag. RFC 5646 registers the shortest ISO 639 code, so a language with a
  * 2-letter code is tagged `ha`, never `hau`; langtags records carry that
@@ -62,52 +46,74 @@ export function canonicalLanguageSubtag(code: string): string {
 }
 
 /**
- * Build the full BCP47 target tag from an ISO 639 language subtag and a raw
- * `il_target_script` value.
+ * Build the BCP47 target tag from an ISO 639 language subtag and a raw
+ * `il_target_script` value, naming only what is not a default: the composition
+ * is `minimalTag`'s (spec 115 R2), measured against the pinned langtags.
  *
- * Rules (language + script → BCP47):
- * - `lang` + plain script subtag (Latn/Deva/…) → `${lang}-${script}`, EXCEPT
- *   when that script is the language's default orthography in langtags, which
- *   the language subtag already implies — canonical BCP47 omits it.
- *   e.g. "ewo" + "Arab" → "ewo-Arab", but "ewo" + "Latn" → "ewo"
- * - `lang` + "romanization-Latn" → `${lang}-Latn`
- *   (Latn script implied; the fact it is a romanization is a strategy detail)
- * - `lang` + "fonipa" → `${lang}-fonipa`
- *   (Latin is implied by the variant; BCP47 omits the script subtag for fonipa)
- * - empty `lang` → "" (no BCP47; caller degrades to script-match ranking)
+ * Rules (language + script -> BCP47):
+ * - `lang` + plain script subtag -> `lang-Script`, EXCEPT when that script is the
+ *   language's default, which the language subtag already implies.
+ *   e.g. "ewo" + "Arab" -> "ewo-Arab", but "ewo" + "Latn" -> "ewo"
+ * - `lang` + "romanization-Latn" -> the Latn script part (dropped when it is the default)
+ * - `lang` + "fonipa" -> the `fonipa` variant; no script part
+ * - empty `lang` -> "" (no BCP47; caller degrades to script-match ranking)
  *
- * An optional `region` subtag (from il_language_region, spec 030 US3) is folded
- * in at the BCP47 region position (language-script-region-variant). Empty region
- * (unambiguous or skipped) leaves the tag exactly as before. The region is
- * normalized to a shape-valid BCP47 region subtag first (see
- * {@link normalizeRegionSubtag}); malformed free text is dropped.
+ * An optional `region` (from il_language_region) is folded in and dropped when it
+ * is the default region of the tagset. Malformed free text is dropped (see
+ * {@link normalizeRegionSubtag}). An optional `dialectSubtag` (a registered
+ * variant, or `x-...` private use; empty until the dialect question) joins as a
+ * variant or private-use part.
+ *
+ * Reads the ALREADY-RESOLVED langtags module synchronously (see
+ * `getLoadedLangtags`); when it has not loaded this session (FR-011 keeps it
+ * lazy) the parts are joined as given, with no default omitted.
  *
  * @param languageSubtag  ISO 639 subtag from `il_language_code`, may be "".
  * @param targetScriptRaw Raw `il_target_script` value from the survey.
  * @param region          Optional region subtag from il_language_region, may be "".
+ * @param dialectSubtag   Optional dialect subtag, may be "".
  */
 export function buildTargetBcp47(
   languageSubtag: string,
   targetScriptRaw: string,
   region = "",
+  dialectSubtag = "",
 ): string {
   const rawLang = languageSubtag.trim();
   if (rawLang === "") return "";
   // Q3 confirms the 3-letter code; the assembled tag carries the canonical form.
   const lang = canonicalLanguageSubtag(rawLang);
   const reg = normalizeRegionSubtag(region);
-  // BCP47 order: language-script-region-variant.
-  if (targetScriptRaw === "fonipa") return [lang, reg, "fonipa"].filter((p) => p !== "").join("-");
-  if (targetScriptRaw === "romanization-Latn") return [lang, "Latn", reg].filter((p) => p !== "").join("-");
-  const { script } = normalizeTargetScript(targetScriptRaw);
-  // "other" and empty string are not valid ISO-15924 subtags; omit the script
-  // rather than emit the malformed "lang-other".
-  const named = script === "" || script === "other" ? "" : script;
-  // A named script that IS the language's default is implied by the language
-  // subtag, so the canonical tag drops it: Latin is the Unicode default for
-  // Ewondo, and a Latin Ewondo keyboard declares `ewo`, not `ewo-Latn`. A
-  // non-default script stays explicit — `ewo-Arab` is the whole reason the
-  // subtag position exists.
-  const scriptPart = named !== "" && isSuppressedScript(lang, named) ? "" : named;
-  return [lang, scriptPart, reg].filter((p) => p !== "").join("-");
+  let script = "";
+  const variants: string[] = [];
+  const privateUse: string[] = [];
+  if (targetScriptRaw === "fonipa") {
+    variants.push("fonipa");
+  } else if (targetScriptRaw === "romanization-Latn") {
+    script = "Latn";
+  } else {
+    const { script: s } = normalizeTargetScript(targetScriptRaw);
+    // "other" and empty string are not valid ISO-15924 subtags; omit the script
+    // rather than emit the malformed "lang-other".
+    script = s === "other" ? "" : s;
+  }
+  const dialect = dialectSubtag.trim();
+  if (dialect !== "") {
+    const parts = dialect.split("-");
+    if (parts[0]?.toLowerCase() === "x") privateUse.push(...parts.slice(1));
+    else variants.push(...parts);
+  }
+  const loaded = getLoadedLangtags();
+  if (loaded === null || !/^[A-Za-z]{2,8}$/.test(lang)) {
+    // Not yet loaded (or free text that is not a language subtag): join as given.
+    const joined = [lang, script, reg, ...variants, ...(privateUse.length > 0 ? ["x", ...privateUse] : [])];
+    return joined.filter((p) => p !== "").join("-");
+  }
+  return loaded.minimalTag({
+    language: lang,
+    ...(script !== "" ? { script } : {}),
+    ...(reg !== "" ? { region: reg } : {}),
+    variants,
+    privateUse,
+  });
 }

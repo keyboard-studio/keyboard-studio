@@ -14,7 +14,7 @@
   "content.flowQuestion.il_language_english.audit_label": "Language name (English)",
   "content.flowQuestion.il_language_english.help_text": "Start typing your language's English name and pick it from the list (for example: Hausa, Swahili, Hindi). When two languages share a name, the list shows the region and local name so you can choose the right one. If your language is not listed, just type its English name and continue — free text is always accepted.",
   "content.flowQuestion.il_language_english.prompt": "What is your language called in English?",
-  "content.flowQuestion.il_language_region.help_text": "This language is used in more than one place, and the local name or spelling can differ by region. Pick the region that matches your community — or skip if you are unsure.",
+  "content.flowQuestion.il_language_region.help_text": "A tag names a region only when it is not the language's usual one. The list starts with this language's default region; pick another place your community is in, or choose \"Other region…\" and type any two-letter country code. Skip if you are unsure.",
   "content.flowQuestion.il_language_region.prompt": "Which region is your language from?",
   "content.flowQuestion.il_script_not_supported.help_text": "This version does not yet support Ethiopic, Han (Chinese/Japanese), or Hangul keyboards. Hangul needs jamo-to-syllable composition; Ethiopic and Han need reorder / IME candidate work — neither is built yet. You can close this form for now; nothing you entered will be submitted.",
   "content.flowQuestion.il_script_not_supported.prompt": "This writing system is not supported yet",

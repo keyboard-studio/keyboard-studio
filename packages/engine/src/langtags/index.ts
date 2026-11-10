@@ -145,3 +145,7 @@ export type { RegisteredLanguage } from "./generated/registeredLanguages.js";
 // registered variants (the prefix-aware `variantsFor` arrives with the dialect question).
 export { registeredVariants as allRegisteredVariants } from "./generated/variants.js";
 export type { RegisteredVariant } from "./generated/variants.js";
+
+// Spec 115 R2: minimal tag against the pinned langtags (FR-014 to FR-018).
+export { minimalTag, minimalTagOf } from "./minimalTag.js";
+export type { TagChoice } from "./minimalTag.js";

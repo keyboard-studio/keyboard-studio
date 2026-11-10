@@ -30,6 +30,14 @@ type LangtagsModule = {
   allDialectTagsets: readonly DialectTagset[];
   /** The IANA language-subtag registry lookup (spec 115 FR-028); undefined when unregistered. */
   registeredLanguage: (subtag: string) => { subtag: string; description: string; scope?: string; macrolanguage?: string } | undefined;
+  /** The minimal tag for a language choice against the pinned langtags (spec 115 R2). */
+  minimalTag: (choice: {
+    language: string;
+    script?: string;
+    region?: string;
+    variants?: string[];
+    privateUse?: string[];
+  }) => string;
   /** The raw IANA variant registry (spec 115 R5). */
   allRegisteredVariants: readonly { subtag: string; descriptions: readonly string[]; prefixes: readonly string[]; deprecated: boolean }[];
 };

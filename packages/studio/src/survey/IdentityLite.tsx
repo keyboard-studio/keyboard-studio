@@ -14,6 +14,7 @@ import type { SurveyContext, FlowOption } from "./types.ts";
 import { deriveScriptPrefill } from "../lib/scriptAxes.ts";
 import type { IdentityLiteResult } from "./identityLiteResult.ts";
 import { getLoadedLangtags } from "../lib/langtagsDefaults.ts";
+import { regionCodeToName } from "../lib/iso3166Names.ts";
 import { buildTargetBcp47, normalizeRegionSubtag } from "./targetBcp47.ts";
 import { answerString } from "./answerString.ts";
 import { normalizeForCompare } from "../lib/normalizeForCompare.ts";
@@ -194,12 +195,32 @@ export function IdentityLite({
         return opts.length > 0 ? opts : undefined;
       }
       if (questionId === "il_language_region") {
-        // The resolved entry's region variants (spec 030 US3): value = region
-        // code (folded into BCP47), label = region name.
-        const variants = resolution.resolvedEntry()?.regionVariants;
-        if (variants !== undefined && variants.length > 0) {
-          return variants.map((v) => ({ value: v.region, label: v.regionName ?? v.region }));
+        // The language's default region first (marked), then its other langtags
+        // regions, then "Other region..." (spec 115 R9). Value = region code
+        // (folded into the tag only when it is not the default); label = name.
+        // CONTENT REVIEW (Article VI): the labels are survey text owned by the content team.
+        const d = resolution.resolvedEntry();
+        const labels = new Map<string, string>();
+        for (const v of d?.regionVariants ?? []) labels.set(v.region, v.regionName ?? v.region);
+        const ordered: string[] = [];
+        for (const code of [d?.defaultRegion, ...(d?.regionVariants ?? []).map((v) => v.region), ...(d?.regions ?? [])]) {
+          if (code !== undefined && code !== "" && !ordered.includes(code)) ordered.push(code);
         }
+        const opts: FlowOption[] = ordered.map((code, i) => {
+          const name = labels.get(code) ?? regionCodeToName(code) ?? code;
+          return {
+            value: code,
+            label:
+              i === 0 && code === d?.defaultRegion
+                ? t({ id: "survey.identityLite.regionOption.default", message: `${{ name }} (default)` })
+                : name,
+          };
+        });
+        opts.push({
+          value: "",
+          label: t({ id: "survey.identityLite.regionOption.other", message: "Other region… (type its country code)" }),
+        });
+        return opts;
       }
       if (questionId === "il_language_code") {
         // Possible code matches FOR THE RESOLVED LANGUAGE (spec 030 US4): the two

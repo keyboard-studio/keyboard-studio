@@ -227,6 +227,20 @@ module.exports = {
       },
       to:   { path: '/ldml-export/__testing__/' },
     },
+    {
+      name: 'ethnolib-only-in-language-chooser',
+      comment:
+        'Spec 115 G1 / FR-035: only survey/languageChooser/ (and the typed-name ' +
+        'resolver, which uses EthnoLib search only) may import @ethnolib/find-language, ' +
+        'so its tag builders can never reach the output path. The emitted tag ' +
+        'comes from the engine langtags minimalTag.',
+      severity: 'error',
+      from: {
+        path: '^packages/studio/src/',
+        pathNot: '^packages/studio/src/survey/(languageChooser/|resolveTypedLanguage\.ts$)',
+      },
+      to:   { path: '@ethnolib/find-language' },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },

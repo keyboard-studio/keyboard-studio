@@ -2604,6 +2604,8 @@
   "survey.identityLite.heading": "Let's identify your language",
   "survey.identityLite.langtagsCaption": "Suggested from langtags — edit if needed",
   "survey.identityLite.lead": "Answer a few quick questions about your language. Nothing is final — you can change any answer later.",
+  "survey.identityLite.regionOption.default": "{name} (default)",
+  "survey.identityLite.regionOption.other": "Other region… (type its country code)",
   "survey.invisibles.backButton": "Back",
   "survey.invisibles.bidiGroup.expandButton": "{0, plural, one {Show # direction control} other {Show # direction controls}}",
   "survey.invisibles.bidiGroup.heading": "Direction controls",

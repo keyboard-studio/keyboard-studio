@@ -5,7 +5,7 @@
 // triggers, the transform groups in call order, the variables, and the document header.
 
 import type { LDMLKeyboard } from "@keymanapp/developer-utils";
-import { resolveLangtag } from "../../langtags/index.js";
+import { minimalTagOf } from "../../langtags/index.js";
 import type { ClassifyDetail } from "../classify/classify.js";
 import { findStore, isGuardElement, type RulePlan } from "../classify/ruleElements.js";
 import { layerModifiers, tableVKey } from "../classify/keystrokes.js";
@@ -43,23 +43,6 @@ export function normaliseVersion(v: string): string {
   if (parts.length === 0 || nums.some((n) => n === null)) return "1.0.0";
   const [a = "0", b = "0", c = "0"] = nums as string[];
   return `${a}.${b}.${c}`;
-}
-
-/** The minimal likely-subtags form of a tag, never containing an extension such as `-k0-`. */
-export function minimalLocale(tag: string): string {
-  const cut = tag.search(/-[a-z0-9]-/i);
-  const base = cut === -1 ? tag : tag.slice(0, cut);
-  const tail = cut === -1 ? "" : tag.slice(cut);
-  return minimalHead(base) + tail;
-}
-
-function minimalHead(base: string): string {
-  const r = resolveLangtag(base);
-  if (r === null) return base;
-  const [lang = "", script = "", region = ""] = r.full.split("-");
-  const candidates = [lang, region ? `${lang}-${region}` : "", script ? `${lang}-${script}` : "", r.full].filter((c) => c !== "");
-  for (const c of candidates) if (resolveLangtag(c)?.full === r.full) return c;
-  return r.full;
 }
 
 function sanitizeSetId(name: string, used: Map<string, string>): string {
@@ -289,7 +272,7 @@ export function lowerDocument(
 
   // --- document -------------------------------------------------------------------------------------------
   const meta = input.metadata;
-  const langs = meta.languages.map(minimalLocale);
+  const langs = meta.languages.map((t) => minimalTagOf(t) ?? t);
   const locale = langs[0] ?? "und";
   const doc: LdmlDocument = {
     comment: headerComment(input, profile, detail, legendUnplaced),

@@ -58,6 +58,7 @@ import { fold, isClose, type ChooserLanguage } from "./dialectSearch.ts";
 import { LanguageCard, plainText, useCardText } from "./LanguageCard.tsx";
 import type { TypedReading } from "./readTypedText.ts";
 import { RemainderChooser, type RemainderChoice } from "./RemainderChooser.tsx";
+import { CustomizePanel, type CustomizeDetails } from "./CustomizePanel.tsx";
 import { resolveTypedTag, type TypedTagProposal } from "./resolveTypedTag.ts";
 import { UnlistedLanguagePanel, type UnlistedInit, type UnlistedResult } from "./UnlistedLanguagePanel.tsx";
 import { useLanguageChooser } from "./vendor/useLanguageChooser.ts";
@@ -117,6 +118,13 @@ export default function LanguageChooser({
   pendingDialectRef.current = pendingDialect;
   const [panel, setPanel] = useState<Panel | null>(null);
   const [showFallbacks, setShowFallbacks] = useState(false);
+  // The language last reported to the survey, before any Customize region is
+  // folded in, and the Customize panel's details (spec 115 US3: a region asked for
+  // on any language routes il_language_region).
+  const [chosen, setChosen] = useState<ChosenSummary | null>(null);
+  const chosenRef = useRef<ChosenSummary | null>(null);
+  const [custom, setCustom] = useState<CustomizeDetails>({});
+  const customRef = useRef<CustomizeDetails>({});
 
   const isMountedRef = useRef(true);
   const onEntryResolvedRef = useRef(onEntryResolved);
@@ -197,6 +205,39 @@ export default function LanguageChooser({
     settled && tagProposal === null && !hasResolvedReading && !merged.some((l) => isClose(l, fold(value)));
   const regions = useMemo(() => getAllRegions(), []);
 
+  function setChosenBase(summary: ChosenSummary | null): void {
+    chosenRef.current = summary;
+    setChosen(summary);
+  }
+
+  function resetCustom(): void {
+    customRef.current = {};
+    setCustom({});
+  }
+
+  /** The Customize region rides on the language as a proposal the author confirms at the region question. */
+  function withCustom<T extends ChosenSummary | null>(summary: T): T {
+    const region = customRef.current.region;
+    if (summary === null || region === undefined) return summary;
+    return { ...summary, extras: { ...summary.extras, region: { code: region.code, source: "the region you specified" } } };
+  }
+
+  function keyOf(entry: ChosenSummary | null): string {
+    return entry === null
+      ? ""
+      : `${entry.code}|${entry.match?.dialectTag ?? entry.match?.glottocode ?? entry.match?.name ?? ""}|${entry.extras?.region?.code ?? ""}`;
+  }
+
+  function customize(details: CustomizeDetails): void {
+    customRef.current = details;
+    setCustom(details);
+    const base = chosenRef.current;
+    if (base === null) return;
+    const entry = withCustom(base);
+    lastKeyRef.current = keyOf(entry);
+    onEntryResolved?.(entry);
+  }
+
   /** A pending dialect name rides on the language that is picked while it is set (FR-030). */
   function withPending<T extends LanguageSummary | null>(summary: T): T {
     const pending = pendingDialectRef.current;
@@ -213,13 +254,12 @@ export default function LanguageChooser({
     const byName = resolveTypedLanguage(value, merged);
     const found: LanguageSummary | null =
       byName !== null ? summaryFor(byName, mod) : autoResolveBeyondName(value, merged, readings, mod);
-    const entry = withPending(found);
-    const key =
-      entry === null
-        ? ""
-        : `${entry.code}|${entry.match?.dialectTag ?? entry.match?.glottocode ?? entry.match?.name ?? ""}|${(entry as ChosenSummary).extras?.region?.code ?? ""}`;
+    const base = withPending(found);
+    const entry = withCustom(base);
+    const key = keyOf(entry);
     if (key === lastKeyRef.current) return;
     lastKeyRef.current = key;
+    setChosenBase(base);
     // While a dialect name is pending, a search that finds no language must not
     // forget the pending name.
     if (entry === null && pendingDialectRef.current !== null) return;
@@ -230,6 +270,8 @@ export default function LanguageChooser({
   function handleType(text: string): void {
     pickedRef.current = null;
     lastKeyRef.current = null;
+    setChosenBase(null);
+    resetCustom();
     setPanel(null);
     onChange(text);
     maybeLoadGlottolog(text);
@@ -241,6 +283,8 @@ export default function LanguageChooser({
   /** Report a pick to the survey: the name goes into the field, the summary through the resolution. */
   function commit(summary: ChosenSummary | null, name: string, advance: boolean): void {
     const finalSummary = withPending(summary);
+    setChosenBase(finalSummary);
+    resetCustom();
     pickedRef.current = normalizeForCompare(name);
     lastKeyRef.current = null;
     onChange(name);
@@ -497,6 +541,7 @@ export default function LanguageChooser({
             message: plural(suggestionCount, { one: "# suggestion", other: "# suggestions" }),
           })}
       </div>
+      {mod !== null && chosen !== null && panel === null && <CustomizePanel details={custom} onChange={customize} />}
       {mod !== null && panel === null && (
         <div style={{ marginTop: 6 }}>
           <button

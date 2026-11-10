@@ -44,6 +44,8 @@ export const definition = {
     // Taken at runtime by IdentityLite.getNextOverride when the picked language
     // is region-ambiguous; declared here for the flow graph.
     { condition: "ctx.ilRegionAmbiguous == 'true'", goto: "il_language_region" },
+    // Taken when the author specified a region in the chooser's Customize panel.
+    { condition: "ctx.ilRegionRequested == 'true'", goto: "il_language_region" },
     { default: true, goto: "il_language_autonym" },
   ],
 } satisfies import("../../types.ts").FlowQuestion;

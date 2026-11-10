@@ -2604,6 +2604,8 @@
   "survey.identityLite.heading": "Identifions votre langue",
   "survey.identityLite.langtagsCaption": "Suggéré à partir de langtags — modifiez si nécessaire",
   "survey.identityLite.lead": "Répondez à quelques questions rapides sur votre langue. Rien n'est définitif — vous pourrez modifier vos réponses plus tard.",
+  "survey.identityLite.regionOption.default": "{name} (par défaut)",
+  "survey.identityLite.regionOption.other": "Autre région… (saisissez son code de pays)",
   "survey.invisibles.backButton": "Retour",
   "survey.invisibles.bidiGroup.expandButton": "{0, plural, one {Afficher la commande de direction n°} other {Afficher les commandes de direction n°}}",
   "survey.invisibles.bidiGroup.heading": "Commandes de direction",
