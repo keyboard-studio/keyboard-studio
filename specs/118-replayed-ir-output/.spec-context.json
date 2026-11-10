@@ -1,9 +1,9 @@
 {
-  "workflow": "speckit",
+  "workflow": "companion",
   "specName": "Output from the replayed keyboard",
   "branch": "118-replayed-ir-output",
-  "currentStep": "specify",
-  "status": "specified",
+  "currentStep": "plan",
+  "status": "planned",
   "history": [
     {
       "step": "specify",
@@ -11,6 +11,64 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-11-10T21:16:41.061Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-10T22:01:53.764Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T22:02:20.742Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T22:03:34.622Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T22:03:35.834Z"
     }
-  ]
+  ],
+  "unattended": true,
+  "decisions": [
+    {
+      "decision": "emit(state, mode) lives in engine/src/output",
+      "why": "keeps studio from reading generated text back",
+      "rejected": "keep in studio lib"
+    },
+    {
+      "decision": "Pattern merge: slot-substitute as text, parse in scaffold, merge into model, after spec 117",
+      "why": "Pattern contract unchanged; fixes group-main defect",
+      "rejected": "typed fragment in Pattern schema"
+    },
+    {
+      "decision": "Defects FR-020 fixed first, failing test each",
+      "why": "migration compared against correct output",
+      "rejected": "fix inside migration phases"
+    },
+    {
+      "decision": "kvks stays a documented text pass after emit",
+      "why": "no fidelity-preserving model; not needed for goal",
+      "rejected": "KvksIR now"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Six landable phases: defects, emit+modes, pattern on model, touch/kvks, ordering edges, projection reduced",
+      "key_finding": "Phase 5 depends on spec 105 phases; phase 2 on spec 117"
+    }
+  },
+  "approach": "Replay becomes the only producer: decisions apply to the keyboard model incl. touch layout; one engine emit(state, mode) writes all outputs; projection reduced to file-level work; defects fixed first."
 }
