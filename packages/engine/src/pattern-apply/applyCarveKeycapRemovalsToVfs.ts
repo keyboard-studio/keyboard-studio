@@ -12,7 +12,7 @@
 // during authoring (spec §11).
 
 import type { IRRule, IRStore, KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
-import { buildTouchKeyRuleIndex, normalizeTouchKeyId } from "@keyboard-studio/contracts";
+import { buildTouchKeyRuleIndex, normalizeTouchKeyId, stripDottedCircle } from "@keyboard-studio/contracts";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import {
   buildRemovalSet,
@@ -262,6 +262,16 @@ export function applyCarveKeycapRemovalsToVfs(
  * Clear matching keycap text in the `.kvks` XML across ALL `<layer>` blocks
  * (carve is layer-agnostic, unlike the S-01/S-08 label patcher). Elements are
  * kept; only their text is emptied. Writes back only when something changed.
+ *
+ * A combining mark is shown on a dotted-circle carrier in the `.kvks`
+ * ("◌̄" for a carved U+0304) while `carved` holds the bare mark, so the
+ * match also tries the carrier-stripped form (contracts' `stripDottedCircle`,
+ * which only strips when the remainder is all combining marks — a bare "◌"
+ * is a real inventory character on sil_cameroon_qwerty and is never blanked
+ * by this). Without the strip, every carved combining mark survives on the
+ * desktop OSK as a ghost key: its rules are gone, so it types nothing, but
+ * its keycap still shows (Bafut on sil_cameroon_qwerty: U+0304/U+0327/U+0330/
+ * U+1DC5/U+1DC6 on the RightAlt layer).
  */
 function clearKvksKeycaps(
   vfs: VirtualFS,
@@ -288,7 +298,13 @@ function clearKvksKeycaps(
       const newBody = layerBody.replace(
         /(<key\b[^>]*>)([^<]*)(<\/key>)/gi,
         (keyFull, keyOpen: string, keyText: string, keyClose: string) => {
-          if (keyText !== "" && carved.has(xmlUnescape(keyText).normalize("NFC"))) {
+          if (keyText === "") return keyFull;
+          const text = xmlUnescape(keyText).normalize("NFC");
+          const stripped = stripDottedCircle(text);
+          if (
+            carved.has(text) ||
+            (stripped !== undefined && carved.has(stripped.normalize("NFC")))
+          ) {
             changed = true;
             return `${keyOpen}${keyClose}`;
           }
