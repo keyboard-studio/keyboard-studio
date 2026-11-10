@@ -75,6 +75,10 @@ import {
   isEmulationKeyId,
   parseTouchKeyAddress,
   producedByKeyId,
+  ruleConditions,
+  rulePreContext,
+  ruleKeystroke,
+  withRuleParts,
   type ContextElement,
   type IRGroup,
   type IRRule,
@@ -95,6 +99,7 @@ import {
 import { groupLayerFamilies } from "./layerFamilies.js";
 import { proposeKeyId } from "./keyIdMinting.js";
 import { touchKeyIdFamily } from "./touch-mechanism-shared.js";
+import { ruleContextElements } from "../shared/rule-shape.js";
 
 // ---------------------------------------------------------------------------
 // Request / result shapes
@@ -250,7 +255,7 @@ export function severTouchKey(
   const taken = collectLayoutKeyIds(layout);
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      for (const el of rule.context) {
+      for (const el of ruleContextElements(rule)) {
         if (el.kind === "vkey") taken.add(el.name.toUpperCase());
       }
     }
@@ -316,7 +321,7 @@ export function severTouchKey(
   const referencedStores = new Set<string>();
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      for (const el of rule.context) {
+      for (const el of ruleContextElements(rule)) {
         if (el.kind === "any" || el.kind === "notany" || el.kind === "index") {
           referencedStores.add(el.storeRef);
         }
@@ -343,7 +348,7 @@ export function severTouchKey(
   // the `dk(name)` spelling gets the typed variant), so the raw spelling is
   // matched too — it is the same binding, just untyped.
   for (const { rule } of collected) {
-    for (const el of rule.context) {
+    for (const el of ruleContextElements(rule)) {
       const deadkeyRef =
         el.kind === "deadkey"
           ? `deadkey(${el.id})`
@@ -364,19 +369,22 @@ export function severTouchKey(
   const collectedSet = new Set(collectedNodeIds);
   const clonedRuleNodeIds: { sourceNodeId: string; cloneNodeId: string }[] = [];
   const cloneBySourceId = new Map<string, IRRule>();
-  for (const { rule } of collected) {
+  const rekey = (el: ContextElement): ContextElement =>
+    el.kind === "vkey" && el.name.toUpperCase() === sourceId.toUpperCase()
+      ? { ...el, name: targetId }
+      : { ...el };
+  for (const { group, rule } of collected) {
     const cloneNodeId = `gen-severed-${rule.nodeId}`;
-    const { sourceLine: _droppedSourceLine, ...rest } = rule;
-    const clone: IRRule = {
-      ...rest,
-      nodeId: cloneNodeId,
-      context: rule.context.map((el): ContextElement =>
-        el.kind === "vkey" && el.name.toUpperCase() === sourceId.toUpperCase()
-          ? { ...el, name: targetId }
-          : { ...el },
-      ),
+    const keystroke = ruleKeystroke(rule, group);
+    const rebuilt = withRuleParts(rule, group, {
+      conditions: ruleConditions(rule).map(rekey),
+      preContext: rulePreContext(rule, group).map(rekey),
+      keystroke: keystroke === undefined ? undefined : rekey(keystroke),
       output: rule.output.map((el) => ({ ...el })),
-    };
+    });
+    // A clone is a new, synthesized rule: it takes the new id and has no source line.
+    const { sourceLine: _droppedSourceLine, ...rest } = rebuilt;
+    const clone: IRRule = { ...rest, nodeId: cloneNodeId };
     cloneBySourceId.set(rule.nodeId, clone);
     clonedRuleNodeIds.push({ sourceNodeId: rule.nodeId, cloneNodeId });
   }

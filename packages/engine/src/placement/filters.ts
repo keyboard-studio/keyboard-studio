@@ -10,6 +10,7 @@
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import type { PlacementCandidate } from "@keyboard-studio/contracts";
+import { ruleContextElements, ruleKeystroke } from "../shared/rule-shape.js";
 
 // ---------------------------------------------------------------------------
 // Standard US-QWERTY letter-key map (unshifted BMP codepoint per vkey)
@@ -180,8 +181,9 @@ export function collectVkeyChars(
   for (const group of ir.groups) {
     if (!group.usingKeys) continue;
     for (const rule of group.rules) {
-      if (rule.context.length !== 1) continue;
-      const ctx = rule.context[0];
+      // A bare keystroke: nothing but the vkey on the left-hand side.
+      if (ruleContextElements(rule).length !== 1) continue;
+      const ctx = ruleKeystroke(rule, group);
       if (!ctx || ctx.kind !== "vkey") continue;
       if (!accept(ctx.name, ctx.modifiers)) continue;
       if (rule.output.length !== 1) continue;

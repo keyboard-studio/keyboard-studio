@@ -2,12 +2,13 @@ import type { KeyboardIR, IRRule, Pattern } from "@keyboard-studio/contracts";
 import { makePattern } from "@keyboard-studio/contracts";
 import type { MatchResult, RecognizerRule } from "../types.js";
 import { ruleRef } from "../node-refs.js";
+import { ruleContextElements } from "../../shared/rule-shape.js";
 import { toUPlus, formatVKeyModifiers, isBehaviourOwned } from "../utils.js";
 
 // Format one rule line for the keystrokeCharacterMap slot.
 // e.g. + [SHIFT K_Q] > U+0190  or  + [K_Q] > U+025B
 function formatMapLine(rule: IRRule): string {
-  const ctx = rule.context[0];
+  const ctx = ruleContextElements(rule)[0];
   const out = rule.output[0];
   if (
     ctx === undefined ||
@@ -22,11 +23,12 @@ function formatMapLine(rule: IRRule): string {
 }
 
 export function isS01(rule: IRRule, groupName: string): boolean {
+  const context = ruleContextElements(rule);
   return (
     groupName !== "deadkeys" &&
-    rule.context.length === 1 &&
-    rule.context[0] !== undefined &&
-    rule.context[0].kind === "vkey" &&
+    context.length === 1 &&
+    context[0] !== undefined &&
+    context[0].kind === "vkey" &&
     rule.output.length === 1 &&
     rule.output[0] !== undefined &&
     rule.output[0].kind === "char"
@@ -87,7 +89,7 @@ export const s01Recognizer: RecognizerRule = {
       // Guard: spec §7.3 S-01 card says "1–5 extra characters" (≤5 inclusive); skip groups with more than 5 distinct base keys.
       const distinctBaseNames = new Set(
         matchingRules
-          .map((r) => r.context[0])
+          .map((r) => ruleContextElements(r)[0])
           .filter((ctx): ctx is NonNullable<typeof ctx> & { kind: "vkey" } => ctx?.kind === "vkey")
           .map((ctx) => ctx.name),
       );

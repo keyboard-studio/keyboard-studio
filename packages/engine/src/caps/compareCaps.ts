@@ -4,8 +4,9 @@
 // demand outside the 300 ms validation cycle) and simulates each key on each
 // used modifier plane under {none, Shift, Caps, Shift+Caps}.
 
-import { caseCounterpart, isCapsModifier, type IRRule, type KeyboardIR, type SimKeyInput } from "@keyboard-studio/contracts";
+import { caseCounterpart, isCapsModifier, ruleKeystroke, type IRGroup, type IRRule, type KeyboardIR, type SimKeyInput } from "@keyboard-studio/contracts";
 import { parse } from "../codec/parse.js";
+import { ruleContextElements } from "../shared/rule-shape.js";
 import { compile } from "../compiler/index.js";
 import { simulate } from "../simulator/index.js";
 import {
@@ -54,7 +55,7 @@ const MOD_MAP: Record<string, SimMod> = {
 function scanKeys(ir: KeyboardIR, into: { caps: Set<string>; planes: Map<string, Set<string>> }): void {
   for (const g of ir.groups) {
     for (const rule of g.rules) {
-      for (const el of rule.context) {
+      for (const el of ruleContextElements(rule)) {
         if (el.kind !== "vkey") continue;
         const planeMods = el.modifiers
           .filter((m) => !isCapsModifier(m) && m !== "SHIFT")
@@ -87,8 +88,9 @@ function deadkeyId(el: { kind: string }): string | undefined {
   return undefined;
 }
 
-function ruleKeys(rule: IRRule): string[] {
-  return rule.context.flatMap((el) => (el.kind === "vkey" ? [el.name] : []));
+function ruleKeys(rule: IRRule, group: IRGroup): string[] {
+  const keystroke = ruleKeystroke(rule, group);
+  return keystroke?.kind === "vkey" ? [keystroke.name] : [];
 }
 
 /** deadkey -> the single key press that produces it (first simple `+ [key] > ... dk` rule), when one exists. */
@@ -115,8 +117,8 @@ function deadkeysReaching(ir: KeyboardIR, keys: ReadonlySet<string>): Set<string
   const out = new Set<string>();
   for (const g of ir.groups) {
     for (const rule of g.rules) {
-      if (!ruleKeys(rule).some((k) => keys.has(k))) continue;
-      for (const el of rule.context) {
+      if (!ruleKeys(rule, g).some((k) => keys.has(k))) continue;
+      for (const el of ruleContextElements(rule)) {
         const id = deadkeyId(el);
         if (id !== undefined) out.add(id);
       }

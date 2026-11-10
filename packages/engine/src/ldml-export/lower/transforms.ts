@@ -4,6 +4,7 @@
 // capture groups, and the single `$[1:set]` mapping. Marks, controls, format characters,
 // non-space whitespace and the supplementary planes are written as `\u{...}`.
 
+import { elementAtOffset } from "@keyboard-studio/contracts";
 import type { ContextElement, IRStore, KeyboardIR, OutputElement } from "@keyboard-studio/contracts";
 import { findStore, isGuardElement, MAX_TRANSFORMS_PER_RULE, dkKey, type RulePlan } from "../classify/ruleElements.js";
 import type { LdmlTransform } from "../xml/model.js";
@@ -136,7 +137,7 @@ export function renderRule(
     }
   }
   const sizes = indexOffsets.map((off) => {
-    const el = full[off - 1];
+    const el = elementAtOffset(rule, plan.group, off);
     return el?.kind === "any" ? (findStore(ir, el.storeRef)?.items.length ?? 1) : 1;
   });
   const combos = cartesian(sizes);

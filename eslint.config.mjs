@@ -97,6 +97,31 @@ const GALLERY_RENDERER_TREES_US3 = [
 // physical-layout / touch-layout decision values, not answers in
 // place of decision records. Mirrors the checker test's lists.
 
+// Spec 116 FR-037: rule-shape access goes through packages/contracts/src/rule-shape.ts
+// (makeRule / withRuleParts / the readers). Raw `matchKind`, raw `.context` reads on a
+// rule, and hand-built { context, output } literals are banned outside the codec.
+// Selectors are appended to every no-restricted-syntax block that can overlap these
+// files, because flat config replaces (not merges) a rule's options per matching block.
+export const ruleShapeSelectors = [
+  {
+    selector: 'MemberExpression[property.name="matchKind"]',
+    message:
+      "Do not read matchKind directly; use the rule-shape accessors in packages/contracts/src/rule-shape.ts (spec 116 FR-037).",
+  },
+  {
+    selector:
+      'MemberExpression[property.name="context"][object.name=/^(rule|r|rl|irRule|newRule|nextRule|stmt)$/]',
+    message:
+      "Do not read rule.context directly; use the rule-shape accessors in packages/contracts/src/rule-shape.ts (spec 116 FR-037).",
+  },
+  {
+    selector:
+      'ObjectExpression:has(> Property[key.name="context"]):has(> Property[key.name="output"])',
+    message:
+      "Do not hand-build a rule literal; use makeRule / withRuleParts from packages/contracts/src/rule-shape.ts (spec 116 FR-037).",
+  },
+];
+
 function galleryWriteBanRule(identifiers) {
   return [
     "error",
@@ -110,6 +135,7 @@ function galleryWriteBanRule(identifiers) {
         message: `Gallery renderer trees must not call store write action "${name}" — report the change through onChange (spec 090 FR-003).`,
       },
     ]),
+    ...ruleShapeSelectors,
   ];
 }
 
@@ -254,6 +280,26 @@ export default [
     },
   },
   {
+    // Spec 116 FR-037: one rule-shape API. See ruleShapeSelectors above.
+    files: ["packages/{contracts,engine,studio,keyboard-lint}/src/**/*.{ts,tsx}"],
+    ignores: [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "packages/engine/src/codec/**",
+      "packages/contracts/src/rule-shape.ts",
+      // Test support builds deliberately off-grammar rule shapes; it is tests by role.
+      "**/__fixtures__/**",
+      "packages/contracts/src/fixtures/**",
+      "**/__testing__/**",
+      "**/test/**",
+      "**/test-support/**",
+      "**/*.testkit.ts",
+    ],
+    rules: {
+      "no-restricted-syntax": ["error", ...ruleShapeSelectors],
+    },
+  },
+  {
     // Spec 090 FR-003 layer 2 overlay (see GALLERY_WRITE_IDENTIFIERS above):
     // no store-write call sites inside gallery renderer trees — neither a
     // bare call (`saveAnswer(...)`) nor a member call
@@ -308,7 +354,7 @@ export default [
       "packages/studio/src/components/StudioFooter.tsx",
     ],
     rules: {
-      "no-restricted-syntax": ["error", ...stepNavSelectors],
+      "no-restricted-syntax": ["error", ...stepNavSelectors, ...ruleShapeSelectors],
     },
   },
   {

@@ -18,6 +18,14 @@
 // identifiable key element (or no family template at all) are skipped, not
 // guessed — the result reports counts honestly.
 
+import { ruleContextElements } from "@keyboard-studio/contracts";
+import {
+  makeRule,
+  ruleConditions,
+  ruleHasNulContext,
+  ruleKeystroke,
+  rulePreContext,
+} from "@keyboard-studio/contracts";
 import type {
   ContextElement,
   IRRule,
@@ -40,10 +48,10 @@ export interface SynthesizeMissingGuardsResult {
 
 /** Normalized guard signature for dedup: guard store + key element. */
 function guardSignature(rule: IRRule): string | null {
-  const guard = rule.context.find(
+  const guard = ruleContextElements(rule).find(
     (el): el is { kind: "any"; storeRef: string } => el.kind === "any",
   );
-  const keyEl = lastKeyElement(rule.context);
+  const keyEl = lastKeyElement(ruleContextElements(rule));
   if (guard === undefined || keyEl === undefined) return null;
   return `${guard.storeRef}::${JSON.stringify(keyEl)}`;
 }
@@ -67,27 +75,33 @@ function findRule(ir: KeyboardIR, nodeId: string): IRRule | undefined {
 }
 
 function cloneWithKey(template: IRRule, entry: MissingGuardEntry): IRRule | null {
-  const keyIndex = (() => {
-    for (let i = template.context.length - 1; i >= 0; i--) {
-      const el = template.context[i]!;
-      if (el.kind === "vkey" || el.kind === "char") return i;
-    }
-    return -1;
-  })();
-  if (keyIndex === -1) return null;
-  const templateKey = template.context[keyIndex]!;
+  // Guard rules are `using keys` rules (`any(store) + key > context`).
+  const group = { usingKeys: true };
+  const isKey = (el: ContextElement): boolean => el.kind === "vkey" || el.kind === "char";
+  const keystroke = ruleKeystroke(template, group);
+  const preContext = rulePreContext(template, group);
+  // The key element is the last vkey/char: the keystroke, else the last one before it.
+  const keyInKeystroke = keystroke !== undefined && isKey(keystroke);
+  const preKeyIndex = keyInKeystroke ? -1 : preContext.map(isKey).lastIndexOf(true);
+  const templateKey = keyInKeystroke ? keystroke : preContext[preKeyIndex];
+  if (templateKey === undefined) return null;
   const replacement: ContextElement =
     templateKey.kind === "vkey"
       ? { kind: "vkey", name: entry.key, modifiers: [...templateKey.modifiers] }
       : { kind: "char", value: entry.outputChar };
-  const context = template.context.map((el, i) => (i === keyIndex ? replacement : el));
-  return {
-    nodeId: crypto.randomUUID(),
-    context,
-    output: template.output.map((el) => ({ ...el })),
-    trailingComment: "added from guard suggestion",
-    rulesStepAdded: true,
-  };
+  return makeRule(
+    {
+      nodeId: crypto.randomUUID(),
+      nulContext: ruleHasNulContext(template),
+      conditions: ruleConditions(template),
+      preContext: keyInKeystroke ? preContext : preContext.map((el, i) => (i === preKeyIndex ? replacement : el)),
+      ...(keystroke !== undefined ? { keystroke: keyInKeystroke ? replacement : keystroke } : {}),
+      output: template.output.map((el) => ({ ...el })),
+      trailingComment: "added from guard suggestion",
+      rulesStepAdded: true,
+    },
+    group,
+  );
 }
 
 /**

@@ -126,7 +126,7 @@ splitter, an offset accessor that matches kmcmplib, and a lint guard (FR-032 to 
   - `packages/studio/src/lib/carvedCombo.ts:45`
   - `packages/studio/src/editors/deadkey/deadkeyWrite.ts` (131, 628)
 - [x] T018 [P] [US5] Migrate the keyboard-lint readers onto the contracts accessors: `packages/keyboard-lint/src/checks/criteria/check-raw-ctrl.ts:43`, `packages/keyboard-lint/src/checks/criteria/check-sided-ctrl-advisory.ts:25`, and any other check that reads `.context` (grep `packages/keyboard-lint/src` for `.context`).
-- [ ] T019 [US5] Migrate the engine rule writers onto `makeRule`/`withRuleParts`:
+- [x] T019 [US5] Migrate the engine rule writers onto `makeRule`/`withRuleParts`:
   - `packages/engine/src/deadkey-lifecycle/mutations.ts` (223–246)
   - `packages/engine/src/pattern-apply/mark-guards.ts` (203, 296–446, 595)
   - `packages/engine/src/pattern-apply/context-variants.ts` (390, 697, 705)
@@ -138,15 +138,15 @@ splitter, an offset accessor that matches kmcmplib, and a lint guard (FR-032 to 
   - `packages/engine/src/facet-transform/migrations/encoding-spelling.ts:147`
   - `packages/engine/src/inventory/producedGlyphs.ts:107`
   - `packages/engine/src/caps/replaceCapsRules.ts:25`: replace its in-place mutation with a rule replacement.
-- [ ] T020 [P] [US5] Migrate the studio rule writers onto `makeRule`/`withRuleParts`: `packages/studio/src/components/rules/guardRuleSynthesis.ts` (46, 83), `packages/studio/src/components/rules/narrowGuard.ts:43`, `packages/studio/src/editors/deadkey/deadkeyWrite.ts:688`, `packages/studio/src/lib/projectWorkingCopyVfs.ts:1563` and `packages/studio/src/components/ruleBuilder/RuleBuilderPanel.tsx`.
-- [ ] T021 [P] [US5] Migrate the test builders `packages/contracts/src/fixtures/ir-builders.ts` and `packages/engine/src/test-support/applyStoreSlotRemovals.testkit.ts` onto `makeRule`. These are test support, so the guard allow-lists them only if migration is impractical. Record why.
-- [ ] T022 [US5] Add the FR-037 guard to `eslint.config.mjs`. It is a `no-restricted-syntax` rule: the repo's ESLint is not type-aware, so it matches syntax. It applies to `packages/{contracts,engine,studio,keyboard-lint}/src/**/*.{ts,tsx}`, excluding `packages/engine/src/codec/**`, `packages/contracts/src/rule-shape.ts` and test files, and it bans:
+- [x] T020 [P] [US5] Migrate the studio rule writers onto `makeRule`/`withRuleParts`: `packages/studio/src/components/rules/guardRuleSynthesis.ts` (46, 83), `packages/studio/src/components/rules/narrowGuard.ts:43`, `packages/studio/src/editors/deadkey/deadkeyWrite.ts:688`, `packages/studio/src/lib/projectWorkingCopyVfs.ts:1563` and `packages/studio/src/components/ruleBuilder/RuleBuilderPanel.tsx`.
+- [x] T021 [P] [US5] Migrate the test builders `packages/contracts/src/fixtures/ir-builders.ts` and `packages/engine/src/test-support/applyStoreSlotRemovals.testkit.ts` onto `makeRule`. These are test support, so the guard allow-lists them only if migration is impractical. Record why.
+- [x] T022 [US5] Add the FR-037 guard to `eslint.config.mjs`. It is a `no-restricted-syntax` rule: the repo's ESLint is not type-aware, so it matches syntax. It applies to `packages/{contracts,engine,studio,keyboard-lint}/src/**/*.{ts,tsx}`, excluding `packages/engine/src/codec/**`, `packages/contracts/src/rule-shape.ts` and test files, and it bans:
   - `MemberExpression[property.name="matchKind"]`;
   - `MemberExpression[property.name="context"]` where the object is a rule-typed identifier. Use the selector list fixed while implementing; follow the `galleryWriteBanRule` pattern already in the file, with a message pointing to `rule-shape.ts`;
   - object literals with both `context` and `output` properties.
 
   A justified exception uses `// eslint-disable-next-line no-restricted-syntax -- <why>`, as the file's own convention requires.
-- [ ] T023 [US5] Gate:
+- [x] T023 [US5] Gate:
   1. `pnpm lint`, `pnpm typecheck` and `pnpm -r test`, plus the engine and studio corpus suites.
   2. Confirm with `git diff origin/main -- '*.test.*' '*.snap'` that every changed expectation is listed in `evidence/splitter-disagreements.md` or in T016's commit.
   3. Tick T003–T023 and commit as `refactor(contracts): one rule-shape API for every rule reader and writer (spec 116 T003-T023)`, listing the disagreement count.

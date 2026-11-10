@@ -22,8 +22,10 @@ import {
   isNulOutput,
   isSuppressionOnlyOutput,
   shapeContext,
+  splitShapeContext,
   shapeOutput,
 } from "./classify.js";
+import { ruleLhsKind } from "@keyboard-studio/contracts";
 import { getCategory, getName } from "./unicodeAdapter.js";
 
 /** Short modifier labels for author-language key descriptions. */
@@ -168,23 +170,8 @@ export function joinList(items: string[]): string {
   return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
-/**
- * Split shape context into the pre-context (everything before the struck
- * key) and the struck key itself (the trailing vkey, if present).
- */
-function splitKeyContext(ctx: ContextElement[]): {
-  pre: ContextElement[];
-  key?: Extract<ContextElement, { kind: "vkey" }>;
-} {
-  const last = ctx[ctx.length - 1];
-  if (last !== undefined && last.kind === "vkey") {
-    return { pre: ctx.slice(0, -1), key: last };
-  }
-  return { pre: ctx };
-}
-
 function describeBlocking(rule: IRRule): string {
-  const { pre, key } = splitKeyContext(shapeContext(rule));
+  const { guards: pre, key } = splitShapeContext(rule);
   const out = shapeOutput(rule);
   const hasBeep = out.some((el) => el.kind === "beep");
   const keepsContext = out.some(isBareContextOutput);
@@ -247,7 +234,7 @@ function describeReorder(rule: IRRule): string {
 }
 
 function describeOpaqueRule(rule: IRRule): string {
-  if (rule.matchKind !== undefined) {
+  if (ruleLhsKind(rule) !== "input") {
     const target = shapeOutput(rule).find(
       (el) =>
         el.kind === "useGroup" ||
@@ -262,7 +249,7 @@ function describeOpaqueRule(rule: IRRule): string {
         if (m?.[1] !== undefined) name = `"${m[1]}"`;
       }
     }
-    const when = rule.matchKind === "match"
+    const when = ruleLhsKind(rule) === "match"
       ? "When a rule in this group has matched"
       : "When nothing else in this group matched";
     return `${when}, processing moves to the ${name} group — a group transition, not a keystroke rule.`;

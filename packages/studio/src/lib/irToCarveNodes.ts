@@ -11,7 +11,17 @@ import type {
   RemovalCapability,
   StoreItem,
 } from '@keyboard-studio/contracts';
-import { buildProducedSet, resolveEffectiveScript } from '@keyboard-studio/contracts';
+import {
+  buildProducedSet,
+  elementAtOffset,
+  resolveEffectiveScript,
+  ruleContextElements,
+  ruleConditions,
+  ruleHasNulContext,
+  ruleKeystroke,
+  ruleKeystrokeLoose,
+  rulePreContext,
+} from '@keyboard-studio/contracts';
 import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, buildProducerIndex, isCharCoveredForLocale, collectCharContributorsBatched, sliceContributorDescriptors, isPlusSeparator, parseSlotId, isCombiningMarkChar, makeSlotId } from '@keyboard-studio/engine';
 import type { ProducerIndex } from '@keyboard-studio/engine';
 import type { StoreSlotBlockReason, StoreSlotEditMode, StoreAnalysis, CharContributors, ContributorDescriptor, CharNormalizationForm } from '@keyboard-studio/engine';
@@ -51,7 +61,7 @@ export type ModifierLayer = 'base' | 'shift' | 'ralt' | 'ctrl' | 'other';
  * Low-severity — left as a future follow-up rather than pulled in now.
  */
 export function ruleModifier(rule: IRRule): ModifierLayer {
-  const vkeyEl = rule.context.find((el) => el.kind === 'vkey');
+  const vkeyEl = ruleContextElements(rule).find((el) => el.kind === 'vkey');
   if (!vkeyEl || vkeyEl.kind !== 'vkey') return 'base';
 
   const mods = new Set(vkeyEl.modifiers.map((m) => m.toUpperCase()));
@@ -95,7 +105,7 @@ function prettyMod(token: string): string {
  * or a '+'-joined combo for 'other'.
  */
 export function modifierLabel(rule: IRRule): string {
-  const vkeyEl = rule.context.find((el) => el.kind === 'vkey');
+  const vkeyEl = ruleContextElements(rule).find((el) => el.kind === 'vkey');
   if (!vkeyEl || vkeyEl.kind !== 'vkey' || vkeyEl.modifiers.length === 0) return '';
 
   const layer = ruleModifier(rule);
@@ -346,7 +356,7 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
   const outputStore = ir.stores.find((s) => s.name === outputEl.storeRef);
   if (!outputStore) {
     // Fallback: unresolvable store — return a single '...' glyph with bare nodeId
-    const keys = contextToKeys(rule.context);
+    const keys = contextToKeys(ruleContextElements(rule));
     if (keys.length === 0) return [];
     return [{
       gid: rule.nodeId,
@@ -359,7 +369,7 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
   }
 
   // Resolve the input store for key labels (best-effort; fall back to '?')
-  const inputAnyEl = rule.context.find((el) => el.kind === 'any');
+  const inputAnyEl = ruleContextElements(rule).find((el) => el.kind === 'any');
   const inputStoreName = inputAnyEl && inputAnyEl.kind === 'any' ? inputAnyEl.storeRef : undefined;
   const inputStore = inputStoreName !== undefined
     ? ir.stores.find((s) => s.name === inputStoreName)
@@ -382,7 +392,7 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
   // Named fan-outs do not reach this expansion today (the engine fan-out
   // predicate requires numeric deadkey pre-terminals); the namedDeadkey
   // arm is display parity for if/when the predicate widens (#2238 audit).
-  const hasDeadkey = rule.context.some((el) => el.kind === 'deadkey' || el.kind === 'namedDeadkey');
+  const hasDeadkey = ruleContextElements(rule).some((el) => el.kind === 'deadkey' || el.kind === 'namedDeadkey');
 
   const glyphs: CarveGlyph[] = [];
   const seen = new Set<string>();
@@ -497,7 +507,7 @@ function storeRefsOf(rule: IRRule): { storeName: string; asSource: boolean; asOu
     else entry.asOutput = true;
   };
 
-  for (const el of rule.context) {
+  for (const el of ruleContextElements(rule)) {
     const ref = storeRefRole(el, false);
     if (ref) touch(ref.storeName, ref.role);
   }
@@ -520,7 +530,7 @@ function storeRefsOf(rule: IRRule): { storeName: string; asSource: boolean; asOu
 // ---------------------------------------------------------------------------
 
 function ruleReferencesStore(rule: IRRule, storeName: string): boolean {
-  for (const el of rule.context) {
+  for (const el of ruleContextElements(rule)) {
     const ref = storeRefRole(el, false);
     if (ref && ref.storeName === storeName) return true;
   }
@@ -547,7 +557,7 @@ function ruleReferencesStore(rule: IRRule, storeName: string): boolean {
 function ruleStoreRoles(rule: IRRule, storeName: string): { asSource: boolean; asOutput: boolean } {
   let asSource = false;
   let asOutput = false;
-  for (const el of rule.context) {
+  for (const el of ruleContextElements(rule)) {
     const ref = storeRefRole(el, false);
     if (ref && ref.storeName === storeName) {
       if (ref.role === 'source') asSource = true;
@@ -598,7 +608,7 @@ function ruleToGlyphs(rule: IRRule, ir: KeyboardIR, capabilities: Map<string, Re
     return expandParallelStoreRule(rule, ir, capabilities);
   }
   // Standard single-output rule (original behavior)
-  const keys = contextToKeys(rule.context);
+  const keys = contextToKeys(ruleContextElements(rule));
   if (keys.length === 0) return [];
   const ch = outputToChar(rule.output);
   if (ch === '?' || ch === '‹dk›') return [];
@@ -873,22 +883,49 @@ function extractPlatformGuard(elements: ContextElement[]): { guard: string | nul
   return { guard, filtered };
 }
 
+// Display helpers below that take a bare rule or context have no group in
+// scope; they read it as a `using keys` group (the loose reading of the
+// rule-shape accessors).
+const NO_GROUP = { usingKeys: true } as const;
+
+/**
+ * A rule's LHS with the codec's `+` separator kept in place. The context-array
+ * helpers here (`triggerKeyLabel`, `bareTriggerLabel`, the store-ref index
+ * scan) take a separator-bearing array by signature, and the separator-free
+ * accessors drop exactly the element they key on.
+ */
+function lhsWithSeparator(rule: IRRule): ContextElement[] {
+  // eslint-disable-next-line no-restricted-syntax -- separator-preserving read for helpers whose public signature takes the raw context array
+  return rule.context;
+}
+
+/**
+ * The elements a rule's keystroke is conditioned on: its `nul`, head
+ * conditions and pre-context. Empty when the rule has no `+` separator (a
+ * bare keystroke rule has no condition to describe).
+ */
+function elementsBeforeKeystroke(rule: IRRule): ContextElement[] {
+  if (!lhsWithSeparator(rule).some(isPlusSeparator)) return [];
+  const nul: ContextElement[] = ruleHasNulContext(rule) ? [{ kind: 'raw', text: 'nul' }] : [];
+  return [...nul, ...ruleConditions(rule), ...rulePreContext(rule, NO_GROUP)];
+}
+
 // Stays bespoke rather than consuming storeRefsOf: it needs the element
 // INDEX of the store ref (ctxRefIdx/outRefIdx) to compute isKeystroke via
 // the '+'/raw separator and to slice the preceding context — a positional
 // need storeRefsOf's per-store roll-up can't serve.
 function describeRuleForStore(rule: IRRule, storeName: string): StoreRuleDetail {
-  const ctxRefIdx = rule.context.findIndex((el) =>
+  const lhs = lhsWithSeparator(rule);
+  const ctxRefIdx = lhs.findIndex((el) =>
     ((el.kind === 'any' || el.kind === 'notany') && el.storeRef === storeName) ||
     (el.kind === 'index' && el.storeRef === storeName),
   );
 
-  // The raw('+') element marks the keystroke boundary — refs after it are the active keypress
-  const plusIdx = rule.context.findIndex(isPlusSeparator);
+  // The keystroke element is the active keypress.
   // ctxRefIdx === -1 means store is output-only (not a keystroke trigger)
-  const isKeystroke = ctxRefIdx !== -1 && (plusIdx === -1 || ctxRefIdx > plusIdx);
+  const isKeystroke = ctxRefIdx !== -1 && lhs[ctxRefIdx] === ruleKeystrokeLoose(rule);
 
-  const preceding = ctxRefIdx > 0 ? rule.context.slice(0, ctxRefIdx) : [];
+  const preceding = ctxRefIdx > 0 ? lhs.slice(0, ctxRefIdx) : [];
 
   // Strip platform() guards from preceding — they're rule-level platform restrictions, not character context
   const { guard: platformGuard, filtered: precedingFiltered } = extractPlatformGuard(preceding);
@@ -1149,9 +1186,8 @@ export function desktopVkeyLabel(name: string): string | undefined {
  * Returns a human-readable string or undefined when no trigger is present.
  */
 export function triggerKeyLabel(context: ContextElement[], ir?: KeyboardIR): string | undefined {
-  const plusIdx = context.findIndex(isPlusSeparator);
-  if (plusIdx === -1) return undefined;
-  const triggerEl = context[plusIdx + 1];
+  if (!context.some(isPlusSeparator)) return undefined;
+  const triggerEl = ruleKeystrokeLoose({ context });
   if (!triggerEl) return undefined;
   switch (triggerEl.kind) {
     case 'vkey':    return desktopVkeyLabel(triggerEl.name);
@@ -1234,9 +1270,10 @@ function findDeadkeyTrigger(ir: KeyboardIR, dkId: number): { el: ContextElement;
   for (const group of ir.groups) {
     if (group.name === 'deadkeys') continue;
     for (const rule of group.rules) {
-      const effCtx = rule.context.filter((c) => !isPlusSeparator(c));
-      if (effCtx.length !== 1 || rule.output.length !== 1) continue;
-      const el = effCtx[0];
+      // A sole-element context: the keystroke, with nothing before or after it.
+      const el = ruleKeystroke(rule, group);
+      if (elementAtOffset(rule, group, 1) !== el || elementAtOffset(rule, group, 2) !== undefined) continue;
+      if (rule.output.length !== 1) continue;
       const out = rule.output[0];
       if (el === undefined || (el.kind !== 'vkey' && el.kind !== 'char')) continue;
       if (out === undefined || out.kind !== 'deadkey' || out.id !== dkId) continue;
@@ -1288,7 +1325,7 @@ export function keySequenceLabel(
   ir: KeyboardIR,
   resolvedStartLabel?: string,
 ): string[] | undefined {
-  const ctx = rule.context;
+  const ctx = lhsWithSeparator(rule);
 
   if (resolvedStartLabel !== undefined) {
     const dkEl = ctx.find((el) => el.kind === 'deadkey');
@@ -1319,9 +1356,8 @@ export function keySequenceLabel(
   // among the literals) never fires this branch — falls through to the
   // honest `undefined` below rather than fabricating a step.
   if (ctx[0] !== undefined && ctx[0].kind === 'char') {
-    const plusIdx = ctx.findIndex(isPlusSeparator);
-    if (plusIdx > 0) {
-      const preceding = ctx.slice(0, plusIdx);
+    const preceding = ctx.some(isPlusSeparator) ? rulePreContext(rule, NO_GROUP) : [];
+    if (preceding.length > 0) {
       const allLiteral = preceding.every(
         (el): el is Extract<ContextElement, { kind: 'char' }> => el.kind === 'char',
       );
@@ -1342,8 +1378,7 @@ export function keySequenceLabel(
   // shape this pass doesn't resolve faithfully — falls through to the
   // honest `undefined` below rather than under-reporting a step).
   if (ctx[0] !== undefined && NON_KEY_PRECEDING_KINDS.has(ctx[0].kind)) {
-    const plusIdx = ctx.findIndex(isPlusSeparator);
-    if (plusIdx > 0) {
+    if (elementsBeforeKeystroke(rule).length > 0) {
       const triggerLabel = bareTriggerLabel(ctx);
       if (triggerLabel !== undefined) return [triggerLabel];
     }
@@ -1528,17 +1563,16 @@ function resolveStoreSlotSteps(
   storeMap: ReadonlyMap<string, IRStore>,
 ): string[] | undefined {
   if (isParallelIndexFanOut(rule)) {
-    const inputAnyEl = rule.context.find((c) => c.kind === 'any');
+    const inputAnyEl = ruleContextElements(rule).find((c) => c.kind === 'any');
     const inputStore = inputAnyEl && inputAnyEl.kind === 'any' ? storeMap.get(inputAnyEl.storeRef) : undefined;
     const baseLabel = slotItemLabel(inputStore?.items[slotIndex]);
     if (baseLabel === undefined) return undefined;
-    const hasDeadkey = rule.context.some((c) => c.kind === 'deadkey');
+    const hasDeadkey = ruleContextElements(rule).some((c) => c.kind === 'deadkey');
     return hasDeadkey ? keySequenceLabel(rule, ir, baseLabel) : [baseLabel];
   }
 
   if (el.kind === 'index') {
-    const effectiveCtx = rule.context.filter((c) => !isPlusSeparator(c));
-    const baseEl = effectiveCtx[el.offset - 1];
+    const baseEl = elementAtOffset(rule, NO_GROUP, el.offset);
     if (baseEl !== undefined && baseEl.kind === 'any') {
       const baseStore = storeMap.get(baseEl.storeRef);
       const baseLabel = slotItemLabel(baseStore?.items[slotIndex]);
@@ -1567,11 +1601,9 @@ const NON_TYPING_TRIGGER_VKEYS = new Set(['K_BKSP', 'K_DEL']);
  * used by both `isNotAForwardTypingPath` and `isTouchOnlyTriggerRule` below.
  */
 function ruleTriggerVkey(rule: IRRule): Extract<ContextElement, { kind: 'vkey' }> | undefined {
-  const ctx = rule.context;
-  const plusIdx = ctx.findIndex(isPlusSeparator);
-  const triggerEl = plusIdx === -1
-    ? (ctx.length === 1 ? ctx[0] : undefined)   // S-01 bare single-vkey shape
-    : ctx[plusIdx + 1];                           // element right of '+'
+  // The keystroke element: right of the `+`, or the last element for an S-01
+  // bare single-vkey shape.
+  const triggerEl = ruleKeystrokeLoose(rule);
   return triggerEl !== undefined && triggerEl.kind === 'vkey' ? triggerEl : undefined;
 }
 
@@ -1631,7 +1663,7 @@ export function charProducers(ir: KeyboardIR, ch: string): CharProducer[] {
   // the rule has no '+'-separated trigger element to describe at all (e.g.
   // a mixed/unresolvable preceding shape with no trigger boundary).
   const unresolvedProducer = (rule: IRRule): CharProducer => {
-    const floor = triggerKeyLabel(rule.context, ir);
+    const floor = triggerKeyLabel(lhsWithSeparator(rule), ir);
     return floor !== undefined ? { steps: [], triggerFloor: floor } : { steps: [] };
   };
 
@@ -1641,9 +1673,7 @@ export function charProducers(ir: KeyboardIR, ch: string): CharProducer[] {
 
     let conditionOutcome: ConditionOutcome = { kind: 'none' };
     if (computeCondition) {
-      const plusIdx = rule.context.findIndex(isPlusSeparator);
-      const preceding = plusIdx === -1 ? [] : rule.context.slice(0, plusIdx);
-      conditionOutcome = buildCondition(preceding, ir);
+      conditionOutcome = buildCondition(elementsBeforeKeystroke(rule), ir);
       if (conditionOutcome.kind === 'unrenderable') {
         producers.push(unresolvedProducer(rule));
         return;
@@ -1664,7 +1694,6 @@ export function charProducers(ir: KeyboardIR, ch: string): CharProducer[] {
   // its own dedup/floor rules).
   const tryProduceStoreMatch = (rule: IRRule): boolean => {
     let matchedViaStore = false;
-    const effCtx = rule.context.filter((c) => !isPlusSeparator(c));
     for (const el of rule.output) {
       if ((el.kind !== 'index' && el.kind !== 'outs') || el.storeRef === undefined) continue;
 
@@ -1674,7 +1703,7 @@ export function charProducers(ir: KeyboardIR, ch: string): CharProducer[] {
       // genuine production shapes (a translation table's input/output
       // stores are always distinct); keep the existing Backspace/K_DEL
       // exclusion (isNotAForwardTypingPath) as well.
-      const targetEl = el.kind === 'index' ? effCtx[el.offset - 1] : undefined;
+      const targetEl = el.kind === 'index' ? elementAtOffset(rule, NO_GROUP, el.offset) : undefined;
       if (el.kind === 'index' && targetEl?.kind === 'any' && targetEl.storeRef === el.storeRef) continue;
 
       const outStore = storeMap.get(el.storeRef);
@@ -1762,16 +1791,15 @@ export function charProducers(ir: KeyboardIR, ch: string): CharProducer[] {
 export function crossPairTrigger(storeName: string, partnerName: string, ir: KeyboardIR): string | undefined {
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      const effectiveContext = rule.context.filter((el) => !isPlusSeparator(el));
       for (const el of rule.output) {
         if (el.kind !== 'index') continue;
-        const target = effectiveContext[el.offset - 1];
+        const target = elementAtOffset(rule, group, el.offset);
         if (target === undefined || target.kind !== 'any') continue;
         const a = el.storeRef;
         const b = target.storeRef;
         const matchesEdge = (a === storeName && b === partnerName) || (a === partnerName && b === storeName);
         if (!matchesEdge) continue;
-        const trigger = triggerKeyLabel(rule.context);
+        const trigger = triggerKeyLabel(lhsWithSeparator(rule));
         if (trigger !== undefined) return trigger;
       }
     }
@@ -2160,8 +2188,9 @@ function isOutputStore(store: IRStore, analysis: StoreAnalysis): boolean {
  */
 export function isSimpleRemovableRule(rule: IRRule): boolean {
   if (rule.ownedByPattern !== undefined) return false;
-  if (rule.context.length !== 1) return false;
-  const ctx = rule.context[0];
+  const ruleCtx = ruleContextElements(rule);
+  if (ruleCtx.length !== 1) return false;
+  const ctx = ruleCtx[0];
   if (ctx === undefined || (ctx.kind !== 'char' && ctx.kind !== 'vkey')) return false;
   if (rule.output.length !== 1) return false;
   const out = rule.output[0];

@@ -44,6 +44,7 @@
 // Keyman boilerplate — fonts, installation) holds by construction; a
 // test pins that.
 
+import { ruleContextElements } from "@keyboard-studio/contracts";
 import type { KeyboardIR, MarkInputOrder } from "@keyboard-studio/contracts";
 
 /** Symptom - fix, one line, in the register of the question's help text. */
@@ -86,7 +87,7 @@ export function hasUserFacingDeadkey(ir: KeyboardIR): boolean {
   if (triggerIds.size === 0) return false;
   return ir.groups.some((group) =>
     group.rules.some((rule) =>
-      rule.context.some((el) => el.kind === "deadkey" && triggerIds.has(el.id)),
+      ruleContextElements(rule).some((el) => el.kind === "deadkey" && triggerIds.has(el.id)),
     ),
   );
 }

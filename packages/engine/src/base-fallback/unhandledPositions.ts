@@ -10,8 +10,8 @@
 // reduces to it (SHIFT/RSHIFT/LSHIFT give shift; RALT, or LCTRL with RALT or LALT,
 // give AltGr). Rules in every `using keys` group count, reachable or not.
 
-import { US_BASE_LAYOUT, isPlusSeparator } from "@keyboard-studio/contracts";
-import type { ContextElement, IRRule, KeyboardIR, StoreItem } from "@keyboard-studio/contracts";
+import { US_BASE_LAYOUT, ruleKeystroke, ruleLhsKind } from "@keyboard-studio/contracts";
+import type { KeyboardIR, StoreItem } from "@keyboard-studio/contracts";
 
 export type PositionState = "none" | "shift" | "altgr" | "shiftAltgr";
 
@@ -45,15 +45,6 @@ function stateOf(words: readonly string[]): PositionState | null {
   return altgr ? (shift ? "shiftAltgr" : "altgr") : shift ? "shift" : "none";
 }
 
-function keystrokeElement(rule: IRRule): ContextElement | undefined {
-  const ctx = rule.context;
-  for (let i = ctx.length - 1; i >= 0; i--) {
-    const el = ctx[i];
-    if (el !== undefined && isPlusSeparator(el)) return ctx[i + 1];
-  }
-  return ctx[ctx.length - 1];
-}
-
 function coverKey(vkey: string, state: PositionState): string {
   return `${vkey.toUpperCase()}|${state}`;
 }
@@ -83,8 +74,8 @@ export function enumerateUnhandledPositions(ir: KeyboardIR, vkeys: Iterable<stri
   for (const g of ir.groups) {
     if (!g.usingKeys) continue;
     for (const rule of g.rules) {
-      if (rule.matchKind !== undefined) continue;
-      const el = keystrokeElement(rule);
+      if (ruleLhsKind(rule) !== "input") continue;
+      const el = ruleKeystroke(rule, g);
       if (el === undefined) continue;
       if (el.kind === "vkey" || el.kind === "char") coverItem(covered, el);
       else if (el.kind === "any") {

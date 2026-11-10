@@ -15,6 +15,12 @@
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import {
+  ruleConditions,
+  ruleExtraKeystrokeElements,
+  ruleKeystrokeLoose,
+  rulePreContext,
+} from "@keyboard-studio/contracts";
+import {
   checkFailed,
   checkPassed,
   type CheckResult,
@@ -87,7 +93,14 @@ function unusedStores(
   };
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      const elements = [...rule.context, ...rule.output];
+      const keystroke = ruleKeystrokeLoose(rule);
+      const elements = [
+        ...ruleConditions(rule),
+        ...rulePreContext(rule, { usingKeys: true }),
+        ...(keystroke !== undefined ? [keystroke] : []),
+        ...ruleExtraKeystrokeElements(rule, { usingKeys: true }),
+        ...rule.output,
+      ];
       for (const el of elements) {
         if (el.kind === "if") {
           note(el.store);

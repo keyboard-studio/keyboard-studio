@@ -52,6 +52,7 @@ import type {
   RawKmnFragment,
 } from "./keyboard-ir.js";
 import type { Pattern } from "./pattern.js";
+import { ruleLhsKind } from "./rule-shape.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -343,8 +344,12 @@ function compareRule(
   }
 
   // matchKind: structural, not optional-with-default
-  if ((a.matchKind ?? undefined) !== (b.matchKind ?? undefined)) {
-    push(diffs, `${path}.matchKind`, a.matchKind, b.matchKind, "match/nomatch kind differs");
+  const matchKindOf = (r: IRRule): "match" | "nomatch" | undefined => {
+    const lhs = ruleLhsKind(r);
+    return lhs === "input" ? undefined : lhs;
+  };
+  if (matchKindOf(a) !== matchKindOf(b)) {
+    push(diffs, `${path}.matchKind`, matchKindOf(a), matchKindOf(b), "match/nomatch kind differs");
   }
 
   // targetSelector

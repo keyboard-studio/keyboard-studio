@@ -4,9 +4,15 @@ import type {
   IRGroup,
   IRStore,
 } from "@keyboard-studio/contracts";
-import { makePattern } from "@keyboard-studio/contracts";
+import {
+  elementAtOffset,
+  makePattern,
+  rulePreContext,
+  ruleKeystrokeLoose,
+} from "@keyboard-studio/contracts";
 import type { MatchResult } from "./types.js";
 import type { Pattern } from "@keyboard-studio/contracts";
+import { ruleContextElements } from "../shared/rule-shape.js";
 import { ruleRef, storeRef } from "./node-refs.js";
 import { buildS02Fragment, findS02Families } from "./s02-families.js";
 import {
@@ -23,7 +29,7 @@ import type {
 function applyRulesToKeystrokeCharMap(rules: IRRule[]): string {
   const lines: string[] = [];
   for (const rule of rules) {
-    const ctx = rule.context[0];
+    const ctx = ruleContextElements(rule)[0];
     const out = rule.output[0];
     if (
       ctx === undefined ||
@@ -58,8 +64,9 @@ function applyNumericIdToLabel(id: number): string {
 
 // A "single" rule: one vkey-or-char context, one char output, no deadkey or store involvement.
 function matchesSingleRole(rule: IRRule): boolean {
-  if (rule.context.length !== 1) return false;
-  const ctx = rule.context[0];
+  const context = ruleContextElements(rule);
+  if (context.length !== 1) return false;
+  const ctx = context[0];
   if (ctx === undefined) return false;
   if (ctx.kind !== "vkey" && ctx.kind !== "char") return false;
   if (rule.output.length !== 1) return false;
@@ -109,7 +116,7 @@ function findS01Clusters(ir: KeyboardIR): S01ClusterMatch[] {
       if (out.kind !== "char") return false;
 
       // Disqualify if context has store references (storeRef field)
-      const ctx = rule.context[0];
+      const ctx = ruleContextElements(rule)[0];
       if (ctx === undefined) return false;
       if (ctx.kind === "any" || ctx.kind === "notany") return false;
 
@@ -121,7 +128,7 @@ function findS01Clusters(ir: KeyboardIR): S01ClusterMatch[] {
     // Count distinct base key names
     const distinctBaseNames = new Set<string>();
     for (const rule of qualifying) {
-      const ctx = rule.context[0];
+      const ctx = ruleContextElements(rule)[0];
       if (ctx === undefined) continue;
       if (ctx.kind === "vkey") distinctBaseNames.add(ctx.name);
       else if (ctx.kind === "char") distinctBaseNames.add(ctx.value);
@@ -172,12 +179,12 @@ interface S03ClusterMatch {
 }
 
 function sequenceTriggerChar(rule: IRRule): string | undefined {
-  const real = rule.context.filter(
-    (el) => !(el.kind === "raw" && el.text.trim() === "+"),
-  );
-  let i = 0;
-  while (real[i]?.kind === "if") i++;
-  const trigger = real[i + 1];
+  // The shape is [any(store), char] after the leading guards (the finder has
+  // already checked it), so the trigger is the keystroke. No group is in scope;
+  // assume a `using keys` group (the loose reader).
+  const keystroke = ruleKeystrokeLoose(rule);
+  const pre = rulePreContext(rule, { usingKeys: true });
+  const trigger = pre.length === 1 ? keystroke : undefined;
   return trigger !== undefined && trigger.kind === "char" ? trigger.value : undefined;
 }
 
@@ -262,16 +269,14 @@ interface S07ClusterMatch {
 // The codec may preserve the inline "+" as a {kind:"raw", text:"+"}
 // context element; strip it, exactly as the S-03 path does.
 function stripPlusSeparator(rule: IRRule): IRRule["context"] {
-  return rule.context.filter(
-    (el) => !(el.kind === "raw" && el.text.trim() === "+"),
-  );
+  return ruleContextElements(rule);
 }
 
 // The context walk shared by the cancel and apply shapes: after the "+"
 // strip, exactly [any(store), char(trigger)] with no leading guards.
 function cycleContextShape(
   rule: IRRule,
-): { anyRef: string; trigger: string } | undefined {
+): { anyEl: Extract<IRRule["context"][number], { kind: "any" }>; anyRef: string; trigger: string } | undefined {
   const real = stripPlusSeparator(rule);
   let guardCount = 0;
   while (real[guardCount]?.kind === "if") guardCount++;
@@ -281,7 +286,7 @@ function cycleContextShape(
   const c1 = real[1];
   if (c0 === undefined || c0.kind !== "any") return undefined;
   if (c1 === undefined || c1.kind !== "char") return undefined;
-  return { anyRef: c0.storeRef, trigger: c1.value };
+  return { anyEl: c0, anyRef: c0.storeRef, trigger: c1.value };
 }
 
 function cancelShape(
@@ -296,7 +301,7 @@ function cancelShape(
   if (o1 === undefined || o1.kind !== "char") return undefined;
   if (o1.value !== ctx.trigger) return undefined;
   if (o0.storeRef === ctx.anyRef) return undefined;
-  if (o0.offset !== 1) return undefined;
+  if (elementAtOffset(rule, { usingKeys: true }, o0.offset) !== ctx.anyEl) return undefined;
   return { markedRef: ctx.anyRef, unmarkedRef: o0.storeRef, trigger: ctx.trigger };
 }
 
@@ -309,7 +314,7 @@ function applyShape(
   const o0 = rule.output[0];
   if (o0 === undefined || o0.kind !== "index") return undefined;
   if (o0.storeRef === ctx.anyRef) return undefined;
-  if (o0.offset !== 1) return undefined;
+  if (elementAtOffset(rule, { usingKeys: true }, o0.offset) !== ctx.anyEl) return undefined;
   return { unmarkedRef: ctx.anyRef, markedRef: o0.storeRef, trigger: ctx.trigger };
 }
 
@@ -477,13 +482,16 @@ function rephShape(rule: IRRule): RephShape | undefined {
     const src = pre[i];
     const dst = reemit[i];
     if (src === undefined || dst === undefined) return undefined;
-    const position = i + 1; // 1-based element position in the stripped context
-    if (dst.kind === "context" && dst.offset === position) continue;
+    // A re-emission refers to this element when its offset names it (1-based
+    // over the context, the `+` separator never counted).
+    const namesSrc = (offset: number): boolean =>
+      elementAtOffset(rule, { usingKeys: true }, offset) === src;
+    if (dst.kind === "context" && namesSrc(dst.offset)) continue;
     if (src.kind === "any") {
       if (
         dst.kind === "index" &&
         dst.storeRef === src.storeRef &&
-        dst.offset === position
+        namesSrc(dst.offset)
       ) {
         continue;
       }
@@ -608,7 +616,7 @@ function populateSlots(
       if (rule === undefined) continue;
 
       if (source.includes("context_pattern[0].name")) {
-        const ctx0 = rule.context[0];
+        const ctx0 = ruleContextElements(rule)[0];
         if (ctx0 === undefined) continue;
         if (ctx0.kind === "vkey") {
           const mods = formatVKeyModifiers(ctx0.modifiers);

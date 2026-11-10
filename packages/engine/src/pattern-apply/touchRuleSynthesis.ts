@@ -62,6 +62,7 @@
  */
 
 import type {
+  ContextElement,
   KeyboardIR,
   IRGroup,
   IRRule,
@@ -73,7 +74,17 @@ import type {
   TouchKeyRuleIndex,
   TouchKeyRuleBinding,
 } from "@keyboard-studio/contracts";
-import { normalizeTouchKeyId, bindingsForKeyId, toUPlusNotation } from "@keyboard-studio/contracts";
+import {
+  normalizeTouchKeyId,
+  bindingsForKeyId,
+  makeRule,
+  toUPlusNotation,
+  ruleConditions,
+  rulePreContext,
+  ruleKeystroke,
+  withRuleParts,
+} from "@keyboard-studio/contracts";
+import { ruleContextElements } from "../shared/rule-shape.js";
 
 import {
   entryGroupOf,
@@ -185,25 +196,28 @@ function outputElementsFor(text: string): OutputElement[] {
 }
 
 function buildProducingRule(nodeId: string, keyId: string, combo: readonly ModifierToken[], outputText: string): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: keyId, modifiers: [...combo] }],
-    output: outputElementsFor(outputText),
-    trailingComment: "generated: touch key rule synthesis (spec 063)",
-  };
+  return makeRule(
+    {
+      nodeId,
+      keystroke: { kind: "vkey", name: keyId, modifiers: [...combo] },
+      output: outputElementsFor(outputText),
+      trailingComment: "generated: touch key rule synthesis (spec 063)",
+    },
+    { usingKeys: true },
+  );
 }
 
 function buildGuardRule(nodeId: string, keyId: string, combo: readonly ModifierToken[], storeName: string): IRRule {
-  return {
-    nodeId,
-    context: [
-      { kind: "any", storeRef: storeName },
-      { kind: "raw", text: "+" },
-      { kind: "vkey", name: keyId, modifiers: [...combo] },
-    ],
-    output: [{ kind: "raw", text: "context" }],
-    trailingComment: "generated: touch key rule guard (spec 063)",
-  };
+  return makeRule(
+    {
+      nodeId,
+      preContext: [{ kind: "any", storeRef: storeName }],
+      keystroke: { kind: "vkey", name: keyId, modifiers: [...combo] },
+      output: [{ kind: "raw", text: "context" }],
+      trailingComment: "generated: touch key rule guard (spec 063)",
+    },
+    { usingKeys: true },
+  );
 }
 
 function outputElementsEqual(a: readonly OutputElement[], b: readonly OutputElement[]): boolean {
@@ -873,7 +887,7 @@ export interface RemoveTouchKeyRuleResult {
 function isStoreReferencedAnywhere(ir: KeyboardIR, storeName: string): boolean {
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      for (const el of rule.context) {
+      for (const el of ruleContextElements(rule)) {
         if ((el.kind === "any" || el.kind === "notany" || el.kind === "index") && el.storeRef === storeName) return true;
       }
       for (const el of rule.output) {
@@ -1058,17 +1072,23 @@ export function renameTouchKeyRule(ir: KeyboardIR, fromKeyId: string, toKeyId: s
     let groupChanged = false;
     const rules = group.rules.map((rule) => {
       let ruleChanged = false;
-      const context = rule.context.map((el) => {
+      const rename = (el: ContextElement): ContextElement => {
         if (el.kind === "vkey" && normalizeTouchKeyId(el.name) === target) {
           ruleChanged = true;
           return { ...el, name: toKeyId };
         }
         return el;
+      };
+      const keystroke = ruleKeystroke(rule, group);
+      const rebuilt = withRuleParts(rule, group, {
+        conditions: ruleConditions(rule).map(rename),
+        preContext: rulePreContext(rule, group).map(rename),
+        keystroke: keystroke === undefined ? undefined : rename(keystroke),
       });
       if (!ruleChanged) return rule;
       groupChanged = true;
       renamedRuleNodeIds.push(rule.nodeId);
-      return { ...rule, context };
+      return rebuilt;
     });
     return groupChanged ? { ...group, rules } : group;
   });

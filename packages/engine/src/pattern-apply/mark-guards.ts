@@ -46,6 +46,7 @@
 // `generated_marks_` name prefixes so they are recognizable and re-runs
 // replace rather than duplicate (idempotent).
 
+import { makeRule } from "@keyboard-studio/contracts";
 import type {
   AttestedStack,
   BackspaceBehaviour,
@@ -67,6 +68,7 @@ import {
 // The composed-unit -> one-mark-shorter pairing is shared with spec 062 US4's
 // backspace-unwrap generator — see mark-decomposition.ts's module doc.
 import { oneMarkShorterPair, type OneMarkShorterPair } from "./mark-decomposition.js";
+import { ruleLhsKind } from "../shared/rule-shape.js";
 
 export const MARKS_GUARD_GROUP = "generated_marks_guard";
 export const MARKS_ALLOWED_STORE_PREFIX = "generated_marks_allowed_";
@@ -185,25 +187,27 @@ function hopAtChainEnd(groups: IRGroup[], firstTarget: string | null): boolean {
     const group = groups.find((g) => g.name === name);
     if (group === undefined || group.usingKeys) return false;
     const exits = (["match", "nomatch"] as const).map((kind) => {
-      const rule = group.rules.find((r) => r.matchKind === kind);
+      const rule = group.rules.find((r) => ruleLhsKind(r) === kind);
       const last = rule?.output[rule.output.length - 1];
       return last !== undefined && isAnyUseGroupOutput(last) ? groupTargetOf(last) : null;
     });
     if (exits[0] === null && exits[1] === null) {
       for (const kind of ["match", "nomatch"] as const) {
-        const index = group.rules.findIndex((r) => r.matchKind === kind);
+        const index = group.rules.findIndex((r) => ruleLhsKind(r) === kind);
         const hop = { kind: "useGroup" as const, groupName: MARKS_GUARD_GROUP };
         group.rules =
           index === -1
             ? [
                 ...group.rules,
-                {
-                  nodeId: GUARD_HOP_NODE_ID[kind],
-                  matchKind: kind,
-                  context: [],
-                  output: [hop],
-                  trailingComment: "generated: marks-series guard hop",
-                },
+                makeRule(
+                  {
+                    nodeId: GUARD_HOP_NODE_ID[kind],
+                    lhsKind: kind,
+                    output: [hop],
+                    trailingComment: "generated: marks-series guard hop",
+                  },
+                  group,
+                ),
               ]
             : group.rules.map((r, i) => (i === index ? { ...r, output: [...r.output, hop] } : r));
       }
@@ -291,12 +295,16 @@ function allowedByMark(
 }
 
 function bufferStartRule(mark: string, output: IRRule["output"]): IRRule {
-  return {
-    nodeId: `gen-marks-start-${hex(mark)}`,
-    context: [{ kind: "raw", text: "nul" }, { kind: "char", value: mark }],
-    output,
-    trailingComment: "generated: bare mark at buffer start (marks series)",
-  };
+  return makeRule(
+    {
+      nodeId: `gen-marks-start-${hex(mark)}`,
+      nulContext: true,
+      preContext: [{ kind: "char", value: mark }],
+      output,
+      trailingComment: "generated: bare mark at buffer start (marks series)",
+    },
+    { usingKeys: false },
+  );
 }
 
 function buildGuard(
@@ -320,12 +328,17 @@ function buildGuard(
     if (contexts.length === 0) {
       // Nothing allowed: an empty store cannot back notany(), and every
       // preceding character is outside the set anyway.
-      rules.push({
-        nodeId: `gen-marks-block-${id}`,
-        context: [{ kind: "char", value: mark }],
-        output: [{ kind: "nul" }],
-        trailingComment: "generated: mark outside its allowed contexts (marks series)",
-      });
+      rules.push(
+        makeRule(
+          {
+            nodeId: `gen-marks-block-${id}`,
+            preContext: [{ kind: "char", value: mark }],
+            output: [{ kind: "nul" }],
+            trailingComment: "generated: mark outside its allowed contexts (marks series)",
+          },
+          { usingKeys: false },
+        ),
+      );
       continue;
     }
     const storeName = `${MARKS_ALLOWED_STORE_PREFIX}${id}`;
@@ -335,12 +348,17 @@ function buildGuard(
       items: contexts.map((value) => ({ kind: "char" as const, value })),
       isSystem: false,
     });
-    rules.push({
-      nodeId: `gen-marks-block-${id}`,
-      context: [{ kind: "notany", storeRef: storeName }, { kind: "char", value: mark }],
-      output: [{ kind: "context", offset: 1 }],
-      trailingComment: "generated: mark outside its allowed contexts (marks series)",
-    });
+    rules.push(
+      makeRule(
+        {
+          nodeId: `gen-marks-block-${id}`,
+          preContext: [{ kind: "notany", storeRef: storeName }, { kind: "char", value: mark }],
+          output: [{ kind: "context", offset: 1 }],
+          trailingComment: "generated: mark outside its allowed contexts (marks series)",
+        },
+        { usingKeys: false },
+      ),
+    );
   }
   return {
     group: {
@@ -384,16 +402,16 @@ function buildUnwrap(
       isSystem: false,
     },
   ];
-  const rule: IRRule = {
-    nodeId: "gen-marks-unwrap-rule",
-    context: [
-      { kind: "any", storeRef: MARKS_UNWRAP_FROM_STORE },
-      { kind: "raw", text: "+" },
-      { kind: "vkey", name: "K_BKSP", modifiers: [] },
-    ],
-    output: [{ kind: "index", storeRef: MARKS_UNWRAP_TO_STORE, offset: 1 }],
-    trailingComment: "generated: stepwise backspace unwrap (marks series)",
-  };
+  const rule: IRRule = makeRule(
+    {
+      nodeId: "gen-marks-unwrap-rule",
+      preContext: [{ kind: "any", storeRef: MARKS_UNWRAP_FROM_STORE }],
+      keystroke: { kind: "vkey", name: "K_BKSP", modifiers: [] },
+      output: [{ kind: "index", storeRef: MARKS_UNWRAP_TO_STORE, offset: 1 }],
+      trailingComment: "generated: stepwise backspace unwrap (marks series)",
+    },
+    { usingKeys: true },
+  );
   return { stores, rule };
 }
 
@@ -439,16 +457,18 @@ function buildWholeStack(
   // Whole-stack under base-plus-mark is the generated pairing; every
   // other combination is native (see buildUnwrap's note).
   if (outputForm !== "base-plus-mark" || backspace !== "whole-stack") return [];
-  return wholeStackSequences(worklist, stacks).map((sequence, i) => ({
-    nodeId: `${MARKS_WHOLESTACK_RULE_PREFIX}${i + 1}`,
-    context: [
-      ...[...sequence].map((ch) => ({ kind: "char" as const, value: ch })),
-      { kind: "raw", text: "+" },
-      { kind: "vkey", name: "K_BKSP", modifiers: [] },
-    ],
-    output: [{ kind: "nul" }],
-    trailingComment: "generated: whole-stack backspace (marks series)",
-  }));
+  return wholeStackSequences(worklist, stacks).map((sequence, i) =>
+    makeRule(
+      {
+        nodeId: `${MARKS_WHOLESTACK_RULE_PREFIX}${i + 1}`,
+        preContext: [...sequence].map((ch) => ({ kind: "char" as const, value: ch })),
+        keystroke: { kind: "vkey", name: "K_BKSP", modifiers: [] },
+        output: [{ kind: "nul" }],
+        trailingComment: "generated: whole-stack backspace (marks series)",
+      },
+      { usingKeys: true },
+    ),
+  );
 }
 
 /**
@@ -494,7 +514,7 @@ export function applyMarkGuards(
         (r) =>
           r.nodeId === "gen-marks-unwrap-rule" ||
           r.nodeId.startsWith(MARKS_WHOLESTACK_RULE_PREFIX) ||
-          (r.matchKind !== undefined && Object.values(GUARD_HOP_NODE_ID).includes(r.nodeId)) ||
+          (ruleLhsKind(r) !== "input" && Object.values(GUARD_HOP_NODE_ID).includes(r.nodeId)) ||
           r.output.some((o) => isUseGroupOutputFor(o, MARKS_GUARD_GROUP)),
       ),
     );
@@ -516,7 +536,7 @@ export function applyMarkGuards(
           (r) =>
             r.nodeId !== "gen-marks-unwrap-rule" &&
             !r.nodeId.startsWith(MARKS_WHOLESTACK_RULE_PREFIX) &&
-            !(r.matchKind !== undefined && Object.values(GUARD_HOP_NODE_ID).includes(r.nodeId)),
+            !(ruleLhsKind(r) !== "input" && Object.values(GUARD_HOP_NODE_ID).includes(r.nodeId)),
         )
         .map((r) =>
           r.output.some((o) => isUseGroupOutputFor(o, MARKS_GUARD_GROUP))
@@ -529,7 +549,7 @@ export function applyMarkGuards(
         // A match/nomatch rule left with no output was only ever the guard
         // hop: one parsed back from a .kmn has lost its generated nodeId.
         // Dropping it lets the hop be re-added whole, comment included.
-        .filter((r) => !(r.matchKind !== undefined && r.output.length === 0)),
+        .filter((r) => !(ruleLhsKind(r) !== "input" && r.output.length === 0)),
     }));
   const stores = ir.stores
     .filter((s) => !isGeneratedStore(s.name))
@@ -559,7 +579,7 @@ export function applyMarkGuards(
   if (guardGroup !== null && entry !== undefined) {
     // Enter the guard group after every entry-group rule fires: extend the
     // existing `match` rule when one exists, otherwise add one.
-    const existingMatchIndex = entry.rules.findIndex((r) => r.matchKind === "match");
+    const existingMatchIndex = entry.rules.findIndex((r) => ruleLhsKind(r) === "match");
     if (existingMatchIndex !== -1) {
       const existingMatch = entry.rules[existingMatchIndex]!;
       const alreadyHasHop = existingMatch.output.some((o) =>
@@ -589,13 +609,15 @@ export function applyMarkGuards(
     } else {
       entry.rules = [
         ...entry.rules,
-        {
-          nodeId: "gen-marks-guard-hop",
-          matchKind: "match",
-          context: [],
-          output: [{ kind: "useGroup", groupName: MARKS_GUARD_GROUP }],
-          trailingComment: "generated: marks-series guard hop",
-        },
+        makeRule(
+          {
+            nodeId: "gen-marks-guard-hop",
+            lhsKind: "match",
+            output: [{ kind: "useGroup", groupName: MARKS_GUARD_GROUP }],
+            trailingComment: "generated: marks-series guard hop",
+          },
+          entry,
+        ),
       ];
     }
   }

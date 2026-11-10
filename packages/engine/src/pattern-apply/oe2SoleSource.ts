@@ -53,12 +53,14 @@ import type {
 import {
   collectFromElements,
   contextHasDirectBackspace,
-  isPlusSeparator,
+  elementAtOffset,
+  ruleKeystroke,
 } from "@keyboard-studio/contracts";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
 import { applyAssignments } from "./applyAssignments.js";
+import { ruleContextElements } from "../shared/rule-shape.js";
 
 /** True when a vkey name denotes the oe2 key, in either spelling the repo carries. */
 export function isOe2VkeyName(name: string): boolean {
@@ -71,15 +73,6 @@ type RouteKind = "oe2" | "other";
 interface GlyphRoutes {
   oe2: boolean;
   other: boolean;
-}
-
-/** The keystroke side of a rule: the elements after the last + separator, or the whole context when there is none. */
-function triggerSegment(context: readonly ContextElement[]): readonly ContextElement[] {
-  let lastPlus = -1;
-  context.forEach((el, i) => {
-    if (isPlusSeparator(el)) lastPlus = i;
-  });
-  return lastPlus === -1 ? context : context.slice(lastPlus + 1);
 }
 
 /** Glyphs one output-element sequence produces, under the canonical produced-set walk. */
@@ -103,11 +96,11 @@ function glyphsOf(
 function attributeFanOutSlots(
   el: Extract<OutputElement, { kind: "index" }>,
   rule: { context: readonly ContextElement[] },
+  group: { usingKeys: boolean },
   storeMap: Map<string, IRStore>,
   addRoute: (glyph: string, route: RouteKind) => void,
 ): boolean {
-  const effCtx = rule.context.filter((c) => !isPlusSeparator(c));
-  const baseEl = effCtx[el.offset - 1];
+  const baseEl = elementAtOffset(rule, group, el.offset);
   if (baseEl === undefined || baseEl.kind !== "any") return false;
   const triggerStore = storeMap.get(baseEl.storeRef);
   const outStore = storeMap.get(el.storeRef);
@@ -167,14 +160,13 @@ export function findOe2SoleSourceGlyphs(ir: KeyboardIR): string[] {
   for (const group of ir.groups) {
     for (const rule of group.rules) {
       // Backspace-correction rules are not typing routes (see module doc).
-      if (contextHasDirectBackspace(rule.context)) continue;
+      if (contextHasDirectBackspace(ruleContextElements(rule))) continue;
       const glyphs = glyphsOf(rule.output, storeMap);
       if (glyphs.size === 0) continue;
 
-      const segment = triggerSegment(rule.context);
-      const vkeys = segment.filter(
-        (el): el is Extract<ContextElement, { kind: "vkey" }> => el.kind === "vkey",
-      );
+      const keystroke = ruleKeystroke(rule, group);
+      const vkeys: Extract<ContextElement, { kind: "vkey" }>[] =
+        keystroke?.kind === "vkey" ? [keystroke] : [];
 
       if (vkeys.length > 0) {
         // The keystroke is a named vkey (any modifier variant). A deadkey
@@ -198,7 +190,7 @@ export function findOe2SoleSourceGlyphs(ir: KeyboardIR): string[] {
       };
       for (const el of rule.output) {
         if (el.kind === "index") {
-          attributeFanOutSlots(el, rule, storeMap, trackingAddRoute);
+          attributeFanOutSlots(el, rule, group, storeMap, trackingAddRoute);
         }
       }
       for (const glyph of glyphs) {

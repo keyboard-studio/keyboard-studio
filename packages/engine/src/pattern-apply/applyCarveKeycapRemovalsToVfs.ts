@@ -25,7 +25,7 @@ import { classifyStoreSlotEdit } from "./applyStoreSlotRemovals.js";
 import { resolveCarveCascade } from "./carveCascade.js";
 import { readVfsText, resolveOskAssetPaths, xmlUnescape } from "./oskAssetShared.js";
 import { TOUCH_LAYOUT_JSON_INDENT } from "../codec/parse-touch.js";
-import { isPlusSeparator } from "../shared/rule-shape.js";
+import { elementAtOffset } from "../shared/rule-shape.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -163,17 +163,12 @@ export function collectCarvedKeycapTexts(
         survivors.add(charVals.join("").normalize("NFC"));
       }
 
-      // The codec's synthetic keystroke-boundary "+" is not a real context
-      // item — index() offsets are 1-based over the remaining items.
-      const effectiveContext = (rule.context as { kind: string; text?: string; storeRef?: string }[])
-        .filter((el) => !isPlusSeparator(el));
-
       for (const el of outEls) {
         if (el.storeRef === undefined) continue;
         if (el.kind === "outs") {
           outputStoreNames.add(el.storeRef);
         } else if (el.kind === "index") {
-          const target = el.offset !== undefined ? effectiveContext[el.offset - 1] : undefined;
+          const target = el.offset !== undefined ? elementAtOffset(rule, group, el.offset) : undefined;
           const isSelfPair = target?.kind === "any" && target.storeRef === el.storeRef;
           // A self-pair only re-emits what was already typed — it is not an
           // independent producer, so it keeps nothing alive.

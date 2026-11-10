@@ -40,6 +40,7 @@ import type {
   RemapPosture,
   ScriptClass,
 } from "@keyboard-studio/contracts";
+import { ruleContextElements } from "../shared/rule-shape.js";
 import { scriptOf } from "../facets/generated/scriptLookup.js";
 
 /** Scripts that carry no script identity of their own (marks, digits, unknown). */
@@ -124,9 +125,7 @@ export function deriveRemapPosture(args: {
       // The codec preserves a structural inline `+` as a raw context
       // element on some shapes (see import-mark-order.ts); strip it before
       // inspecting the context.
-      const real = rule.context.filter(
-        (el) => !(el.kind === "raw" && el.text.trim() === "+"),
-      );
+      const real = ruleContextElements(rule);
       if (real.length !== 1) continue;
       const key = real[0];
       if (key === undefined || key.kind !== "vkey") continue;

@@ -72,6 +72,7 @@
 
 import type { KeyboardIR, IRStore, OutputElement } from "../keyboard-ir.js";
 import { contextHasDirectBackspace } from "./backspaceContext.js";
+import { ruleContextElements } from "../rule-shape.js";
 
 // ---------------------------------------------------------------------------
 // Options
@@ -297,7 +298,7 @@ export function buildProducedSet(
 
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      if (excludeBackspaceCorrections && contextHasDirectBackspace(rule.context)) continue;
+      if (excludeBackspaceCorrections && contextHasDirectBackspace(ruleContextElements(rule))) continue;
       collectFromElements(rule.output, storeMap, collector, includeSpace);
     }
   }

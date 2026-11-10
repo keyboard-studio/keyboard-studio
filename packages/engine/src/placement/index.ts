@@ -15,7 +15,14 @@
  * @see D-INT-3 / D-INT-4 in utilities/kbgen/INTEGRATION.md
  */
 
-import type { KeyboardIR, ContextElement, OutputElement } from "@keyboard-studio/contracts";
+import type { KeyboardIR, IRGroup, IRRule, OutputElement } from "@keyboard-studio/contracts";
+import {
+  ruleConditions,
+  ruleExtraKeystrokeElements,
+  ruleKeystroke,
+  rulePreContext,
+  ruleLhsKind,
+} from "@keyboard-studio/contracts";
 import type { PlacementCandidate } from "@keyboard-studio/contracts";
 import {
   isMnemonicKeyboard,
@@ -39,21 +46,29 @@ interface TaggedCandidate {
 // ---------------------------------------------------------------------------
 
 /**
- * Extract a single vkey + modifiers from a rule context array.
- * Returns null when the context has no vkey, has more than one vkey, or
+ * Extract a single vkey + modifiers from a rule (its keystroke).
+ * Returns null when the keystroke is not a vkey, has more than one vkey, or
  * contains conditional elements (any, notany, index, context) that make the
  * rule store-driven rather than direct.
  */
 function extractVkey(
-  context: ContextElement[],
+  rule: IRRule,
+  group: IRGroup,
 ): { vkey: string; modifiers: string[] } | null {
-  let vkeyEl: { name: string; modifiers: string[] } | null = null;
-  for (const el of context) {
+  const keystroke = ruleKeystroke(rule, group);
+  if (keystroke === undefined || keystroke.kind !== "vkey") return null;
+  const vkeyEl = { name: keystroke.name, modifiers: keystroke.modifiers };
+  // Everything around the keystroke: a second vkey, or any conditional or
+  // store-driven element, makes the rule not a simple direct one.
+  const around = [
+    ...ruleConditions(rule),
+    ...rulePreContext(rule, group),
+    ...ruleExtraKeystrokeElements(rule, group),
+  ];
+  for (const el of around) {
     switch (el.kind) {
       case "vkey":
-        if (vkeyEl !== null) return null; // two vkeys → not a simple direct rule
-        vkeyEl = { name: el.name, modifiers: el.modifiers };
-        break;
+        return null; // two vkeys → not a simple direct rule
       case "any":
       case "notany":
       case "index":
@@ -73,7 +88,6 @@ function extractVkey(
         break;
     }
   }
-  if (vkeyEl === null) return null;
   return { vkey: vkeyEl.name, modifiers: vkeyEl.modifiers };
 }
 
@@ -170,7 +184,7 @@ export function emitPlacementMap(
 
     for (const rule of group.rules) {
       // Skip group-transition rules (match/nomatch > use(...)).
-      if (rule.matchKind !== undefined) continue;
+      if (ruleLhsKind(rule) !== "input") continue;
 
       // Skip ANSI-only rules (targetSelector = keymanonly means desktop only —
       // but we still keep them; keymanweb means web-only — still keep; the
@@ -179,7 +193,7 @@ export function emitPlacementMap(
       // excluded by isMnemonicKeyboard(), but defensively also skip any rule
       // in a usingKeys group that has no vkey context (non-key context rule).
 
-      const vkeyInfo = extractVkey(rule.context);
+      const vkeyInfo = extractVkey(rule, group);
       if (vkeyInfo === null) continue;
 
       const outputInfo = extractOutput(rule.output);

@@ -19,6 +19,7 @@
 // order drifted from IR order, or the IR is unavailable), the fired trace's
 // own matchedContext/emittedOutput carry the author-language description.
 
+import { ruleContextElements } from "@keyboard-studio/contracts";
 import type {
   ContextElement,
   IRRule,
@@ -121,7 +122,7 @@ function outputElementText(el: OutputElement): string {
  * `rule matching \`a\` → deadkey(3)` (deadkey arming).
  */
 export function describeRuleShape(rule: IRRule): string {
-  const context = rule.context.map(contextElementText).join(" + ") || "anything";
+  const context = ruleContextElements(rule).map(contextElementText).join(" + ") || "anything";
   const output = rule.output.map(outputElementText).join(" + ");
   const rhs = output === "" ? "no output" : `outputs ${output}`;
   return `rule matching ${context} → ${rhs}`;

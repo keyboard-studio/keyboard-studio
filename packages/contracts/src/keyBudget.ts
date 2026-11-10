@@ -22,8 +22,9 @@
 // Contracts is the shared floor both already import, and it already hosts
 // comparable IR-analysis helpers (`buildProducedSet`).
 
-import type { ContextElement, IRRule, KeyboardIR } from "./keyboard-ir";
+import type { ContextElement, KeyboardIR } from "./keyboard-ir";
 import type { SpareKeyAvailability } from "./axes";
+import { ruleKeystroke } from "./rule-shape";
 import baseLayoutsData from "../data/base-layouts.json" with { type: "json" };
 
 /** The three availability bands. Programmatic form — safe as a map key. */
@@ -85,15 +86,6 @@ function planeOf(key: ContextElement | undefined): "shift" | "altgr" | "base" | 
   return "base";
 }
 
-/**
- * The struck key a rule matches — the LAST context element. The IR flattens a
- * rule's whole left-hand side into `context[]` with no explicit `+` marker, so
- * the key is positional.
- */
-function ruleKey(rule: IRRule): ContextElement | undefined {
-  return rule.context[rule.context.length - 1];
-}
-
 /** The stock physical char-key vkey set (the placement universe). */
 function stockKeys(): Set<string> {
   return new Set(Object.keys(STOCK_BASE_LAYOUTS[DEFAULT_BASELAYOUT] ?? {}));
@@ -133,7 +125,7 @@ export function measureKeyBudget(ir: KeyboardIR): KeyBudget | null {
 
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      const key = ruleKey(rule);
+      const key = ruleKeystroke(rule, group);
       if (key === undefined || key.kind !== "vkey" || !keys.has(key.name)) continue;
       // A stock physical key is pressed here — the base HAS a physical-key
       // surface to measure, even if this particular rule is a reserved chord we

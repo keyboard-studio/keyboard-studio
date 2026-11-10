@@ -111,7 +111,8 @@
  * Touch-layout (S-13) nodes are not classified and receive no map entry.
  */
 
-import type { KeyboardIR, Pattern, ContextElement } from "@keyboard-studio/contracts";
+import type { IRRule, KeyboardIR, Pattern } from "@keyboard-studio/contracts";
+import { ruleContextElements } from "../shared/rule-shape.js";
 import type { RemovalCapability } from "@keyboard-studio/contracts";
 import { isNamedDeadkeyElement } from "@keyboard-studio/contracts";
 import { isS01 } from "./rules/s01-simple-swap.js";
@@ -131,9 +132,10 @@ function capabilityForStrategy(strategyId: string | undefined): RemovalCapabilit
 }
 
 /** True if the rule's LHS carries any form of prior context (other than S-02 body). */
-function isContextSensitive(rule: { context: ContextElement[] }): boolean {
-  if (rule.context.length > 1) return true;
-  return rule.context.some((el) => el.kind === "context");
+function isContextSensitive(rule: IRRule): boolean {
+  const context = ruleContextElements(rule);
+  if (context.length > 1) return true;
+  return context.some((el) => el.kind === "context");
 }
 
 /**
@@ -183,7 +185,7 @@ export function classifyRemovalCapabilities(ir: KeyboardIR): Map<string, Removal
       // named body stays opaque (test F3's pin is preserved).
       if (
         !ownedByS06 &&
-        (rule.context.some(isNamedDeadkeyElement) ||
+        (ruleContextElements(rule).some(isNamedDeadkeyElement) ||
           rule.output.some(isNamedDeadkeyElement))
       ) {
         result.set(rule.nodeId, "not-removable:opaque");

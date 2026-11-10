@@ -4,7 +4,7 @@
 // know (is the rule lowered, its keystroke targets, what was evaluated away). The
 // lowering never re-decides a status; it reads the plan.
 
-import { deadkeyNameKey } from "@keyboard-studio/contracts";
+import { deadkeyNameKey, elementAtOffset, ruleLhsKind } from "@keyboard-studio/contracts";
 import type {
   ContextElement,
   IRGroup,
@@ -140,16 +140,17 @@ export function storeLiterals(store: IRStore): (string | null)[] {
 
 /** Count the transforms the cartesian expansion of the rule's index() references yields. */
 export function expansionCount(
-  full: readonly ContextElement[],
-  keyIndex: number,
+  rule: IRRule,
+  group: IRGroup,
+  keyOffset: number,
   out: readonly OutputElement[],
   ir: KeyboardIR,
 ): number {
   const offsets = new Set<number>();
-  for (const el of out) if (el.kind === "index" && el.offset - 1 !== keyIndex) offsets.add(el.offset);
+  for (const el of out) if (el.kind === "index" && el.offset !== keyOffset) offsets.add(el.offset);
   let n = 1;
   for (const off of offsets) {
-    const el = full[off - 1];
+    const el = elementAtOffset(rule, group, off);
     if (el?.kind !== "any") continue;
     const s = findStore(ir, el.storeRef);
     n *= Math.max(1, s?.items.length ?? 1);
@@ -158,15 +159,16 @@ export function expansionCount(
 }
 
 export function meetsSetMapping(
-  full: readonly ContextElement[],
-  keyIndex: number,
+  rule: IRRule,
+  group: IRGroup,
+  keyOffset: number,
   out: readonly OutputElement[],
   ir: KeyboardIR,
 ): boolean {
   if (out.length !== 1) return false;
   const o = out[0];
-  if (o?.kind !== "index" || o.offset - 1 === keyIndex) return false;
-  const el = full[o.offset - 1];
+  if (o?.kind !== "index" || o.offset === keyOffset) return false;
+  const el = elementAtOffset(rule, group, o.offset);
   if (el?.kind !== "any") return false;
   const from = findStore(ir, el.storeRef);
   const to = findStore(ir, o.storeRef);
@@ -225,7 +227,7 @@ export function analyseRule(
   if (facts.role === "unreachable") return reject("1.11");
 
   // --- match / nomatch (rows 1.8, 1.9, 3.21) -----------------------------------------------------
-  if (rule.matchKind !== undefined) {
+  if (ruleLhsKind(rule) !== "input") {
     const calls = ruleCalls(rule);
     plan.calls = calls;
     const only = rule.output.length === 1 ? rule.output[0] : undefined;
@@ -243,8 +245,8 @@ export function analyseRule(
 
   // --- Keystroke (rows 2.x) -----------------------------------------------------------------------
   const ks = split.keystroke;
-  const full = split.keyElement ? [...split.pre, split.keyElement] : [...split.pre];
-  const keyIndex = split.keyElement ? full.length - 1 : -1;
+  // 1-based offset of the keystroke over `[...pre, keystroke]`, or -1 when there is none.
+  const keyOffset = split.keyElement ? split.pre.length + 1 : -1;
   const mnemonic = rc.mnemonic;
 
   const keyRow = (v: string): RowId => {
@@ -339,7 +341,7 @@ export function analyseRule(
     } else if (ks.kind === "any") {
       const store = findStore(ir, ks.storeRef);
       const targets = storeKeyTargets(store, rc);
-      const idxRefs = rule.output.filter((o): o is Extract<OutputElement, { kind: "index" }> => o.kind === "index" && o.offset - 1 === keyIndex);
+      const idxRefs = rule.output.filter((o): o is Extract<OutputElement, { kind: "index" }> => o.kind === "index" && o.offset === keyOffset);
       const bad = targets.length === 0 || targets.some((t) => t === null) ||
         idxRefs.some((o) => (findStore(ir, o.storeRef)?.items.length ?? -1) !== targets.length);
       if (bad) return reject("2.25", { status: "N", params: { store: ks.storeRef } });
@@ -487,17 +489,17 @@ export function analyseRule(
   if (idx.length > 0) {
     for (const o of idx) {
       if (o.kind !== "index") continue;
-      const el = full[o.offset - 1];
+      const el = elementAtOffset(rule, group, o.offset);
       if (el?.kind !== "any") return reject("6.2", { params: { reason: "index-target", offset: String(o.offset) } });
       const to = findStore(ir, o.storeRef);
       const lits = to ? storeLiterals(to) : [null];
       if (lits.some((x) => x === null)) return reject("3.26", { status: "N", params: { store: o.storeRef } });
     }
-    if (meetsSetMapping(full, keyIndex, out, ir)) {
+    if (meetsSetMapping(rule, group, keyOffset, out, ir)) {
       plan.setMapping = true;
       n("3.7");
     } else {
-      const count = expansionCount(full, keyIndex, out, ir) * Math.max(1, plan.targets.length);
+      const count = expansionCount(rule, group, keyOffset, out, ir) * Math.max(1, plan.targets.length);
       if (count > MAX_TRANSFORMS_PER_RULE) return reject("3.9", { status: "N", params: { count: String(count) } });
       n("3.8");
     }

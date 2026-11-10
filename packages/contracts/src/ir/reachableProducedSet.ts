@@ -57,6 +57,7 @@
  */
 
 import type { KeyboardIR, IRStore, TouchKeyIR, TouchLayoutIR } from "../keyboard-ir.js";
+import { ruleContextElements } from "../rule-shape.js";
 import { buildProducedSet, collectFromElements } from "./producedSet.js";
 import type { BuildProducedSetOptions } from "./producedSet.js";
 import {
@@ -277,7 +278,7 @@ export function buildReachableProducedSet(
       if (indexedRuleNodeIds.has(rule.nodeId)) continue;
       if (options?.excludeBackspaceCorrections === true) {
         // Mirror buildProducedSet's own guard so the two agree on this rule class.
-        const hasDirectBackspace = rule.context.some(
+        const hasDirectBackspace = ruleContextElements(rule).some(
           (el) => el.kind === "vkey" && normalizeTouchKeyId(el.name) === "K_BKSP",
         );
         if (hasDirectBackspace) continue;

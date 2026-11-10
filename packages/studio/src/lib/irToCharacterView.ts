@@ -9,9 +9,10 @@
 // Kept pure (no store reads, no React) so the derivation is unit-testable in
 // isolation from the component.
 
+import { ruleHasNulContext, ruleConditions, rulePreContext } from '@keyboard-studio/contracts';
 import type { KeyboardIR, RemovalCapability, StoreItem } from '@keyboard-studio/contracts';
-import { buildProducedSet } from '@keyboard-studio/contracts';
-import { collectCharContributors, isParallelIndexFanOut, isPlusSeparator } from '@keyboard-studio/engine';
+import { buildProducedSet, elementAtOffset } from '@keyboard-studio/contracts';
+import { collectCharContributors, isParallelIndexFanOut } from '@keyboard-studio/engine';
 import type { CharContributors } from '@keyboard-studio/engine';
 import { toRailNodes, invisibleCharLabel, keySequenceLabel, desktopVkeyLabel, displayChar, charProducers, isNotAForwardTypingPath, isTouchOnlyTriggerRule, ASCII_LETTER_RE } from './irToCarveNodes.ts';
 import type { CharProducer } from './irToCarveNodes.ts';
@@ -401,10 +402,9 @@ function sequenceShapeCells(ir: KeyboardIR): { ch: string; keys: string[] }[] {
       if (rule.output.length !== 1) continue;
       const outEl = rule.output[0];
       if (outEl === undefined || outEl.kind !== 'index') continue;
-      if (rule.context.findIndex(isPlusSeparator) === -1) continue; // needs a literal trailing trigger
+      if (!ruleHasNulContext(rule) && ruleConditions(rule).length === 0 && rulePreContext(rule, group).length === 0) continue; // needs a literal trailing trigger
 
-      const effectiveCtx = rule.context.filter((el) => !isPlusSeparator(el));
-      const baseEl = effectiveCtx[outEl.offset - 1];
+      const baseEl = elementAtOffset(rule, group, outEl.offset);
       if (baseEl === undefined || baseEl.kind !== 'any') continue;
 
       const baseStore = storeMap.get(baseEl.storeRef);

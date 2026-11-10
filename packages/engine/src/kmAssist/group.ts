@@ -54,13 +54,13 @@ import type {
   IRRule,
   OutputElement,
 } from "@keyboard-studio/contracts";
-import { isPlusSeparator } from "@keyboard-studio/contracts";
+import { isPlusSeparator, ruleKeystrokeLoose } from "@keyboard-studio/contracts";
 import {
   classifyRuleKind,
   isBareContextOutput,
   isIndexedContextOutput,
   isNulOutput,
-  shapeContext,
+  splitShapeContext,
   shapeOutput,
   type RuleKind,
 } from "./classify.js";
@@ -225,21 +225,6 @@ function outputToken(el: OutputElement): string {
       if (isIndexedContextOutput(el)) return "indexed";
       return "raw";
   }
-}
-
-/**
- * Split shape context into the guard set (everything before the struck key)
- * and the struck key itself (the trailing vkey, if present).
- */
-function splitGuards(ctx: ContextElement[]): {
-  guards: ContextElement[];
-  key?: Extract<ContextElement, { kind: "vkey" }>;
-} {
-  const last = ctx[ctx.length - 1];
-  if (last !== undefined && last.kind === "vkey") {
-    return { guards: ctx.slice(0, -1), key: last };
-  }
-  return { guards: ctx };
 }
 
 // ---------------------------------------------------------------------------
@@ -408,8 +393,9 @@ function outputsIdentical(members: IRRule[]): boolean {
  * render without the `+`, matching their source form.
  */
 function sampleText(rule: IRRule): string {
+  // eslint-disable-next-line no-restricted-syntax -- probes whether the codec's synthetic `+` separator is present; the accessors deliberately hide it, and no group is in scope to derive it from.
   const hasInlinePlus = rule.context.some(isPlusSeparator);
-  const hasVkey = rule.context.some((el) => el.kind === "vkey");
+  const hasVkey = ruleKeystrokeLoose(rule)?.kind === "vkey";
   return emitRule(rule, hasInlinePlus || hasVkey);
 }
 
@@ -428,8 +414,7 @@ interface MemberSplit {
 }
 
 function splitRule(rule: IRRule): MemberSplit {
-  const ctx = shapeContext(rule);
-  const { guards, key } = splitGuards(ctx);
+  const { guards, key } = splitShapeContext(rule);
   const guardTokens = guards.map(guardToken);
   const outputShape = shapeOutput(rule).map(outputToken).join("+") || "empty";
   return {

@@ -24,7 +24,7 @@ import type {
   ToleranceReport,
   VirtualFS,
 } from '@keyboard-studio/contracts';
-import { createVirtualFS, isPlusSeparator } from '@keyboard-studio/contracts';
+import { createVirtualFS, isPlusSeparator, ruleLhsKind } from '@keyboard-studio/contracts';
 
 import { compile } from '../compiler/index.js';
 import { emit } from '../codec/emit.js';
@@ -323,15 +323,17 @@ export function buildToleranceCompileVfs(ir: KeyboardIR): VirtualFS {
 export function splitRuleAtPlus(
   rule: IRRule,
 ): { before: ContextElement[]; keyPart: ContextElement[] } | undefined {
-  if (rule.matchKind !== undefined) return undefined;
-  const plusIdx = rule.context.findIndex(isPlusSeparator);
+  if (ruleLhsKind(rule) !== "input") return undefined;
+  // eslint-disable-next-line no-restricted-syntax -- needs the raw position of the first `+` and the exact element count; the accessors hide the separator and split at the last one, which would change which bare rules are splittable.
+  const context = rule.context;
+  const plusIdx = context.findIndex(isPlusSeparator);
   if (plusIdx !== -1) {
-    return { before: rule.context.slice(0, plusIdx), keyPart: rule.context.slice(plusIdx + 1) };
+    return { before: context.slice(0, plusIdx), keyPart: context.slice(plusIdx + 1) };
   }
   // No `+` at all: a bare single-element rule has no preceding context and
   // its sole element IS the key. Anything else with no `+` cannot be split.
-  if (rule.context.length === 1) {
-    return { before: [], keyPart: rule.context };
+  if (context.length === 1) {
+    return { before: [], keyPart: context };
   }
   return undefined;
 }

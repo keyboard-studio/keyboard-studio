@@ -1,4 +1,5 @@
-import type { ContextElement, IRStore, KeyboardIR, OutputElement } from "../keyboard-ir.js";
+import type { IRStore, KeyboardIR, OutputElement } from "../keyboard-ir.js";
+import { ruleConditions, ruleHasNulContext, ruleKeystroke, rulePreContext } from "../rule-shape.js";
 
 /**
  * caseCounterpart — deterministic case-pair helper for the shift-layer
@@ -221,8 +222,12 @@ function collectPlaneOutputs(
   for (const group of ir.groups) {
     if (!group.usingKeys) continue;
     for (const rule of group.rules) {
-      if (rule.context.length !== 1 || rule.output.length === 0) continue;
-      const ctx = rule.context[0] as ContextElement;
+      if (rule.output.length === 0) continue;
+      // A bare keystroke: no `nul`, condition or pre-context around it.
+      if (ruleHasNulContext(rule) || ruleConditions(rule).length > 0) continue;
+      if (rulePreContext(rule, group).length > 0) continue;
+      const ctx = ruleKeystroke(rule, group);
+      if (ctx === undefined) continue;
       if (ctx.kind === "vkey") {
         const plane = planeFor(ctx.modifiers);
         if (plane === null) continue;

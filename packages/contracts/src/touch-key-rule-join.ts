@@ -41,7 +41,6 @@
  */
 
 import type {
-  ContextElement,
   IRGroup,
   IRRule,
   IRStore,
@@ -49,7 +48,14 @@ import type {
   OutputElement,
 } from "./keyboard-ir.js";
 import { collectFromElements } from "./ir/producedSet.js";
-import { isPlusSeparator } from "./rule-shape.js";
+import {
+  ruleConditions,
+  ruleContextElements,
+  ruleExtraKeystrokeElements,
+  ruleHasNulContext,
+  ruleKeystroke,
+  rulePreContext,
+} from "./rule-shape.js";
 
 // ---------------------------------------------------------------------------
 // Ids and normalization
@@ -295,27 +301,22 @@ export interface BuildTouchKeyRuleIndexOptions {
 // ---------------------------------------------------------------------------
 
 /**
- * The vkey element a rule is keyed on: the FIRST `{kind:"vkey"}` in the context,
- * after filtering plus-separators. Rules with no vkey element fall to the
- * key-position `any()` expansion (see {@link StruckAny}); rules with neither
- * are not indexed.
+ * The vkey element a rule is keyed on: the rule's keystroke (see
+ * `ruleKeystroke`), when it is a vkey. Rules whose keystroke is not a vkey fall
+ * to the key-position `any()` expansion (see {@link StruckAny}); rules with
+ * neither are not indexed.
  *
- * The plus-separator filter is not optional. The codec inserts a synthetic
- * `{kind:"raw", text:"+"}` element to mark where pre-context ends and the matched
- * keystroke begins, so a Cameroon-style `any(diablock) + [T_0300] > context`
- * carries three context elements, and a scan that did not filter would still find
- * the vkey here — but a rule written with the `+` in other positions would not.
- * This is deliberately a stronger rule than the engine's private
- * `extractRuleVkey`, which does not filter separators.
+ * The keystroke is the one element after the `+` separator, or the last element
+ * when there is no separator, and only in a `using keys` group; the separator
+ * itself is never an element of any part.
  */
 function resolveStruckVkey(
-  context: readonly ContextElement[],
+  rule: IRRule,
+  group: IRGroup,
 ): { name: string; modifiers: readonly string[] } | undefined {
-  for (const el of context) {
-    if (isPlusSeparator(el)) continue;
-    if (el.kind === "vkey") return { name: el.name, modifiers: el.modifiers };
-  }
-  return undefined;
+  const keystroke = ruleKeystroke(rule, group);
+  if (keystroke === undefined || keystroke.kind !== "vkey") return undefined;
+  return { name: keystroke.name, modifiers: keystroke.modifiers };
 }
 
 /** Normalize a vkey element's modifier words: uppercase, dedupe, sort. */
@@ -324,24 +325,17 @@ function normalizeModifiers(modifiers: readonly string[]): readonly string[] {
 }
 
 /**
- * True when the context carries meaning beyond the struck key itself — i.e. the
- * rule only fires in a particular preceding context.
+ * True when the rule carries meaning beyond the struck key itself — i.e. the
+ * rule only fires in a particular preceding context. A `nul`, a head `if()`
+ * guard, pre-context, or extra keystroke elements all count.
  */
-function hasPreContext(context: readonly ContextElement[], struckIndex: number): boolean {
-  return context.some((el, i) => {
-    if (i === struckIndex) return false;
-    if (isPlusSeparator(el)) return false;
-    return true;
-  });
-}
-
-function indexOfStruckVkey(context: readonly ContextElement[]): number {
-  for (let i = 0; i < context.length; i++) {
-    const el = context[i];
-    if (el === undefined || isPlusSeparator(el)) continue;
-    if (el.kind === "vkey") return i;
-  }
-  return -1;
+function hasPreContext(rule: IRRule, group: IRGroup): boolean {
+  return (
+    ruleHasNulContext(rule) ||
+    ruleConditions(rule).length > 0 ||
+    rulePreContext(rule, group).length > 0 ||
+    ruleExtraKeystrokeElements(rule, group).length > 0
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -362,59 +356,33 @@ function indexOfStruckVkey(context: readonly ContextElement[]): number {
  * can call the keys dead, and carve of a fan character silently no-ops.
  */
 interface StruckAny {
-  /** Raw context-array index of the `any` element. */
-  readonly elementIndex: number;
   /**
-   * The element's 1-based position among the context's non-separator
-   * elements — the position an output `index(store, n)` uses to refer to it.
-   * The synthetic `+` separator is not a Keyman context element and does not
-   * count; every other element (including an `if()` guard, per spec 103)
-   * does.
+   * The element's 1-based offset over `[nul?, ...conditions, ...preContext,
+   * keystroke]` — the offset an output `index(store, n)` uses to refer to it
+   * (the same numbering `elementAtOffset` resolves). The synthetic `+`
+   * separator is not a Keyman context element and does not count; every other
+   * element (including an `if()` guard, per spec 103) does.
    */
   readonly position: number;
   readonly storeRef: string;
 }
 
 /**
- * Find the key-position `any()` of a rule that has no vkey element, or
+ * Find the key-position `any()` of a rule that has no vkey keystroke, or
  * `undefined` when the rule's struck key does not arrive through `any()`.
  *
- * Key position is defined by the `+` separator: the elements after it are
- * the keystroke part, and the FIRST `any()` among them is the struck key.
- * An `any()` BEFORE the separator is pre-context — a condition, never the
- * struck key — and never expands. With no separator, the whole context is
- * the keystroke part only when it is a single element (a bare
- * `any(fan) > …`); a longer separator-less context cannot be told apart
- * from pre-context, so it does not expand either.
+ * Key position is the rule's keystroke (see `ruleKeystroke`). An `any()` in
+ * pre-context is a condition, never the struck key, and never expands.
  */
-function resolveStruckAny(context: readonly ContextElement[]): StruckAny | undefined {
-  let separatorIndex = -1;
-  for (let i = 0; i < context.length; i++) {
-    const el = context[i];
-    if (el !== undefined && isPlusSeparator(el)) {
-      separatorIndex = i;
-      break;
-    }
-  }
-
-  if (separatorIndex === -1) {
-    const nonSeparators = context.filter((el) => !isPlusSeparator(el));
-    if (nonSeparators.length !== 1) return undefined;
-    const only = nonSeparators[0];
-    if (only === undefined || only.kind !== "any") return undefined;
-    return { elementIndex: context.indexOf(only), position: 1, storeRef: only.storeRef };
-  }
-
-  let position = 0;
-  for (let i = 0; i < context.length; i++) {
-    const el = context[i];
-    if (el === undefined || isPlusSeparator(el)) continue;
-    position++;
-    if (i > separatorIndex && el.kind === "any") {
-      return { elementIndex: i, position, storeRef: el.storeRef };
-    }
-  }
-  return undefined;
+function resolveStruckAny(rule: IRRule, group: IRGroup): StruckAny | undefined {
+  const keystroke = ruleKeystroke(rule, group);
+  if (keystroke === undefined || keystroke.kind !== "any") return undefined;
+  const position =
+    (ruleHasNulContext(rule) ? 1 : 0) +
+    ruleConditions(rule).length +
+    rulePreContext(rule, group).length +
+    1;
+  return { position, storeRef: keystroke.storeRef };
 }
 
 // ---------------------------------------------------------------------------
@@ -442,7 +410,7 @@ function collectStoreRefs(rule: IRRule): readonly string[] | undefined {
   const push = (ref: string) => {
     if (!refs.includes(ref)) refs.push(ref);
   };
-  for (const el of rule.context) {
+  for (const el of ruleContextElements(rule)) {
     if (el.kind === "any" || el.kind === "notany" || el.kind === "index") push(el.storeRef);
   }
   for (const el of rule.output) {
@@ -545,7 +513,7 @@ export function buildTouchKeyRuleIndex(
       const role = classifyTouchRuleRole(rule.output);
       const storeRefs = collectStoreRefs(rule);
 
-      const struck = resolveStruckVkey(rule.context);
+      const struck = resolveStruckVkey(rule, group);
       if (struck !== undefined) {
         if (!inScope(struck.name)) continue;
 
@@ -563,7 +531,6 @@ export function buildTouchKeyRuleIndex(
           if (produced.length > 0) producingIds.add(normalized);
         }
 
-        const struckIndex = indexOfStruckVkey(rule.context);
         const producedText = role === "produces" ? leadingCharRun(rule.output) : undefined;
 
         addBinding(
@@ -576,7 +543,7 @@ export function buildTouchKeyRuleIndex(
             role,
             produced,
             ...(producedText !== undefined ? { producedText } : {}),
-            contextGuarded: hasPreContext(rule.context, struckIndex),
+            contextGuarded: hasPreContext(rule, group),
             ...(storeRefs !== undefined ? { storeRefs } : {}),
           },
           normalized,
@@ -589,7 +556,7 @@ export function buildTouchKeyRuleIndex(
       // binding per vkey item of the key store. Store items that are
       // characters match typed context, not struck keys, and never expand;
       // a missing store expands nothing.
-      const struckAny = resolveStruckAny(rule.context);
+      const struckAny = resolveStruckAny(rule, group);
       if (struckAny === undefined) continue;
       const keyStore = storeMap.get(struckAny.storeRef);
       if (keyStore === undefined) continue;
@@ -632,7 +599,7 @@ export function buildTouchKeyRuleIndex(
             role,
             produced,
             ...(producedText !== undefined ? { producedText } : {}),
-            contextGuarded: hasPreContext(rule.context, struckAny.elementIndex),
+            contextGuarded: hasPreContext(rule, group),
             ...(storeRefs !== undefined ? { storeRefs } : {}),
           },
           normalized,

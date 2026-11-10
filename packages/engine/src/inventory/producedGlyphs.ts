@@ -14,7 +14,7 @@
  */
 
 import type { KeyboardIR, IRStore, OutputElement } from "@keyboard-studio/contracts";
-import { buildProducedSet } from "@keyboard-studio/contracts";
+import { buildProducedSet, makeRule } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
 // Options (re-exported for backward compatibility)
@@ -102,11 +102,7 @@ export function collectFromOutput(
         usingKeys: false,
         readonly: false,
         rules: [
-          {
-            nodeId: "_r",
-            context: [],
-            output: output as OutputElement[],
-          },
+          makeRule({ nodeId: "_r", output: output as OutputElement[] }, { usingKeys: false }),
         ],
       },
     ],

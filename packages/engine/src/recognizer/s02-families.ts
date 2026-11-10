@@ -50,7 +50,7 @@ import type {
   IRStore,
   KeyboardIR,
 } from "@keyboard-studio/contracts";
-import { isDeadkeyOnlyOutput, isPlusSeparator } from "../shared/rule-shape.js";
+import { elementAtOffset, isDeadkeyOnlyOutput, isPlusSeparator, ruleContextElements } from "../shared/rule-shape.js";
 import { formatDkName, formatVKeyModifiers, isBehaviourOwned } from "./utils.js";
 
 // ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ import { formatDkName, formatVKeyModifiers, isBehaviourOwned } from "./utils.js"
  */
 export function cleanedContext(rule: IRRule): ContextElement[] | null {
   const cleaned: ContextElement[] = [];
-  for (const el of rule.context) {
+  for (const el of ruleContextElements(rule)) {
     if (isPlusSeparator(el)) continue;
     if (el.kind === "raw") return null;
     cleaned.push(el);
@@ -166,9 +166,10 @@ export function matchS02FanOut(rule: IRRule): S02FanOutMatch | null {
   const anyIndex = cleaned.findIndex((el) => el.kind === "any");
   if (anyIndex === -1 || anyIndex !== cleaned.length - 1) return null;
   if (cleaned.filter((el) => el.kind === "any").length !== 1) return null;
-  if (out.offset !== anyIndex + 1) return null;
   const anyEl = cleaned[anyIndex]!;
   if (anyEl.kind !== "any") return null;
+  // No group is in scope; assume a `using keys` group (the loose reader).
+  if (elementAtOffset(rule, { usingKeys: true }, out.offset) !== anyEl) return null;
 
   if (cleaned.length === 2) {
     const dk = cleaned[0]!;
@@ -392,7 +393,7 @@ export function findS02Families(ir: KeyboardIR): S02Family[] {
     const primaryTrigger =
       v.triggers.length > 0 ? pickPrimaryTrigger(v.triggers) : undefined;
     const hasBeep = v.group.rules.some((r) => {
-      const c0 = r.context[0];
+      const c0 = ruleContextElements(r)[0];
       if (c0 === undefined || c0.kind !== "deadkey" || c0.id !== v.deadkeyId) {
         return false;
       }

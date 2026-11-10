@@ -10,10 +10,6 @@
     "§8",
     "specs/080-documentation-completeness"
   ],
-  "track": [
-    "§8",
-    "specs/018-qu-wire-track"
-  ],
   "attribution": [
     "§8",
     "specs/064-keyboard-attribution"
@@ -88,6 +84,9 @@
   ],
   "html": [
     "specs/html-editor"
+  ],
+  "icon": [
+    "specs/icon-editor"
   ],
   "package": [
     "§16"

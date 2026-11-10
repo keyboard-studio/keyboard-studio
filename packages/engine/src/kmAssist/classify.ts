@@ -28,7 +28,13 @@ import type {
   IRRule,
   OutputElement,
 } from "@keyboard-studio/contracts";
-import { isPlusSeparator } from "@keyboard-studio/contracts";
+import {
+  ruleConditions,
+  ruleHasNulContext,
+  ruleKeystrokeLoose,
+  ruleLhsKind,
+  rulePreContext,
+} from "@keyboard-studio/contracts";
 
 /** Display kind for a typed rule, used by the rules-step filter and views. */
 export type RuleKind =
@@ -83,9 +89,33 @@ export function isLayerDirective(el: OutputElement): boolean {
  * synthetic `+` keystroke separator and `platform('…')` guards.
  */
 export function shapeContext(rule: IRRule): ContextElement[] {
-  return rule.context.filter(
-    (el) => !isPlusSeparator(el) && !isPlatformGuard(el),
-  );
+  // No group is in scope for a flat rule list, so every element after the head
+  // run is read as pre-context (`usingKeys: false`) and the keystroke is found
+  // separately by `splitShapeContext`.
+  const nul: ContextElement[] = ruleHasNulContext(rule) ? [{ kind: "raw", text: "nul" }] : [];
+  return [
+    ...nul,
+    ...ruleConditions(rule),
+    ...rulePreContext(rule, { usingKeys: false }),
+  ].filter((el) => !isPlatformGuard(el));
+}
+
+/**
+ * Split a rule's shape context into the guard set (everything but the struck
+ * key) and the struck key itself, when the keystroke is a vkey. A keystroke that
+ * is not a vkey (`any()`, a char) stays among the guards: this view only names
+ * vkey-struck rules.
+ */
+export function splitShapeContext(rule: IRRule): {
+  guards: ContextElement[];
+  key?: Extract<ContextElement, { kind: "vkey" }>;
+} {
+  const shape = shapeContext(rule);
+  const keystroke = ruleKeystrokeLoose(rule);
+  if (keystroke !== undefined && keystroke.kind === "vkey") {
+    return { guards: shape.filter((el) => el !== keystroke), key: keystroke };
+  }
+  return { guards: shape };
 }
 
 /**
@@ -117,7 +147,7 @@ export function isSuppressionOnlyOutput(output: OutputElement[]): boolean {
 export function classifyRuleKind(rule: IRRule): RuleKind {
   // Group-transition rules (`match > use(g)` / `nomatch > use(g)`) are
   // control flow, not keystroke rules.
-  if (rule.matchKind !== undefined) return "opaque";
+  if (ruleLhsKind(rule) !== "input") return "opaque";
 
   const ctx = shapeContext(rule);
   const out = shapeOutput(rule);

@@ -1,8 +1,14 @@
 // Keystroke classification (mapping rows 2.1-2.7, 2.9-2.13, 2.19-2.25).
-// A rule has no key field: the keystroke follows a synthetic `+` separator in `context`,
-// or, when the rule has no pre-context, it is the only context element.
+// A rule has no key field: the keystroke is found through the shared rule-shape readers
+// (the element after the `+` separator, or the last element when there is none).
 
-import { US_BASE_LAYOUT, isPlusSeparator } from "@keyboard-studio/contracts";
+import {
+  US_BASE_LAYOUT,
+  ruleConditions,
+  ruleHasNulContext,
+  ruleKeystroke,
+  rulePreContext,
+} from "@keyboard-studio/contracts";
 import type { ContextElement, IRRule, IRStore, StoreItem } from "@keyboard-studio/contracts";
 import { FORM_ONLY_KEYS, FORM_ROWS, type LdmlForm } from "../lower/positions.js";
 import type { LdmlBaseLayout, RowId } from "../types.js";
@@ -119,29 +125,19 @@ function toKeystroke(el: ContextElement): Keystroke {
   }
 }
 
-/** Split a rule at its keystroke. A rule in a group without `using keys` has none. */
+/**
+ * Split a rule at its keystroke, through the shared rule-shape readers. A rule in
+ * a group without `using keys` has none. `pre` is `[nul?, ...conditions,
+ * ...preContext]` and never carries the `+` separator, so `[...pre, keyElement]`
+ * is the offset-numbered element list (`elementAtOffset`).
+ */
 export function splitRule(rule: IRRule, usingKeys: boolean): SplitRule {
-  if (!usingKeys || rule.matchKind !== undefined) return { pre: rule.context, keystroke: null, keyElement: null };
-  const ctx = rule.context;
-  let plus = -1;
-  for (let i = ctx.length - 1; i >= 0; i--) {
-    const el = ctx[i];
-    if (el !== undefined && isPlusSeparator(el)) {
-      plus = i;
-      break;
-    }
-  }
-  if (plus >= 0) {
-    const el = ctx[plus + 1];
-    return {
-      pre: ctx.slice(0, plus),
-      keystroke: el === undefined ? null : toKeystroke(el),
-      keyElement: el ?? null,
-    };
-  }
-  const last = ctx[ctx.length - 1];
-  if (last === undefined) return { pre: [], keystroke: null, keyElement: null };
-  return { pre: ctx.slice(0, -1), keystroke: toKeystroke(last), keyElement: last };
+  const group = { usingKeys };
+  const pre: ContextElement[] = [];
+  if (ruleHasNulContext(rule)) pre.push({ kind: "raw", text: "nul" });
+  pre.push(...ruleConditions(rule), ...rulePreContext(rule, group));
+  const keyElement = ruleKeystroke(rule, group) ?? null;
+  return { pre, keystroke: keyElement === null ? null : toKeystroke(keyElement), keyElement };
 }
 
 // ---------------------------------------------------------------------------
