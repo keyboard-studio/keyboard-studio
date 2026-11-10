@@ -579,6 +579,12 @@ const OPAQUE_REASON_LANGUAGE: Record<string, string> = {
     "A store with a backwards character range the editor can't expand safely.",
   "malformed-range":
     "A store with a malformed character range the editor can't expand safely.",
+  "foreign-compile-target":
+    "A line written for another keyboard engine (KMFL or Weaver), which Keyman ignores.",
+  "removed-statement":
+    "Uses a statement newer versions of Keyman no longer support; kept exactly as written.",
+  "multi-element-keystroke":
+    "A keystroke with more than one key; Keyman uses only the first, so the rule is kept as written.",
 };
 
 /**

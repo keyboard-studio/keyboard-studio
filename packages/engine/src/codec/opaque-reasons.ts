@@ -16,6 +16,9 @@ export const OPAQUE_REASONS = {
   // and `context(1)` in context position (N must be > 1 there).
   INDEXED_CONTEXT: "indexed-context",
   OUTS_EXPANSION: "outs-expansion",
+  // Retained for persisted working copies: the legacy reader opaqued SMP
+  // `U+XXXXX` literals. The Keyman lexer reads them as characters (spec 116),
+  // so the new reader is not expected to produce it.
   SMP_LITERAL: "smp-literal",
   // Bracketed menu-store literal (`store( a_menu ) '[1ae 2a …]'`) — the
   // old-style multi-tap menu syntax from the Keyman advanced docs. The
@@ -36,6 +39,17 @@ export const OPAQUE_REASONS = {
   // fabricating a wrong-direction interior or dropping data silently.
   DESCENDING_RANGE: "descending-range",
   MALFORMED_RANGE: "malformed-range",
+  // A line under a `$kmfl:` or `$weaver:` compile target: written for another
+  // engine, so Keyman ignores it and it is preserved verbatim (spec 116).
+  FOREIGN_COMPILE_TARGET: "foreign-compile-target",
+  // A statement Keyman 19 removed from the language (`clearcontext`, `fix`,
+  // `switch`, `key`). The Keyman grammar rejects the line, so it is preserved
+  // verbatim (spec 116).
+  REMOVED_STATEMENT: "removed-statement",
+  // A keystroke (`+ ...`) with more than one element. kmcmplib uses only the
+  // first element and warns, so the rule is preserved verbatim rather than
+  // typed with a guess (spec 116).
+  MULTI_ELEMENT_KEYSTROKE: "multi-element-keystroke",
 } as const;
 
 export type OpaqueReason = (typeof OPAQUE_REASONS)[keyof typeof OPAQUE_REASONS];
