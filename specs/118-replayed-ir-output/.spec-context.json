@@ -533,7 +533,11 @@
     {
       "note": "T004 and T009 regression tests were not shown red before the fix; T005 only routes non-.kmn files through the wrapper (replay fires for .kmn only); T007 fixed in studio deadkeyWrite, not engine keyEditOps as tasks.md named",
       "step": "implement"
+    },
+    {
+      "note": "Phase 4 (T018-T021) not started: blocked on spec 117 explicit-keystroke change (spec.md Ordering against spec 117; tasks.md Phase 4 header). origin/117-typed-rule-shape still at specify (552ec0ca), nothing merged to main as of 2026-11-11. Needs developer call: wait for 117 B1, or waive the ordering and reorder phases 5-6 ahead.",
+      "step": "implement"
     }
   ],
-  "last_action": "Phase 2 (T003-T011) done; typecheck, pnpm -r test and pnpm lint green"
+  "last_action": "round blocked at T018 on spec 117"
 }
