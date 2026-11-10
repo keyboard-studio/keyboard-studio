@@ -354,7 +354,12 @@ splitter that already exists.
   bound by the existing compile-time drift guards.
 - **FR-024**: Every consumer that switches over element kinds MUST handle the new members, and
   exhaustiveness checks MUST fail the build for any consumer that doesn't. The plan MUST list these
-  consumers, in the style of spec 103's consumer review.
+  consumers, in the style of spec 103's consumer review. Before any new member is added, every
+  consumer the inventory finds non-exhaustive MUST be made exhaustive. The same applies to consumers
+  that recognise these constructs from `raw` text or a fragment reason, and to consumers that would
+  drop an unknown store-item kind. When a member lands, each recogniser for it MUST switch to the
+  typed member in the same change, with a test showing the classification is unchanged (research
+  R5c).
 - **FR-025**: This spec MUST NOT change spec 103's ruling. A `<>` comparison and an `if()` that is not
   at the head of the context stay opaque, as spec 103 FR-003 says. If the new grammar makes typing them
   cheap, that is proposed as an amendment to spec 103, not done here.
@@ -425,8 +430,12 @@ splitter that already exists.
   onto FR-032 and FR-035, except the codec itself.
 - **FR-037**: A lint rule MUST fail on a direct read or write of a rule's context array, or of
   `matchKind`, outside the codec and the accessor module itself.
-- **FR-038**: FR-032 to FR-037 MUST NOT change the `KeyboardIR` contract, emitted output or any test
-  expectation.
+- **FR-038**: FR-032 to FR-037 MUST NOT change the `KeyboardIR` contract or emitted output. A test
+  expectation may change **only** where a consumer's own keystroke splitter disagreed with kmcmplib.
+  Today five splitters disagree on multiple `+`, a vkey before the `+`, `any()` keystrokes and groups
+  that are not `using keys` (research R5a). Each such change MUST be listed in its commit with the
+  rule, the old answer, the new answer and the kmcmplib reference. Any recognizer rule that newly
+  matches because it stops rejecting the separator MUST land in its own commit.
 
 **Gates**
 
