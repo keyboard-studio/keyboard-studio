@@ -17,8 +17,8 @@ Corpus-gated tests need `../keyboards` at the CI pin (`KEYBOARDS_CORPUS_SHA` in 
 
 ## Phase 1: Setup
 
-- [ ] **T001** Capture the baseline: golden fixture outputs (`__fixtures__/flagParity/fullSpine.kmn` and the reference keyboard) and rebuild timings (`rebuildPerf.measure`) on an unchanged tree, for FR-030 and FR-032 · `packages/studio/src/lib/` (baseline record under `specs/118-replayed-ir-output/evidence/baseline.md`)
-- [ ] **T002** Confirm `../keyboards` is at `KEYBOARDS_CORPUS_SHA` and that spec 117's explicit-keystroke change and spec 105's phases are their current state, so the blocking edges in Phases 4 and 7 are real · `.github/workflows/ci.yml`
+- [x] **T001** Capture the baseline: golden fixture outputs (`__fixtures__/flagParity/fullSpine.kmn` and the reference keyboard) and rebuild timings (`rebuildPerf.measure`) on an unchanged tree, for FR-030 and FR-032 · `packages/studio/src/lib/` (baseline record under `specs/118-replayed-ir-output/evidence/baseline.md`)
+- [x] **T002** Confirm `../keyboards` is at `KEYBOARDS_CORPUS_SHA` and that spec 117's explicit-keystroke change and spec 105's phases are their current state, so the blocking edges in Phases 4 and 7 are real · `.github/workflows/ci.yml`
 
 **Checkpoint**: baseline recorded; corpus pin confirmed.
 
