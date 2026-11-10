@@ -7,7 +7,7 @@
 
 import type { ContextElement, KeyboardIR, OutputElement, StoreItem } from "@keyboard-studio/contracts";
 
-import { isNamedDeadkeyName } from "@keyboard-studio/contracts";
+import { isNamedDeadkeyName, hasRawCallPrefix } from "@keyboard-studio/contracts";
 
 import { OPAQUE_REASONS, type OpaqueReason } from "./opaque-reasons.js";
 
@@ -261,7 +261,7 @@ export function isHeadClusterSoFar(elements: ContextElement[]): boolean {
     (el) =>
       el.kind === "if" ||
       el.kind === "baselayout" ||
-      (el.kind === "raw" && /^platform\s*\(/i.test(el.text.trim())),
+      (el.kind === "raw" && hasRawCallPrefix(el.text, "platform")),
   );
 }
 

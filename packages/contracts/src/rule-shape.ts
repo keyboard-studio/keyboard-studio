@@ -88,7 +88,7 @@ function isConditionElement(el: RuleElementLike): boolean {
   return (
     el.kind === "if" ||
     el.kind === "baselayout" ||
-    (el.kind === "raw" && /^platform\s*\(/i.test(el.text?.trim() ?? ""))
+    (el.kind === "raw" && hasRawCallPrefix(el.text ?? "", "platform"))
   );
 }
 
@@ -315,3 +315,51 @@ export function withRuleParts(
   if (rule.sourceLine !== undefined) parts.sourceLine = rule.sourceLine;
   return makeRule(parts, group);
 }
+
+// ---------------------------------------------------------------------------
+// Raw call-element classification
+// ---------------------------------------------------------------------------
+
+/**
+ * What a `{kind:"raw"}` element's text says when it is one of the three
+ * layer/platform calls the codec keeps verbatim: `layer('x')`,
+ * `platform('desktop native')` or `set(&layer='x')`. `value` is the unquoted
+ * argument. Anything else is `other`.
+ *
+ * This is the strict, full-text reading: the call must be the whole (trimmed)
+ * text, the argument must be quoted with `'` or `"`, and the name is matched
+ * case-insensitively with no whitespace before the `(` of `layer`/`platform`.
+ */
+export type RawElementClass =
+  | { kind: "layer"; value: string }
+  | { kind: "platform"; value: string }
+  | { kind: "setLayer"; value: string }
+  | { kind: "other" };
+
+const LAYER_CALL_RE = /^layer\(\s*(?:'([^']*)'|"([^"]*)")\s*\)$/i;
+const PLATFORM_CALL_RE = /^platform\(\s*(?:'([^']*)'|"([^"]*)")\s*\)$/i;
+const SET_LAYER_RE = /^set\(\s*&layer\s*=\s*(?:'([^']*)'|"([^"]*)")\s*\)$/i;
+
+export function classifyRawElement(text: string): RawElementClass {
+  const t = text.trim();
+  let m = LAYER_CALL_RE.exec(t);
+  if (m) return { kind: "layer", value: (m[1] ?? m[2]) as string };
+  m = PLATFORM_CALL_RE.exec(t);
+  if (m) return { kind: "platform", value: (m[1] ?? m[2]) as string };
+  m = SET_LAYER_RE.exec(t);
+  if (m) return { kind: "setLayer", value: (m[1] ?? m[2]) as string };
+  return { kind: "other" };
+}
+
+/**
+ * The deliberately looser reading: the trimmed text merely *starts* like a
+ * `platform(` / `layer(` call (whitespace allowed before the `(`), whatever
+ * follows. Used where a malformed call must still be treated as a call — a
+ * guard or directive, not shape — rather than as unclassified text.
+ */
+export function hasRawCallPrefix(text: string, fn: "platform" | "layer"): boolean {
+  return (fn === "platform" ? PLATFORM_PREFIX_RE : LAYER_PREFIX_RE).test(text.trim());
+}
+
+const PLATFORM_PREFIX_RE = /^platform\s*\(/i;
+const LAYER_PREFIX_RE = /^layer\s*\(/i;

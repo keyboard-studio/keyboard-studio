@@ -54,6 +54,7 @@ import type {
   IRRule,
   OutputElement,
 } from "@keyboard-studio/contracts";
+import { assertNever } from "@keyboard-studio/contracts";
 import { isPlusSeparator, ruleKeystrokeLoose } from "@keyboard-studio/contracts";
 import {
   classifyRuleKind,
@@ -188,6 +189,8 @@ function describeGuards(guards: ContextElement[]): string {
           return describeKey(el.name, el.modifiers);
         case "raw":
           return el.text.trim();
+        default:
+          return assertNever(el, "describeGuards");
       }
     }),
   );

@@ -29,6 +29,7 @@ import type {
   OutputElement,
 } from "@keyboard-studio/contracts";
 import {
+  hasRawCallPrefix,
   ruleConditions,
   ruleHasNulContext,
   ruleKeystrokeLoose,
@@ -76,12 +77,12 @@ export function isIndexedContextOutput(el: OutputElement): boolean {
 
 /** Context-side `platform('…')` guard — a platform modifier, not shape. */
 export function isPlatformGuard(el: ContextElement): boolean {
-  return el.kind === "raw" && /^platform\s*\(/i.test(rawText(el));
+  return el.kind === "raw" && hasRawCallPrefix(rawText(el), "platform");
 }
 
 /** Output-side `layer('…')` directive — a touch-layer modifier, not shape. */
 export function isLayerDirective(el: OutputElement): boolean {
-  return el.kind === "raw" && /^layer\s*\(/i.test(rawText(el));
+  return el.kind === "raw" && hasRawCallPrefix(rawText(el), "layer");
 }
 
 /**

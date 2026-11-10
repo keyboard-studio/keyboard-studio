@@ -23,6 +23,7 @@ import {
   rulePreContext,
   ruleLhsKind,
 } from "@keyboard-studio/contracts";
+import { assertNever } from "@keyboard-studio/contracts";
 import type { PlacementCandidate } from "@keyboard-studio/contracts";
 import {
   isMnemonicKeyboard,
@@ -86,6 +87,8 @@ function extractVkey(
         // These can appear as pre-context chars (lookahead) — allow them but do
         // not prevent extraction if we already have a vkey.
         break;
+      default:
+        return assertNever(el, "extractVkey");
     }
   }
   return { vkey: vkeyEl.name, modifiers: vkeyEl.modifiers };

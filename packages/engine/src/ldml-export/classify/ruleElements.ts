@@ -4,7 +4,7 @@
 // know (is the rule lowered, its keystroke targets, what was evaluated away). The
 // lowering never re-decides a status; it reads the plan.
 
-import { deadkeyNameKey, elementAtOffset, ruleLhsKind } from "@keyboard-studio/contracts";
+import { assertNever, deadkeyNameKey, elementAtOffset, ruleLhsKind } from "@keyboard-studio/contracts";
 import type {
   ContextElement,
   IRGroup,
@@ -427,6 +427,8 @@ export function analyseRule(
       }
       case "vkey":
         return reject("6.2", { params: { reason: "vkey-in-context" } });
+      default:
+        return assertNever(el, "context element");
     }
   }
   if (plan.pre.some((e) => e.kind === "any" || e.kind === "notany" || e.kind === "char" || e.kind === "deadkey" || e.kind === "namedDeadkey")) plan.hasContext = true;
@@ -479,6 +481,8 @@ export function analyseRule(
         if (parseLayerCall(el.text) !== null) return reject("3.21");
         return reject("6.2", { params: { reason: "output-raw", element: el.text } });
       }
+      default:
+        return assertNever(el, "output element");
     }
   }
   captures += capOffsets.size;

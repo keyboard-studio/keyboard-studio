@@ -36,7 +36,7 @@
 // (`ContextVariant.precomposedOutput`) and its NFD-normalized echo form
 // without recompiling.
 
-import { makeRule } from '@keyboard-studio/contracts';
+import { makeRule, storeItemText } from '@keyboard-studio/contracts';
 import type {
   ContextElement,
   ContextVariant,
@@ -150,7 +150,7 @@ function targetsIncludeWeb(ir: KeyboardIR): boolean {
   const targets = ir.stores.find((s) => s.isSystem && s.name.toUpperCase() === 'TARGETS');
   if (targets === undefined) return false;
   const text = targets.items
-    .map((item) => (item.kind === 'char' ? item.value : item.kind === 'raw' ? item.text : ' '))
+    .map((item) => storeItemText(item, ' '))
     .join('');
   return text
     .toLowerCase()

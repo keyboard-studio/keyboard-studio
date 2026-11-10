@@ -27,7 +27,7 @@
  */
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
-import { toUPlusSequence } from "@keyboard-studio/contracts";
+import { toUPlusSequence, storeItemText } from "@keyboard-studio/contracts";
 import { ruleContextElements } from "../shared/rule-shape.js";
 
 const MNEMONIC_STORE_NAME = "MNEMONICLAYOUT";
@@ -39,11 +39,7 @@ function storeTextValue(ir: KeyboardIR, systemStoreName: string): string | undef
   );
   if (store === undefined) return undefined;
   return store.items
-    .map((item) => {
-      if (item.kind === "char") return item.value;
-      if (item.kind === "raw") return item.text;
-      return "";
-    })
+    .map((item) => storeItemText(item))
     .join("");
 }
 

@@ -16,7 +16,7 @@
 // character the keyboard's rules can emit.
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
-import { buildProducedSet } from "@keyboard-studio/contracts";
+import { buildProducedSet, storeItemText } from "@keyboard-studio/contracts";
 import type { CriteriaPlacement } from "@keyboard-studio/contracts";
 import {
   checkFailed,
@@ -134,9 +134,7 @@ export function displayMapReference(ir: KeyboardIR): string | undefined {
   for (const store of ir.stores) {
     if (!store.isSystem || store.name.toUpperCase() !== "DISPLAYMAP") continue;
     const value = store.items
-      .map((item) =>
-        item.kind === "char" ? item.value : item.kind === "raw" ? item.text : "",
-      )
+      .map((item) => storeItemText(item))
       .join("")
       .trim();
     if (value !== "") return value;

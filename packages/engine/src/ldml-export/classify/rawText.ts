@@ -6,6 +6,7 @@
 // patterns row 6.2 admits because the codec keeps them as `raw` context elements:
 // the bare token `nul` (row 3.24) and a bracketed key `[MODS K_X]` (row 2.22).
 
+import { classifyRawElement } from "@keyboard-studio/contracts";
 import { OPAQUE_REASONS } from "../../codec/opaque-reasons.js";
 import type { RowId } from "../types.js";
 
@@ -17,25 +18,22 @@ export function parseUseCall(text: string): string | null {
   return m ? (m[1] as string) : null;
 }
 
-function quotedArg(text: string, fn: string): string | null {
-  const m = new RegExp(String.raw`^${fn}\(\s*(?:'([^']*)'|"([^"]*)")\s*\)$`, "i").exec(text.trim());
-  return m ? ((m[1] ?? m[2]) as string) : null;
-}
-
 /** `layer('x')` -> `x`. */
 export function parseLayerCall(text: string): string | null {
-  return quotedArg(text, "layer");
+  const c = classifyRawElement(text);
+  return c.kind === "layer" ? c.value : null;
 }
 
 /** `platform('desktop native')` -> `desktop native`. */
 export function parsePlatformCall(text: string): string | null {
-  return quotedArg(text, "platform");
+  const c = classifyRawElement(text);
+  return c.kind === "platform" ? c.value : null;
 }
 
 /** `set(&layer='x')` -> `x` (spaces around `=` allowed). */
 export function parseSetLayer(text: string): string | null {
-  const m = /^set\(\s*&layer\s*=\s*(?:'([^']*)'|"([^"]*)")\s*\)$/i.exec(text.trim());
-  return m ? ((m[1] ?? m[2]) as string) : null;
+  const c = classifyRawElement(text);
+  return c.kind === "setLayer" ? c.value : null;
 }
 
 /** The bare `nul` token the codec keeps as a context element (row 3.24). */

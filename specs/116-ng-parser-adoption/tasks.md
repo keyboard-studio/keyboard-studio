@@ -272,7 +272,7 @@ members, after hardening every consumer, and the LDML classifier reads them (FR-
 
 ### 6a. Hardening (before any new member exists; research R5c)
 
-- [ ] T048 [P] [US3] Make every non-exhaustive kind switch exhaustive, with explicit cases for every **current** kind and `assertNever` in the default:
+- [x] T048 [P] [US3] Make every non-exhaustive kind switch exhaustive, with explicit cases for every **current** kind and `assertNever` in the default:
   - `packages/engine/src/kmAssist/group.ts:168`
   - `packages/contracts/src/ir/outputRepertoire.ts:216`
   - `packages/engine/src/ldml-export/classify/keystrokes.ts:105`
@@ -282,7 +282,7 @@ members, after hardening every consumer, and the LDML classifier reads them (FR-
   - `packages/studio/src/lib/irToCarveNodes.ts:269,840,1460`
 
   No behaviour change; tests unchanged.
-- [ ] T049 [P] [US3] Add an exhaustive `storeItemText(item: StoreItem): string` to `packages/contracts/src/ir/` (new file `storeItemText.ts`, exported from the contracts index). Replace every `char ? value : raw ? text : ""` ternary with it:
+- [x] T049 [P] [US3] Add an exhaustive `storeItemText(item: StoreItem): string` to `packages/contracts/src/ir/` (new file `storeItemText.ts`, exported from the contracts index). Replace every `char ? value : raw ? text : ""` ternary with it:
   - `packages/engine/src/caps/casedKeysStore.ts:16`
   - `packages/keyboard-lint/src/checks/criteria/check-cased-keys.ts:35`, `check-produced-set.ts:138`, `check-bitmap.ts:31`
   - `packages/engine/src/pattern-apply/context-variants.ts:151`
@@ -294,8 +294,8 @@ members, after hardening every consumer, and the LDML classifier reads them (FR-
   - `packages/contracts/src/ir/outputRepertoire.ts:124`
 
   No behaviour change.
-- [ ] T050 [US3] Add `classifyRawElement(text: string)` to `packages/contracts/src/rule-shape.ts`. It returns `{kind:"layer", value} | {kind:"platform", value} | {kind:"setLayer", value} | {kind:"other"}`, unifying the regexes in `engine/src/kmAssist/classify.ts:72–96`, `engine/src/ldml-export/classify/rawText.ts:26–38`, `ldml-export/classify/layerRules.ts:139,186`, `ldml-export/classify/ruleElements.ts` (5 sites) and `studio/src/lib/irToCarveNodes.ts:860–870` (`PLATFORM_GUARD_RE`). Route all those sites through it. Tests unchanged.
-- [ ] T051 [US3] Commit 6a as `refactor: harden IR kind consumers before new members (spec 116 T048-T050)` after `pnpm lint && pnpm typecheck && pnpm -r test`. Push.
+- [x] T050 [US3] Add `classifyRawElement(text: string)` to `packages/contracts/src/rule-shape.ts`. It returns `{kind:"layer", value} | {kind:"platform", value} | {kind:"setLayer", value} | {kind:"other"}`, unifying the regexes in `engine/src/kmAssist/classify.ts:72–96`, `engine/src/ldml-export/classify/rawText.ts:26–38`, `ldml-export/classify/layerRules.ts:139,186`, `ldml-export/classify/ruleElements.ts` (5 sites) and `studio/src/lib/irToCarveNodes.ts:860–870` (`PLATFORM_GUARD_RE`). Route all those sites through it. Tests unchanged.
+- [x] T051 [US3] Commit 6a as `refactor: harden IR kind consumers before new members (spec 116 T048-T050)` after `pnpm lint && pnpm typecheck && pnpm -r test`. Push.
 
 ### 6b. New members
 

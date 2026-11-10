@@ -12,6 +12,7 @@ import type {
   StoreItem,
 } from '@keyboard-studio/contracts';
 import {
+  assertNever,
   buildProducedSet,
   elementAtOffset,
   resolveEffectiveScript,
@@ -307,6 +308,8 @@ export function contextToKeys(context: ContextElement[]): string[] {
         break;
       case 'raw':
         break;
+      default:
+        return assertNever(el, 'contextToKeys');
     }
   }
   return keys;
@@ -862,11 +865,16 @@ function precedingContextLabel(elements: ContextElement[]): string {
         // Skip structural KMN syntax tokens ('+' separator) — they're codec artifacts, not meaningful context
         if (el.text.trim() !== '+') parts.push('specific input');
         break;
+      default:
+        return assertNever(el, 'precedingContextLabel');
     }
   }
   return parts.join(' + ');
 }
 
+// Deliberately not `classifyRawElement`: this reads a platform guard that merely
+// *starts* the text (no closing `$`), single-quoted, with a `\w+` name. That is
+// narrower on the argument and looser on the tail than the strict whole-text call.
 const PLATFORM_GUARD_RE = /^\s*platform\s*\(\s*'(\w+)'\s*\)/i;
 
 function extractPlatformGuard(elements: ContextElement[]): { guard: string | null; filtered: ContextElement[] } {
@@ -1505,8 +1513,14 @@ function buildCondition(preceding: readonly ContextElement[], ir: KeyboardIR): C
         return { kind: 'text', text: `only on the '${el.value}' keyboard layout` };
       case 'if':
         return { kind: 'text', text: `only when ${el.store} is set to '${el.value}'` };
-      default:
+      case 'vkey':
+      case 'deadkey':
+      case 'namedDeadkey':
+      case 'index':
+      case 'raw':
         return { kind: 'unrenderable' };
+      default:
+        return assertNever(el, 'buildCondition');
     }
   }
 

@@ -40,6 +40,7 @@ import type {
   RemapPosture,
   ScriptClass,
 } from "@keyboard-studio/contracts";
+import { assertNever } from "@keyboard-studio/contracts";
 import { ruleContextElements } from "../shared/rule-shape.js";
 import { scriptOf } from "../facets/generated/scriptLookup.js";
 
@@ -65,6 +66,7 @@ function firstProducedCodepoint(
         break;
       }
       case "deadkey":
+      case "namedDeadkey":
       case "beep":
         // Produce no character themselves; the produced character (if any)
         // comes from a later element.
@@ -92,6 +94,8 @@ function firstProducedCodepoint(
       case "useGroup":
       case "raw":
         return undefined;
+      default:
+        return assertNever(el, "firstProducedCodepoint");
     }
   }
   return undefined;

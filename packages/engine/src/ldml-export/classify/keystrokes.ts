@@ -9,6 +9,7 @@ import {
   ruleKeystroke,
   rulePreContext,
 } from "@keyboard-studio/contracts";
+import { assertNever } from "@keyboard-studio/contracts";
 import type { ContextElement, IRRule, IRStore, StoreItem } from "@keyboard-studio/contracts";
 import { FORM_ONLY_KEYS, FORM_ROWS, type LdmlForm } from "../lower/positions.js";
 import type { LdmlBaseLayout, RowId } from "../types.js";
@@ -120,8 +121,16 @@ function toKeystroke(el: ContextElement): Keystroke {
       if (b) return { kind: "rawKey", vkey: b.vkey, mods: analyseModifiers(b.modifiers) };
       return { kind: "opaque", text: el.text };
     }
-    default:
+    case "notany":
+    case "deadkey":
+    case "namedDeadkey":
+    case "context":
+    case "index":
+    case "baselayout":
+    case "if":
       return { kind: "opaque", text: el.kind };
+    default:
+      return assertNever(el, "toKeystroke");
   }
 }
 

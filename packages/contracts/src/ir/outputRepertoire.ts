@@ -23,6 +23,7 @@ import type {
   StoreItem,
   TouchKeyIR,
 } from "../keyboard-ir.js";
+import { assertNever } from "../assert-never.js";
 import type { OutputRepertoire } from "../toleranceReport.js";
 import {
   ruleConditions,
@@ -258,8 +259,15 @@ function expandRule(
           }
           break;
         }
+        case "deadkey":
+        case "namedDeadkey":
+        case "beep":
+        case "nul":
+        case "useGroup":
+        case "raw":
+          break; // no text
         default:
-          break; // deadkey, beep, nul, useGroup, raw: no text
+          assertNever(o, "output element");
       }
     }
 
