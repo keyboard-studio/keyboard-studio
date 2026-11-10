@@ -285,8 +285,26 @@
     ],
     "workingCopyMutations": [],
     "decisionMutations": [],
-    "navigateTo": [
-      "output"
-    ]
+    "navigateTo": []
+  },
+  {
+    "stepId": "trial",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "decisionMutations": [],
+    "navigateTo": []
+  },
+  {
+    "stepId": "publish",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [],
+    "decisionMutations": [],
+    "navigateTo": []
   }
 ]

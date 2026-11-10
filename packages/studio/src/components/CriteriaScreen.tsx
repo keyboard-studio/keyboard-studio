@@ -1,7 +1,7 @@
 // CriteriaScreen — the authored criteria route's host (spec 084, T4.2).
 //
 // Owns exactly one artifact pipeline instance while this route is
-// mounted (the OutputScreen precedent in usePreviewArtifact's header:
+// mounted (the Trial/Publish precedent in usePreviewArtifact's header:
 // each screen runs its own pipeline, deliberately), and assembles
 // everything the pure criteria page needs: the shared authored result
 // (useAuthoredCriteria over this screen's own stage) and the criteria

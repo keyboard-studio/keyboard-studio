@@ -10,8 +10,10 @@
 //                         no path from this tab into the working copy
 //                         (spec 057 US2). The route token stays `preview`
 //                         while the tab is labelled "Compare".
-//   #output             — OutputScreen: "ship it" — Download .zip +
-//                         SignUpPanel (no interactive OSK)
+//   #output             — OutputRedirect (spec 113): the Output tab lands
+//                         in the Trial/Publish tail (Trial normally,
+//                         Publish when the walk is done, Start with no
+//                         project). The Output screen itself is retired.
 //   #criteria           — CriteriaScreen: the criteria compliance page
 //                         (spec 084) — every catalog criterion judged
 //                         against the keyboard Output would ship.
@@ -106,7 +108,7 @@ import { FlowMapView } from "./dashboard/DashboardView.tsx";
 import { runCompleteness } from "./dashboard/completeness.ts";
 import { CompareScreen } from "./components/CompareScreen.tsx";
 import { StudioFooter } from "./components/StudioFooter.tsx";
-import { OutputScreen } from "./components/OutputScreen.tsx";
+import { OutputRedirect } from "./components/OutputRedirect.tsx";
 import { CriteriaScreen } from "./components/CriteriaScreen.tsx";
 import { AfterApplySuggestions } from "./components/AfterApplySuggestions.tsx";
 import { useLingui } from "@lingui/react/macro";
@@ -1821,10 +1823,10 @@ function StudioShellContent() {
 
   // ---------------------------------------------------------------------------
   // Output nav-link UX signal (P0 fix) — NOT the authoritative enforcement
-  // (that is OutputScreen's canDownload gate via usePreviewArtifact, which
+  // (that is the Publish step's canDownload gate via usePreviewArtifact, which
   // still applies regardless of how #output was reached). This is purely so
   // the block is visible on the tab itself before the click. Same shared hook
-  // (hooks/useInventoryCoverageGate.ts) as StepHost/PhaseFGate/OutputScreen —
+  // (hooks/useInventoryCoverageGate.ts) as StepHost/PhaseFGate/PublishStep —
   // do not re-derive the desktop-always/touch-only-if-applicable booleans
   // here. IMPORTANT (mechanism-gallery-progression invariant): this is the
   // IMPLEMENTED-ONLY gate — a mark-for-later-review character is still
@@ -1851,7 +1853,7 @@ function StudioShellContent() {
     (s) => s.backToUnfinishedGallery,
   );
   // A BACK action (backToUnfinishedGallery), not the forward-push `advance` —
-  // mirrors OutputScreen.tsx's handleGoToGallery / PhaseFGate.tsx's
+  // mirrors OutputGateBanners' handleGoToGallery / PhaseFGate.tsx's
   // handleGoBack exactly (see backToUnfinishedGallery's own docstring for the
   // P0 history-corruption regression a forward-push here would reproduce).
   // Also switches routes to #survey — unlike those two call sites, this
@@ -2005,7 +2007,7 @@ function StudioShellContent() {
       content = <CompareScreen />;
       break;
     case "output":
-      content = <OutputScreen />;
+      content = <OutputRedirect />;
       break;
     case "flowmap":
       content = (

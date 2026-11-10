@@ -36,7 +36,7 @@ export interface NavBarProps {
   active: RouteId;
   /**
    * P0 fix UX signal (not the authoritative enforcement — that lives in
-   * OutputScreen/usePreviewArtifact's canDownload gate, which is reachable
+   * PublishStep/usePreviewArtifact's canDownload gate, which is reachable
    * regardless of how #output was navigated to). Dims the Output tab and
    * marks it aria-disabled with an explanatory title so the block is obvious
    * BEFORE the click, not just after landing on a disabled download button.

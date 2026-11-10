@@ -152,6 +152,12 @@ export interface PublishManagedPROptions {
   importAttribution?: string;
   /** Backend proxy URL (SPA reads from config; not hard-coded). */
   proxyEndpoint: string;
+  /**
+   * Proof the submitter is signed in, sent as `Authorization: Bearer`: the
+   * Keyboard Studio session token from Google sign-in, or a GitHub user
+   * token. The proxy answers 401 without one.
+   */
+  authToken?: string;
 }
 
 /** Reuses the same success shape as the Option A path. */

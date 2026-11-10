@@ -130,6 +130,8 @@ export type ActiveStepId =
   | "help"
   | "html"
   | "icon"
+  | "trial"
+  | "publish"
   | "done"
   | "unsupported";
 

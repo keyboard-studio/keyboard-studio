@@ -8,7 +8,7 @@
  *         -> project-name step
  *           -> prefill confirmation
  *             -> Phase B (characters, build-list method)
- *               -> navigate to Output tab
+ *               -> navigate to Publish step
  *                 -> wait for WASM compile (canDownload)
  *                   -> download .zip
  *                     -> assert .kmn + .kps + .kvks + welcome.htm present and non-empty
@@ -41,7 +41,8 @@ import {
   drivePunctuationStep,
   driveMarksSeries,
   driveMechanismsGallery,
-  navigateToOutput,
+  navigateToPublish,
+  navigateToTrial,
   triggerDownload,
   seedReturningVisitor,
   switchTab,
@@ -223,7 +224,8 @@ async function completePhaseB(page: Page, fx: WalkFixture = FIXTURE): Promise<vo
 
 /**
  * Drive Carve + Mechanisms to completion so the Output nav gate
- * (useInventoryCoverageGate) is satisfied before navigateToOutput is called.
+ * (useInventoryCoverageGate) is satisfied before navigateToPublish is called.
+ * (The gate is the Trial step's Continue gate too — spec 113.)
  *
  * Most fixtures in this file add a character the base ALREADY produces (é on
  * basic_kbdfr, ω on basic_kbdhe, etc.) — before the spec 071 marks
@@ -365,14 +367,14 @@ test.describe("Track 1 (copy-edit) E2E", () => {
 
     await finishGalleryWork(page);
 
-    // Navigate to Output tab and trigger the download.
-    await navigateToOutput(page);
+    // Navigate to Publish and trigger the download.
+    await navigateToPublish(page);
 
-    // Accessibility gate (spec 056 FR-003): scan the output screen.
-    // 1.4.3 — the Output screen's documented pre-existing contrast debt
+    // Accessibility gate (spec 056 FR-003): scan the publish step.
+    // 1.4.3 — the Publish step's documented pre-existing contrast debt
     // (OskModeToggle, SignUpPanel); see helpers/contrastDebt.ts. The OSK
     // iframe's own debt is now fixed at the source.
-    await expectNoSeriousAxeViolations(page, "output screen (copy-edit walk)", {
+    await expectNoSeriousAxeViolations(page, "publish step (copy-edit walk)", {
       exclude: OUTPUT_SCREEN_DEBT,
     });
     const download = await triggerDownload(page);
@@ -421,7 +423,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
   test("base keyboard compiles cleanly via kmcmplib WASM oracle (open-base mode)", async ({
     page,
   }) => {
-    // Walk the full wizard and reach the Output screen.
+    // Walk the full wizard and reach the Publish step.
     await fillIdentityLite(page);
     await pickStartKeyboard(page, FIXTURE.startKeyboardId);
     await confirmCopyTrack(page);
@@ -430,7 +432,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     await confirmPrefill(page);
     await completePhaseB(page);
     await finishGalleryWork(page);
-    await navigateToOutput(page);
+    await navigateToPublish(page);
 
     // The download button becoming enabled IS the compile-clean assertion for
     // the BASE keyboard (basic_kbdfr) in open-base mode:
@@ -486,8 +488,8 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     await confirmPrefill(page);
     await completePhaseB(page);
     await finishGalleryWork(page);
-    await navigateToOutput(page);
-    // spec 080 FR-017: the documentation checklist is present on Output — six
+    await navigateToPublish(page);
+    // spec 080 FR-017: the documentation checklist is present on Publish — six
     // rows, informational (the download below still proceeds with rows on
     // placeholder, FR-018).
     const checklist = page.getByTestId("documentation-checklist");
@@ -571,8 +573,25 @@ test.describe("Track 1 (copy-edit) E2E", () => {
 // kmcmplib compile (see triggerDownload + the base-compile note above).
 // ---------------------------------------------------------------------------
 
-/** Walk identity → base → attribution → project-name → prefill → Phase B → Output tab. */
-async function walkToOutput(page: Page, fx: WalkFixture): Promise<void> {
+/** Walk identity → base → attribution → project-name → prefill → Phase B → Trial step. */
+async function walkToTrial(page: Page, fx: WalkFixture): Promise<void> {
+  await fillIdentityLite(page, fx);
+  await pickStartKeyboardCopyEdit(page, fx);
+  await confirmCopyTrack(page);
+  await driveAttributionStep(page);
+  await acceptProjectName(page);
+  await confirmPrefill(page);
+
+  // Same mid-walk tab round trip as walkToPublish (spec 057 FR-072).
+  await switchTab(page, "preview");
+  await switchTab(page, "survey");
+  await completePhaseB(page, fx);
+  await finishGalleryWork(page, fx);
+  await navigateToTrial(page);
+}
+
+/** Walk identity → base → attribution → project-name → prefill → Phase B → Publish step. */
+async function walkToPublish(page: Page, fx: WalkFixture): Promise<void> {
   await fillIdentityLite(page, fx);
   await pickStartKeyboardCopyEdit(page, fx);
   await confirmCopyTrack(page);
@@ -589,11 +608,11 @@ async function walkToOutput(page: Page, fx: WalkFixture): Promise<void> {
   await switchTab(page, "survey");
   await completePhaseB(page, fx);
   await finishGalleryWork(page, fx);
-  await navigateToOutput(page);
+  await navigateToPublish(page);
 }
 
 async function walkToDownload(page: Page, fx: WalkFixture): Promise<Download> {
-  await walkToOutput(page, fx);
+  await walkToPublish(page, fx);
   return triggerDownload(page);
 }
 
@@ -647,15 +666,34 @@ test.describe("spec 034 proven-script walks + publish paths", () => {
     });
   }
 
-  // --- T016: the output screen presents BOTH publish paths, and the PR path
+  // --- T016: the publish step presents BOTH publish paths, and the PR path
   // degrades honestly (never fakes success) when the OAuth/managed-PR backend is
   // unreachable, while the ZIP path stays fully functional. NB: touch-STAGE
   // reachability is pinned at the spine level by the advance/manifest unit tests
   // (SR-3, advance.test.ts) — 034 owns reachability + wiring; touch DEPTH is 035.
-  test("T016 [US2]: output screen exposes both publish paths; PR degrades honestly, ZIP still works", async ({
+  test("T016 [US2]: publish step exposes both publish paths; PR degrades honestly, ZIP still works", async ({
     page,
   }) => {
-    await walkToOutput(page, FIXTURE);
+    // Submitting needs a sign-in the server can check. Seed a Google identity
+    // carrying a session token (its validity is the backend's concern, and
+    // there is no backend in e2e), so the submit button is reachable.
+    await page.addInitScript(() => {
+      sessionStorage.setItem(
+        "ks.google.identity",
+        JSON.stringify({
+          sub: "e2e",
+          email: "e2e@example.com",
+          emailVerified: true,
+          name: "E2E Author",
+          picture: "https://example.com/p.png",
+          sessionToken: "kss1.e2e.sig",
+        }),
+      );
+    });
+    await walkToPublish(page, FIXTURE);
+
+    // The testing-phase notice names the testing copy and the coming Keyman route.
+    await expect(page.getByTestId("submit-testing-phase-notice")).toContainText(/coming soon/i);
 
     // PP-1: ZIP download affordance is present and (once compiled) enabled.
     const downloadBtn = page.getByTestId("emit-download");
@@ -675,10 +713,10 @@ test.describe("spec 034 proven-script walks + publish paths", () => {
     await page.getByRole("checkbox").check();
     await page.getByRole("button", { name: /submit keyboard to community repository/i }).click();
 
-    // An error alert appears; the "your submission is being reviewed" success
+    // An error alert appears; the "your test submission was received" success
     // panel must NOT appear.
     await expect(page.getByRole("alert").first()).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(/your submission is being reviewed/i)).toHaveCount(0);
+    await expect(page.getByText(/your test submission was received/i)).toHaveCount(0);
 
     // PP-1 (independence): the ZIP path is still functional after a failed PR submit.
     const [download] = await Promise.all([
@@ -723,7 +761,7 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     page,
   }) => {
     // Advance several stages (identity -> base -> track -> project_name ->
-    // prefill -> Phase B), mirroring the proven walkToOutput helper up to
+    // prefill -> Phase B), mirroring the proven walkToPublish helper up to
     // (not including) the Output-tab hop.
     await fillIdentityLite(page);
     await pickStartKeyboard(page, FIXTURE.startKeyboardId);
@@ -872,10 +910,11 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
 // ---------------------------------------------------------------------------
 // spec 094 (T042) — test-and-revise loop.
 //
-// Build 1 → open Rules (a full-layout step) from Output's section list → Back
-// to testing (the hash returns to #output without passing any other step) →
-// build 2 → reload, and both builds are still listed. Build 2 is made with no
-// survey step visited after it, so the reload proves Output itself autosaves.
+// Build 1 → open Rules (a full-layout step) from Trial's section list → Back
+// to testing (the hash returns to #survey on the Trial step, without passing
+// any other step) → build 2 → reload, and both builds are still listed. Build 2
+// is made with no survey step visited after it, so the reload proves Trial
+// itself autosaves.
 // The walk accepts Rules as it was, and the section list still offers it
 // ("Kept as it was"). The visit is a round trip, not an edit; the
 // edit-and-keep and Discard paths are covered by the golden walks
@@ -890,14 +929,14 @@ async function makeTestBuild(page: Page): Promise<Download> {
   return download;
 }
 
-test.describe("spec 094: test builds and the revise-from-Output loop", () => {
+test.describe("spec 094: test builds and the revise-from-Trial loop", () => {
   test.beforeEach(async ({ page }) => {
     await seedReturningVisitor(page);
     await page.goto("/");
   });
 
   test("T042: build 1, revise Rules and come back, build 2, both survive a reload", async ({ page }) => {
-    await walkToOutput(page, FIXTURE);
+    await walkToTrial(page, FIXTURE);
 
     const first = await makeTestBuild(page);
     expect(first.suggestedFilename()).toMatch(/-test-build-1\.kmp$/);
@@ -907,14 +946,14 @@ test.describe("spec 094: test builds and the revise-from-Output loop", () => {
     const toggle = page.getByTestId("output-section-list-toggle");
     if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
     await page.getByTestId("output-section-rules").click();
-    // Opened from Output, the footer offers "Back to testing" in place of Continue.
+    // Opened from Trial, the footer offers "Back to testing" in place of Continue.
     await expect(page.getByTestId("step-revision-back-to-testing")).toBeVisible({ timeout: 30_000 });
-    expect(new URL(page.url()).hash).not.toBe("#output");
+    expect(new URL(page.url()).hash).toBe("#survey");
 
-    // Full-layout step, Output origin: the footer offers "Back to testing".
+    // Full-layout step, Trial origin: the footer offers "Back to testing".
     await page.getByTestId("step-revision-back-to-testing").click();
-    await page.waitForSelector('[data-testid="output-screen-root"]', { timeout: 15_000 });
-    expect(new URL(page.url()).hash).toBe("#output");
+    await page.waitForSelector('[data-testid="trial-step-root"]', { timeout: 15_000 });
+    expect(new URL(page.url()).hash).toBe("#survey");
 
     const second = await makeTestBuild(page);
     expect(second.suggestedFilename()).toMatch(/-test-build-2\.kmp$/);
@@ -923,7 +962,7 @@ test.describe("spec 094: test builds and the revise-from-Output loop", () => {
     // Let the 500 ms autosave commit the testing record, then reload.
     await page.waitForTimeout(1_500);
     await page.reload();
-    await page.waitForSelector('[data-testid="output-screen-root"]', { timeout: 30_000 });
+    await page.waitForSelector('[data-testid="trial-step-root"]', { timeout: 30_000 });
     await expect(page.getByTestId("test-build-list").locator("li")).toHaveCount(2, { timeout: 30_000 });
   });
 });

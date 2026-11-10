@@ -74,12 +74,12 @@ describe("TesterReports", () => {
     expect(useTestingStore.getState().reports[0]).not.toHaveProperty("sectionId");
   });
 
-  it("a report naming a section opens it with the return to Output (FR-013)", () => {
+  it("a report naming a section opens it with the return to Trial (FR-013)", () => {
     render(<TesterReports />);
     addReport("Rule fires twice", "rules");
     const report = useTestingStore.getState().reports[0]!;
     fireEvent.click(screen.getByTestId(`report-open-${report.reportId}`));
-    expect(jumpToLocation).toHaveBeenCalledWith({ route: "survey", step: "rules" }, { returnTo: { route: "output" } });
+    expect(jumpToLocation).toHaveBeenCalledWith({ route: "survey", step: "rules" }, { returnTo: { route: "survey", step: "trial" } });
   });
 
   it("states the reason in a polite status region when the jump is refused", () => {

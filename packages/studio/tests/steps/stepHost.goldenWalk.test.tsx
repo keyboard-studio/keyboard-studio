@@ -223,12 +223,60 @@ vi.mock("../../src/editors/assignLoop/IconEditor.tsx", async () => {
     },
   };
 });
+vi.mock("../../src/editors/assignLoop/TrialStep.tsx", async () => {
+  const { usePublishStepNav } = await import("../../src/hooks/usePublishStepNav.ts");
+  return {
+    TrialStep: ({
+      onComplete,
+      onBack,
+    }: {
+      onComplete: (result: { buildsAtCompletion: number }) => void;
+      onBack?: () => void;
+    }) => {
+      usePublishStepNav({
+        ...(onBack !== undefined
+          ? { back: { label: "trial-back", onClick: onBack, testId: "trial-back" } }
+          : {}),
+        forward: {
+          label: "trial-continue",
+          onClick: () => onComplete({ buildsAtCompletion: 0 }),
+          testId: "trial-continue",
+        },
+      });
+      return <div data-testid="stage-trial" />;
+    },
+  };
+});
+vi.mock("../../src/editors/assignLoop/PublishStep.tsx", async () => {
+  const { usePublishStepNav } = await import("../../src/hooks/usePublishStepNav.ts");
+  return {
+    PublishStep: ({
+      onComplete,
+      onBack,
+    }: {
+      onComplete: (result: { submitted: boolean }) => void;
+      onBack?: () => void;
+    }) => {
+      usePublishStepNav({
+        ...(onBack !== undefined
+          ? { back: { label: "publish-back", onClick: onBack, testId: "publish-back" } }
+          : {}),
+        forward: {
+          label: "publish-finish",
+          onClick: () => onComplete({ submitted: false }),
+          testId: "publish-finish",
+        },
+      });
+      return <div data-testid="stage-publish" />;
+    },
+  };
+});
 vi.mock("../../src/components/UnsupportedScriptStub.tsx", () =>
   import("../../src/test/studioShellMocks/UnsupportedScriptStub.tsx"),
 );
 vi.mock("../../src/components/OSKFrame.tsx", () => import("../../src/test/studioShellMocks/OSKFrame.tsx"));
 vi.mock("../../src/components/OskModeToggle.tsx", () => import("../../src/test/studioShellMocks/OskModeToggle.tsx"));
-vi.mock("../../src/components/OutputScreen.tsx", () => import("../../src/test/studioShellMocks/OutputScreen.tsx"));
+vi.mock("../../src/components/OutputRedirect.tsx", () => import("../../src/test/studioShellMocks/OutputRedirect.tsx"));
 vi.mock("../../src/dashboard/DashboardView.tsx", () => import("../../src/test/studioShellMocks/DashboardView.tsx"));
 vi.mock("../../src/hooks/useKeyboardArtifact.ts", () =>
   import("../../src/test/studioShellMocks/idleKeyboardArtifact.ts"),
@@ -629,6 +677,8 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "help", testId: "survey-advance", async: true },
     { stepId: "html", testId: "html-continue", async: true },
     { stepId: "icon", testId: "icon-continue", async: true },
+    { stepId: "trial", testId: "trial-continue", async: true },
+    { stepId: "publish", testId: "publish-finish", async: true },
   ]);
 }
 

@@ -879,6 +879,22 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           break;
         }
 
+        case "trial": {
+          // Trial — the journey replay makes no test builds (building one
+          // is the headless author's job, stepDrivers/trial.ts); the step
+          // completes with the count at completion, zero here.
+          result = { buildsAtCompletion: 0 };
+          break;
+        }
+
+        case "publish": {
+          // Publish — the journey replay never submits a managed PR
+          // (a real network submission to the author's GitHub account);
+          // the step completes unsubmitted.
+          result = { submitted: false };
+          break;
+        }
+
         case "help": {
           const answers = answerMapFromGroup(group, "help");
           const walked = walkFlowFromAnswers(STEP_FLOW_IDS["help"]!, surveyContext, answers);

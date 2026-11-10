@@ -70,6 +70,12 @@ export interface UseGoogleAuthResult {
   status: GoogleAuthStatus;
   /** The stored Google identity session, or null. */
   identity: GoogleIdentitySession | null;
+  /**
+   * Keyboard Studio session token from sign-in: the submit endpoint's proof
+   * that this Google user is signed in. Null when absent (signed out, or the
+   * backend has no SESSION_SIGNING_KEY).
+   */
+  sessionToken: string | null;
   /** Human-readable error, or null. */
   error: string | null;
   /** Begin the Google OAuth PKCE flow — redirects the tab to Google. */
@@ -135,6 +141,7 @@ export function useGoogleAuth(): UseGoogleAuthResult {
   return {
     status,
     identity,
+    sessionToken: storedIdentity?.sessionToken ?? null,
     error,
     connect,
     disconnect,

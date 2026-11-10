@@ -44,6 +44,7 @@ import {
   driveMechanismsGallery,
   driveTouchGallery,
   driveHelpPhase,
+  goToPublishFromDone,
   triggerDownload,
 } from "./helpers/surveyFlow";
 
@@ -114,7 +115,7 @@ test("spec 090 SC-003: full walk leaves exactly one live log entry per decision"
   await driveMechanismsGallery(page);
   await driveTouchGallery(page);
   await driveHelpPhase(page, "Welcome to the keyboard.", "Press a key to start.");
-  await page.waitForURL(/#output$/, { timeout: 30_000 });
+  await goToPublishFromDone(page);
 
   const download = await triggerDownload(page);
   const zipPath = await download.path();

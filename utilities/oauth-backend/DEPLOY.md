@@ -108,6 +108,15 @@ Other:
   deploy — the presence of both creds is the gate. Register the client under
   Google Cloud → APIs & Services → Credentials → OAuth client ID (Web), with
   Authorized redirect URI `https://<prod-domain>/oauth/google/callback`.
+- `SESSION_SIGNING_KEY` — **needed for Google users to submit.**
+  `POST /submit/managed-pr` requires a sign-in (`Authorization: Bearer ...`):
+  a GitHub user token, checked against GitHub's `/user`, or a Keyboard Studio
+  session token that `/oauth/google/exchange` issues to Google users (HMAC-SHA256,
+  12-hour lifetime). This key signs and checks those tokens. Unset → the Google
+  exchange issues no token, so Google users get `401 sign_in_required` when they
+  submit; GitHub users are unaffected. Use a long random value
+  (`openssl rand -base64 48`); rotating it signs out every Google user's submit
+  token. Never logged.
 
 SPA (Vite build-time env):
 - `VITE_GITHUB_CLIENT_ID` = **GitHub App** client id (public — safe in the
