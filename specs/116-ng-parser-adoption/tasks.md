@@ -215,7 +215,7 @@ splitter, an offset accessor that matches kmcmplib, and a lint guard (FR-032 to 
   - `pnpm --filter @keyboard-studio/engine exec vitest run src/codec`, where every existing test passes unchanged except where an allow-listed class applies;
   - the engine corpus suite;
   - `pnpm --filter @keyboard-studio/studio build`, which proves the parser runs in the browser bundle.
-- [ ] T041 [US1] Gate:
+- [x] T041 [US1] Gate:
   1. `pnpm lint` (including depcruise `codec-ng-internal`), `pnpm typecheck` and `pnpm -r test`, plus the corpus suites.
   2. Tick T024–T041 and commit as `feat(engine): read .kmn with the vendored Keyman parser front end (spec 116 T024-T041)`, with allow-list counts and timing in the message.
   3. Push explicitly, after checking the upstream.

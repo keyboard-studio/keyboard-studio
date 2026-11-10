@@ -256,6 +256,14 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-10T12:27:46.160Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T14:10:17.133Z"
     }
   ],
   "decisions": [
@@ -264,7 +272,7 @@
     }
   ],
   "unattended": true,
-  "currentTask": "T030",
+  "currentTask": "T041",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -525,6 +533,13 @@
         "packages/engine/src/codec/ng/lexer-equivalence.corpus.test.ts",
         "packages/engine/src/codec/ng/lexer-reference.testkit.ts",
         "packages/engine/src/codec/ng/PROVENANCE.md"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Gate green: lint, typecheck, all package tests",
+      "files": [
+        "specs/116-ng-parser-adoption/tasks.md"
       ]
     }
   },
