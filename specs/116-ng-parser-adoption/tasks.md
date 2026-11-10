@@ -353,17 +353,17 @@ and the importer policy (FR-027 to FR-029b, SC-007, SC-010).
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T065 [P] Update the docs:
+- [x] T065 [P] Update the docs:
   - `docs/architecture.md`, codec section: the reader is the vendored Keyman front end plus lowering; comments go through `onTrivia`; per-line recovery; the reason catalogue.
   - `docs/packages.md`: `engine/src/codec/ng/` is vendored, see `PROVENANCE.md`.
   - `docs/tooling.md`: the new corpus suites, and `scripts/vendor-ng-parser.mjs`.
 
   Keep `README.md` untouched unless it names the reader.
-- [ ] T066 [P] Add a CHANGELOG entry in `CHANGELOG.md` under Unreleased: new reader, comment fidelity, typed IR members, capability table, rule-shape API.
-- [ ] T067 Ask km-testing for its pre-PR test-delta audit over `git diff origin/main -- '*.test.*'`. Prune scratch or task-scoped tests, keeping the equivalence, comparison and regression, timing, lexer-equivalence and capability suites.
-- [ ] T068 Run `node utilities/spec-trace check`, and acknowledge the spec 116 and spec 108 mapping-contract units changed by this work (`node utilities/spec-trace acknowledge …`).
-- [ ] T069 Run the whole-feature gate from [quickstart.md](quickstart.md): `pnpm lint && pnpm typecheck && pnpm -r test`, plus the engine and studio corpus suites. Record the results in `specs/116-ng-parser-adoption/evidence/final-gate.md`.
-- [ ] T070 Prepare the follow-on spec handoff, but don't create it. Check `gh pr list --state open --json number,title,headRefName` and `ls specs` for the next free number. Write `specs/116-ng-parser-adoption/evidence/follow-on-handoff.md`, which:
+- [x] T066 [P] Add a CHANGELOG entry in `CHANGELOG.md` under Unreleased: new reader, comment fidelity, typed IR members, capability table, rule-shape API.
+- [x] T067 Ask km-testing for its pre-PR test-delta audit over `git diff origin/main -- '*.test.*'`. Prune scratch or task-scoped tests, keeping the equivalence, comparison and regression, timing, lexer-equivalence and capability suites.
+- [x] T068 Run `node utilities/spec-trace check`, and acknowledge the spec 116 and spec 108 mapping-contract units changed by this work (`node utilities/spec-trace acknowledge …`).
+- [x] T069 Run the whole-feature gate from [quickstart.md](quickstart.md): `pnpm lint && pnpm typecheck && pnpm -r test`, plus the engine and studio corpus suites. Record the results in `specs/116-ng-parser-adoption/evidence/final-gate.md`.
+- [x] T070 Prepare the follow-on spec handoff, but don't create it. Check `gh pr list --state open --json number,title,headRefName` and `ls specs` for the next free number. Write `specs/116-ng-parser-adoption/evidence/follow-on-handoff.md`, which:
   - names that number;
   - copies FR-040, FR-041 and FR-042 (the B3 → B1 → B2 order, the shapes, the gates: joint session, contracts major version bump, the draft-envelope v3 re-parse of `startIr`, rule-level zod schemas, offsets as written, the spec 103 revision request);
   - links research R5.

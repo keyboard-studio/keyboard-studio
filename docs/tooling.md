@@ -244,6 +244,28 @@ on every PR against one known corpus. It also sets `KEYBOARDS_REPO` to that path
 postbuild and dev server. When the fork moves, bump the pin deliberately and re-run the
 corpus-gated tests locally against the new commit first.
 
+The `.kmn` reader (spec 116) has its own corpus suites, run through the engine's
+`vitest.corpus.config.ts`
+(`pnpm --filter @keyboard-studio/engine exec vitest run --config vitest.corpus.config.ts <path>`):
+
+- `src/codec/reader-regression.corpus.test.ts` holds the reader to the IR, node-id, opaque-reason
+  and comment counts recorded in `specs/116-ng-parser-adoption/evidence/reader-differential.md`.
+- `src/codec/reader-timing.corpus.test.ts` is the read-time budget: total within 2x the recorded
+  baseline (`evidence/baseline.md`), slowest file within 300 ms.
+- `src/codec/ng/lexer-equivalence.corpus.test.ts` checks the locally patched lexer emits exactly
+  the unpatched upstream token stream; `parser-equivalence.corpus.test.ts` checks the local
+  FIRST-set prediction patch changes no parse result.
+- `src/shared/rule-shape-equivalence.corpus.test.ts` checks the rule-shape accessors against the
+  rule splitters they replaced; it fails only on a disagreement research R5a does not explain.
+
+### Vendored Keyman parser
+
+`packages/engine/src/codec/ng/` is a snapshot of Keyman's next-generation `.kmn` parser front end.
+To re-sync it: `node scripts/vendor-ng-parser.mjs <keyman-checkout> <commit>`. The script reads
+each file with `git show <commit>:<path>`, never the working tree. It does not re-apply local
+patches: re-apply those by hand from `codec/ng/PROVENANCE.md`, update the commit recorded there,
+then run the reader corpus suites above.
+
 ### Headless author
 
 The scripted author ([spec 107](../specs/107-headless-scripted-author/quickstart.md)) walks the

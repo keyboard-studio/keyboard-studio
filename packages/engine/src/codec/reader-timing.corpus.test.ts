@@ -55,7 +55,7 @@ describe.skipIf(!rootExists)("reader timing baseline (parse)", () => {
 
 const BUDGET_SLOWEST_MS = 300;
 const BUDGET_FACTOR = 2;
-/** Full reader path (T040): owner-accepted total factor and per-MB file cap. */
+/** Full reader path: owner-accepted total factor and per-MB file cap. */
 const FULL_PATH_FACTOR = 2.5;
 const FULL_PATH_MS_PER_MB = 150;
 
@@ -88,7 +88,7 @@ function lexAndParseLines(text: string): unknown {
 const perfRun = process.env["KS_CORPUS_PERF"] === "1";
 
 describe.skipIf(!rootExists || !perfRun)("reader speed budget (lex + per-line parse)", () => {
-  // The T031 speed gate: met after local patches 1 and 3 (PROVENANCE.md). See research R1.
+  // The lexer speed gate: met after local patches 1 and 3 (PROVENANCE.md). See research R1.
   it("lexing plus per-line parsing stays within 2x baseline total and 300 ms per file", () => {
     const baseline = recordedBaselineTotalMs();
     const t = timeReader(ROOT, lexAndParseLines);
@@ -100,7 +100,7 @@ describe.skipIf(!rootExists || !perfRun)("reader speed budget (lex + per-line pa
     expect(t.slowest.ms).toBeLessThanOrEqual(BUDGET_SLOWEST_MS);
   }, 300_000);
 
-  // T040: the full reader path, parse() = lex + parse + lower. Owner rulings
+  // The full reader path, parse() = lex + parse + lower. Owner rulings
   // (2026-11-10): a missed per-file cap scales by size, so each file's cap is
   // max(300 ms, 150 ms per MB); and the measured total (2.5-2.6 s under vitest,
   // about 2.3x baseline) was accepted as close enough, so the full path's total

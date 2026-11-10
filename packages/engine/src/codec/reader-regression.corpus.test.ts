@@ -1,6 +1,6 @@
 /**
  * Holds the .kmn reader to the numbers of the final reader comparison
- * (specs/116-ng-parser-adoption/evidence/reader-differential.md, spec 116 T045),
+ * (specs/116-ng-parser-adoption/evidence/reader-differential.md),
  * so later drift fails. Over every corpus .kmn (root: env KS_KEYBOARDS, else
  * the sibling `keyboards` checkout) and every engine `.kmn` fixture:
  *   1. the fragment count per opaque reason equals the report's "Phase 6 (US3)" After column

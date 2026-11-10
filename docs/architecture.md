@@ -57,7 +57,19 @@ starting point ──▶ extraction (spec 092) ──▶ proposals ──▶ aut
 - **Codec spine.** `.kmn`/`.kvks`/`.keyman-touch-layout` parse into a typed
   `KeyboardIR`; everything works on the IR, never on raw text; unmodelled
   constructs survive as opaque `RawKmnFragment` nodes (constitution Art II).
-  → spec §5a · `packages/engine/src/codec/`
+  The `.kmn` reader (`codec/lower.ts`, spec 116) is Keyman's vendored
+  next-generation lexer and parser (`codec/ng/`) plus a lowering pass to the
+  IR. It parses one logical line at a time, so a line the grammar rejects
+  becomes an opaque fragment and costs only that line; it never calls
+  upstream's whole-file `Parser.parse()`, which truncates at the first bad
+  line. Comments, which the grammar never sees, come through the lexer's
+  `onTrivia` side-channel (`codec/comment-channel.ts`). Every opaque fragment
+  carries a reason from the catalogue in `codec/opaque-reasons.ts`. Rule shape
+  (LHS kind, context, keystroke) is read and built only through the accessors
+  in `contracts/src/rule-shape.ts`, enforced by ESLint. Which IR constructs
+  each import/export format carries is the capability table in
+  `contracts/src/capability/format-capability.ts`.
+  → spec §5a, spec 116 · `packages/engine/src/codec/`
 - **Decision spine (specs 087–093).** The unit of authoring is a **decision**.
   Question and gallery modules declare `provides`/`requires` in the decision
   registry; one topological sort (`orderByDependencies`) derives every order,

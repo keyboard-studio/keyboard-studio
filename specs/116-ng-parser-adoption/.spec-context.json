@@ -3,7 +3,7 @@
   "specName": "Adopt the Keyman next-generation KMN parser, and type the IR for multi-target export",
   "branch": "116-ng-parser-adoption",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "implemented",
   "history": [
     {
       "step": "specify",
@@ -448,6 +448,54 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-10T16:47:37.672Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T065",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T16:49:44.858Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T066",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T16:50:03.235Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T068",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T16:50:32.895Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T067",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T16:51:03.757Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T070",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T16:51:35.425Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T069",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T17:45:54.912Z"
     }
   ],
   "decisions": [
@@ -486,10 +534,20 @@
       "decision": "cldr-legacy export cells are n/a with a note rather than absent",
       "why": "the coverage check asks for a cell per format; n/a with a note says input-only explicitly",
       "rejected": "omitting cldr-legacy export cells as the contract sketch says"
+    },
+    {
+      "decision": "buildOutputRepertoire expands typed outs() stores through resolveStoreItems instead of filtering them out",
+      "why": "pre-116 those stores were fragments whose storeSketch (the expansion) the repertoire read; filtering left any()/index() over them unresolved and the normalization step refused el_dinka and sil_yoruba8",
+      "rejected": "re-attaching a storeSketch to typed stores"
+    },
+    {
+      "decision": "CHANGELOG entry went to packages/contracts/CHANGELOG.md under [Unreleased]",
+      "why": "the repo has no root CHANGELOG.md; contracts is the only package changelog",
+      "rejected": "creating a new root CHANGELOG.md"
     }
   ],
   "unattended": true,
-  "currentTask": "T064",
+  "currentTask": "T069",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -965,14 +1023,62 @@
       "files": [
         "packages/contracts/src/capability/format-capability.ts"
       ]
+    },
+    "T065": {
+      "status": "DONE",
+      "did": "Docs: codec reader in architecture.md, vendored codec/ng in packages.md, reader corpus suites and vendor script in tooling.md",
+      "files": [
+        "docs/architecture.md",
+        "docs/packages.md",
+        "docs/tooling.md"
+      ]
+    },
+    "T066": {
+      "status": "DONE",
+      "did": "Unreleased entry in packages/contracts/CHANGELOG.md (no root CHANGELOG.md exists): reader, comments, typed members, capability table, rule-shape API",
+      "files": [
+        "packages/contracts/CHANGELOG.md"
+      ]
+    },
+    "T068": {
+      "status": "DONE",
+      "did": "spec-trace check run; acknowledged specs/116-ng-parser-adoption and docs/architecture.md; no spec 108 unit drifted; the other 6 drifts (081,102,107,111,114,icon-editor) are untouched by this branch and left for their owners",
+      "files": [
+        "docs/spec-trace.json"
+      ]
+    },
+    "T067": {
+      "status": "DONE",
+      "did": "km-testing audit of 32 changed test files: none pruned (all map to a requirement); task ids dropped from 3 corpus-suite comments; no weakened assertions; engine src/shared + reader corpus suites 230/230 pass",
+      "files": [
+        "packages/engine/src/shared/rule-shape-equivalence.corpus.test.ts",
+        "packages/engine/src/codec/reader-regression.corpus.test.ts",
+        "packages/engine/src/codec/reader-timing.corpus.test.ts"
+      ]
+    },
+    "T070": {
+      "status": "DONE",
+      "did": "Follow-on handoff written: number 117 (main to 114, branches 115/116, no open PR claims a spec), FR-040..042 copied, R5 linked; spec and issue left to the owner",
+      "files": [
+        "specs/116-ng-parser-adoption/evidence/follow-on-handoff.md"
+      ]
+    },
+    "T069": {
+      "status": "DONE",
+      "did": "Full gate green (build, lint, typecheck, -r test, engine corpus) after fixing an outs()-store repertoire regression; one studio carving corpus failure predates the branch (same on merge base 6c643b4f); recorded in evidence/final-gate.md",
+      "files": [
+        "specs/116-ng-parser-adoption/evidence/final-gate.md",
+        "packages/contracts/src/ir/outputRepertoire.ts",
+        "packages/contracts/src/ir/outputRepertoire.test.ts"
+      ]
     }
   },
   "step_summaries": {
     "implement": {
-      "summary": "Phase 1 setup: baseline and timing helper"
+      "summary": "Spec 116 polish: docs, changelog, test audit, spec-trace ack, full gate (plus outs-store repertoire regression fix), follow-on handoff for spec 117"
     }
   },
-  "last_action": "Phase 7 (T060-T064) done, gate green",
+  "last_action": "all 70 tasks done; full gate green bar one carving test that also fails on main",
   "concerns": [
     {
       "note": "T031 speed gate not met: lex+LineRule parse 4974 ms vs 2208 ms budget, slowest vietnamese_telex 685 ms vs 300 ms. Remaining cost is in recursive-descent/kmn-analyzer which T029 forbids touching. Owner decision needed (R1 finding 5 options, or revisit budget). contracts/vendoring.md exclusion of statement-analyzer/store-analyzer is wrong; analyzer imports them.",
@@ -984,6 +1090,14 @@
     },
     {
       "note": "klc/xkb/keylayout and planned LDML import cells are researched claims from format docs, not checked against an implementation; the cldr-legacy cells read the in-review importer branch and may drift if it changes before merge",
+      "step": "implement"
+    },
+    {
+      "note": "studio decisionPoint.carving.corpus.test.ts (at tolerance, rule#279) fails on main too; not fixed here",
+      "step": "implement"
+    },
+    {
+      "note": "spec-trace still flags 6 sections this branch did not touch (081,102,107,111,114,icon-editor); left for their owners",
       "step": "implement"
     }
   ],
@@ -1037,6 +1151,40 @@
       "what": "Phase 7 full gate",
       "command": "pnpm typecheck; pnpm lint; pnpm -r test",
       "result": "all exit 0; lint 61 warnings, none new"
+    },
+    {
+      "what": "contracts outputRepertoire unit test",
+      "command": "pnpm --filter @keyboard-studio/contracts exec vitest run src/ir/outputRepertoire.test.ts",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 1.3,
+      "result": "      Tests  17 passed (17) ·    Start at  18:46:06 ·    Duration  686ms (transform 115ms, setup 0ms, import 271ms, tests 301ms, environment 0ms)"
+    },
+    {
+      "what": "normalization-step parity corpus suite",
+      "command": "pnpm --filter @keyboard-studio/engine exec vitest run --config vitest.corpus.config.ts src/pattern-apply/normalization-step/parity.corpus.test.ts",
+      "source": "derived",
+      "exitCode": 0,
+      "durationSeconds": 547.3,
+      "result": "      Tests  7 passed | 1 skipped (8) ·    Start at  18:46:08 ·    Duration  546.65s (transform 653ms, setup 454ms, import 1.34s, tests 544.74s, environment 0ms)"
+    },
+    {
+      "what": "Full gate: pnpm build, pnpm lint, pnpm typecheck, pnpm -r test",
+      "command": "pnpm build && pnpm lint && pnpm typecheck && pnpm -r test",
+      "result": "all exit 0 (contracts 1157, engine 5129, studio 11743 passed)"
+    },
+    {
+      "what": "engine corpus suites at CI corpus pin 435f82d6",
+      "command": "pnpm --filter @keyboard-studio/engine exec vitest run --config vitest.corpus.config.ts",
+      "result": "18 files / 1879 tests pass"
+    },
+    {
+      "what": "studio corpus suites",
+      "command": "pnpm --filter @keyboard-studio/studio exec vitest run --config vitest.corpus.config.ts",
+      "result": "1 failure: decisionPoint.carving at tolerance",
+      "warnings": [
+        "identical failure on merge base 6c643b4f, so it predates spec 116"
+      ]
     }
   ],
   "coverage": {
