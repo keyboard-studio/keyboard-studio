@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Adopt the Keyman next-generation KMN parser, and type the IR for multi-target export
+# Specification Quality Checklist: Adopt the Keyman next-generation KMN parser, and type the IR as a multi-format hub
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-11-10
