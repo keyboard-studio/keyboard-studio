@@ -544,6 +544,11 @@
       "decision": "CHANGELOG entry went to packages/contracts/CHANGELOG.md under [Unreleased]",
       "why": "the repo has no root CHANGELOG.md; contracts is the only package changelog",
       "rejected": "creating a new root CHANGELOG.md"
+    },
+    {
+      "decision": "Removed dead extractProducedOutput from parse-shared.ts and documented the drop-vs-expand outs() policy on withoutOutsStores",
+      "why": "km-synthesis findings; lowering now builds producedOutput from the syntax tree",
+      "rejected": "wider parse-shared export pruning in this cycle"
     }
   ],
   "unattended": true,
@@ -1099,6 +1104,22 @@
     {
       "note": "spec-trace still flags 6 sections this branch did not touch (081,102,107,111,114,icon-editor); left for their owners",
       "step": "implement"
+    },
+    {
+      "note": "Malformed rule/begin/group/store lines still throw and abort the parse (lower.ts legacyRule and line readers), as on main; spec wording that a rejected line costs only that line covers grammar rejections only. Follow-up: fragment fallback or narrower wording.",
+      "step": "implement"
+    },
+    {
+      "note": "Unfiltered ir.stores readers that now see typed outs stores (reachableProducedSet, touch-key-rule-join, collectCharContributors:1071/1083, modifierCombos, carveTouchProducers, mark-guards, kmAssist/inventory, ldml-export transforms) were audited by inspection only; no el_dinka/sil_yoruba8 differential test.",
+      "step": "implement"
+    },
+    {
+      "note": "A comment on the final line of a file emits above the header (km-verification probe); behaviour matched the legacy reader in the reader differential, not fixed here.",
+      "step": "implement"
+    },
+    {
+      "note": "km-synthesis P2s deferred: sketchStoreItems vs resolveStoreItems parallel expanders, lower.ts helpers overlapping parse-shared, over-exported parse-shared names, buildStoreMap rebuilds the name map per outs store.",
+      "step": "implement"
     }
   ],
   "verified": [
@@ -1185,6 +1206,22 @@
       "warnings": [
         "identical failure on merge base 6c643b4f, so it predates spec 116"
       ]
+    },
+    {
+      "what": "km-lead review cycle 1: km-verification, km-qc, km-keyman, km-synthesis",
+      "result": "no P0 survived synthesis; CONDITIONAL"
+    },
+    {
+      "what": "km-keyman P1 (offsets skip if/platform) checked against kmcmplib Compiler.cpp CheckStatementOffsets",
+      "result": "refuted: incxstr counts CODE_IFOPT/CODE_NUL positions (ERROR_ContextExCannotReferenceIf/Nul exist); FR-033 stands"
+    },
+    {
+      "what": "km-qc P1 issue numbers in shipped code",
+      "result": "refuted: every #NNNN in the diff is carried over from main by the reader file split"
+    },
+    {
+      "what": "Pattern audit for outs()-store repertoire fix (fa6c68f5)",
+      "result": "km-verification sweep: storeSketch has no other reader; withoutOutsStores consumers handle outs stores explicitly"
     }
   ],
   "coverage": {

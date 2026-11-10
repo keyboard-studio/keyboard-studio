@@ -793,20 +793,6 @@ export function parseOutputElements(
   return parseOutputElementsCore(toks, "strict", opaqueOut);
 }
 
-/**
- * Lenient variant of the output-element walk, used to build the best-effort
- * `RawKmnFragment.producedOutput` sketch for rules the strict parser opaques.
- * Never bails: constructs the strict mode rejects become typed elements where
- * the OutputElement union can express them (SMP literal → char, outs → outs)
- * and `{kind:"raw"}` placeholders otherwise, so unknown content still breaks
- * a char run in the produced-set walker. Output-side tokens only — callers
- * must pass RHS tokens, never context/guard content.
- */
-export function extractProducedOutput(toks: string[]): OutputElement[] {
-  // The lenient core never returns null; the fallback keeps the types honest.
-  return parseOutputElementsCore(toks, "lenient", { reason: null }) ?? [];
-}
-
 export function parseOutputElementsCore(
   toks: string[],
   mode: "strict" | "lenient",
