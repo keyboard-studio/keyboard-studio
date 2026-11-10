@@ -24,13 +24,18 @@ import type {
   ContextElement,
   OutputElement,
   StoreItem,
+  DeprecatedRewrite,
 } from "@keyboard-studio/contracts";
 
-import { isNamedDeadkeyName } from "@keyboard-studio/contracts";
+import { isNamedDeadkeyName, isPlusSeparator } from "@keyboard-studio/contracts";
 
-import { tokenize } from "./tokenize.js";
+import { tokenize, type Token, type TargetSelector } from "./tokenize.js";
 import { NodeIdMinter } from "../shared/node-ids.js";
 import { OPAQUE_REASONS, type OpaqueReason } from "./opaque-reasons.js";
+import {
+  DESKTOP_PLATFORM_GUARD,
+  WEB_PLATFORM_GUARDS,
+} from "./target-guards.js";
 
 // System stores whose canonical spelling is NOT all-uppercase. The lookup key
 // is the uppercased form; the value is what gets stored in IRStore.name.
@@ -43,6 +48,182 @@ const CANONICAL_SYSTEM_STORE: Record<string, string> = { CASEDKEYS: "CasedKeys" 
 export interface ParseResult {
   ir: KeyboardIR;
   opaqueFeatures: Array<{ feature: string; count: number }>;
+  /**
+   * Deprecated .kmn forms rewritten during parse (#2633), in source order.
+   * Each entry is one visible rewrite: the parser still accepts the form,
+   * but the emitted .kmn carries the modern equivalent. Empty when the
+   * source used no deprecated forms.
+   */
+  rewrites: DeprecatedRewrite[];
+}
+
+// ---------------------------------------------------------------------------
+// Deprecated .kmn forms (#2633)
+// ---------------------------------------------------------------------------
+
+/**
+ * Decode a legacy Keyman value-format token to its character, or null.
+ *
+ * Keyman 19 deprecated `d###` (decimal), `x###` (hex) and bare `###`
+ * (octal) codepoint spellings (WARN_DeprecatedValueFormat 0x0BC); Keyman 20
+ * removes them. The modern spelling is `U+XXXX`. Only the unambiguous
+ * shapes decode: `d` + 1-3 decimal digits 0-255 (a byte value), `x` + 1-4
+ * hex digits (a BMP codepoint), or 1-3 octal digits (0-0777). Anything
+ * outside those ranges stays raw — never mistype a token that is not a
+ * legacy codepoint (e.g. an out-of-range `d999` keeps its raw form and the
+ * compiler's error, rather than fabricating a character).
+ */
+function parseLegacyValueFormat(tok: string): string | null {
+  const dec = /^d(\d{1,3})$/i.exec(tok);
+  if (dec !== null) {
+    const cp = parseInt(dec[1] ?? "0", 10);
+    return cp <= 0xff ? String.fromCodePoint(cp) : null;
+  }
+  const hex = /^x([0-9A-Fa-f]{1,4})$/i.exec(tok);
+  if (hex !== null) {
+    return String.fromCodePoint(parseInt(hex[1] ?? "0", 16));
+  }
+  const oct = /^([0-7]{1,3})$/.exec(tok);
+  if (oct !== null) {
+    return String.fromCodePoint(parseInt(oct[1] ?? "0", 8));
+  }
+  return null;
+}
+
+/** Format a BMP character the way the rewrite record (and emit) spell it. */
+function formatLegacyRewrite(ch: string): string {
+  const hex = (ch.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0");
+  return `U+${hex}`;
+}
+
+/**
+ * Options for decoding a legacy value-format token (#2633 §3).
+ * `isAnsi` marks a `begin ANSI` section: values ≥ 128 there are code-page
+ * bytes, not necessarily Unicode codepoints, so they are left raw and
+ * reported via `onEscalation` rather than guessed. `onRewrite` records a
+ * performed rewrite; both callbacks are omitted for best-effort sketches
+ * (the fragment preserves the source text, so no rewrite happened there).
+ */
+interface LegacyValueOptions {
+  isAnsi?: boolean;
+  onRewrite?: (original: string, rewritten: string) => void;
+  onEscalation?: (original: string) => void;
+}
+
+/**
+ * Decode one legacy value-format token, honouring the ANSI guard. Returns
+ * the character, or null when the token is not a legacy format — or when it
+ * is one the ANSI guard forbids decoding (reported via `onEscalation`,
+ * caller falls through to the raw handling).
+ */
+function tryLegacyValue(tok: string, opts?: LegacyValueOptions): string | null {
+  const decoded = parseLegacyValueFormat(tok);
+  if (decoded === null) return null;
+  if (opts?.isAnsi === true && (decoded.codePointAt(0) ?? 0) >= 0x80) {
+    opts.onEscalation?.(tok);
+    return null;
+  }
+  opts?.onRewrite?.(tok, formatLegacyRewrite(decoded));
+  return decoded;
+}
+
+// Old-style bare header statements (help.keyman.com "Header keywords"),
+// matched pre-`begin` only. `BITMAPS` is the plural spelling of `BITMAP`.
+// The mapping is the km-keyman ruling for #2633 (see
+// ~/workspace/keyboard-studio-notes/2633-ruling.md): NAME / VERSION /
+// COPYRIGHT / HOTKEY / BITMAP / MESSAGE become the matching system store
+// (precedent: #4160/#4161 `VERSION 10.0` → `store(&VERSION) '10.0'`);
+// LANGUAGE / LAYOUT have no modern store — `store(&LANGUAGE)` and
+// `store(&LAYOUT)` are illegal since Keyman 10
+// (validator/checks/deprecatedStores.ts, DeprecationChecks.cpp) — so those
+// headers are dropped: the metadata belongs in the `.kps`.
+const HEADER_STATEMENT_RE =
+  /^(BITMAPS?|COPYRIGHT|HOTKEY|LANGUAGE|LAYOUT|MESSAGE|NAME|VERSION)\s+(.*)$/i;
+const HEADER_STATEMENT_STORES: Record<string, string> = {
+  NAME: "NAME",
+  VERSION: "VERSION",
+  COPYRIGHT: "COPYRIGHT",
+  HOTKEY: "HOTKEY",
+  BITMAP: "BITMAP",
+  MESSAGE: "MESSAGE",
+};
+// Headers with no modern store: LANGUAGE / LAYOUT are dropped (the metadata
+// belongs in the `.kps`); BITMAPS (two images, Keyman 3.2) has no
+// single-store equivalent, so it is dropped with both filenames recorded.
+const DROPPED_HEADER_STATEMENTS = new Set(["LANGUAGE", "LAYOUT", "BITMAPS"]);
+
+interface ParsedHeaderStatement {
+  /** Upper-cased keyword as written, e.g. "NAME". */
+  keyword: string;
+  /** System store the statement maps to, or null when the header is dropped. */
+  storeName: string | null;
+  /** Unquoted value text, e.g. "Test Keyboard" or "10.0". */
+  value: string;
+}
+
+/**
+ * Parse a pre-`begin` line as an old-style header statement, or null when
+ * it is not one. The value must be exactly one quoted string or one bare
+ * token — except BITMAPS, which takes two filenames. Anything else (missing
+ * value, trailing junk) is not a header statement and falls through to the
+ * unknown-pre-begin fragment path.
+ */
+function parseHeaderStatement(text: string): ParsedHeaderStatement | null {
+  const m = HEADER_STATEMENT_RE.exec(text.trim());
+  if (m === null) return null;
+  const keyword = (m[1] ?? "").toUpperCase();
+  const rawValue = (m[2] ?? "").trim();
+  // BITMAPS takes two filenames ("a.bmp" "b.bmp"): no single-store
+  // equivalent, so it is a dropped header — record both filenames (they
+  // ride in the rewrite entry's sourceText), do not guess.
+  if (keyword === "BITMAPS") {
+    const two = /^("[^"]*"|'[^']*'|\S+)\s+("[^"]*"|'[^']*'|\S+)$/.exec(rawValue);
+    if (two === null) return null;
+    return { keyword, storeName: null, value: rawValue };
+  }
+  const quoted = /^"([^"]*)"$/.exec(rawValue) ?? /^'([^']*)'$/.exec(rawValue);
+  let value: string;
+  if (quoted !== null) {
+    value = quoted[1] ?? "";
+  } else if (/^\S+$/.test(rawValue)) {
+    value = rawValue;
+  } else {
+    return null;
+  }
+  const storeName = HEADER_STATEMENT_STORES[keyword] ??
+    (DROPPED_HEADER_STATEMENTS.has(keyword) ? null : undefined);
+  if (storeName === undefined) return null;
+  return { keyword, storeName, value };
+}
+
+/**
+ * Translate an old-style HOTKEY string to the modern `store(&hotkey)`
+ * virtual-key form (#2633 ruling §2): `^` = Ctrl, `%` = Alt, `+` = Shift,
+ * then the letter key — `HOTKEY "^%A"` → `[CTRL ALT K_A]`. An
+ * already-bracketed form (`[Alt Shift K_PAUSE]`) passes through verbatim.
+ * Returns null for forms the mapping does not cover (non-letter keys) —
+ * the caller then keeps the quoted-string form and records it.
+ */
+function translateHotkey(value: string): string | null {
+  if (/^\[.*\]$/.test(value.trim())) return value.trim();
+  const m = /^([\^%+]*)'?([A-Za-z])'?$/.exec(value.trim());
+  if (m === null) return null;
+  const mods: string[] = [];
+  const marks = m[1] ?? "";
+  if (marks.includes("^")) mods.push("CTRL");
+  if (marks.includes("%")) mods.push("ALT");
+  if (marks.includes("+")) mods.push("SHIFT");
+  mods.push(`K_${(m[2] ?? "").toUpperCase()}`);
+  return `[${mods.join(" ")}]`;
+}
+
+/** True when a raw fragment's source text declares `store(&NAME)` (system). */
+function fragmentDeclaresSystemStore(frag: RawKmnFragment, name: string): boolean {
+  const re = new RegExp(
+    `^\\s*(?:\\$[^:]+:\\s*)?store\\s*\\(\\s*&${name}\\s*\\)`,
+    "i",
+  );
+  return re.test(frag.sourceText);
 }
 
 // ---------------------------------------------------------------------------
@@ -426,7 +607,10 @@ function isBracketedMenuLiteral(str: string): boolean {
  * literal, malformed/descending range), in which case the caller wraps the
  * whole store as a RawKmnFragment with that reason.
  */
-function parseStoreItems(rawValue: string): { items: StoreItem[]; opaqueReason: OpaqueReason | null } {
+function parseStoreItems(
+  rawValue: string,
+  legacyOpts?: LegacyValueOptions,
+): { items: StoreItem[]; opaqueReason: OpaqueReason | null } {
   const toks = splitTokens(rawValue);
   const items: StoreItem[] = [];
   for (let i = 0; i < toks.length; ) {
@@ -457,6 +641,15 @@ function parseStoreItems(rawValue: string): { items: StoreItem[]; opaqueReason: 
     const cp = parseCodepoint(tok);
     if (cp !== null) {
       items.push({ kind: "char", value: cp });
+      i++;
+      continue;
+    }
+    // Legacy value format (#2633): d### / x### / octal ### → the character.
+    // Decoded here so emit spells it U+XXXX (ANSI-guarded: see
+    // tryLegacyValue — an escalated token falls through to the raw item).
+    const legacy = tryLegacyValue(tok, legacyOpts);
+    if (legacy !== null) {
+      items.push({ kind: "char", value: legacy });
       i++;
       continue;
     }
@@ -553,7 +746,8 @@ const MAX_SKETCH_ITEMS = 0x20000;
 
 function sketchStoreItems(
   rawValue: string,
-  known: Map<string, StoreItem[]>
+  known: Map<string, StoreItem[]>,
+  isAnsiSketch = false,
 ): StoreItem[] | undefined {
   const out: StoreItem[] = [];
   const toks = splitTokens(rawValue);
@@ -571,6 +765,10 @@ function sketchStoreItems(
     i++;
     const cp = parseCodepoint(tok);
     if (cp !== null) { out.push({ kind: "char", value: cp }); continue; }
+    // Legacy value format (#2633): decode silently, ANSI-guarded — the
+    // sketch is best-effort and the fragment preserves the source text.
+    const legacy = tryLegacyValue(tok, { isAnsi: isAnsiSketch });
+    if (legacy !== null) { out.push({ kind: "char", value: legacy }); continue; }
     if (isSmpLiteral(tok)) {
       const m = /^U\+([0-9A-Fa-f]+)$/.exec(tok);
       out.push({ kind: "char", value: String.fromCodePoint(parseInt(m?.[1] ?? "0", 16)) });
@@ -622,7 +820,8 @@ function sketchStoreItems(
  */
 function parseContextElements(
   toks: string[],
-  opaqueOut: { reason: string | null }
+  opaqueOut: { reason: string | null },
+  legacyOpts?: LegacyValueOptions,
 ): ContextElement[] | null {
   const elements: ContextElement[] = [];
   for (const tok of toks) {
@@ -635,6 +834,13 @@ function parseContextElements(
     const cp = parseCodepoint(tok);
     if (cp !== null) {
       elements.push({ kind: "char", value: cp });
+      continue;
+    }
+    // Legacy value format (#2633): d### / x### / octal ### → the character
+    // (ANSI-guarded: an escalated token falls through to the raw element).
+    const legacy = tryLegacyValue(tok, legacyOpts);
+    if (legacy !== null) {
+      elements.push({ kind: "char", value: legacy });
       continue;
     }
     // quoted string
@@ -744,9 +950,10 @@ function parseContextElements(
  */
 function parseOutputElements(
   toks: string[],
-  opaqueOut: { reason: string | null }
+  opaqueOut: { reason: string | null },
+  legacyOpts?: LegacyValueOptions,
 ): OutputElement[] | null {
-  return parseOutputElementsCore(toks, "strict", opaqueOut);
+  return parseOutputElementsCore(toks, "strict", opaqueOut, legacyOpts);
 }
 
 /**
@@ -766,7 +973,8 @@ function extractProducedOutput(toks: string[]): OutputElement[] {
 function parseOutputElementsCore(
   toks: string[],
   mode: "strict" | "lenient",
-  opaqueOut: { reason: string | null }
+  opaqueOut: { reason: string | null },
+  legacyOpts?: LegacyValueOptions,
 ): OutputElement[] | null {
   const elements: OutputElement[] = [];
   for (const tok of toks) {
@@ -780,6 +988,15 @@ function parseOutputElementsCore(
     const cp = parseCodepoint(tok);
     if (cp !== null) {
       elements.push({ kind: "char", value: cp });
+      continue;
+    }
+    // Legacy value format (#2633): d### / x### / octal ### → the character
+    // (ANSI-guarded: an escalated token falls through to the raw element).
+    // In lenient mode (produced-output sketch) the decode is silent: the
+    // sketch is best-effort and the fragment preserves the source text.
+    const legacy = tryLegacyValue(tok, legacyOpts);
+    if (legacy !== null) {
+      elements.push({ kind: "char", value: legacy });
       continue;
     }
     // quoted string
@@ -1106,6 +1323,189 @@ export function parse(text: string, keyboardId: string): ParseResult {
   // We collect system stores by name for IRHeader construction.
   const sysStores: Record<string, string> = {};
 
+  // ---- Deprecated-form rewrites (#2633) ----
+  // Every rewrite the parser performs on a deprecated form is recorded here
+  // (kind, source line, what the line was, what it became) and returned in
+  // ParseResult.rewrites so the import can show it in the as-built notes.
+  const rewrites: DeprecatedRewrite[] = [];
+  function recordRewrite(
+    kind: DeprecatedRewrite["kind"],
+    sourceLine: number,
+    sourceText: string,
+    rewrittenText: string,
+  ): void {
+    rewrites.push({ kind, sourceLine, sourceText, rewrittenText });
+  }
+  // Header statements collected during the loop, finalised after it — only
+  // then is it known whether a real store() declaration already provides
+  // the value (a real store wins, either order).
+  interface PendingHeader {
+    keyword: string;
+    storeName: string | null;
+    value: string;
+    line: number;
+    sourceText: string;
+  }
+  const pendingHeaders: PendingHeader[] = [];
+  // Set when a rule is rewritten with a platform() guard — a guard needs
+  // store(&version) >= '9.0' (see raiseVersionForPlatformGuards below).
+  let addedPlatformGuards = false;
+  // Original (prefix-stripped) line text of targeted typed stores, by nodeId,
+  // plus the raw value for system stores — the post-loop store merge needs
+  // both to write its rewrite records and fix up sysStores. `selector`
+  // records which prefix the store came from (the merge deletes the
+  // survivor's targetSelector, so the conflict pass reads it here).
+  const storeSourceText = new Map<
+    string,
+    { text: string; rawValue: string; selector: TargetSelector }
+  >();
+
+  // Encoding breakpoints for the §3 ANSI guard: (line, encoding) of each
+  // `begin` directive in source order. A line's enclosing encoding is the
+  // most recent begin at or before it; before any begin, the file's FIRST
+  // begin encoding (the same first-wins convention as IRHeader.encoding).
+  const encodingBreakpoints: Array<{ line: number; encoding: "Unicode" | "ANSI" }> = [];
+  for (const t of tokens) {
+    if (t.kind !== "begin") continue;
+    const b = parseBeginLine(t.text);
+    if (b !== null && (b.encoding === "Unicode" || b.encoding === "ANSI")) {
+      encodingBreakpoints.push({ line: t.line, encoding: b.encoding });
+    }
+  }
+  function isAnsiLine(line: number): boolean {
+    let current: "Unicode" | "ANSI" | undefined;
+    for (const bp of encodingBreakpoints) {
+      if (bp.line <= line) current = bp.encoding;
+      else break;
+    }
+    if (current === undefined) current = encodingBreakpoints[0]?.encoding;
+    return current === "ANSI";
+  }
+  /** Legacy-value options for a source line: ANSI guard + rewrite recording. */
+  function legacyOptsFor(line: number): LegacyValueOptions {
+    return {
+      isAnsi: isAnsiLine(line),
+      onRewrite: (original, rewritten) =>
+        recordRewrite("legacy-value-format", line, original, rewritten),
+      onEscalation: (original) =>
+        recordRewrite(
+          "legacy-value-format",
+          line,
+          original,
+          `(kept as ${original} — a begin ANSI value ≥ 128 is a code-page byte, not a Unicode codepoint; needs a code-page decision)`,
+        ),
+    };
+  }
+  /**
+   * Source text of a fragment line, preserving a stripped target-selector
+   * prefix (#2633): opaque lines are NOT rewritten, so the gate stays
+   * visible in the fragment. `$keyman:` ("both") is a no-op and is dropped.
+   */
+  function fragmentSourceText(tok: Token): string {
+    if (tok.targetSelector === "keyman" || tok.targetSelector === undefined) return tok.text;
+    return `$${tok.targetSelector}: ${tok.text}`;
+  }
+  /**
+   * Record the drop of a `$keyman:` ("both") prefix — semantics-preserving,
+   * so it is dropped wherever it appears (typed and opaque lines alike).
+   */
+  function recordKeymanDrop(tok: Token): void {
+    if (tok.targetSelector === "keyman") {
+      recordRewrite("target-selector", tok.line, `$keyman: ${tok.text}`, tok.text);
+    }
+  }
+
+  /**
+   * Bump every index(store, N) offset in a rule's source text by one — the
+   * record of a guard rewrite, mirroring the IR change below. Only the code
+   * part is touched (a trailing `c <comment>` may mention index() without
+   * referring to a rule position). The text is returned unchanged when it
+   * holds no index() call, so spacing is preserved exactly in that case.
+   */
+  function bumpIndexOffsetsInRuleText(text: string): string {
+    if (!/\bindex\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s*,\s*\d+\s*\)/i.test(text)) return text;
+    const { rhs, trailingComment } = stripTrailingComment(text);
+    const bumped = rhs.replace(
+      /\bindex\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*(\d+)\s*\)/gi,
+      (_m, store: string, n: string) => `index(${store}, ${Number(n) + 1})`,
+    );
+    return trailingComment === undefined ? bumped : `${bumped} c ${trailingComment}`;
+  }
+
+  /**
+   * Rewrite a typed rule's target-selector prefix (#2633 §1): `$keyman:`
+   * ("both") is dropped; `$keymanonly:` becomes one rule guarded
+   * `platform('desktop native')`; `$keymanweb:` becomes THREE rules guarded
+   * `platform('web')` / `platform('phone native')` / `platform('tablet
+   * native')` (no single "js build" token exists). Returns the rules to
+   * push — the first keeps `base.nodeId` (leading/trailing comments anchor
+   * to it), the web copies mint fresh nodeIds and drop the trailing comment.
+   * Sets `addedPlatformGuards` when any guard is added.
+   *
+   * Guard placement (verified against kmc 19.0.320-beta, exp1–exp6): the
+   * guard goes FIRST in the context, and every index(store, N) offset is
+   * bumped by one. index() pairs with the Nth context position (1-based,
+   * counting every element including zero-width if()/platform() calls, and
+   * counting multi-char strings per character) — a guard inserted before a
+   * paired any() without the bump makes kmc report "An index() in the
+   * output does not have a corresponding any() statement" (0x502032).
+   * outs() is unaffected by guard position (no offset to track).
+   */
+  function applyTargetSelectorToRule(base: IRRule, tok: Token): IRRule[] {
+    const selector = tok.targetSelector;
+    if (selector === undefined) return [base];
+    if (selector === "keyman") {
+      recordRewrite("target-selector", tok.line, `$keyman: ${tok.text}`, tok.text);
+      return [base];
+    }
+    const guards =
+      selector === "keymanonly" ? [DESKTOP_PLATFORM_GUARD] : [...WEB_PLATFORM_GUARDS];
+    addedPlatformGuards = true;
+    const bumpedText = bumpIndexOffsetsInRuleText(tok.text);
+    const rewrittenText = guards.map((g) => `${g} ${bumpedText}`).join("; ");
+    recordRewrite("target-selector", tok.line, `$${selector}: ${tok.text}`, rewrittenText);
+    return guards.map((guard, i) => {
+      // index() offsets (context and output) are 1-based context positions;
+      // the guard prepended below shifts every paired any() one position
+      // later, so each offset is bumped by one. Elements are cloned — the
+      // web copies must not share (and re-bump) base's elements.
+      const context: ContextElement[] = [
+        { kind: "raw", text: guard },
+        ...base.context.map((el) =>
+          el.kind === "index" ? { ...el, offset: el.offset + 1 } : el,
+        ),
+      ];
+      const output = base.output.map((el) =>
+        el.kind === "index" ? { ...el, offset: el.offset + 1 } : el,
+      );
+      // In a `using keys` group the `+` keystroke separator belongs AFTER
+      // the guard, immediately before the KEY — the LAST context element
+      // (the key is the last element by KMN definition, whatever its kind:
+      // vkey, any(), char). kmc rejects `+ platform(...)` ("Invalid
+      // statement in key part") and, in a non-keys group, `platform(...)
+      // + <key>` — so in a non-keys group no `+` is inserted at all
+      // (emitRule prepends none there either). Attested corpus shape:
+      // `platform('touch') any(x) + [K_A]`.
+      if (
+        currentGroup?.usingKeys === true &&
+        !context.some((el) => isPlusSeparator(el)) &&
+        context.length > 1
+      ) {
+        context.splice(context.length - 1, 0, { kind: "raw", text: "+" });
+      }
+      const copy: IRRule = {
+        nodeId: i === 0 ? base.nodeId : minter.mint("rule"),
+        context,
+        output,
+        ...(base.sourceLine !== undefined ? { sourceLine: base.sourceLine } : {}),
+      };
+      if (i === 0 && base.trailingComment !== undefined) {
+        copy.trailingComment = base.trailingComment;
+      }
+      return copy;
+    });
+  }
+
   for (let ti = 0; ti < tokens.length; ti++) {
     const tok = tokens[ti];
     if (!tok) continue;
@@ -1126,6 +1526,17 @@ export function parse(text: string, keyboardId: string): ParseResult {
         const parsed = parseBeginLine(tok.text);
         if (!parsed) {
           throw new Error(`Malformed begin directive at line ${tok.line}:${tok.col}: ${tok.text}`);
+        }
+        // A target-prefixed begin line is pathological (no corpus case):
+        // the prefix is dropped, the entry point kept, and the drop recorded.
+        recordKeymanDrop(tok);
+        if (tok.targetSelector === "keymanweb" || tok.targetSelector === "keymanonly") {
+          recordRewrite(
+            "target-selector",
+            tok.line,
+            `$${tok.targetSelector}: ${tok.text}`,
+            `${tok.text} (prefix dropped — an entry point cannot be target-gated; needs review)`,
+          );
         }
         // Record the encoding for IRHeader.encoding so that isMnemonicKeyboard()
         // can detect ANSI vs Unicode keyboards at import time.  The encoding
@@ -1169,17 +1580,31 @@ export function parse(text: string, keyboardId: string): ParseResult {
 
         // Body parsing is identical for system and user stores: wrap as a raw
         // fragment when it carries an opaque construct, otherwise emit a store.
-        const { items, opaqueReason } = parseStoreItems(parsed.rawValue);
+        // Legacy value formats in the body are decoded (ANSI-guarded) and the
+        // rewrite recorded against this line.
+        const { items, opaqueReason } = parseStoreItems(parsed.rawValue, legacyOptsFor(tok.line));
         if (opaqueReason !== null) {
           bumpOpaque(opaqueReason);
           const frag: RawKmnFragment = {
             nodeId: storeNodeId,
             origin: "imported",
-            sourceText: tok.text,
+            sourceText: fragmentSourceText(tok),
             reason: opaqueReason,
             sourceLine: tok.line,
           };
-          const sketch = sketchStoreItems(parsed.rawValue, knownStoreItems);
+          // A target-prefixed opaque store cannot be rewritten (D9 fidelity):
+          // the prefix stays in the fragment text and the escalation is
+          // recorded so the user can see it needs review.
+          recordKeymanDrop(tok);
+          if (tok.targetSelector === "keymanweb" || tok.targetSelector === "keymanonly") {
+            recordRewrite(
+              "target-selector",
+              tok.line,
+              fragmentSourceText(tok),
+              `(kept as-is — opaque store; target gating could not be rewritten, needs review)`,
+            );
+          }
+          const sketch = sketchStoreItems(parsed.rawValue, knownStoreItems, isAnsiLine(tok.line));
           if (sketch !== undefined) {
             frag.storeSketch = sketch;
             knownStoreItems.set(parsed.name.toLowerCase(), sketch);
@@ -1195,7 +1620,17 @@ export function parse(text: string, keyboardId: string): ParseResult {
             isSystem: parsed.isSystem,
             sourceLine: tok.line,
           };
-          if (tok.targetSelector !== undefined) irStore.targetSelector = tok.targetSelector;
+          // Target-prefixed stores are merged after the loop (desktop body
+          // wins); `$keyman:` ("both") is dropped now, with a rewrite record.
+          recordKeymanDrop(tok);
+          if (tok.targetSelector === "keymanweb" || tok.targetSelector === "keymanonly") {
+            irStore.targetSelector = tok.targetSelector;
+            storeSourceText.set(storeNodeId, {
+              text: tok.text,
+              rawValue: parsed.rawValue,
+              selector: tok.targetSelector,
+            });
+          }
           if (parsed.trailingComment !== undefined) irStore.trailingComment = parsed.trailingComment;
           stores.push(irStore);
         }
@@ -1206,6 +1641,17 @@ export function parse(text: string, keyboardId: string): ParseResult {
         const parsed = parseGroupLine(tok.text);
         if (!parsed) {
           throw new Error(`Malformed group declaration at line ${tok.line}:${tok.col}: ${tok.text}`);
+        }
+        // A target-prefixed group line is pathological (no corpus case):
+        // the prefix is dropped, the group kept, and the drop recorded.
+        recordKeymanDrop(tok);
+        if (tok.targetSelector === "keymanweb" || tok.targetSelector === "keymanonly") {
+          recordRewrite(
+            "target-selector",
+            tok.line,
+            `$${tok.targetSelector}: ${tok.text}`,
+            `${tok.text} (prefix dropped — a group cannot be target-gated; needs review)`,
+          );
         }
         flushCommentsFreestanding();
         currentGroup = {
@@ -1244,7 +1690,12 @@ export function parse(text: string, keyboardId: string): ParseResult {
           matchKind: tok.kind,
           sourceLine: tok.line,
         };
-        if (tok.targetSelector !== undefined) rule.targetSelector = tok.targetSelector;
+        // Target-prefixed transitions are merged after the loop (desktop
+        // wins); `$keyman:` ("both") is dropped now, with a rewrite record.
+        recordKeymanDrop(tok);
+        if (tok.targetSelector === "keymanweb" || tok.targetSelector === "keymanonly") {
+          rule.targetSelector = tok.targetSelector;
+        }
         if (currentGroup) {
           currentGroup.rules.push(rule);
         }
@@ -1253,17 +1704,66 @@ export function parse(text: string, keyboardId: string): ParseResult {
 
       case "rule": {
         if (!headerParsed) {
+          // Old-style header statement (NAME, VERSION, ...) — collected for
+          // finalisation after the loop, once it is known whether a real
+          // store() already provides the value. A trailing c-comment rides
+          // along as a freestanding comment so no text is lost.
+          const { rhs: headerText, trailingComment: headerComment } =
+            stripTrailingComment(tok.text);
+          const header = parseHeaderStatement(headerText);
+          if (header !== null) {
+            pendingHeaders.push({
+              keyword: header.keyword,
+              storeName: header.storeName,
+              value: header.value,
+              line: tok.line,
+              sourceText: tok.text,
+            });
+            flushCommentsFreestanding();
+            if (headerComment !== undefined) {
+              comments.push({
+                nodeId: minter.mint("comment"),
+                text: headerComment,
+                anchor: "freestanding",
+                sourceLine: tok.line,
+              });
+            }
+            // A target-prefixed header statement is pathological; the
+            // prefix is dropped with the header (recorded here).
+            recordKeymanDrop(tok);
+            if (tok.targetSelector === "keymanweb" || tok.targetSelector === "keymanonly") {
+              recordRewrite(
+                "target-selector",
+                tok.line,
+                `$${tok.targetSelector}: ${tok.text}`,
+                `${tok.text} (prefix dropped — a header statement cannot be target-gated; needs review)`,
+              );
+            }
+            break;
+          }
           // Rule before begin — treat as raw.
           flushCommentsFreestanding();
           bumpOpaque(OPAQUE_REASONS.UNKNOWN_PRE_BEGIN);
           rawFragments.push({
             nodeId: minter.mint("raw"),
             origin: "imported",
-            sourceText: tok.text,
+            sourceText: fragmentSourceText(tok),
             reason: OPAQUE_REASONS.UNKNOWN_PRE_BEGIN,
             sourceLine: tok.line,
             // groupNodeId is intentionally absent: pre-begin = global/no group
           });
+          // A target-prefixed pre-begin line cannot be rewritten (D9
+          // fidelity): the prefix stays in the fragment text and the
+          // escalation is recorded so the user can see it needs review.
+          recordKeymanDrop(tok);
+          if (tok.targetSelector === "keymanweb" || tok.targetSelector === "keymanonly") {
+            recordRewrite(
+              "target-selector",
+              tok.line,
+              fragmentSourceText(tok),
+              `(kept as-is — pre-begin line; target gating could not be rewritten, needs review)`,
+            );
+          }
           break;
         }
 
@@ -1294,12 +1794,12 @@ export function parse(text: string, keyboardId: string): ParseResult {
         // separator, so the only list tokenised with separator splitting
         // (#2247).
         const ctxToks = splitTokens(parsedLine.contextRaw, true);
-        const ctxElements = parseContextElements(ctxToks, opaqueCheck);
+        const ctxElements = parseContextElements(ctxToks, opaqueCheck, legacyOptsFor(tok.line));
 
         let outElements: OutputElement[] | null = null;
         if (ctxElements !== null) {
           const outToks = splitTokens(parsedLine.outputRaw);
-          outElements = parseOutputElements(outToks, opaqueCheck);
+          outElements = parseOutputElements(outToks, opaqueCheck, legacyOptsFor(tok.line));
         }
 
         if (ctxElements === null || outElements === null) {
@@ -1309,10 +1809,22 @@ export function parse(text: string, keyboardId: string): ParseResult {
           const frag: RawKmnFragment = {
             nodeId: ruleNodeId,
             origin: "imported",
-            sourceText: tok.text,
+            sourceText: fragmentSourceText(tok),
             reason,
             sourceLine: tok.line,
           };
+          // A target-prefixed opaque rule cannot be rewritten (D9 fidelity):
+          // the prefix stays in the fragment text and the escalation is
+          // recorded so the user can see it needs review.
+          recordKeymanDrop(tok);
+          if (tok.targetSelector === "keymanweb" || tok.targetSelector === "keymanonly") {
+            recordRewrite(
+              "target-selector",
+              tok.line,
+              fragmentSourceText(tok),
+              `(kept as-is — opaque rule; target gating could not be rewritten, needs review)`,
+            );
+          }
           if (currentGroup !== null) frag.groupNodeId = currentGroup.nodeId;
           // Best-effort produced-output sketch (RHS only), attached only when
           // it carries statically producible content so the produced-set walk
@@ -1337,9 +1849,13 @@ export function parse(text: string, keyboardId: string): ParseResult {
                 output: outElements,
                 sourceLine: tok.line,
               };
-          if (tok.targetSelector !== undefined) rule.targetSelector = tok.targetSelector;
+          // Target-selector rewrite (#2633 §1): `$keyman:` dropped,
+          // `$keymanonly:` one platform('desktop native')-guarded rule,
+          // `$keymanweb:` three platform-guarded copies. The first copy
+          // keeps ruleNodeId, so the leading/trailing comments anchor to it.
+          const rulesToPush = applyTargetSelectorToRule(rule, tok);
           if (currentGroup) {
-            currentGroup.rules.push(rule);
+            for (const r of rulesToPush) currentGroup.rules.push(r);
           }
           // Trailing comment node
           if (parsedLine.trailingComment !== undefined) {
@@ -1363,6 +1879,244 @@ export function parse(text: string, keyboardId: string): ParseResult {
 
   // Flush any remaining pending comments.
   flushCommentsFreestanding();
+
+  // ---------------------------------------------------------------------------
+  // Deprecated-form finalisation (#2633) — post-loop passes.
+  // ---------------------------------------------------------------------------
+
+  // Merge target-prefixed store twins: group typed stores by lowercased
+  // name; when a group has targeted stores and NO unprefixed store, the
+  // desktop (`keymanonly`) body wins (first desktop wins; if no desktop,
+  // the first web body wins). Losers are dropped and the survivor is
+  // unprefixed. Groups that already have an unprefixed store are left
+  // alone — that is a genuine duplicate in the source, which kmc errors
+  // on today too.
+  function mergeTargetedStores(): void {
+    const byName = new Map<string, IRStore[]>();
+    for (const s of stores) {
+      const key = s.name.toLowerCase();
+      const list = byName.get(key) ?? [];
+      list.push(s);
+      byName.set(key, list);
+    }
+    for (const [, group] of byName) {
+      const targeted = group.filter(
+        (s) => s.targetSelector === "keymanweb" || s.targetSelector === "keymanonly",
+      );
+      if (targeted.length === 0) continue;
+      if (group.some((s) => s.targetSelector === undefined)) continue;
+      const desktop = targeted.find((s) => s.targetSelector === "keymanonly");
+      const survivor = desktop ?? targeted[0]!;
+      const survivorSrc = storeSourceText.get(survivor.nodeId);
+      const survivorLine = survivorSrc?.text ?? `store(${survivor.isSystem ? "&" : ""}${survivor.name})`;
+      recordRewrite(
+        "target-selector",
+        survivor.sourceLine ?? 0,
+        `$${survivor.targetSelector}: ${survivorLine}`,
+        survivorLine,
+      );
+      for (const loser of targeted) {
+        if (loser === survivor) continue;
+        const loserSrc = storeSourceText.get(loser.nodeId);
+        const loserLine = loserSrc?.text ?? `store(${loser.isSystem ? "&" : ""}${loser.name})`;
+        recordRewrite(
+          "target-selector",
+          loser.sourceLine ?? 0,
+          `$${loser.targetSelector}: ${loserLine}`,
+          `(dropped — store(${loser.name}) keeps the ${desktop !== undefined ? "desktop" : "first web"} body)`,
+        );
+        const idx = stores.indexOf(loser);
+        if (idx >= 0) stores.splice(idx, 1);
+      }
+      // The survivor is now unprefixed; for a system store the header
+      // extraction must see the SURVIVOR's value (the loop's last-wins
+      // sysStores entry may hold a dropped twin's value).
+      delete survivor.targetSelector;
+      if (survivor.isSystem && survivorSrc !== undefined) {
+        sysStores[survivor.name] = survivorSrc.rawValue;
+      }
+    }
+  }
+
+  // &CasedKeys and &mnemonicLayout cannot coexist in one file (kmc
+  // 0x50206b: "&CasedKeys system store is not supported with mnemonic
+  // layouts"). The pair is legal only when target-separated ($keymanweb:
+  // vs $keymanonly:), and the store merge unprefixes both into one file.
+  // When the pair was target-separated in the source, keep the WEB store
+  // and drop the desktop-only one (the ruling's compile-gate fallback:
+  // never emit a file that fails to build), recording the loss. When both
+  // were unprefixed (or same-target) in the source the conflict is
+  // pre-existing — leave it alone.
+  function resolveCasedKeysMnemonicConflict(): void {
+    const cased = stores.find((s) => s.isSystem && s.name.toUpperCase() === "CASEDKEYS");
+    const mnemonic = stores.find(
+      (s) => s.isSystem && s.name.toUpperCase() === "MNEMONICLAYOUT",
+    );
+    if (cased === undefined || mnemonic === undefined) return;
+    const casedSel = storeSourceText.get(cased.nodeId)?.selector;
+    const mnemonicSel = storeSourceText.get(mnemonic.nodeId)?.selector;
+    const separated =
+      (casedSel === "keymanweb" && mnemonicSel === "keymanonly") ||
+      (casedSel === "keymanonly" && mnemonicSel === "keymanweb");
+    if (!separated) return;
+    const keepWeb = casedSel === "keymanweb" ? cased : mnemonic;
+    const dropDesktop = casedSel === "keymanweb" ? mnemonic : cased;
+    const dropSrc = storeSourceText.get(dropDesktop.nodeId);
+    const dropLine = dropSrc?.text ?? `store(&${dropDesktop.name})`;
+    recordRewrite(
+      "target-selector",
+      dropDesktop.sourceLine ?? 0,
+      `$keymanonly: ${dropLine}`,
+      `(dropped — store(&${keepWeb.name}) and store(&${dropDesktop.name}) cannot coexist; the web &${keepWeb.name} store is kept so the file compiles; the desktop-only value needs review)`,
+    );
+    const idx = stores.indexOf(dropDesktop);
+    if (idx >= 0) stores.splice(idx, 1);
+    delete sysStores[dropDesktop.name];
+  }
+
+  // Merge target-prefixed match/nomatch twins, per group and kind: desktop
+  // wins, web is dropped; a lone prefixed transition is kept unprefixed.
+  // Groups that already have an unprefixed transition of the same kind are
+  // left alone (genuine duplicate in the source).
+  function mergeTargetedTransitions(): void {
+    for (const group of groups) {
+      for (const kind of ["match", "nomatch"] as const) {
+        const targeted = group.rules.filter(
+          (r) => r.matchKind === kind &&
+            (r.targetSelector === "keymanweb" || r.targetSelector === "keymanonly"),
+        );
+        if (targeted.length === 0) continue;
+        if (group.rules.some((r) => r.matchKind === kind && r.targetSelector === undefined)) {
+          continue;
+        }
+        const desktop = targeted.find((r) => r.targetSelector === "keymanonly");
+        const survivor = desktop ?? targeted[0]!;
+        const rhs = survivor.output[0]?.kind === "raw" ? survivor.output[0].text : "";
+        recordRewrite(
+          "target-selector",
+          survivor.sourceLine ?? 0,
+          `$${survivor.targetSelector}: ${kind} > ${rhs}`,
+          `${kind} > ${rhs}`,
+        );
+        for (const loser of targeted) {
+          if (loser === survivor) continue;
+          const loserRhs = loser.output[0]?.kind === "raw" ? loser.output[0].text : "";
+          recordRewrite(
+            "target-selector",
+            loser.sourceLine ?? 0,
+            `$${loser.targetSelector}: ${kind} > ${loserRhs}`,
+            `(dropped — ${kind} keeps the ${desktop !== undefined ? "desktop" : "first web"} variant)`,
+          );
+          const idx = group.rules.indexOf(loser);
+          if (idx >= 0) group.rules.splice(idx, 1);
+        }
+        delete survivor.targetSelector;
+      }
+    }
+  }
+
+  // Finalise pending header statements: synthesise the matching system
+  // store when no real store() declaration already provides the value
+  // (a real store wins, either order — including an opaque fragment that
+  // declares the name). LANGUAGE / LAYOUT / BITMAPS have no modern store
+  // and are dropped, with the drop recorded.
+  function finalizePendingHeaders(): void {
+    for (const header of pendingHeaders) {
+      if (header.storeName === null) {
+        recordRewrite(
+          "header-statement",
+          header.line,
+          header.sourceText,
+          `(dropped — ${header.keyword} has no modern equivalent; metadata belongs in the .kps)`,
+        );
+        continue;
+      }
+      const name = header.storeName;
+      const existingTyped = stores.find(
+        (s) => s.isSystem && s.name.toUpperCase() === name,
+      );
+      const existingFrag = rawFragments.find((f) => fragmentDeclaresSystemStore(f, name));
+      if (existingTyped !== undefined || existingFrag !== undefined) {
+        recordRewrite(
+          "header-statement",
+          header.line,
+          header.sourceText,
+          `(dropped — store(&${name}) already declared; header value '${header.value}' not used)`,
+        );
+        continue;
+      }
+      // Synthesise the system store. HOTKEY translates to the virtual-key
+      // form when the old string form maps cleanly; anything else becomes
+      // plain characters of the quoted value (the HOTKEY fallback keeps the
+      // quoted string so the value survives, and the record says so).
+      let items: StoreItem[];
+      let rewrittenText: string;
+      if (name === "HOTKEY") {
+        const vkey = translateHotkey(header.value);
+        if (vkey !== null) {
+          items = [{ kind: "raw", text: vkey }];
+          rewrittenText = `store(&HOTKEY) ${vkey}`;
+        } else {
+          items = [...header.value].map((ch) => ({ kind: "char" as const, value: ch }));
+          rewrittenText = `store(&HOTKEY) '${header.value}' (kept as a quoted string — no virtual-key mapping for '${header.value}')`;
+        }
+      } else {
+        items = [...header.value].map((ch) => ({ kind: "char" as const, value: ch }));
+        const q = header.value.includes("'") ? '"' : "'";
+        rewrittenText = `store(&${name}) ${q}${header.value}${q}`;
+      }
+      const store: IRStore = {
+        nodeId: minter.mint("store"),
+        name,
+        items,
+        isSystem: true,
+        sourceLine: header.line,
+      };
+      stores.push(store);
+      if (!(name in sysStores)) {
+        sysStores[name] =
+          name === "HOTKEY" && items[0]?.kind === "raw"
+            ? (items[0].text ?? "")
+            : `'${header.value}'`;
+      }
+      recordRewrite("header-statement", header.line, header.sourceText, rewrittenText);
+    }
+  }
+
+  // Raise store(&version) to '9.0' when platform() guards were added and
+  // the file declares an explicit version below 9.0 — guards need Keyman
+  // 9.0+. A missing version is left alone (the compiler infers it).
+  function raiseVersionForPlatformGuards(): void {
+    if (!addedPlatformGuards) return;
+    const versionStore = stores.find(
+      (s) => s.isSystem && s.name.toUpperCase() === "VERSION",
+    );
+    if (versionStore === undefined) return;
+    if (!versionStore.items.every((it) => it.kind === "char")) return;
+    const text = versionStore.items
+      .map((it) => (it.kind === "char" ? it.value : ""))
+      .join("");
+    const m = /^(\d+)(?:\.\d+)?/.exec(text);
+    if (m === null) return;
+    if (parseInt(m[1] ?? "0", 10) >= 9) return;
+    versionStore.items = [..."9.0"].map((ch) => ({ kind: "char" as const, value: ch }));
+    sysStores["VERSION"] = "'9.0'";
+    recordRewrite(
+      "version-raise",
+      versionStore.sourceLine ?? 0,
+      `store(&VERSION) '${text}'`,
+      `store(&VERSION) '9.0' (raised — platform() guards need Keyman 9.0+)`,
+    );
+  }
+
+  mergeTargetedStores();
+  resolveCasedKeysMnemonicConflict();
+  mergeTargetedTransitions();
+  finalizePendingHeaders();
+  raiseVersionForPlatformGuards();
+  // Rewrites are recorded in parse order per form; sort by source line for
+  // a stable, source-order presentation in the as-built notes.
+  rewrites.sort((a, b) => a.sourceLine - b.sourceLine);
 
   // ---------------------------------------------------------------------------
   // Build IRHeader from collected system store values.
@@ -1428,5 +2182,5 @@ export function parse(text: string, keyboardId: string): ParseResult {
     recognizedPatterns: [],
   };
 
-  return { ir, opaqueFeatures };
+  return { ir, opaqueFeatures, rewrites };
 }

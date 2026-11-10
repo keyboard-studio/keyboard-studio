@@ -719,6 +719,31 @@ export enum ImportStatus {
   RoundTripDivergence = "round-trip-divergence",
 }
 
+/**
+ * One Keyman 19-deprecated .kmn form the codec rewrote while parsing
+ * (#2633). Keyman 19 deprecated these forms (upstream keymanapp/keyman
+ * commit 45755d3894, shipped in 19.0.320-beta) and Keyman 20 removes them,
+ * so the working copy must carry the modern equivalent. The parser still
+ * ACCEPTS every form (a corpus keyboard using one must remain a valid
+ * starting point); the rewrite is what the emitted .kmn carries. Each entry
+ * is one visible rewrite: the decision record / as-built notes surface
+ * renders these so the author can see exactly what changed.
+ */
+export type DeprecatedRewriteKind =
+  | "header-statement"
+  | "legacy-value-format"
+  | "target-selector"
+  | "version-raise";
+export interface DeprecatedRewrite {
+  kind: DeprecatedRewriteKind;
+  /** 1-based source line of the original (deprecated) form. */
+  sourceLine: number;
+  /** Original source text of the deprecated form (trimmed). */
+  sourceText: string;
+  /** What it became in the modern IR / emitted .kmn. */
+  rewrittenText: string;
+}
+
 /** Full report produced by the codec + Layer A' checks (I1-I5) after parsing a source keyboard. */
 export interface ImportReport {
   keyboardId: string;
@@ -730,6 +755,13 @@ export interface ImportReport {
   recognizedRatio: number;
   /** Populated when status is RoundTripDivergence (check I2 failure). */
   roundTripDiff?: RoundTripDiff;
+  /**
+   * Deprecated .kmn forms the codec rewrote while parsing (#2633), in
+   * source order. Absent when the parse produced no rewrites (or when the
+   * report predates #2633). The as-built notes render these so the author
+   * can see exactly what changed.
+   */
+  deprecatedRewrites?: DeprecatedRewrite[];
   /**
    * Per-node removal capability classifications produced by
    * `classifyRemovalCapabilities` at import time.
