@@ -176,6 +176,86 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-10T11:47:39.723Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T11:51:37.597Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T11:53:18.994Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T11:53:44.141Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T12:18:46.666Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T12:18:46.765Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T12:18:46.863Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T12:19:39.569Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T12:21:46.790Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T12:27:46.061Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T12:27:46.160Z"
     }
   ],
   "decisions": [
@@ -184,7 +264,7 @@
     }
   ],
   "unattended": true,
-  "currentTask": "T017",
+  "currentTask": "T030",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -354,6 +434,98 @@
         "packages/studio/src/lib/carvedCombo.ts",
         "packages/studio/src/editors/deadkey/deadkeyWrite.ts"
       ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Migrated engine rule writers onto makeRule/withRuleParts; replaceCapsRules now replaces rules",
+      "files": [
+        "packages/engine/src/deadkey-lifecycle/mutations.ts",
+        "packages/engine/src/pattern-apply/mark-guards.ts",
+        "packages/engine/src/pattern-apply/context-variants.ts",
+        "packages/engine/src/pattern-apply/touchRuleSynthesis.ts",
+        "packages/engine/src/pattern-apply/severTouchKey.ts",
+        "packages/engine/src/pattern-apply/carveSuppression.ts",
+        "packages/engine/src/pattern-apply/normalization-step/index.ts",
+        "packages/engine/src/rulePacks/install.ts",
+        "packages/engine/src/facet-transform/migrations/encoding-spelling.ts",
+        "packages/engine/src/inventory/producedGlyphs.ts",
+        "packages/engine/src/caps/replaceCapsRules.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Migrated studio rule writers onto makeRule/withRuleParts",
+      "files": [
+        "packages/studio/src/components/rules/guardRuleSynthesis.ts",
+        "packages/studio/src/components/rules/narrowGuard.ts",
+        "packages/studio/src/editors/deadkey/deadkeyWrite.ts",
+        "packages/studio/src/lib/projectWorkingCopyVfs.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Migrated test builders onto makeRule; charRule kept as documented exception",
+      "files": [
+        "packages/contracts/src/fixtures/ir-builders.ts",
+        "packages/engine/src/test-support/applyStoreSlotRemovals.testkit.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "scripts/vendor-ng-parser.mjs written and run at pinned commit",
+      "files": [
+        "scripts/vendor-ng-parser.mjs",
+        "packages/engine/src/codec/ng/"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "PROVENANCE.md written (adds statement/store analyzer files, deviation from contract)",
+      "files": [
+        "packages/engine/src/codec/ng/PROVENANCE.md"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "ng/ compiles under engine tsconfig with type-only fixes listed in PROVENANCE; node-import grep empty",
+      "files": [
+        "packages/engine/src/codec/ng/"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "depcruise codec-ng-internal rule (ng/ self-imports and upstream analyzer cycles exempted) and eslint ng override",
+      "files": [
+        ".dependency-cruiser.cjs",
+        "eslint.config.mjs"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "profiled unpatched lexer over corpus; profile entry recorded in research R1",
+      "files": [
+        "specs/116-ng-parser-adoption/research.md"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "first-char dispatch lexer patch (lex 7.0s->0.8s) + lexer-equivalence corpus test vs unpatched reference; local patch 1 recorded",
+      "files": [
+        "packages/engine/src/codec/ng/lexer.ts",
+        "packages/engine/src/codec/ng/lexer-equivalence.corpus.test.ts",
+        "packages/engine/src/codec/ng/lexer-reference.testkit.ts",
+        "packages/engine/src/codec/ng/PROVENANCE.md"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "onTrivia callback patch, equivalence test extended, local patch 2 recorded",
+      "files": [
+        "packages/engine/src/codec/ng/lexer.ts",
+        "packages/engine/src/codec/ng/lexer-equivalence.corpus.test.ts",
+        "packages/engine/src/codec/ng/lexer-reference.testkit.ts",
+        "packages/engine/src/codec/ng/PROVENANCE.md"
+      ]
     }
   },
   "step_summaries": {
@@ -361,5 +533,11 @@
       "summary": "Phase 1 setup: baseline and timing helper"
     }
   },
-  "last_action": "Phase 1 done, T001-T002"
+  "last_action": "stopped at T031 speed gate; T024-T030 done",
+  "concerns": [
+    {
+      "note": "T031 speed gate not met: lex+LineRule parse 4974 ms vs 2208 ms budget, slowest vietnamese_telex 685 ms vs 300 ms. Remaining cost is in recursive-descent/kmn-analyzer which T029 forbids touching. Owner decision needed (R1 finding 5 options, or revisit budget). contracts/vendoring.md exclusion of statement-analyzer/store-analyzer is wrong; analyzer imports them.",
+      "step": "implement"
+    }
+  ]
 }
