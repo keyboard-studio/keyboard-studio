@@ -35,7 +35,8 @@ import {
 } from "../rule-shape.js";
 import { decodeUnicodeKeyId } from "../touch-coverage.js";
 import { US_BASE_LAYOUT } from "./usBaseLayout.js";
-import { withoutOutsStores } from "./outsStores.js";
+import { storeHasOuts } from "./outsStores.js";
+import { resolveStoreItems } from "./resolveStoreItems.js";
 
 export interface BuildOutputRepertoireOptions {
   /** Polled during the closure; when it returns true the closure stops early. */
@@ -119,9 +120,20 @@ function storeNameOfFragment(sourceText: string): string | undefined {
   return /^\s*store\s*\(\s*([^)\s]+)\s*\)/i.exec(sourceText)?.[1];
 }
 
+/**
+ * Store name -> items, by position. A store holding `outs()` references maps to
+ * its expansion, which is what its pre-spec-116 opaque fragment carried as
+ * `storeSketch`. As in that sketch, a reference that cannot expand contributes
+ * nothing.
+ */
 function buildStoreMap(ir: KeyboardIR): Map<string, StoreItem[]> {
   const m = new Map<string, StoreItem[]>();
-  for (const s of ir.stores as IRStore[]) m.set(s.name.toLowerCase(), s.items);
+  for (const s of ir.stores as IRStore[]) {
+    const items = storeHasOuts(s)
+      ? resolveStoreItems(ir, s.name).filter((it) => !(it.kind === "raw" && it.text.startsWith("outs(")))
+      : s.items;
+    m.set(s.name.toLowerCase(), items);
+  }
   for (const f of ir.raw) {
     if (f.storeSketch === undefined) continue;
     const name = storeNameOfFragment(f.sourceText);
@@ -361,8 +373,7 @@ export function buildOutputRepertoire(
   ir: KeyboardIR,
   options?: BuildOutputRepertoireOptions,
 ): OutputRepertoire {
-  // Pairs stores by position: read without outs() stores (see withoutOutsStores).
-  const stores = buildStoreMap(withoutOutsStores(ir));
+  const stores = buildStoreMap(ir);
   const unresolvedRaw = new Map<string, string>();
   const truncation = new Set<string>();
   const instances: Instance[] = [];
