@@ -1,0 +1,16 @@
+{
+  "workflow": "speckit",
+  "specName": "Output from the replayed keyboard",
+  "branch": "118-replayed-ir-output",
+  "currentStep": "specify",
+  "status": "specified",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-10T21:16:41.061Z"
+    }
+  ]
+}
