@@ -20,12 +20,24 @@ on the `116-ng-parser-adoption` branch; PR #2637).
 - **Spec 116's Tier B ruling** (2026-11-10: KM crew design review, owner accepted) moved these
   breaking changes out of 116 into this spec. It fixed their order (B3, then B1, then B2), the gates,
   and the rejected alternatives. This spec carries that ruling and does not reopen it.
-- **Spec 103** (first-class `if()` guards, ratified 2026-10-15) keeps guards as ordinary elements of
-  a rule's context and rejected a separate guard field. B2 conflicts with that (FR-030).
+- **Spec 103** (first-class `if()` guards, ratified 2026-10-15) kept guards as ordinary elements of
+  a rule's context and rejected a separate guard field. **Revised 2026-11-10 (owner ruling):** head
+  conditions become an ordered typed list (FR-030, Clarifications).
 
 **Depends on** spec 116 (PR #2637). It routes every rule-shape read and write through shared
 accessors, so this spec changes the accessors' insides, not their callers. **Unblocks** spec 118's
 pattern application (FR-012), which merges rules and should be written once against the new shape.
+
+## Clarifications
+
+### Session 2026-11-10
+
+- Q: B2 moves head guards out of the rule context, against spec 103's ratified placement, which
+  rejected a separate guard field because one field "cannot represent two-guard rules". Revise 103,
+  keep it and narrow B2, or defer B2? → A (Matthew, owner ruling): **Revise spec 103.** Head
+  conditions become an ordered typed list on the input side. A list holds two or more guards, which
+  answers 103's objection. A condition not at the head stays in the pre-context. Recorded as a dated
+  revision in spec 103.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -88,8 +100,8 @@ rule carries an optional leading `nul`, the run of conditions at its head (`if`,
 `baselayout`), its pre-context and its keystroke. Tools ask which kind of rule they hold instead of
 inspecting markers.
 
-**Why this priority**: It completes the typed shape. It is P2 because it conflicts with spec 103's
-ratified guard placement and cannot start until that is ruled on (FR-030).
+**Why this priority**: It completes the typed shape. It is P2 because it comes last in the ruled
+order and revises spec 103's guard placement (FR-030).
 
 **Independent Test**: For every corpus rule, the left-hand-side kind and head conditions read from
 the model equal spec 116's accessor results, and emitting gives the same text.
@@ -189,11 +201,10 @@ before and after each phase.
 **B2, typed left-hand side**
 
 - **FR-030**: Each rule MUST have one typed left-hand side, `match`, `nomatch` or input. An input
-  side holds an optional leading `nul`, the head run of conditions, the pre-context and the
-  keystroke. A condition or `nul` not at the head stays a pre-context element.
-  [NEEDS CLARIFICATION: B2 moves head guards out of the rule context, against spec 103's ratified
-  placement. Revise spec 103 so head conditions become a typed list on the rule, or keep guards in
-  the context and limit B2 to the left-hand-side kind?]
+  side holds an optional leading `nul`, the head run of conditions as an ordered typed list (`if`,
+  `platform`, `baselayout`, repeatable), the pre-context and the keystroke. A condition or `nul` not
+  at the head stays a pre-context element where it was written. This revises spec 103's guard
+  placement (Clarifications, 2026-11-10).
 
 **Gates** (spec 116 FR-041)
 

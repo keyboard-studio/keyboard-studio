@@ -1,0 +1,16 @@
+{
+  "workflow": "speckit",
+  "specName": "Typed rule shape",
+  "branch": "117-typed-rule-shape",
+  "currentStep": "specify",
+  "status": "specified",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-10T22:12:14.008Z"
+    }
+  ]
+}

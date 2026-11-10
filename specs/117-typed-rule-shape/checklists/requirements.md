@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,8 +31,8 @@
 
 ## Notes
 
-- **Open:** one marker, FR-030 (B2 against spec 103's ratified guard placement). That is an owner
-  ruling.
+- **Resolved 2026-11-10 (owner ruling):** FR-030. Spec 103 is revised so head conditions are an
+  ordered typed list. Recorded in the spec's Clarifications and in spec 103's Status.
 - **Procedural gate:** FR-040 (joint engine and content session, contracts major bump) must be held
   before implementation. It is not a specification gap.
 - **Domain terms:** the spec uses Keyman terms (virtual key, modifier names, `if`/`platform`/

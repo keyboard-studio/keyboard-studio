@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-11-07",
+  "lastUpdated": "2026-11-10",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -1092,7 +1092,7 @@
     },
     "specs/103-first-class-if-guards": {
       "title": "Feature Specification: First-class `if()` guards in KeyboardIR",
-      "hash": "sha256:61626d8372652a28",
+      "hash": "sha256:14619a1ca9448100",
       "status": "implemented",
       "implements": [],
       "decisions": [],
@@ -1224,6 +1224,14 @@
     "specs/113-trial-and-publish-steps": {
       "title": "Feature Specification: Trial and Publish steps (split of the Output screen)",
       "hash": "sha256:697628078cf2c793",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/117-typed-rule-shape": {
+      "title": "Feature Specification: Typed rule shape",
+      "hash": "sha256:6816beae1924177c",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

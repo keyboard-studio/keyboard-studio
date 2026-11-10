@@ -10,6 +10,14 @@ pre-authorised once the spec 082 gate was verified met (gate verdict
 GATE MET, comment 6202484468, 2026-10-15: the 082 deliverables this spec
 depends on — kmAssist, rule builder, rule naming, live rules step — landed
 in PR #1852).
+**Revised 2026-11-10 (Matthew, owner ruling in spec 117):** the guard
+*placement* below is superseded for guards at the head of a rule. Spec 117
+(B2) gives each input rule an ordered typed list of head conditions (`if`,
+`platform`, `baselayout`, repeatable). A list holds two or more guards, so
+the two-guard objection to a separate field no longer applies. A guard that
+is not at the head stays a context element, as here. The `if` variant's
+shape (`store`, `value`, equality only) is unchanged. See
+[spec 117](../117-typed-rule-shape/spec.md).
 The FR-009 corpus round-trip vectors are a hard merge gate for the
 implementation PR, not a start precondition. Open question 1 is settled by
 the ruling: equality-only modelling stands, `<>` stays opaque per FR-003.
