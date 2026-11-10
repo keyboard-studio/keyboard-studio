@@ -62,6 +62,11 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) => {
     applyTouchKeycapRemovalsToVfs: applyTouchKeycapRemovalsToVfsSpy,
     applyKeyEditsToVfs: applyKeyEditsToVfsSpy,
     emitKmn: emitKmnSpy,
+    // A copy-mode write goes through the emit stage; keep the spy on the full emit.
+    emitStage: (state: { ir: unknown }, mode: { kind: string }) =>
+      mode.kind === "copy"
+        ? { ok: true, text: emitKmnSpy(state.ir) }
+        : (original.emitStage as (s: unknown, m: unknown) => unknown)(state, mode),
   };
 });
 

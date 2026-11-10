@@ -3,6 +3,7 @@
 // with identical options and report the same site keys (SC-005).
 
 import type { ClassifyOptions, LdmlExportMetadata } from "@keyboard-studio/engine";
+import { emitOutputTree, type EmittedOutput } from "./emitAdapter.ts";
 import packageJson from "../../package.json";
 
 /** The studio build the export comment names. Read from the package, never the clock. */
@@ -21,4 +22,9 @@ export function ldmlClassifyOptions(
     attribution: metadata.attributionText !== "",
     provenanceRecord: true,
   };
+}
+
+/** The emitted tree the LDML exporter reads: the same stage as the download, not a second projection. */
+export async function emitLdmlProjection(): Promise<EmittedOutput | null> {
+  return emitOutputTree();
 }

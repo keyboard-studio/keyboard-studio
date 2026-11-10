@@ -33,7 +33,7 @@
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { PublishManagedPRError } from "@keyboard-studio/contracts";
-import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
+import { emitOutputTree } from "../lib/emitAdapter.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import {
@@ -417,8 +417,8 @@ export function ManagedPRSubmitPanel({
       // for the author's agreement; declining cancels the submission.
       const projected = await reformatConsent.guard(async (consented) => {
         const out = consented
-          ? await projectWorkingCopyForOutput({ consentedReemit: true })
-          : await projectWorkingCopyForOutput();
+          ? await emitOutputTree({ consentedReemit: true })
+          : await emitOutputTree();
         if (out?.reformatRequired !== undefined && !consented) {
           throw new ReformatConsentRequiredError(out.reformatRequired);
         }

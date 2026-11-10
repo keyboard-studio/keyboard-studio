@@ -98,3 +98,9 @@ export function createOutputService(): OutputService {
     },
   };
 }
+
+// The single .kmn emit stage (spec 118).
+export { emit } from "./emit.js";
+export type { EmitState, EmitMode, EmitResult } from "./emit.js";
+export { openSplice } from "./openSplice.js";
+export type { OpenSpliceInput, OpenSpliceResult } from "./openSplice.js";

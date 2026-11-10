@@ -1239,3 +1239,7 @@ export type { KmnEdit, InsertAnchor, SpliceKmnResult } from "./pattern-apply/spl
 export * from "./caps/index.js";
 // Spec 111 T059b/T059c - touch modifier-key and symbols-layer upgrade fixers.
 export * from "./touch-upgrades/index.js";
+
+// The single .kmn emit stage (spec 118); named apart from the codec's `emitKmn`.
+export { emit as emitStage, openSplice } from "./output/index.js";
+export type { EmitState, EmitMode, EmitResult, OpenSpliceInput, OpenSpliceResult } from "./output/index.js";

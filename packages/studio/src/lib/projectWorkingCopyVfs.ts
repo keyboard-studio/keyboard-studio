@@ -112,8 +112,6 @@ import {
   applyKeyEditsToVfs,
   parseTouchKeyAddress,
   parseKmn,
-  emitKmn,
-  projectKmnText,
   resetIdentity,
   renameFilesInVfs,
   parseSlotId,
@@ -146,6 +144,7 @@ import { claimedInputRuleIds } from "./claimedInputs.ts";
 import { deriveCasedKeys } from "./casedKeysDerivation.ts";
 import type { CapsHandlingValue } from "../decisions/decisionTypes.ts";
 import { withCurrentSpans } from "./openMode.ts";
+import { writeKmnThroughEmit } from "./emitKmnWriter.ts";
 
 /** Violation scan that never throws: an unparseable .kmn is reported elsewhere. */
 function safeFormViolations(
@@ -573,34 +572,15 @@ export function projectWorkingCopyVfs(
   const openMode = input.openMode;
   const reformatRequired: string[] = [];
 
-  // Writes a changed `.kmn`: a splice into the current text on Open (FR-008),
-  // a full emit otherwise. `currentText`/`currentIr` are the file as the VFS
-  // holds it right now, so node ids and line spans agree by construction.
+  // Writes a changed `.kmn` through the single emit stage (a splice on Open,
+  // a full emit otherwise); see emitKmnWriter.
+  const writerCtx = { vfs, openMode, warnings, reformatRequired };
   const writeKmn = (
     path: string,
     currentText: string,
     currentIr: KeyboardIR,
     nextIr: KeyboardIR,
-  ): void => {
-    if (openMode === undefined) {
-      vfs.set(path, emitKmn(nextIr), false);
-      return;
-    }
-    const projected = projectKmnText(currentText, currentIr, nextIr);
-    if (projected.ok) {
-      vfs.set(path, projected.text, false);
-      return;
-    }
-    if (openMode.consentedReemit === true) {
-      vfs.set(path, emitKmn(nextIr), false);
-      warnings.push(`[open] ${path} was reformatted with the author's agreement (${projected.reason})`);
-      return;
-    }
-    reformatRequired.push(path);
-    warnings.push(
-      `[open] ${path} cannot be updated in place (${projected.reason}); it needs the author's agreement to be reformatted and was left unchanged`,
-    );
-  };
+  ): void => writeKmnThroughEmit(writerCtx, path, currentText, currentIr, nextIr);
 
   // Step 0: Touch layout injection — write the Phase E touch layout JSON into
   // `source/<keyboardId>.keyman-touch-layout` before any other projection step.

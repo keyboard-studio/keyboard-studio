@@ -25,7 +25,8 @@
 // download click and emits no live diagnostics into the editor.
 
 import type { CompilerDiagnostic, VirtualFS } from "@keyboard-studio/contracts";
-import { projectWorkingCopyForOutput, zipProjectedVfs, type ProjectForOutputOptions } from "./serializeWorkingCopy.ts";
+import { zipProjectedVfs, type ProjectForOutputOptions } from "./serializeWorkingCopy.ts";
+import { emitOutputTree } from "./emitAdapter.ts";
 import type { KeymanGapComparison, KeymanMessage, LdmlExportInput, LdmlProfileId } from "@keyboard-studio/engine";
 import {
   getBuildKmp,
@@ -45,7 +46,7 @@ export { ReformatConsentRequiredError };
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getLayoutFamilyAnswer, getPickedWindowsLayouts } from "./layoutFamily.ts";
 import { resolveLdmlBaseLayout } from "./ldmlBaseLayout.ts";
-import { LDML_STUDIO_VERSION } from "./ldmlExportInputs.ts";
+import { LDML_STUDIO_VERSION, emitLdmlProjection } from "./ldmlExportInputs.ts";
 import { buildLdmlExportMetadata, collectLdmlPackageFiles } from "./ldmlExportMetadata.ts";
 import { readVfsText } from "./vfsText.ts";
 
@@ -101,7 +102,7 @@ export class OutputBundleError extends Error {
  * any (spec 094 contracts C3), so the source zip is always the publish tree.
  */
 export async function buildOutputBundle(opts?: ProjectForOutputOptions): Promise<OutputBundle | null> {
-  const projected = await projectWorkingCopyForOutput(opts);
+  const projected = await emitOutputTree(opts);
   if (projected === null) return null;
   // Open (spec 111 FR-009): files that could not be updated in place wait for
   // the author's agreement; nothing is delivered without it.
@@ -291,7 +292,7 @@ const ANSI_ONLY_MESSAGE =
 async function resolveLdmlExportInput(
   profileId: LdmlProfileId,
 ): Promise<{ input: LdmlExportInput; warnings: string[] }> {
-  const projected = await projectWorkingCopyForOutput();
+  const projected = await emitLdmlProjection();
   if (projected === null) {
     throw new OutputBundleError("Nothing to export: select a keyboard first.");
   }

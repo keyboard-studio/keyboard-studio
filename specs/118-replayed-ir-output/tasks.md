@@ -59,22 +59,22 @@ it through an adapter. No behaviour change. Fixes are already in Phase 2.
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T012** [P] [US1] `emit(state, mode)` entry and the `unedited` and `copy` modes · `packages/engine/src/output/emit.ts` (new) + `packages/engine/src/output/emit.test.ts` (new)
-- [ ] **T013** [P] [US1] `open` mode: splice changed nodes into the author's text (spec 111); no reformat without consent · `packages/engine/src/output/openSplice.ts` (new) + `packages/engine/src/output/openSplice.test.ts` (new)
+- [x] **T012** [P] [US1] `emit(state, mode)` entry and the `unedited` and `copy` modes · `packages/engine/src/output/emit.ts` (new) + `packages/engine/src/output/emit.test.ts` (new)
+- [x] **T013** [P] [US1] `open` mode: splice changed nodes into the author's text (spec 111); no reformat without consent · `packages/engine/src/output/openSplice.ts` (new) + `packages/engine/src/output/openSplice.test.ts` (new)
 
 **⟶ Wait for Wave 1 to finish, then:**
 
 **Wave 2 — independent (different files):**
 
-- [ ] **T014** [US1] Studio adapter: builds `state` and file-level inputs (descriptor, id renames, docs, fonts) and calls `emit` · `packages/studio/src/lib/emitAdapter.ts` (new) + `emitAdapter.test.ts` (new). Needs T012, T013.
-- [ ] **T015** [P] [US1] Switch LDML export to the adapter · `packages/studio/src/lib/ldmlExportInputs.ts`
-- [ ] **T016** [P] [US1] Switch download, source archive and pull-request paths to the adapter · `packages/studio/src/lib/buildOutputBundle.ts`
+- [x] **T014** [US1] Studio adapter: builds `state` and file-level inputs (descriptor, id renames, docs, fonts) and calls `emit` · `packages/studio/src/lib/emitAdapter.ts` (new) + `emitAdapter.test.ts` (new). Needs T012, T013.
+- [x] **T015** [P] [US1] Switch LDML export to the adapter · `packages/studio/src/lib/ldmlExportInputs.ts`
+- [x] **T016** [P] [US1] Switch download, source archive and pull-request paths to the adapter · `packages/studio/src/lib/buildOutputBundle.ts`
 
 **⟶ Wait for Wave 2 to finish, then:**
 
 **Wave 3:**
 
-- [ ] **T017** [US1] Agreement and golden gate: preview, download, archive, pull request and LDML agree for every fixture walk (SC-001); rebuild time re-measured against T001 (FR-032) · `packages/studio/src/lib/emitAgreement.test.ts` (new), `specs/118-replayed-ir-output/evidence/baseline.md`
+- [x] **T017** [US1] Agreement and golden gate: preview, download, archive, pull request and LDML agree for every fixture walk (SC-001); rebuild time re-measured against T001 (FR-032) · `packages/studio/src/lib/emitAgreement.test.ts` (new), `specs/118-replayed-ir-output/evidence/baseline.md`
 
 **Checkpoint**: one `emit` used by every output path (FR-014); no caller re-reads generated text.
 

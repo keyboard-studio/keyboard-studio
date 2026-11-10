@@ -155,6 +155,54 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-11-10T22:40:52.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T22:55:12.003Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T22:55:12.109Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T23:07:14.487Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T23:07:14.606Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T23:07:14.734Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T23:07:14.844Z"
     }
   ],
   "unattended": true,
@@ -325,7 +373,7 @@
       ]
     }
   },
-  "currentTask": "T011",
+  "currentTask": "T017",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -426,6 +474,58 @@
         "packages/studio/src/lib/projectWorkingCopyVfs.ts",
         "packages/studio/src/lib/openMode.styleLine.test.ts",
         "packages/studio/src/lib/projectWorkingCopyVfs.open.test.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "emit(state, mode) with unedited and copy modes",
+      "files": [
+        "packages/engine/src/output/emit.ts",
+        "packages/engine/src/output/emit.test.ts",
+        "packages/engine/src/output/index.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "open mode splice, consent required for reformat",
+      "files": [
+        "packages/engine/src/output/openSplice.ts",
+        "packages/engine/src/output/openSplice.test.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "studio adapter and emit writer; projection writeKmn goes through emit",
+      "files": [
+        "packages/studio/src/lib/emitAdapter.ts",
+        "packages/studio/src/lib/emitAdapter.test.ts",
+        "packages/studio/src/lib/emitKmnWriter.ts",
+        "packages/studio/src/lib/projectWorkingCopyVfs.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "LDML export reads the adapter",
+      "files": [
+        "packages/studio/src/lib/ldmlExportInputs.ts",
+        "packages/studio/src/lib/buildOutputBundle.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "download, archive and PR paths read the adapter",
+      "files": [
+        "packages/studio/src/lib/buildOutputBundle.ts",
+        "packages/studio/src/components/ManagedPRSubmitPanel.tsx"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "agreement test across tree, archive and LDML; rebuild time re-measured and appended to baseline",
+      "files": [
+        "packages/studio/src/lib/emitAgreement.test.ts",
+        "specs/118-replayed-ir-output/evidence/baseline.md"
       ]
     }
   },
