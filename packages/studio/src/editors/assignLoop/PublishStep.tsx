@@ -142,6 +142,8 @@ export function PublishStep({ onComplete, onBack }: EditorStepProps) {
   // single source for the download control's announced id — see
   // downloadKeyboardId below.
   const identity = useWorkingCopyStore((s) => s.identity);
+  const startLicenseText = useWorkingCopyStore((s) => s.startLicenseText);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
 
   // Output-time staleness gate. staleSteps.has(TOUCH_STEP_ID) already implies
   // the touch step was completed (a touchLayoutJson side-car was written) and
@@ -288,6 +290,8 @@ export function PublishStep({ onComplete, onBack }: EditorStepProps) {
             {...(touchBlockerStep !== undefined ? { touchBlockerStep } : {})}
             coverageGate={coverageGate}
             licenseUnparseable={licenseUnparseable}
+            startLicenseText={startLicenseText}
+            startIr={startIr}
             attributionMissing={attributionMissing}
             {...(attributionBlockerStep !== undefined ? { attributionBlockerStep } : {})}
             resolveStartHolder={resolveStartHolder}

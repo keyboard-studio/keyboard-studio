@@ -23,10 +23,13 @@
 import { useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { formatCoverageBannerParts, type InventoryCoverageGate } from "../lib/unimplementedInventory.ts";
 import { jumpToLocation } from "../lib/jumpToLocation.ts";
+import { startCopyrightHolders } from "../lib/startCopyrightHolders.ts";
 import { unreachableReasonLabel } from "../decisions/progressDots.ts";
 import type { ActiveStepId } from "../stores/surveySessionStore.ts";
+import { StartHolderResolver } from "./StartHolderResolver.tsx";
 
 /** An inline link-styled button inside a status banner (spec 094 "Open" controls). */
 const BANNER_LINK_STYLE: React.CSSProperties = {
@@ -59,6 +62,8 @@ export interface OutputGateBannersProps {
   coverageGate: InventoryCoverageGate;
   /** The base's own copyright notice could not be read (spec 064 D5). */
   licenseUnparseable: { reason: string; line: string } | null;
+  startLicenseText: string | null;
+  startIr: KeyboardIR | null;
   /** No attribution captured at all (spec 064 D6). */
   attributionMissing: boolean;
   /** The step that fixes missing attribution, from `outputBlockers()`. */
@@ -73,11 +78,14 @@ export function OutputGateBanners({
   touchBlockerStep,
   coverageGate,
   licenseUnparseable,
+  startLicenseText,
+  startIr,
   attributionMissing,
   attributionBlockerStep,
   resolveStartHolder,
 }: OutputGateBannersProps) {
   const { t, i18n } = useLingui();
+  const startHolderCandidates = startCopyrightHolders(startLicenseText, null, startIr);
 
   const {
     unimplementedDesktop,
@@ -235,53 +243,10 @@ export function OutputGateBanners({
               it needs confirming before it can be downloaded.
             </Trans>
           </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const input = e.currentTarget.elements.namedItem(
-                "startHolder",
-              ) as HTMLInputElement | null;
-              if (input !== null) resolveStartHolder(input.value);
-            }}
-            style={{ display: "flex", gap: 6, alignItems: "center" }}
-          >
-            <input
-              name="startHolder"
-              type="text"
-              aria-label={t({
-                id: "output.status.licenseUnreadable.holderLabel",
-                message: "Original copyright holder",
-              })}
-              placeholder={t({
-                id: "output.status.licenseUnreadable.holderPlaceholder",
-                message: "Original copyright holder",
-              })}
-              style={{
-                flex: 1,
-                padding: "5px 8px",
-                background: "var(--app-bg)",
-                color: "var(--app-text)",
-                border: "1px solid var(--app-border)",
-                borderRadius: 4,
-                fontSize: 12,
-              }}
-            />
-            <button
-              type="submit"
-              data-testid="resolve-base-holder"
-              style={{
-                padding: "5px 12px",
-                background: "var(--app-accent)",
-                color: "var(--app-text-on-accent)",
-                border: "1px solid var(--app-border)",
-                borderRadius: 4,
-                fontSize: 12,
-                cursor: "pointer",
-              }}
-            >
-              <Trans id="output.status.licenseUnreadable.confirm">Confirm</Trans>
-            </button>
-          </form>
+          <StartHolderResolver
+            candidates={startHolderCandidates}
+            onResolve={resolveStartHolder}
+          />
         </div>
       )}
       {/* spec 064 D6 — no attribution captured at all. Not an error the

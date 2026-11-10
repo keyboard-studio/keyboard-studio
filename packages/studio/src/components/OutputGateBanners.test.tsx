@@ -12,6 +12,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import type { InventoryCoverageGate } from "../lib/unimplementedInventory.ts";
+import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { OutputGateBanners } from "./OutputGateBanners.tsx";
 
 const jumpToLocation = vi.fn(
@@ -44,6 +45,8 @@ function renderBanners(overrides: Partial<React.ComponentProps<typeof OutputGate
       touchStale={false}
       coverageGate={OPEN_GATE}
       licenseUnparseable={null}
+      startLicenseText={null}
+      startIr={null}
       attributionMissing={false}
       resolveStartHolder={resolveStartHolder}
       {...overrides}
@@ -143,10 +146,39 @@ describe("OutputGateBanners — touch-stale / licence / attribution banners", ()
     });
     expect(screen.getByTestId("license-unreadable")).toBeTruthy();
     expect(document.body.textContent).toContain("Copyright (c) Some Author");
+    expect(screen.queryByTestId("start-holder-choices")).toBeNull();
     const input = screen.getByLabelText("Original copyright holder") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "Some Author" } });
     fireEvent.click(screen.getByTestId("resolve-base-holder"));
     expect(resolveStartHolder).toHaveBeenCalledWith("Some Author");
+  });
+
+  it("offers a labelled holder choice without confirming it until Confirm is pressed", () => {
+    const { resolveStartHolder } = renderBanners({
+      licenseUnparseable: { reason: "unparseable", line: "Copyright (c) YYYY ______" },
+      startIr: {
+        header: { copyright: "(c) 2016 SIL  International" },
+      } as KeyboardIR,
+    });
+    const group = screen.getByRole("radiogroup");
+    expect(group.getAttribute("aria-labelledby")).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: "SIL International" }));
+    expect(resolveStartHolder).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("resolve-base-holder"));
+    expect(resolveStartHolder).toHaveBeenCalledWith("SIL  International");
+  });
+
+  it("keeps the free-text fallback available alongside holder choices", () => {
+    const { resolveStartHolder } = renderBanners({
+      licenseUnparseable: { reason: "unparseable", line: "Copyright (c) YYYY ______" },
+      startIr: {
+        header: { copyright: "(c) 2016 SIL  International" },
+      } as KeyboardIR,
+    });
+    const input = screen.getByLabelText("Original copyright holder");
+    fireEvent.change(input, { target: { value: "Someone Else" } });
+    fireEvent.click(screen.getByTestId("resolve-base-holder"));
+    expect(resolveStartHolder).toHaveBeenCalledWith("Someone Else");
   });
 
   it("shows the attribution banner and its 'Open language step' returns to the caller's step", () => {

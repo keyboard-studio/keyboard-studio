@@ -41,6 +41,8 @@ export function TrialStep({ onComplete, onBack }: EditorStepProps) {
   // across step changes, so the pipeline reads the settled store.
   const artifact = usePreviewArtifact();
   const builds = useTestingStore((s) => s.builds);
+  const startLicenseText = useWorkingCopyStore((s) => s.startLicenseText);
+  const startIr = useWorkingCopyStore((s) => s.startIr);
 
   const {
     startKeyboard,
@@ -179,6 +181,8 @@ export function TrialStep({ onComplete, onBack }: EditorStepProps) {
         {...(touchBlockerStep !== undefined ? { touchBlockerStep } : {})}
         coverageGate={coverageGate}
         licenseUnparseable={licenseUnparseable}
+        startLicenseText={startLicenseText}
+        startIr={startIr}
         attributionMissing={attributionMissing}
         {...(attributionBlockerStep !== undefined ? { attributionBlockerStep } : {})}
         resolveStartHolder={resolveStartHolder}
