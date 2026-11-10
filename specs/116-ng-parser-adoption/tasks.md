@@ -38,8 +38,8 @@ and push to `116-ng-parser-adoption` once its gate is green (the CLAUDE.md caden
 
 **Purpose**: baseline numbers every later gate compares against.
 
-- [ ] T001 Run `pnpm install && pnpm build`, then `pnpm -r test` and the engine corpus suite (`pnpm --filter @keyboard-studio/engine exec vitest run --config vitest.corpus.config.ts`). Record the pass counts and the `../keyboards` commit (`git -C ../keyboards rev-parse HEAD`) in `specs/116-ng-parser-adoption/evidence/baseline.md`. Create the `evidence/` directory.
-- [ ] T002 Write a corpus timing helper in `packages/engine/src/codec/reader-timing.ts`. It reads every `.kmn` under `../keyboards` (`release/` and `experimental/`, skipping `node_modules`/`build`), times a given `(text, id) => unknown` function per file, and returns `{ totalMs, slowest: {file, ms}, perFile }`. Add a corpus test `packages/engine/src/codec/reader-timing.corpus.test.ts` that records the **current** `parse()` baseline into `evidence/baseline.md`. It makes no assertion yet; T031 and T040 add the budget assertions.
+- [x] T001 Run `pnpm install && pnpm build`, then `pnpm -r test` and the engine corpus suite (`pnpm --filter @keyboard-studio/engine exec vitest run --config vitest.corpus.config.ts`). Record the pass counts and the `../keyboards` commit (`git -C ../keyboards rev-parse HEAD`) in `specs/116-ng-parser-adoption/evidence/baseline.md`. Create the `evidence/` directory.
+- [x] T002 Write a corpus timing helper in `packages/engine/src/codec/reader-timing.ts`. It reads every `.kmn` under `../keyboards` (`release/` and `experimental/`, skipping `node_modules`/`build`), times a given `(text, id) => unknown` function per file, and returns `{ totalMs, slowest: {file, ms}, perFile }`. Add a corpus test `packages/engine/src/codec/reader-timing.corpus.test.ts` that records the **current** `parse()` baseline into `evidence/baseline.md`. It makes no assertion yet; T031 and T040 add the budget assertions.
 
 ---
 

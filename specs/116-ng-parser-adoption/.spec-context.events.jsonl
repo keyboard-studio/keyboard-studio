@@ -1,0 +1,2 @@
+{"step": "implement", "substep": null, "task": "T001", "kind": "complete", "by": "ai", "at": "2026-11-10T11:25:13.184Z", "did": "Baseline recorded in evidence/baseline.md", "files": ["specs/116-ng-parser-adoption/evidence/baseline.md"]}
+{"step": "implement", "substep": null, "task": "T002", "kind": "complete", "by": "ai", "at": "2026-11-10T11:25:13.344Z", "did": "Corpus timing helper plus baseline test", "files": ["packages/engine/src/codec/reader-timing.ts", "packages/engine/src/codec/reader-timing.corpus.test.ts"]}

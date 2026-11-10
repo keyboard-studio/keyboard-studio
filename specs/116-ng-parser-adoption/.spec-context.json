@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "Adopt the Keyman next-generation KMN parser, and type the IR for multi-target export",
   "branch": "116-ng-parser-adoption",
-  "currentStep": "tasks",
-  "status": "ready-to-implement",
+  "currentStep": "implement",
+  "status": "implementing",
   "history": [
     {
       "step": "specify",
@@ -25,11 +25,59 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-11-10T11:00:16.658Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-10T11:00:51.507Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T11:25:13.184Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-10T11:25:13.344Z"
     }
   ],
   "decisions": [
     {
       "decision": "{\"id\":\"tier-b-split\",\"summary\":\"Option A: breaking IR changes (B3 modifiers, B1 keystroke, B2 typed LHS) move to a follow-on spec; B4 replaced by importer-report policy; prep accessors FR-032..038 land in 116\",\"by\":\"km-lead ruling, owner accepted 2026-11-10\"}"
     }
-  ]
+  ],
+  "unattended": true,
+  "currentTask": "T002",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Baseline recorded in evidence/baseline.md",
+      "files": [
+        "specs/116-ng-parser-adoption/evidence/baseline.md"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Corpus timing helper plus baseline test",
+      "files": [
+        "packages/engine/src/codec/reader-timing.ts",
+        "packages/engine/src/codec/reader-timing.corpus.test.ts"
+      ]
+    }
+  },
+  "step_summaries": {
+    "implement": {
+      "summary": "Phase 1 setup: baseline and timing helper"
+    }
+  },
+  "last_action": "Phase 1 done, T001-T002"
 }
