@@ -26,9 +26,21 @@ export class TokenBuffer {
  */
   public constructor(
     /** the list of Tokens produced by the Lexer */
-    private readonly list: Token[]
+    private readonly list: Token[],
+    /**
+     * LOCAL PATCH 3 (performance): an optional window [start, end) of the list,
+     * so a caller parsing one line at a time needs no copy of its tokens.
+     * Positions stay indices into `list`; `end` plays the part of list.length.
+     */
+    start: number = 0,
+    private readonly end: number = list.length
   ) {
+    this._currentPosition = start;
+    this.start = start;
   }
+
+  /** LOCAL PATCH 3: the window start (0 for a whole list). */
+  private readonly start: number;
 
   public get currentPosition() { return this._currentPosition; }
 
@@ -38,7 +50,7 @@ export class TokenBuffer {
    * @returns the current token or the EOF token
    */
   public currentToken(): Token {
-    return this._currentPosition == this.list.length ? this.eof : this.list[this._currentPosition] as Token;
+    return this._currentPosition == this.end ? this.eof : this.list[this._currentPosition] as Token;
   }
 
   /**
@@ -46,7 +58,7 @@ export class TokenBuffer {
    */
   public popToken(): void {
     // TODO-NG-COMPILER: consider if a warning is justified for popToken() when we are already at list.length
-    this._currentPosition = Math.min(this._currentPosition + 1, this.list.length);
+    this._currentPosition = Math.min(this._currentPosition + 1, this.end);
   }
 
   /**
@@ -56,7 +68,7 @@ export class TokenBuffer {
    */
   public resetCurrentPosition(save: number): void {
     // TODO-NG-COMPILER: fatal error if save < 0 or > length
-    this._currentPosition = Math.min(Math.max(0, save), this.list.length);
+    this._currentPosition = Math.min(Math.max(this.start, save), this.end);
   }
 
   /**

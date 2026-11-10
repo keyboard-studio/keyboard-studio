@@ -157,14 +157,25 @@ export abstract class SingleChildRuleWithASTRebuild extends SingleChildRule {
    * @returns true if this rule was successfully parsed
    */
   public override parse(tokenBuffer: TokenBuffer, node: ASTNode): boolean {
-    const tmp: ASTNode = new ASTNode();
+    // LOCAL PATCH 3 (performance): with prediction on, one scratch node per rule
+    // instance. The rule graph is a tree built by constructors, so an instance is
+    // never active twice at once, and the parent only takes the scratch node's
+    // children (every ASTRebuild returns the node it is given).
+    const tmp: ASTNode = Rule.prediction ? (this.scratch ??= new ASTNode()) : new ASTNode();
+    tmp.truncateChildren(0);
     // TODO-NG-COMPILER: fatal error if rule is null
     const parseSuccess: boolean = this.rule?.parse(tokenBuffer, tmp) ?? false;
     if (parseSuccess) {
-      node.addChildrenOf(this.strategy.apply(tmp));
+      const rebuilt = this.strategy.apply(tmp);
+      node.addChildrenOf(rebuilt);
+      if (rebuilt !== tmp) this.scratch = undefined; // a strategy kept the node: never reuse it
     }
+    tmp.truncateChildren(0);
     return parseSuccess;
   };
+
+  /** LOCAL PATCH 3: the reusable temporary node (see parse). */
+  private scratch: ASTNode | undefined = undefined;
 }
 
 /**

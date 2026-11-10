@@ -155,6 +155,16 @@ characters in Phase 2. Keys with modifiers in stores are left for the follow-on.
   on the 300 ms line, the next candidates are the per-line `tokens.slice` and the `TokenBuffer`
   per line (lowering owns that loop, T034), and the `ASTRebuild` temporary node.
 
+- **Decision (owner, 2026-11-10): lowering is AST-native, and a missed per-file cap scales by
+  size.** Before T034, measured: the legacy reader's element-level work (its total minus its
+  tokenizer) is about 630 ms over the corpus and about 115 ms on `hakka`. Re-parsing element text
+  with the `parse-shared.ts` helpers would add that to a lex + parse that already costs about
+  250 ms on `hakka` under vitest. So `lower.ts` walks the typed nodes (`STRING`, `U_CHAR`,
+  `VIRTUAL_KEY`, `ANY`, `INDEX`, …) directly, and uses the shared helpers only where the contract
+  needs their exact semantics on a value that has no typed node. If the full path still misses the
+  flat 300 ms on the largest keyboards at T040, the per-file cap becomes a per-MB budget, so large
+  keyboards are judged in proportion (the total stays at 2× baseline).
+
 - **Decision (comments, revising R2):** one lexer pass. The comment side-channel is a callback on
   non-emitted tokens, added in the same local lexer patch as the performance work. The two-pass wrap
   is rejected on the trial-run evidence.

@@ -79,7 +79,12 @@ function lexAndParseLines(text: string): unknown {
   return accepted;
 }
 
-describe.skipIf(!rootExists)("reader speed budget (lex + per-line parse)", () => {
+// Opt-in with KS_CORPUS_PERF=1, like spec 086's generation-time budget: a timing
+// budget is only meaningful when nothing else competes for the CPU, so CI runs
+// it in its own step rather than inside the parallel corpus sweep.
+const perfRun = process.env["KS_CORPUS_PERF"] === "1";
+
+describe.skipIf(!rootExists || !perfRun)("reader speed budget (lex + per-line parse)", () => {
   // The T031 speed gate: met after local patches 1 and 3 (PROVENANCE.md). See research R1.
   it("lexing plus per-line parsing stays within 2x baseline total and 300 ms per file", () => {
     const baseline = recordedBaselineTotalMs();

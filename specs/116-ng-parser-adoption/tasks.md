@@ -190,27 +190,27 @@ splitter, an offset accessor that matches kmcmplib, and a lint guard (FR-032 to 
 
 - [x] T032 [US1] `git mv packages/engine/src/codec/parse.ts packages/engine/src/codec/parse-legacy.ts` and rename its export to `parseLegacy`. Create a new `packages/engine/src/codec/parse.ts` that, for now, re-exports `parseLegacy` as `parse`, so every existing caller and test is untouched. Move helpers the new reader will share (`parseStoreItems`, `sketchStoreItems`, `extractProducedOutput`, the range decoders, the `nodeId` minter) from `parse-legacy.ts` into `packages/engine/src/codec/parse-shared.ts`, with no behaviour change. Run `pnpm --filter @keyboard-studio/engine exec vitest run src/codec`, which must pass unchanged.
 - [x] T033 [US1] Add the new reasons to `packages/engine/src/codec/opaque-reasons.ts`: `FOREIGN_COMPILE_TARGET: "foreign-compile-target"`, `REMOVED_STATEMENT: "removed-statement"` and `MULTI_ELEMENT_KEYSTROKE: "multi-element-keystroke"`, each with a comment. Keep `SMP_LITERAL` and note it is retained for persisted drafts. Add no catch-all.
-- [ ] T034 [US1] Implement the line loop in `packages/engine/src/codec/lower.ts`, per [contracts/lowering.md](contracts/lowering.md) §1:
+- [x] T034 [US1] Implement the line loop in `packages/engine/src/codec/lower.ts`, per [contracts/lowering.md](contracts/lowering.md) §1:
   1. Lex once, with `onTrivia` collecting records for US2 (stored, unused for now).
   2. Split at `NEWLINE`.
   3. Parse each slice with the exported `LineRule`. A line counts as accepted only if the parse returns true **and** every token is consumed.
   4. A rejected line becomes a `RawKmnFragment` with a classified reason: `removed-statement` for `fix`/`clearcontext`/`switch`/`key`, `foreign-compile-target` for `$kmfl`/`$weaver`. Any unclassified rejection throws an internal error naming the line, so the comparison suite surfaces it; it is never a catch-all.
   5. Never call upstream `Parser.parse()`.
-- [ ] T035 [US1] Implement header, store and group lowering in `packages/engine/src/codec/lower.ts`, per [contracts/lowering.md](contracts/lowering.md) §2 rows `compileTarget`, `systemStoreAssign`, `normalStoreAssign`, `headerAssign`/`capsLockHeader`, `beginStatement` and `groupStatement`. Reuse the `parse-shared.ts` helpers so store items, sketches, ranges and menu literals behave exactly as today (research R6). Set `sourceLine`, `groupNodeId`, `targetSelector` and the `IRHeader` fields as `parse-legacy.ts` does.
-- [ ] T036 [US1] Implement rule lowering in `packages/engine/src/codec/lower.ts`, per [contracts/lowering.md](contracts/lowering.md) §2 rows `productionBlock`, `ifLikeStatement`, `keystroke`, `rhsBlock`/`outputStatement` and `text`/`simpleText`:
+- [x] T035 [US1] Implement header, store and group lowering in `packages/engine/src/codec/lower.ts`, per [contracts/lowering.md](contracts/lowering.md) §2 rows `compileTarget`, `systemStoreAssign`, `normalStoreAssign`, `headerAssign`/`capsLockHeader`, `beginStatement` and `groupStatement`. Reuse the `parse-shared.ts` helpers so store items, sketches, ranges and menu literals behave exactly as today (research R6). Set `sourceLine`, `groupNodeId`, `targetSelector` and the `IRHeader` fields as `parse-legacy.ts` does.
+- [x] T036 [US1] Implement rule lowering in `packages/engine/src/codec/lower.ts`, per [contracts/lowering.md](contracts/lowering.md) §2 rows `productionBlock`, `ifLikeStatement`, `keystroke`, `rhsBlock`/`outputStatement` and `text`/`simpleText`:
   - Build `context` through `makeRule` (T006), so the separator placement matches the old reader.
   - Keep every semantic check that produces today's reasons (`indexed-context`, `if-option-store` for `<>` or non-head `if`, `option-store-directive`, `call-return`, `outs-expansion`, ranges, menu stores).
   - Lower SMP `U_CHAR` and `NAMED_CONSTANT` to characters.
   - Set `producedOutput` on rule fragments, using the shared helper.
-- [ ] T037 [US1] Make the minting order in `lower.ts` match `parse-legacy.ts` for every node kind, with the same prefixes and sequence, so `nodeId`s are equal for the same source.
-- [ ] T038 [US1] Write the comparison suite `packages/engine/src/codec/reader-differential.corpus.test.ts`. For every corpus `.kmn` plus every `.kmn` fixture under `packages/engine/src/codec/**/__fixtures__` and the inline sources in existing codec tests, run `parseLegacy` and the new `lower()`, then compare:
+- [x] T037 [US1] Make the minting order in `lower.ts` match `parse-legacy.ts` for every node kind, with the same prefixes and sequence, so `nodeId`s are equal for the same source.
+- [x] T038 [US1] Write the comparison suite `packages/engine/src/codec/reader-differential.corpus.test.ts`. For every corpus `.kmn` plus every `.kmn` fixture under `packages/engine/src/codec/**/__fixtures__` and the inline sources in existing codec tests, run `parseLegacy` and the new `lower()`, then compare:
   1. `normaliseForComparison` deep equality with **comments excluded** (the known gap until US2);
   2. `emit()` text equality;
   3. the raw `nodeId` sequence;
   4. `ImportStatus` (never worse).
 
   Read differences against `specs/116-ng-parser-adoption/evidence/allow-list.json` (`{file, line, old, new, reason}` entries). Write `specs/116-ng-parser-adoption/evidence/reader-differential.md` with per-file results, per-reason counts old against new, and timing. Seed the allow-list with the 2 `fix` lines in `experimental/gff/gff_geez_emufi/extras/gff_geez_emufi-pua.kmn:1342,1346`; the reason is "Keyman-19 removed statement; old reader dropped the `''`" (research R1, finding 4).
-- [ ] T039 [US1] Iterate on `lower.ts` until T038 shows no unlisted difference. Each remaining difference must be fixed or added to `allow-list.json` with a reason. Expect `smp-literal` fragments to become typed characters: add **one** allow-list rule for that class, with per-file counts in the report, rather than 2,308 entries.
+- [x] T039 [US1] Iterate on `lower.ts` until T038 shows no unlisted difference. Each remaining difference must be fixed or added to `allow-list.json` with a reason. Expect `smp-literal` fragments to become typed characters: add **one** allow-list rule for that class, with per-file counts in the report, rather than 2,308 entries.
 - [ ] T040 [US1] Switch `packages/engine/src/codec/parse.ts` to call `lower()`, keeping `parseLegacy` importable only by the comparison suite. Add the reader's full path (lex + parse + lower) to the budget assertion in `reader-timing.corpus.test.ts` (≤ 2× baseline total, ≤ 300 ms slowest). Then run:
   - `pnpm --filter @keyboard-studio/engine exec vitest run src/codec`, where every existing test passes unchanged except where an allow-listed class applies;
   - the engine corpus suite;

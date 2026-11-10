@@ -93,7 +93,13 @@ export class Lexer {
      * table marks emit:false (comments, whitespace, continuations). Does not change which
      * tokens are emitted. See PROVENANCE.md.
      */
-    private readonly onTrivia?: (token: Token) => void
+    private readonly onTrivia?: (token: Token) => void,
+    /**
+     * LOCAL PATCH 2: when given, onTrivia is called only for these trivia token
+     * types, so a caller that wants comments alone does not pay for a Token per
+     * whitespace run.
+     */
+    private readonly triviaTypes?: ReadonlySet<TokenType>
   ) {
   }
 
@@ -141,7 +147,7 @@ export class Lexer {
       if (recognizer.regExp.test(this.buffer)) {
         const matchEnd  = recognizer.regExp.lastIndex;
         const matchText = this.buffer.slice(this.offset, matchEnd);
-        if (!recognizer.emit && this.onTrivia) {
+        if (!recognizer.emit && this.onTrivia && (this.triviaTypes === undefined || this.triviaTypes.has(recognizer.tokenType))) {
           this.onTrivia(new Token(recognizer.tokenType, matchText, this.lineNum, this.charNum, undefined, this.filename));
         }
         // if handleContinuation is true, no CONTINUATIONs will be emitted,

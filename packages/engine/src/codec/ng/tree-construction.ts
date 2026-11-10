@@ -83,6 +83,11 @@ export class ASTNode {
     return this.children.length;
   }
 
+  /** LOCAL PATCH 3 (performance): the child at index `i` (0 <= i < childCount), without a copy. */
+  public childAt(i: number): ASTNode {
+    return this.children[i] as ASTNode;
+  }
+
   /**
    * LOCAL PATCH 3 (performance): drop the children added after `length`,
    * undoing what a failed parse attempt wrote into this node.

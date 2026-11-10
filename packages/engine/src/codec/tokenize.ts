@@ -109,84 +109,68 @@ export function tokenize(source: string): Token[] {
   const tokens: Token[] = [];
 
   for (const { text, line } of logicalLines) {
-    let trimmed = text.trim();
-
-    // Blank lines
-    if (trimmed === "") {
-      tokens.push({ kind: "blank", text: "", line, col: 1 });
-      continue;
-    }
-
-    // Column of first non-whitespace (computed BEFORE stripping the prefix
-    // so error messages still point at the source column the user sees).
-    const col = text.search(/\S/) + 1;
-
-    // Target-selector prefix: $keyman:, $keymanweb:, $keymanonly:
-    // Stripped here so the rest of the line classifies as the underlying
-    // kind (store / rule / etc.) and we don't pollute downstream parsers.
-    let targetSelector: TargetSelector | undefined;
-    const prefixMatch = TARGET_PREFIX_RE.exec(trimmed);
-    if (prefixMatch) {
-      targetSelector = (prefixMatch[1] ?? "").toLowerCase() as TargetSelector;
-      trimmed = trimmed.slice(prefixMatch[0].length).trim();
-      // If after stripping the prefix nothing remains, treat as blank.
-      if (trimmed === "") {
-        tokens.push({ kind: "blank", text: "", line, col, targetSelector });
-        continue;
-      }
-    }
-    const pushToken = (kind: TokenKind, tokenText: string): void => {
-      const t: Token = { kind, text: tokenText, line, col };
-      if (targetSelector !== undefined) t.targetSelector = targetSelector;
-      tokens.push(t);
-    };
-
-    // Comment: starts with `c` followed by whitespace, or `c` alone
-    if (COMMENT_TRIMMED_RE.test(trimmed)) {
-      const commentText = trimmed.slice(1).trim();
-      pushToken("comment", commentText);
-      continue;
-    }
-
-    // begin directive
-    if (BEGIN_RE.test(trimmed)) {
-      pushToken("begin", trimmed);
-      continue;
-    }
-
-    // group declaration
-    if (GROUP_RE.test(trimmed)) {
-      pushToken("group", trimmed);
-      continue;
-    }
-
-    // store declaration (system or user)
-    if (STORE_RE.test(trimmed)) {
-      pushToken("store", trimmed);
-      continue;
-    }
-
-    // match / nomatch transition rules (no + prefix)
-    if (MATCH_RE.test(trimmed)) {
-      pushToken("match", trimmed);
-      continue;
-    }
-    if (NOMATCH_RE.test(trimmed)) {
-      pushToken("nomatch", trimmed);
-      continue;
-    }
-
-    // Rule: anything else that contains `>` (possibly with `+` prefix, or bare context)
-    // We treat any non-blank, non-directive line with `>` as a potential rule.
-    if (trimmed.includes(">")) {
-      pushToken("rule", trimmed);
-      continue;
-    }
-
-    // Fallthrough: unrecognized — treat as a rule token so the parser can
-    // generate a RawKmnFragment rather than silently losing the line.
-    pushToken("rule", trimmed);
+    tokens.push(classifyLine(text, line));
   }
 
   return tokens;
 }
+
+/**
+ * Classify one logical line (continuations already joined, BOM stripped)
+ * into its Token. Shared by tokenize() and the spec 116 reader (lower.ts),
+ * so both see the same line kinds, target selectors and trimmed text.
+ */
+export function classifyLine(text: string, line: number): Token {
+  let trimmed = text.trim();
+
+  // Blank lines
+  if (trimmed === "") {
+    return { kind: "blank", text: "", line, col: 1 };
+  }
+
+  // Column of first non-whitespace (computed BEFORE stripping the prefix
+  // so error messages still point at the source column the user sees).
+  const col = text.search(/\S/) + 1;
+
+  // Target-selector prefix: $keyman:, $keymanweb:, $keymanonly:
+  // Stripped here so the rest of the line classifies as the underlying
+  // kind (store / rule / etc.) and we don't pollute downstream parsers.
+  let targetSelector: TargetSelector | undefined;
+  const prefixMatch = TARGET_PREFIX_RE.exec(trimmed);
+  if (prefixMatch) {
+    targetSelector = (prefixMatch[1] ?? "").toLowerCase() as TargetSelector;
+    trimmed = trimmed.slice(prefixMatch[0].length).trim();
+    // If after stripping the prefix nothing remains, treat as blank.
+    if (trimmed === "") {
+      return { kind: "blank", text: "", line, col, targetSelector };
+    }
+  }
+  let kind: TokenKind;
+  let tokenText = trimmed;
+  if (COMMENT_TRIMMED_RE.test(trimmed)) {
+    // Comment: starts with `c` followed by whitespace, or `c` alone
+    kind = "comment";
+    tokenText = trimmed.slice(1).trim();
+  } else if (BEGIN_RE.test(trimmed)) {
+    kind = "begin";
+  } else if (GROUP_RE.test(trimmed)) {
+    kind = "group";
+  } else if (STORE_RE.test(trimmed)) {
+    kind = "store"; // system or user
+  } else if (MATCH_RE.test(trimmed)) {
+    kind = "match"; // match / nomatch transition rules (no + prefix)
+  } else if (NOMATCH_RE.test(trimmed)) {
+    kind = "nomatch";
+  } else {
+    // Rule: anything else (a non-blank, non-directive line with `>` is a
+    // potential rule; an unrecognized line is also treated as a rule token so
+    // the parser can generate a RawKmnFragment rather than silently losing it).
+    kind = "rule";
+  }
+  const t: Token = { kind, text: tokenText, line, col };
+  if (targetSelector !== undefined) t.targetSelector = targetSelector;
+  return t;
+}
+
+/** Strip a UTF-8 / UTF-16 BOM if present (exported for lower.ts). */
+export { stripBom };
