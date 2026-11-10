@@ -78,6 +78,23 @@ export class ASTNode {
     return this;
   }
 
+  /** LOCAL PATCH 3 (performance): the number of children, without a copy. */
+  public get childCount(): number {
+    return this.children.length;
+  }
+
+  /**
+   * LOCAL PATCH 3 (performance): drop the children added after `length`,
+   * undoing what a failed parse attempt wrote into this node.
+   *
+   * @param length the child count to restore
+   */
+  public truncateChildren(length: number): void {
+    if (this.children.length > length) {
+      this.children.length = length;
+    }
+  }
+
   /**
    * Add a new child node by type with optional token.
    *
@@ -134,7 +151,24 @@ export class ASTNode {
    * @returns the number of children of the required type
    */
   public numberOfChildrenOfType(requiredType: NodeType): number {
-    return this.getChildrenOfType(requiredType).length;
+    // LOCAL PATCH 3 (performance): count without building a filtered array
+    let count = 0;
+    for (const child of this.children) {
+      if (child.nodeType === requiredType) count++;
+    }
+    return count;
+  }
+
+  /** LOCAL PATCH 3 (performance): the only child of the type, or undefined if there are none or several. */
+  private soleChildOfType(requiredType: NodeType): ASTNode | undefined {
+    let found: ASTNode | undefined = undefined;
+    for (const child of this.children) {
+      if (child.nodeType === requiredType) {
+        if (found !== undefined) return undefined;
+        found = child;
+      }
+    }
+    return found;
   }
 
   /**
@@ -153,7 +187,11 @@ export class ASTNode {
    * @returns true if there is at least one child of the required type
    */
   public hasChildrenOfType(requiredType: NodeType): boolean  {
-    return this.getChildrenOfType(requiredType).length > 0;
+    // LOCAL PATCH 3 (performance): no filtered array
+    for (const child of this.children) {
+      if (child.nodeType === requiredType) return true;
+    }
+    return false;
   }
 
   /**
@@ -162,7 +200,7 @@ export class ASTNode {
    * @returns true if there is one and only one child
    */
   public hasSoleChild(): boolean  {
-    return this.getChildren().length == 1;
+    return this.children.length == 1; // LOCAL PATCH 3 (performance): no copy
   }
 
   /**
@@ -172,7 +210,7 @@ export class ASTNode {
    * @returns true if there is one and only one child of the required type
    */
   public hasSoleChildOfType(requiredType: NodeType): boolean  {
-    return this.getChildrenOfType(requiredType).length == 1;
+    return this.soleChildOfType(requiredType) !== undefined; // LOCAL PATCH 3 (performance)
   }
 
   /**
@@ -202,8 +240,8 @@ export class ASTNode {
    * @returns the sole child node or null
    */
   public getSoleChild(): ASTNode {
-    const children = this.getChildren();
-    return (children.length == 1) ? children[0] as ASTNode : null as never;
+    // LOCAL PATCH 3 (performance): no copy
+    return (this.children.length == 1) ? this.children[0] as ASTNode : null as never;
   }
 
   /**
@@ -212,8 +250,7 @@ export class ASTNode {
    * @returns the sole child node or null
    */
   public getSoleChildOfType(requiredType: NodeType): ASTNode {
-    const children = this.getChildrenOfType(requiredType);
-    return (children.length == 1) ? children[0] as ASTNode : null as never;
+    return this.soleChildOfType(requiredType) ?? null as never; // LOCAL PATCH 3 (performance)
   }
 
   /**
@@ -240,7 +277,8 @@ export class ASTNode {
    * @returns an array of child nodes
    */
   public removeChildren(): ASTNode[] {
-    const list = this.getChildren();
+    // LOCAL PATCH 3 (performance): hand over the array instead of copying it
+    const list = this.children;
     this.children = [];
     return list;
   }

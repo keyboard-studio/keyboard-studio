@@ -80,11 +80,8 @@ function lexAndParseLines(text: string): unknown {
 }
 
 describe.skipIf(!rootExists)("reader speed budget (lex + per-line parse)", () => {
-  // The vendored front end alone (lexer patched) is currently over budget: the per-line parse
-  // stage costs more than the whole budget. `it.fails` keeps CI green while recording that the
-  // gate is unmet; it turns red the moment the budget is met, which is the cue to make this a
-  // plain `it`. See research R1 (Profile) and evidence/baseline.md.
-  it.fails("lexing plus per-line parsing stays within 2x baseline total and 300 ms per file", () => {
+  // The T031 speed gate: met after local patches 1 and 3 (PROVENANCE.md). See research R1.
+  it("lexing plus per-line parsing stays within 2x baseline total and 300 ms per file", () => {
     const baseline = recordedBaselineTotalMs();
     const t = timeReader(ROOT, lexAndParseLines);
     console.log(

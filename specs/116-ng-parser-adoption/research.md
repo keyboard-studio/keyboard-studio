@@ -128,9 +128,32 @@ characters in Phase 2. Keys with modifiers in stores are left for the follow-on.
   `parser-equivalence.corpus.test.ts` checks the same thing in CI. Profile after the patch:
   combinator `parse` 30% self, GC 19%, lexer `matchToken` 14%, `ast-rebuild` `apply` 5%. The total
   now sits at the budget line and the slowest file just over it, so T031 stays unchecked and its
-  assertion stays `it.fails`. Next candidates, not yet done: write into the parent node and
-  truncate on failure instead of allocating a temporary `ASTNode` per attempt (the GC share); avoid
-  the per-line `tokens.slice` in the line loop.
+  assertion stays `it.fails`.
+
+- **Allocation patches (owner: "optimise away"). T031 met.** Three more changes, each behaviour-
+  preserving:
+  1. **Combinators build straight into the parent node and roll back on failure**
+     (`ASTNode.truncateChildren`) instead of allocating a temporary node per attempt. A failing
+     combinator adds nothing to its node, so this gives the same children in the same order.
+  2. **`ASTNode` queries without throwaway arrays.** `hasSoleChildOfType`, `getSoleChildOfType`,
+     `hasChildrenOfType`, `numberOfChildrenOfType` and `getSoleChild` now loop instead of
+     filtering or copying, and `removeChildren` hands over its array. `AddSystemStoreSource` runs on
+     every line and queries every system-store type, so this was a large share of the GC time.
+  3. **Lexer: no per-token options object and no match array.** The flags are passed positionally,
+     and a sticky `test()` plus a slice replaces `exec()[0]` (patch 1).
+
+  Results, whole corpus:
+
+  | Run | Total | Slowest |
+  |---|---|---|
+  | Standalone `tsx` bench | 1,441–1,498 ms | 212–234 ms (`hakka`) |
+  | Vitest, timing suite alone | 1,750–1,818 ms | 247–273 ms |
+  | Budget | 2,208 ms | 300 ms |
+
+  On `hakka` (575k tokens) lexing went from 133 ms to about 78 ms; parsing is about 115 ms. The
+  vitest margin on the slowest file is about 15%, and a slower CI runner eats into it. If CI flakes
+  on the 300 ms line, the next candidates are the per-line `tokens.slice` and the `TokenBuffer`
+  per line (lowering owns that loop, T034), and the `ASTRebuild` temporary node.
 
 - **Decision (comments, revising R2):** one lexer pass. The comment side-channel is a callback on
   non-emitted tokens, added in the same local lexer patch as the performance work. The two-pass wrap

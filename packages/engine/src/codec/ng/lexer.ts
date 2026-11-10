@@ -106,19 +106,21 @@ export class Lexer {
    * @return                   an array of all emitted tokens
    */
   public parse({addEOF=true, emitAll=false, handleContinuation=true}={}): Token[]  {
-    while (this.matchToken({addEOF, emitAll, handleContinuation}));
+    // LOCAL PATCH 1 (performance): flags passed positionally, no options object per token
+    while (this.matchTokenWith(addEOF, emitAll, handleContinuation));
     return this.tokenList;
   }
 
   /**
-   * Match a single token, pushing it onto the lexer tokenList if it is to be emitted
+   * Match a single token, pushing it onto the lexer tokenList if it is to be emitted.
+   * (Upstream `matchToken`, taking the flags positionally: LOCAL PATCH 1.)
    *
    * @param addEOF             add an end-of-file token if required
    * @param emitAll            whether to emit all tokens found
    * @param handleContinuation whether to combine continuation lines into a single line
    * @return                   whether a matching token was found
    */
-  private matchToken({addEOF, emitAll, handleContinuation}:{addEOF:boolean, emitAll:boolean, handleContinuation:boolean}): boolean {
+  private matchTokenWith(addEOF: boolean, emitAll: boolean, handleContinuation: boolean): boolean {
     let   tokenMatch: boolean = false;
 
 
@@ -134,26 +136,26 @@ export class Lexer {
       const recognizer: ScanRecognizer    = candidates[ri]!;
       const emitToken: boolean            = emitAll || recognizer.emit;
       recognizer.regExp.lastIndex         = this.offset;
-      const match: RegExpExecArray | null = recognizer.regExp.exec(this.buffer);
-
-      if (match) {
+      // LOCAL PATCH 1 (performance): a sticky test() plus a slice gives the same text as exec()[0]
+      // without allocating a match array
+      if (recognizer.regExp.test(this.buffer)) {
+        const matchEnd  = recognizer.regExp.lastIndex;
+        const matchText = this.buffer.slice(this.offset, matchEnd);
         if (!recognizer.emit && this.onTrivia) {
-          this.onTrivia(new Token(recognizer.tokenType, match[0], this.lineNum, this.charNum, undefined, this.filename));
+          this.onTrivia(new Token(recognizer.tokenType, matchText, this.lineNum, this.charNum, undefined, this.filename));
         }
-        // the line seen so far is the buffer text from the start of the line to the end of this match
-        const matchEnd = this.offset + match[0].length;
         // if handleContinuation is true, no CONTINUATIONs will be emitted,
         // nor will NEWLINEs that follow CONTINUATIONs be emitted
         if (recognizer.tokenType === TokenType.CONTINUATION) {
             if (handleContinuation) {
               this.seenContinuation = true;
             } else if (emitToken) { // not handling continuation and emitting CONTINUATION
-              this.tokenList.push(new Token(TokenType.CONTINUATION, match[0], this.lineNum, this.charNum, undefined, this.filename));
+              this.tokenList.push(new Token(TokenType.CONTINUATION, matchText, this.lineNum, this.charNum, undefined, this.filename));
             }
         } else if (recognizer.tokenType === TokenType.NEWLINE) {
           if ((handleContinuation && !this.seenContinuation) || !handleContinuation) {
             if (emitToken) { // emitting NEWLINE
-              this.tokenList.push(new Token(TokenType.NEWLINE, match[0], this.lineNum, this.charNum, this.buffer.slice(this.lineStart, matchEnd), this.filename));
+              this.tokenList.push(new Token(TokenType.NEWLINE, matchText, this.lineNum, this.charNum, this.buffer.slice(this.lineStart, matchEnd), this.filename));
             }
             this.lineStart = matchEnd; // reset on NEWLINE
           }
@@ -161,7 +163,7 @@ export class Lexer {
             this.seenContinuation = false; // as seen a NEWLINE
           }
         } else if (emitToken) { // emitting other tokens
-          this.tokenList.push(new Token(recognizer.tokenType, match[0], this.lineNum, this.charNum, undefined, this.filename));
+          this.tokenList.push(new Token(recognizer.tokenType, matchText, this.lineNum, this.charNum, undefined, this.filename));
         }
         tokenMatch  = true;
         this.offset = recognizer.regExp.lastIndex; // advance the buffer offset past the matched token
@@ -169,7 +171,7 @@ export class Lexer {
           this.lineNum += 1;
           this.charNum  = 1;
         } else {
-          this.charNum += match[0].length;
+          this.charNum += matchText.length;
         }
       }
     }

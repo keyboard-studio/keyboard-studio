@@ -80,10 +80,17 @@ export abstract class Rule { // equivalent to a no-child rule
     return this.firstCache;
   }
 
+  /** LOCAL PATCH 3: the set to test, or null when the rule may start with anything (filled on first use). */
+  private startTokens: ReadonlySet<TokenType> | null | undefined = undefined;
+
   /** LOCAL PATCH 3: true unless this rule certainly fails on a token of this type. */
   public mayStartWith(tokenType: TokenType): boolean {
-    const f = this.first();
-    return f.nullable || f.tokens === null || f.tokens.has(tokenType);
+    let tokens = this.startTokens;
+    if (tokens === undefined) {
+      const f = this.first();
+      tokens = this.startTokens = f.nullable ? null : f.tokens;
+    }
+    return tokens === null || tokens.has(tokenType);
   }
 
   /** LOCAL PATCH 3: FIRST set for a rule whose parse() is the class's own combinator parse. */
@@ -203,16 +210,29 @@ export class SequenceRule extends MultiChildRule {
     }
 
     const save = tokenBuffer.currentPosition;
-    const tmp  = new ASTNode();
 
+    if (!Rule.prediction) {
+      const tmp = new ASTNode();
+      for (const rule of this.rules) {
+        if (!rule.parse(tokenBuffer, tmp)) {
+          tokenBuffer.resetCurrentPosition(save);
+          return false;
+        }
+      }
+      node.addChildrenOf(tmp);
+      return true;
+    }
+
+    // LOCAL PATCH 3: build straight into node and roll back on failure
+    // (same children, in the same order, as building into a temporary node)
+    const mark = node.childCount;
     for (const rule of this.rules) {
-      if (!rule.parse(tokenBuffer, tmp)) {
+      if (!rule.parse(tokenBuffer, node)) {
+        node.truncateChildren(mark);
         tokenBuffer.resetCurrentPosition(save);
         return false;
       }
     }
-
-    node.addChildrenOf(tmp);
     return true;
   }
 
@@ -250,15 +270,26 @@ export class AlternateRule extends MultiChildRule {
       return false;
     }
 
-    // LOCAL PATCH 3: only the alternatives that can start with the current token, in order
-    const rules = Rule.prediction ? this.candidatesFor(tokenBuffer.currentToken().tokenType) : this.rules;
+    if (!Rule.prediction) {
+      for (const rule of this.rules) {
+        tmp = new ASTNode();
+        if (rule.parse(tokenBuffer, tmp)) {
+          node.addChildrenOf(tmp);
+          return true;
+        }
+      }
+      tokenBuffer.resetCurrentPosition(save);
+      return false;
+    }
 
-    for (const rule of rules) {
-      tmp = new ASTNode();
-      if (rule.parse(tokenBuffer, tmp)) {
-        node.addChildrenOf(tmp);
+    // LOCAL PATCH 3: only the alternatives that can start with the current token, in order,
+    // each built straight into node and rolled back on failure
+    const mark = node.childCount;
+    for (const rule of this.candidatesFor(tokenBuffer.currentToken().tokenType)) {
+      if (rule.parse(tokenBuffer, node)) {
         return true;
       }
+      node.truncateChildren(mark);
     }
 
     tokenBuffer.resetCurrentPosition(save);
@@ -314,12 +345,20 @@ export class OptionalRule extends SingleChildRule {
       return false;
     }
 
-    // LOCAL PATCH 3: the child certainly fails, which leaves the buffer where it is
-    if (Rule.prediction && !this.rule.mayStartWith(tokenBuffer.currentToken().tokenType)) {
+    const save = tokenBuffer.currentPosition;
+
+    if (Rule.prediction) {
+      // LOCAL PATCH 3: skip a certain failure; otherwise build into node, rolling back on failure
+      if (this.rule.mayStartWith(tokenBuffer.currentToken().tokenType)) {
+        const mark = node.childCount;
+        if (!this.rule.parse(tokenBuffer, node)) {
+          node.truncateChildren(mark);
+          tokenBuffer.resetCurrentPosition(save);
+        }
+      }
       return true;
     }
 
-    const save = tokenBuffer.currentPosition;
     const tmp  = new ASTNode();
 
     if (this.rule.parse(tokenBuffer, tmp)) {
@@ -368,12 +407,21 @@ export class ManyRule extends SingleChildRule {
       return false;
     }
 
-    while (true) {
-      // LOCAL PATCH 3: the child certainly fails, which leaves the buffer where it is
-      if (Rule.prediction && !this.rule.mayStartWith(tokenBuffer.currentToken().tokenType)) {
-        break;
+    if (Rule.prediction) {
+      // LOCAL PATCH 3: stop at a certain failure; build into node, rolling back a failed attempt
+      while (this.rule.mayStartWith(tokenBuffer.currentToken().tokenType)) {
+        const save = tokenBuffer.currentPosition;
+        const mark = node.childCount;
+        if (!this.rule.parse(tokenBuffer, node)) {
+          node.truncateChildren(mark);
+          tokenBuffer.resetCurrentPosition(save);
+          break;
+        }
       }
+      return true;
+    }
 
+    while (true) {
       const save = tokenBuffer.currentPosition;
       const tmp  = new ASTNode();
 
@@ -420,12 +468,26 @@ export class OneOrManyRule extends SingleChildRule {
   public override parse(tokenBuffer: TokenBuffer, node: ASTNode): boolean {
     // TODO-NG-COMPILER: fatal error if rule is null
     let anyParseSuccess: boolean = false;
-    do {
-      // LOCAL PATCH 3: the child certainly fails, which leaves the buffer where it is
-      if (Rule.prediction && this.rule != null && !this.rule.mayStartWith(tokenBuffer.currentToken().tokenType)) {
-        break;
-      }
 
+    if (Rule.prediction) {
+      if (this.rule == null) {
+        return false;
+      }
+      // LOCAL PATCH 3: stop at a certain failure; build into node, rolling back a failed attempt
+      while (this.rule.mayStartWith(tokenBuffer.currentToken().tokenType)) {
+        const save = tokenBuffer.currentPosition;
+        const mark = node.childCount;
+        if (!this.rule.parse(tokenBuffer, node)) {
+          node.truncateChildren(mark);
+          tokenBuffer.resetCurrentPosition(save);
+          break;
+        }
+        anyParseSuccess = true;
+      }
+      return anyParseSuccess;
+    }
+
+    do {
       const save = tokenBuffer.currentPosition;
       const tmp  = new ASTNode();
       if (this.rule?.parse(tokenBuffer, tmp)) {
