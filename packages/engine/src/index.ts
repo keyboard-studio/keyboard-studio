@@ -102,6 +102,8 @@ export {
   emitTouchLayout,
   TOUCH_LAYOUT_JSON_INDENT,
   OPAQUE_REASONS,
+  isKeyboardSource,
+  NOT_A_KEYBOARD_SOURCE_MESSAGE,
 } from "./codec/index.js";
 export type { ParseResult, OpaqueReason } from "./codec/index.js";
 

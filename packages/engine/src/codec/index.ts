@@ -5,6 +5,7 @@
 
 export { parse } from "./parse.js";
 export type { ParseResult } from "./parse.js";
+export { isKeyboardSource, NOT_A_KEYBOARD_SOURCE_MESSAGE } from "./keyboard-source.js";
 
 export { emit, emitRule, emitStore } from "./emit.js";
 
