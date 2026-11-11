@@ -76,10 +76,17 @@ export function splitTokens(text: string, splitSeparatorPlus = false): string[] 
       i = j + 1;
       continue;
     }
-    // bracket group [...]
+    // bracket group [...] — quote-aware, so a quoted key name such as
+    // [CTRL ALT SHIFT "]"] does not end the group at the quoted ']'.
     if (ch === "[") {
       let j = i + 1;
-      while (j < text.length && text[j] !== "]") j++;
+      let quote = "";
+      while (j < text.length && (quote !== "" || text[j] !== "]")) {
+        const c = text[j] ?? "";
+        if (quote !== "") { if (c === quote) quote = ""; }
+        else if (c === "'" || c === '"') quote = c;
+        j++;
+      }
       result.push(text.slice(i, j + 1));
       i = j + 1;
       continue;

@@ -58,3 +58,19 @@ describe("osk-frame.html — Content-Security-Policy meta tag", () => {
     expect(scriptSrcValue).not.toContain("unsafe-inline");
   });
 });
+
+describe("osk-frame.html — longpress popup overflow (Matthew 2026-11-11)", () => {
+  // KMW positions the longpress popup (#kmw-popup-keys) and the keytip ABOVE
+  // the OSK box's top edge — the Preview configures no predictive-text model,
+  // so there is no autosuggest banner holding that space open. #osk-host-frame
+  // used to clip it with overflow:hidden (a leftover from the Keyman Developer
+  // debug-host scaffold), hiding every top-row longpress entirely. The e2e in
+  // e2e/preview-longpress-popup.spec.ts proves the popup paints; this static
+  // guard keeps the one-line fix from being reverted silently in the unit lane.
+  it("#osk-host-frame lets the popup paint above the box", () => {
+    const ruleMatch = /#osk-host-frame\s*\{([^}]*)\}/.exec(frameHtml);
+    expect(ruleMatch, "#osk-host-frame rule must exist").not.toBeNull();
+    expect(ruleMatch![1]).toContain("overflow: visible");
+    expect(ruleMatch![1]).not.toContain("overflow: hidden");
+  });
+});

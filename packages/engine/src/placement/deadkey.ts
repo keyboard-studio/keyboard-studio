@@ -165,7 +165,7 @@ export function extractDeadkeyCandidatesFromRule(
   // rewrite form, where the guard is the rule context's first element
   // (a sourced guard such as platform('touch') is not one of the rewrite
   // spellings and keeps its existing treatment).
-  const firstCtx = rule.context[0];
+  const firstCtx = ruleContextElements(rule)[0];
   if (
     rule.targetSelector !== undefined ||
     (firstCtx?.kind === "raw" && isRewritePlatformGuard(firstCtx.text))

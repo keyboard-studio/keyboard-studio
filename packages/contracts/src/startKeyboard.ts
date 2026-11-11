@@ -40,7 +40,11 @@ export interface StartKeyboard {
 
   /**
    * POSIX path relative to the root of keymanapp/keyboards.
-   * Always under release/ and uses lowercase.
+   * Always under release/ and uses lowercase — except CLDR entries
+   * (`origin: "cldr"`, issue #2599), whose path is the pseudo-path
+   * `cldr/<platform>/<file>` (e.g. `cldr/windows/de-t-k0-windows.xml`):
+   * CLDR data is a second pinned source (Unicode License, not the corpus
+   * release tree), and the loader resolves it from `cldr`, never from `path`.
    * @example "release/b/basic_kbdus"
    * @see spec.md §8 step 1
    */
@@ -108,6 +112,44 @@ export interface StartKeyboard {
    * @see spec.md §8 step 1 (spec 080 amendment)
    */
   docProfile?: StartDocumentationProfile;
+
+  /**
+   * Where this start keyboard comes from. Absent means the corpus
+   * (`keymanapp/keyboards` release tree). `"cldr"` means a CLDR 43.1 legacy
+   * keyboard (issue #2599): `path` is then the pseudo-path
+   * `cldr/<platform>/<file>` (not a corpus path), and `cldr` names the
+   * source files the loader must fetch. The loader branches on this field;
+   * every other consumer treats a CLDR entry like any other start.
+   */
+  origin?: "corpus" | "cldr";
+
+  /**
+   * CLDR source files for an `origin: "cldr"` entry (issue #2599). The
+   * desktop file seeds the rules (windows > osx > chromeos precedence was
+   * already applied when the entry was built); the Android files seed the
+   * phone / tablet touch layouts. Absent for corpus entries.
+   */
+  cldr?: CldrStartSource;
+}
+
+/**
+ * CLDR 43.1 source files behind an `origin: "cldr"` start keyboard
+ * (issue #2599). File names are bare (`de-t-k0-windows.xml`); the loader
+ * resolves them against the pinned `release-43-1` tag.
+ */
+export interface CldrStartSource {
+  /** BCP47 tag, e.g. `de`, `az-Cyrl`. */
+  locale: string;
+  /** File-name variant, e.g. `extended`; `""` for the base file. */
+  variant: string;
+  /** Desktop platform of `desktopFile`, when a desktop file exists. */
+  desktopPlatform?: "windows" | "osx" | "chromeos";
+  /** Desktop file, e.g. `de-t-k0-windows.xml`. */
+  desktopFile?: string;
+  /** Android phone file, e.g. `de-t-k0-android.xml`. */
+  androidFile?: string;
+  /** Android 600dpi file (the tablet touch layout). */
+  tabletFile?: string;
 }
 
 /**
@@ -125,6 +167,10 @@ export type StartKeyboardInit = {
   packageId?: string;
   /** See {@link StartKeyboard.languages}. */
   languages?: string[];
+  /** See {@link StartKeyboard.origin}. */
+  origin?: "corpus" | "cldr";
+  /** See {@link StartKeyboard.cldr}. */
+  cldr?: CldrStartSource;
 };
 
 /**
@@ -148,5 +194,7 @@ export function makeStartKeyboard(init: StartKeyboardInit): StartKeyboard {
     ...(init.sourceUrl !== undefined ? { sourceUrl: init.sourceUrl } : {}),
     ...(init.packageId !== undefined ? { packageId: init.packageId } : {}),
     ...(init.languages !== undefined ? { languages: init.languages } : {}),
+    ...(init.origin !== undefined ? { origin: init.origin } : {}),
+    ...(init.cldr !== undefined ? { cldr: init.cldr } : {}),
   };
 }
