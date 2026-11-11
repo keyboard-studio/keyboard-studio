@@ -11,6 +11,7 @@
 // strings, comments and deadkey spellings cannot confuse it.
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { ruleKeystrokeLoose } from "@keyboard-studio/contracts";
 import {
   checkFailed,
   checkPassed,
@@ -28,17 +29,16 @@ export function checkCapsNcapsConsistent(
   const byKey = new Map<string, { withCaps: number; withoutCaps: number }>();
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      for (const el of rule.context) {
-        if (el.kind !== "vkey") continue;
-        const name = el.name.toUpperCase();
-        const hasCaps = el.modifiers.some(
-          (m) => m === "CAPS" || m === "NCAPS",
-        );
-        const entry = byKey.get(name) ?? { withCaps: 0, withoutCaps: 0 };
-        if (hasCaps) entry.withCaps += 1;
-        else entry.withoutCaps += 1;
-        byKey.set(name, entry);
-      }
+      const el = ruleKeystrokeLoose(rule);
+      if (el?.kind !== "vkey") continue;
+      const name = el.name.toUpperCase();
+      const hasCaps = el.modifiers.some(
+        (m) => m === "CAPS" || m === "NCAPS",
+      );
+      const entry = byKey.get(name) ?? { withCaps: 0, withoutCaps: 0 };
+      if (hasCaps) entry.withCaps += 1;
+      else entry.withoutCaps += 1;
+      byKey.set(name, entry);
     }
   }
   const offenders = [...byKey.entries()].filter(

@@ -1,4 +1,5 @@
 // Shared fixtures for the applyStoreSlotRemovals.*.test.ts files.
+import { makeRule } from "@keyboard-studio/contracts";
 import { charStore, irGroup, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { KeyboardIR, IRStore, IRGroup, IRRule, StoreItem } from "@keyboard-studio/contracts";
 
@@ -30,14 +31,19 @@ export function makeParallelStoreGroup(
   inputStoreName: string,
   outputStoreName: string,
 ): IRGroup {
-  const rule: IRRule = {
-    nodeId: ruleNodeId,
-    context: [
-      { kind: "deadkey", id: dkId },
-      { kind: "any", storeRef: inputStoreName },
-    ],
-    output: [{ kind: "index", storeRef: outputStoreName, offset: 2 }],
-  };
+  // No `+`: this fixture deliberately spells the cross-pair context without a
+  // keystroke boundary, so both elements are pre-context.
+  const rule: IRRule = makeRule(
+    {
+      nodeId: ruleNodeId,
+      preContext: [
+        { kind: "deadkey", id: dkId },
+        { kind: "any", storeRef: inputStoreName },
+      ],
+      output: [{ kind: "index", storeRef: outputStoreName, offset: 2 }],
+    },
+    { usingKeys: true },
+  );
   return irGroup({ nodeId: groupNodeId, rules: [rule] });
 }
 
@@ -79,11 +85,14 @@ export function makeSelfPairedIr(storeNodeId = "store#word"): KeyboardIR {
     { kind: "char", value: "z" },
   ];
   const store = makeOutputStore(storeNodeId, "word", items);
-  const rule: IRRule = {
-    nodeId: "rule#self",
-    context: [{ kind: "any", storeRef: "word" }],
-    output: [{ kind: "index", storeRef: "word", offset: 1 }],
-  };
+  const rule: IRRule = makeRule(
+    {
+      nodeId: "rule#self",
+      preContext: [{ kind: "any", storeRef: "word" }],
+      output: [{ kind: "index", storeRef: "word", offset: 1 }],
+    },
+    { usingKeys: true },
+  );
   const group: IRGroup = { nodeId: "group#main", name: "main", usingKeys: true, rules: [rule], readonly: false };
   return makeTestIR([group], [store]);
 }

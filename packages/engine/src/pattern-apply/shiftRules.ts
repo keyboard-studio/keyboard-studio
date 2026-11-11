@@ -27,7 +27,8 @@
  */
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
-import { toUPlusSequence } from "@keyboard-studio/contracts";
+import { toUPlusSequence, storeItemText } from "@keyboard-studio/contracts";
+import { ruleContextElements } from "../shared/rule-shape.js";
 
 const MNEMONIC_STORE_NAME = "MNEMONICLAYOUT";
 
@@ -38,11 +39,7 @@ function storeTextValue(ir: KeyboardIR, systemStoreName: string): string | undef
   );
   if (store === undefined) return undefined;
   return store.items
-    .map((item) => {
-      if (item.kind === "char") return item.value;
-      if (item.kind === "raw") return item.text;
-      return "";
-    })
+    .map((item) => storeItemText(item))
     .join("");
 }
 
@@ -84,7 +81,7 @@ export function keyHasCapsHandling(
   const group = ir.groups.find((g) => g.name === groupName);
   if (group === undefined) return false;
   for (const rule of group.rules) {
-    for (const el of rule.context) {
+    for (const el of ruleContextElements(rule)) {
       if (
         el.kind === "vkey" &&
         el.name === vkeyName &&

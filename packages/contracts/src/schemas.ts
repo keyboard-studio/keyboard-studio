@@ -35,6 +35,9 @@ import type {
   FacetValue,
   IRRule,
   KeyboardIR,
+  ContextElement,
+  OutputElement,
+  StoreItem,
 } from "./keyboard-ir";
 import type { AxisFill, AxisFillSource } from "./axisFill";
 import type {
@@ -977,6 +980,71 @@ export const IRRuleOwnershipSchema = z
   });
 
 // ---------------------------------------------------------------------------
+// KMN IR element unions (spec 116). Mirrors of StoreItem / ContextElement /
+// OutputElement, pinned in BOTH directions by the drift guards at the bottom of
+// this file: the schema's inferred type must be assignable to the contract union
+// and the union back to the schema's, so a kind added to the contract without a
+// schema member (or the reverse) fails the build.
+// ---------------------------------------------------------------------------
+
+export const StoreItemSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("char"), value: z.string() }),
+  z.object({ kind: z.literal("vkey"), name: z.string() }),
+  z.object({ kind: z.literal("deadkey"), id: z.number() }),
+  z.object({ kind: z.literal("namedDeadkey"), name: z.string() }),
+  z.object({ kind: z.literal("any") }),
+  z.object({ kind: z.literal("outs"), storeRef: z.string() }),
+  z.object({ kind: z.literal("raw"), text: z.string() }),
+]);
+
+export const ContextElementSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("char"), value: z.string() }),
+  z.object({ kind: z.literal("vkey"), name: z.string(), modifiers: z.array(z.string()) }),
+  z.object({ kind: z.literal("deadkey"), id: z.number() }),
+  z.object({ kind: z.literal("namedDeadkey"), name: z.string() }),
+  z.object({ kind: z.literal("any"), storeRef: z.string() }),
+  z.object({ kind: z.literal("notany"), storeRef: z.string() }),
+  z.object({ kind: z.literal("context"), offset: z.number() }),
+  z.object({ kind: z.literal("index"), storeRef: z.string(), offset: z.number() }),
+  z.object({ kind: z.literal("baselayout"), value: z.string() }),
+  z.object({ kind: z.literal("if"), store: z.string(), value: z.string() }),
+  z.object({ kind: z.literal("platform"), value: z.string() }),
+  z.object({ kind: z.literal("raw"), text: z.string() }),
+]);
+
+// Self-recursive through `set.value`, so the schema carries an explicit annotation
+// and the recursion goes through z.lazy. That annotation only checks the object
+// literals ARE contract members; it cannot notice a contract kind the schema lacks,
+// so the member list is kept apart and `_OutputElementKindsGuard` pins its kinds.
+const outputElementOptions = [
+  z.object({ kind: z.literal("char"), value: z.string() }),
+  z.object({ kind: z.literal("deadkey"), id: z.number() }),
+  z.object({ kind: z.literal("namedDeadkey"), name: z.string() }),
+  z.object({ kind: z.literal("beep") }),
+  z.object({ kind: z.literal("nul") }),
+  z.object({ kind: z.literal("context"), offset: z.number() }),
+  z.object({ kind: z.literal("index"), storeRef: z.string(), offset: z.number() }),
+  z.object({ kind: z.literal("outs"), storeRef: z.string() }),
+  z.object({ kind: z.literal("useGroup"), groupName: z.string() }),
+  z.object({ kind: z.literal("layer"), value: z.string() }),
+  z.object({
+    kind: z.literal("set"),
+    storeRef: z.string(),
+    value: z.array(z.lazy((): z.ZodType<OutputElement> => OutputElementSchema)),
+  }),
+  z.object({ kind: z.literal("save"), storeRef: z.string() }),
+  z.object({ kind: z.literal("reset"), storeRef: z.string() }),
+  z.object({ kind: z.literal("call"), storeRef: z.string() }),
+  z.object({ kind: z.literal("return") }),
+  z.object({ kind: z.literal("raw"), text: z.string() }),
+] as const;
+
+export const OutputElementSchema: z.ZodType<OutputElement> = z.discriminatedUnion(
+  "kind",
+  outputElementOptions,
+);
+
+// ---------------------------------------------------------------------------
 // Compile-time drift guards.
 //
 // Each canonical schema's inferred type must stay assignable to the locked
@@ -1007,6 +1075,20 @@ type _IRRuleOwnershipKeysGuard = Expect<
 
 // These aliases are intentionally unused at the value level — their declaration
 // is the assertion. A failure surfaces here as a constraint error on `Expect`.
+// KMN IR element unions (spec 116): both directions, so a missing member on
+// either side fails the build.
+type _StoreItemGuard = Expect<AssignableTo<z.infer<typeof StoreItemSchema>, StoreItem>>;
+type _StoreItemReverseGuard = Expect<AssignableTo<StoreItem, z.infer<typeof StoreItemSchema>>>;
+type _ContextElementGuard = Expect<AssignableTo<z.infer<typeof ContextElementSchema>, ContextElement>>;
+type _ContextElementReverseGuard = Expect<
+  AssignableTo<ContextElement, z.infer<typeof ContextElementSchema>>
+>;
+type _OutputElementGuard = Expect<AssignableTo<z.infer<typeof OutputElementSchema>, OutputElement>>;
+// OutputElementSchema is annotated (it is self-recursive), so its inferred type IS the
+// contract type and the two guards above cannot see a missing member. Pin the kind set.
+type _OutputElementKindsGuard = Expect<
+  Equal<z.infer<(typeof outputElementOptions)[number]>["kind"], OutputElement["kind"]>
+>;
 type _PatternGuard = Expect<AssignableTo<z.infer<typeof PatternSchema>, Pattern>>;
 type _PatternQuestionGuard = Expect<
   AssignableTo<z.infer<typeof PatternQuestionSchema>, PatternQuestion>

@@ -8,6 +8,7 @@
 // every group count, including deadkey and context groups.
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { ruleKeystrokeLoose } from "@keyboard-studio/contracts";
 import {
   checkFailed,
   checkPassed,
@@ -40,7 +41,8 @@ export function findRawCtrlRules(ir: KeyboardIR, keyboardId: string): RawCtrlRul
   const found: RawCtrlRule[] = [];
   ir.groups.forEach((group, groupIndex) => {
     group.rules.forEach((rule, ruleIndex) => {
-      const vkey = rule.context.find((c) => c.kind === "vkey");
+      // Loose: these checks audit every group, deadkey and context groups included.
+      const vkey = ruleKeystrokeLoose(rule);
       if (vkey === undefined || vkey.kind !== "vkey") return;
       const mods = vkey.modifiers.map((m) => m.toUpperCase());
       if (!mods.includes("CTRL") || mods.some((m) => ALT_MODIFIERS.has(m))) return;

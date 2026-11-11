@@ -86,7 +86,7 @@ group(main) using keys
 `;
 
 // ---------------------------------------------------------------------------
-// Opaque fixture — an SMP literal the codec preserves as a RawKmnFragment
+// Opaque fixture — an option-store directive the codec preserves as a RawKmnFragment
 // ---------------------------------------------------------------------------
 
 export const OPAQUE_FRAGMENT_KMN = `c opaque fragment fixture
@@ -94,13 +94,14 @@ store(&NAME) 'OpaqueFrag'
 store(&VERSION) '14.0'
 store(&KEYBOARDVERSION) '1.0'
 store(&TARGETS) 'any'
+store(opt) '0'
 
 begin Unicode > use(main)
 
 group(main) using keys
 
 + [K_A] > 'a' U+0301
-+ [K_Z] > U+10330
++ [K_Z] > 'z' outs(opt)
 `;
 
 // ---------------------------------------------------------------------------

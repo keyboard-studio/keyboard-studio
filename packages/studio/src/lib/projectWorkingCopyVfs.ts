@@ -85,11 +85,19 @@
 // The function mutates `vfs` in-place. Callers that need the original VFS
 // preserved must clone it before calling (e.g. createVirtualFS(startVfs.entries())).
 
+import { ruleContextElements } from "@keyboard-studio/contracts";
 import { applyCustomCssToVfs } from "./customCss.ts";
 import { applyAuthoredDocsToVfs, type AuthoredDocs } from "./authoredDocs.ts";
+import {
+  ruleConditions,
+  ruleKeystroke,
+  rulePreContext,
+  withRuleParts,
+} from "@keyboard-studio/contracts";
 import type {
   AttestedStack,
   BackspaceBehaviour,
+  ContextElement,
   KeyboardIR,
   OutputForm,
   PackageFontSet,
@@ -171,7 +179,7 @@ function allCapsRuleKeys(ir: KeyboardIR): Set<string> {
   const keys = new Set<string>();
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      for (const el of rule.context) {
+      for (const el of ruleContextElements(rule)) {
         if (el.kind === "vkey" && (el.modifiers.includes("CAPS") || el.modifiers.includes("NCAPS"))) {
           keys.add(el.name);
         }
@@ -989,7 +997,7 @@ export function projectWorkingCopyVfs(
   if (additions !== undefined) {
     for (const group of additions.groups) {
       for (const rule of group.added) {
-        for (const el of rule.context) {
+        for (const el of ruleContextElements(rule)) {
           if (el.kind === "vkey") additionBoundIds.add(el.name.toUpperCase());
         }
       }
@@ -1560,16 +1568,24 @@ function applyKeyRenamesToRuleBindings(
       let groupTouched = false;
       const nextRules = group.rules.map((rule) => {
         let ruleTouched = false;
-        const nextContext = rule.context.map((el) => {
+        const rekey = (el: ContextElement): ContextElement => {
           if (el.kind === "vkey" && el.name.toUpperCase() === oldUpper) {
             ruleTouched = true;
             return { ...el, name: newId };
           }
           return el;
-        });
+        };
+        const keystroke = ruleKeystroke(rule, group);
+        const nextConditions = ruleConditions(rule).map(rekey);
+        const nextPreContext = rulePreContext(rule, group).map(rekey);
+        const nextKeystroke = keystroke === undefined ? undefined : rekey(keystroke);
         if (!ruleTouched) return rule;
         groupTouched = true;
-        return { ...rule, context: nextContext };
+        return withRuleParts(rule, group, {
+          conditions: nextConditions,
+          preContext: nextPreContext,
+          keystroke: nextKeystroke,
+        });
       });
       if (!groupTouched) return group;
       renameTouchedAnything = true;

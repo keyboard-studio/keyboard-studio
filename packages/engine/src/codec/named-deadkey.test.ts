@@ -173,7 +173,7 @@ describe("named deadkeys — boundaries held (#2238)", () => {
   it("opaque-store sketches carry the name verbatim — no synthetic ids anywhere", () => {
     const { ir } = parse(
       kmn(
-        "store(base) U+0300 dk(acute)\nstore(all) outs(base)\n",
+        "store(base) U+0300 dk(acute)\nstore(all) outs(base) '[1a 2b]'\n",
         "+ [K_A] > U+0061\n",
       ),
       "sketch",

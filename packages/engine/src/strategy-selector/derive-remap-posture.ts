@@ -40,6 +40,8 @@ import type {
   RemapPosture,
   ScriptClass,
 } from "@keyboard-studio/contracts";
+import { assertNever } from "@keyboard-studio/contracts";
+import { ruleContextElements } from "../shared/rule-shape.js";
 import { scriptOf } from "../facets/generated/scriptLookup.js";
 
 /** Scripts that carry no script identity of their own (marks, digits, unknown). */
@@ -64,6 +66,7 @@ function firstProducedCodepoint(
         break;
       }
       case "deadkey":
+      case "namedDeadkey":
       case "beep":
         // Produce no character themselves; the produced character (if any)
         // comes from a later element.
@@ -89,8 +92,16 @@ function firstProducedCodepoint(
       case "nul":
       case "context":
       case "useGroup":
+      case "layer":
+      case "set":
+      case "save":
+      case "reset":
+      case "call":
+      case "return":
       case "raw":
         return undefined;
+      default:
+        return assertNever(el, "firstProducedCodepoint");
     }
   }
   return undefined;
@@ -124,9 +135,7 @@ export function deriveRemapPosture(args: {
       // The codec preserves a structural inline `+` as a raw context
       // element on some shapes (see import-mark-order.ts); strip it before
       // inspecting the context.
-      const real = rule.context.filter(
-        (el) => !(el.kind === "raw" && el.text.trim() === "+"),
-      );
+      const real = ruleContextElements(rule);
       if (real.length !== 1) continue;
       const key = real[0];
       if (key === undefined || key.kind !== "vkey") continue;

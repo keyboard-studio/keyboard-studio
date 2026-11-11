@@ -46,7 +46,8 @@ import type {
   KeyboardIR,
   OutputElement,
 } from "@keyboard-studio/contracts";
-import { deadkeyNameKey, isPlusSeparator } from "@keyboard-studio/contracts";
+import { deadkeyNameKey, elementAtOffset } from "@keyboard-studio/contracts";
+import { ruleContextElements } from "../shared/rule-shape.js";
 import { formatDkName, isBehaviourOwned } from "./utils.js";
 
 // ---------------------------------------------------------------------------
@@ -72,7 +73,7 @@ export function deadkeyDiscriminator(key: string): string {
 
 /** The rule's context with `+` separator elements removed (a view). */
 export function s06CleanedContext(rule: IRRule): ContextElement[] {
-  return rule.context.filter((el) => !isPlusSeparator(el));
+  return ruleContextElements(rule);
 }
 
 function soleDeadkeyOutputKey(rule: IRRule): string | null {
@@ -97,7 +98,11 @@ export function isS06FanOutMember(rule: IRRule): boolean {
   if (cleaned[1]!.kind !== "any") return false;
   if (rule.output.length !== 1) return false;
   const out = rule.output[0]!;
-  return out.kind === "index" && out.offset === cleaned.length;
+  // No group is in scope; assume a `using keys` group (the loose reader).
+  return (
+    out.kind === "index" &&
+    elementAtOffset(rule, { usingKeys: true }, out.offset) === cleaned[1]
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -463,6 +463,15 @@ jobs:
         env:
           KS_CORPUS_PERF: "1"
 
+      # spec 116: the .kmn reader speed budget (2x the recorded parse() baseline
+      # in total, and the per-file cap), opt-in via KS_CORPUS_PERF for the same
+      # reason as the step above: it must not share the CPU with the parallel sweep.
+      - name: Test (spec 116 reader speed budget, corpus)
+        if: github.event_name != 'pull_request' && needs.changes.outputs.corpus == 'true'
+        run: pnpm --filter @keyboard-studio/engine exec vitest run --config vitest.corpus.config.ts codec/reader-timing.corpus
+        env:
+          KS_CORPUS_PERF: "1"
+
       # The co-located Vercel functions under /api are intentionally outside the
       # pnpm workspace, so `pnpm -r test` does not cover them. Run their standalone
       # vitest config explicitly — otherwise these tests can rot unnoticed.

@@ -69,6 +69,7 @@
  */
 
 import type { KeyboardIR, IRRule, StoreItem } from "@keyboard-studio/contracts";
+import { ruleContextElements } from "../shared/rule-shape.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -483,7 +484,7 @@ function normalizeModifierWord(word: string): ModifierToken | undefined {
 /** Extract the raw (unordered, pre-exclusion-check) modifier set of a rule's vkey context element(s). */
 function extractRuleModifiers(rule: IRRule): ModifierToken[] {
   const found = new Set<ModifierToken>();
-  for (const el of rule.context) {
+  for (const el of ruleContextElements(rule)) {
     if (el.kind !== "vkey") continue;
     // Unify a raw generic+chiral ctrl/alt mix before the normalizeModifierWord
     // narrowing below — same rationale as parseKeySpec: an existing
@@ -498,7 +499,7 @@ function extractRuleModifiers(rule: IRRule): ModifierToken[] {
 }
 
 function extractRuleVkey(rule: IRRule): string | undefined {
-  for (const el of rule.context) {
+  for (const el of ruleContextElements(rule)) {
     if (el.kind === "vkey") return el.name;
   }
   return undefined;
@@ -506,7 +507,7 @@ function extractRuleVkey(rule: IRRule): string | undefined {
 
 /** True when the rule's context requires a (numeric or named) deadkey. */
 function ruleContextHasDeadkey(rule: IRRule): boolean {
-  return rule.context.some((el) => el.kind === "deadkey" || el.kind === "namedDeadkey");
+  return ruleContextElements(rule).some((el) => el.kind === "deadkey" || el.kind === "namedDeadkey");
 }
 
 /**
@@ -633,7 +634,7 @@ interface AnyIndexEntry {
  * extractRuleVkey already handle directly.
  */
 function resolveAnyIndexEntries(ir: KeyboardIR, rule: IRRule): AnyIndexEntry[] {
-  const anyEl = rule.context.find(
+  const anyEl = ruleContextElements(rule).find(
     (el): el is Extract<IRRule["context"][number], { kind: "any" }> => el.kind === "any",
   );
   if (!anyEl) return [];

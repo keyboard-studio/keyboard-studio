@@ -69,6 +69,15 @@ import type {
   StoreItem,
 } from "@keyboard-studio/contracts";
 import {
+  elementAtOffset,
+  ruleConditions,
+  ruleExtraKeystrokeElements,
+  ruleHasNulContext,
+  ruleKeystrokeLoose,
+  rulePreContext,
+  withoutOutsStores,
+} from "@keyboard-studio/contracts";
+import {
   getCategory,
   getCCC,
   getName,
@@ -90,18 +99,21 @@ import {
 export function postfixMarkSequenceRefs(
   rule: IRRule,
 ): { baseRef: string; markedRef: string; guardCount: number } | undefined {
-  const real = rule.context.filter(
-    (el) => !(el.kind === "raw" && el.text.trim() === "+"),
-  );
+  // No group is in scope here; assume a `using keys` group (the loose reader).
+  const group = { usingKeys: true };
   // Leading typed guards (spec 103) are conditions on the rule, not part of
   // the sequence-replace shape — but they DO occupy context positions, so
-  // they count toward the any()'s position below.
-  let guardCount = 0;
-  while (real[guardCount]?.kind === "if") guardCount++;
-  const shape = real.slice(guardCount);
-  if (shape.length !== 2) return undefined;
-  const base = shape[0];
-  const trigger = shape[1];
+  // they count toward the any()'s position below. Only `if` guards are
+  // tolerated: a `nul`, `baselayout()` or `platform()` head is not this shape.
+  if (ruleHasNulContext(rule)) return undefined;
+  const conditions = ruleConditions(rule);
+  if (conditions.some((el) => el.kind !== "if")) return undefined;
+  const guardCount = conditions.length;
+  if (ruleExtraKeystrokeElements(rule, group).length > 0) return undefined;
+  const pre = rulePreContext(rule, group);
+  if (pre.length !== 1) return undefined;
+  const base = pre[0];
+  const trigger = ruleKeystrokeLoose(rule);
   if (base === undefined || base.kind !== "any") return undefined;
   if (trigger === undefined || trigger.kind !== "char") return undefined;
   if (rule.output.length !== 1) return undefined;
@@ -114,7 +126,7 @@ export function postfixMarkSequenceRefs(
   // 1 + the number of leading guards. The real guard-free sil_ipa rule
   // confirms the base case: `any(equalD) + "=" > index(equalU,1)`; the
   // guarded variants carry offset 2, the guard occupying position 1.
-  if (out.offset !== guardCount + 1) return undefined;
+  if (elementAtOffset(rule, group, out.offset) !== base) return undefined;
   return { baseRef: base.storeRef, markedRef: out.storeRef, guardCount };
 }
 
@@ -226,8 +238,10 @@ export function isBaseToMarkedRemap(
  * @see spec.md §7.2 rule 3a
  */
 export function detectMarkInputOrderFromImport(
-  ir: KeyboardIR,
+  source: KeyboardIR,
 ): AxisFill | undefined {
+  // Pairs stores by position: read without outs() stores (see withoutOutsStores).
+  const ir = withoutOutsStores(source);
   for (const group of ir.groups) {
     for (const rule of group.rules) {
       const refs = postfixMarkSequenceRefs(rule);

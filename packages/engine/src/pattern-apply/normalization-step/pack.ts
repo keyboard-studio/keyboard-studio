@@ -7,6 +7,7 @@ import type {
   OutputRepertoire,
 } from "@keyboard-studio/contracts";
 import { MAX_GENERATED_RULES, MAX_GENERATED_STORES, MAX_MARK_TUPLES, NORMALIZATION_STORE_PREFIX } from "./constants.js";
+import { makeRule } from "../../shared/rule-shape.js";
 
 /**
  * Rule packing (spec 086 R5): a greedy safe set cover of the maps over five
@@ -93,7 +94,13 @@ export function packNormalization(
   const idx = (s: string, offset: number): OutputElement => ({ kind: "index", storeRef: s, offset });
   const outChars = (cps: string[]): OutputElement[] => cps.map((value) => ({ kind: "char" as const, value }));
   const rule = (context: ContextElement[], output: OutputElement[]): void => {
-    rules.push({ nodeId: `${NORMALIZATION_STORE_PREFIX}rule_${rules.length}`, context, output });
+    // The step group is a non-keys group, so the whole left-hand side is pre-context.
+    rules.push(
+      makeRule(
+        { nodeId: `${NORMALIZATION_STORE_PREFIX}rule_${rules.length}`, preContext: context, output },
+        { usingKeys: false },
+      ),
+    );
   };
 
   const bySrc = new Map(maps.map((m) => [m.a.join(""), m] as const));

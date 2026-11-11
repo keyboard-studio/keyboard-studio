@@ -1,12 +1,20 @@
 import type { IRRule, KeyboardIR, Pattern } from "@keyboard-studio/contracts";
-import { makePattern } from "@keyboard-studio/contracts";
+import {
+  makePattern,
+  ruleConditions,
+  ruleExtraKeystrokeElements,
+  ruleHasNulContext,
+  rulePreContext,
+  ruleKeystrokeLoose,
+} from "@keyboard-studio/contracts";
 import type { MatchResult, RecognizerRule } from "../types.js";
 import { ruleRef, storeRef } from "../node-refs.js";
 import { storeItemsToCharString, formatDkName } from "../utils.js";
 import { buildS02Fragment, findS02Families } from "../s02-families.js";
 
 /**
- * isBody — the CLASSIC S-02 body shape on the RAW context:
+ * isBody — the CLASSIC S-02 body shape on the rule-shape accessors' view of the
+ * context (the `+` keystroke separator is never a context element):
  * [dk(D), any(BASE_STORE)] > [index(OUT_STORE, 2)], offset exactly 2.
  *
  * This predicate is retained for classifyRemovalCapabilities (Decision 3:
@@ -19,10 +27,12 @@ import { buildS02Fragment, findS02Families } from "../s02-families.js";
  * plus the ownership-gated store alias, not through this raw shape.
  */
 export function isBody(rule: IRRule): boolean {
-  if (rule.context.length !== 2) return false;
-  const c0 = rule.context[0];
-  const c1 = rule.context[1];
-  if (c0 === undefined || c0.kind !== "deadkey") return false;
+  // No group is in scope here; assume a `using keys` group (the loose reader).
+  if (ruleHasNulContext(rule) || ruleConditions(rule).length > 0) return false;
+  if (ruleExtraKeystrokeElements(rule, { usingKeys: true }).length > 0) return false;
+  const pre = rulePreContext(rule, { usingKeys: true });
+  const c1 = ruleKeystrokeLoose(rule);
+  if (pre.length !== 1 || pre[0]?.kind !== "deadkey") return false;
   if (c1 === undefined || c1.kind !== "any") return false;
   if (rule.output.length !== 1) return false;
   const out = rule.output[0];

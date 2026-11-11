@@ -19,6 +19,7 @@
 // order drifted from IR order, or the IR is unavailable), the fired trace's
 // own matchedContext/emittedOutput carry the author-language description.
 
+import { ruleContextElements } from "@keyboard-studio/contracts";
 import type {
   ContextElement,
   IRRule,
@@ -84,6 +85,8 @@ function contextElementText(el: ContextElement): string {
       return `baselayout(${el.value})`;
     case "if":
       return `if(${el.store} = '${el.value}')`;
+    case "platform":
+      return `platform('${el.value}')`;
     case "raw":
       return el.text;
   }
@@ -109,6 +112,18 @@ function outputElementText(el: OutputElement): string {
       return `outs(${el.storeRef})`;
     case "useGroup":
       return `use(${el.groupName})`;
+    case "layer":
+      return `layer('${el.value}')`;
+    case "set":
+      return `set(${el.storeRef} = ${el.value.map(outputElementText).join(" ")})`;
+    case "save":
+      return `save(${el.storeRef})`;
+    case "reset":
+      return `reset(${el.storeRef})`;
+    case "call":
+      return `call(${el.storeRef})`;
+    case "return":
+      return "return";
     case "raw":
       return el.text;
   }
@@ -121,7 +136,7 @@ function outputElementText(el: OutputElement): string {
  * `rule matching \`a\` → deadkey(3)` (deadkey arming).
  */
 export function describeRuleShape(rule: IRRule): string {
-  const context = rule.context.map(contextElementText).join(" + ") || "anything";
+  const context = ruleContextElements(rule).map(contextElementText).join(" + ") || "anything";
   const output = rule.output.map(outputElementText).join(" + ");
   const rhs = output === "" ? "no output" : `outputs ${output}`;
   return `rule matching ${context} → ${rhs}`;

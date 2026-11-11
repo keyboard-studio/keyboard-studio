@@ -24,7 +24,7 @@ import type {
   ToleranceReport,
   VirtualFS,
 } from '@keyboard-studio/contracts';
-import { createVirtualFS, isPlusSeparator } from '@keyboard-studio/contracts';
+import { createVirtualFS, isPlusSeparator, ruleLhsKind } from '@keyboard-studio/contracts';
 
 import { compile } from '../compiler/index.js';
 import { emit } from '../codec/emit.js';
@@ -205,10 +205,26 @@ function extractPureOutsRefs(sourceText: string): string[] | null {
  * cycle) is simply absent from the returned map — callers already treat an
  * absent store as "not found", the same conservative fallback as any other
  * unresolvable reference.
+ *
+ * The codec now types `outs(a)` in a store body (`StoreItem.outs`), so a pure
+ * `outs()` store is read from its items. The fragment path is kept for drafts
+ * saved before that, which still hold the `outs-expansion` fragment. A typed
+ * store that mixes `outs()` with other items stays unresolved, as the mixed
+ * fragment did.
  */
 export function buildStoreCharIndex(ir: KeyboardIR): Map<string, string[]> {
   const index = new Map<string, string[]>();
+  const typedOutsRefs = new Map<string, string[]>();
   for (const store of ir.stores) {
+    if (store.items.some((i) => i.kind === 'outs')) {
+      const refs: string[] = [];
+      for (const i of store.items) {
+        if (i.kind !== 'outs') break;
+        refs.push(i.storeRef);
+      }
+      if (refs.length === store.items.length) typedOutsRefs.set(store.name, refs);
+      continue;
+    }
     index.set(
       store.name,
       store.items.filter((i) => i.kind === 'char').map((i) => i.value),
@@ -227,9 +243,10 @@ export function buildStoreCharIndex(ir: KeyboardIR): Map<string, string[]> {
     const already = index.get(name);
     if (already !== undefined) return already;
     if (resolving.has(name)) return undefined; // cycle guard
+    const typed = typedOutsRefs.get(name);
     const src = outsFragmentByName.get(name);
-    if (src === undefined) return undefined;
-    const refs = extractPureOutsRefs(src);
+    if (typed === undefined && src === undefined) return undefined;
+    const refs = typed ?? extractPureOutsRefs(src as string);
     if (refs === null) return undefined;
     resolving.add(name);
     const parts: string[] = [];
@@ -245,7 +262,7 @@ export function buildStoreCharIndex(ir: KeyboardIR): Map<string, string[]> {
     index.set(name, parts);
     return parts;
   }
-  for (const name of outsFragmentByName.keys()) resolve(name);
+  for (const name of [...typedOutsRefs.keys(), ...outsFragmentByName.keys()]) resolve(name);
 
   return index;
 }
@@ -323,15 +340,17 @@ export function buildToleranceCompileVfs(ir: KeyboardIR): VirtualFS {
 export function splitRuleAtPlus(
   rule: IRRule,
 ): { before: ContextElement[]; keyPart: ContextElement[] } | undefined {
-  if (rule.matchKind !== undefined) return undefined;
-  const plusIdx = rule.context.findIndex(isPlusSeparator);
+  if (ruleLhsKind(rule) !== "input") return undefined;
+  // eslint-disable-next-line no-restricted-syntax -- needs the raw position of the first `+` and the exact element count; the accessors hide the separator and split at the last one, which would change which bare rules are splittable.
+  const context = rule.context;
+  const plusIdx = context.findIndex(isPlusSeparator);
   if (plusIdx !== -1) {
-    return { before: rule.context.slice(0, plusIdx), keyPart: rule.context.slice(plusIdx + 1) };
+    return { before: context.slice(0, plusIdx), keyPart: context.slice(plusIdx + 1) };
   }
   // No `+` at all: a bare single-element rule has no preceding context and
   // its sole element IS the key. Anything else with no `+` cannot be split.
-  if (rule.context.length === 1) {
-    return { before: [], keyPart: rule.context };
+  if (context.length === 1) {
+    return { before: [], keyPart: context };
   }
   return undefined;
 }

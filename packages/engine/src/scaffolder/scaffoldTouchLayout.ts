@@ -45,7 +45,9 @@ import type {
   TouchLayoutIR,
   TouchKeyIR,
   IRRule,
+  IRGroup,
 } from "@keyboard-studio/contracts";
+import { ruleContextElements, ruleKeystroke } from "../shared/rule-shape.js";
 import { NodeIdMinter } from "../shared/node-ids.js";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import { decomposeGrapheme } from "../character-discovery/decompose.js";
@@ -240,14 +242,14 @@ type DeadkeySuccessors = Map<string, string[]>;
  * Classify the modifier set of a rule into one of the three touch layers
  * (or null if the modifiers make the rule irrelevant to touch, e.g. CAPS).
  */
-function classifyModifiers(rule: IRRule): LayerId | null {
+function classifyModifiers(rule: IRRule, group: IRGroup): LayerId | null {
   let hasShift = false;
   let hasRalt = false;
   let hasCaps = false;
 
-  for (const el of rule.context) {
-    if (el.kind !== "vkey") continue;
-    for (const mod of el.modifiers) {
+  const keystroke = ruleKeystroke(rule, group);
+  if (keystroke?.kind === "vkey") {
+    for (const mod of keystroke.modifiers) {
       if (mod === "SHIFT") hasShift = true;
       if (mod === "RALT" || mod === "RIGHTALT") hasRalt = true;
       if (mod === "CAPS" || mod === "NCAPS") hasCaps = true;
@@ -293,13 +295,11 @@ function charOutputText(rule: IRRule): string | null {
 }
 
 /**
- * Extract the vkey name from the rule's context (the first vkey element).
+ * Extract the vkey name from the rule's keystroke.
  */
-function extractVkey(rule: IRRule): string | null {
-  for (const el of rule.context) {
-    if (el.kind === "vkey") return el.name;
-  }
-  return null;
+function extractVkey(rule: IRRule, group: IRGroup): string | null {
+  const keystroke = ruleKeystroke(rule, group);
+  return keystroke?.kind === "vkey" ? keystroke.name : null;
 }
 
 /**
@@ -312,10 +312,10 @@ function buildKeyMap(ir: KeyboardIR): KeyMap {
   for (const group of ir.groups) {
     if (group.readonly) continue;
     for (const rule of group.rules) {
-      const vkey = extractVkey(rule);
+      const vkey = extractVkey(rule, group);
       if (!vkey) continue;
 
-      const layer = classifyModifiers(rule);
+      const layer = classifyModifiers(rule, group);
       if (!layer) continue;
 
       const char = charOutputText(rule);
@@ -470,12 +470,12 @@ function buildDeadkeySuccessors(
         for (const rule of group.rules) {
           if (!ownedIds.has(rule.nodeId)) continue;
 
-          const hasDeadkeyCtx = rule.context.some((el) => el.kind === "deadkey");
+          const hasDeadkeyCtx = ruleContextElements(rule).some((el) => el.kind === "deadkey");
           if (!hasDeadkeyCtx) continue;
 
           // Shape 1 (collapsed): deadkey context + a triggering vkey + a
           // direct char output, all on the same rule.
-          const directVkey = extractVkey(rule);
+          const directVkey = extractVkey(rule, group);
           const directChar = charOutputText(rule);
           if (directVkey && directChar) {
             addSuccessor(directVkey, directChar);
@@ -487,7 +487,7 @@ function buildDeadkeySuccessors(
           // continuation rule — context has an any(storeRef) alongside the
           // deadkey marker, output is an index(storeRef, offset) reference.
           let baseStoreRef: string | undefined;
-          for (const el of rule.context) {
+          for (const el of ruleContextElements(rule)) {
             if (el.kind === "any") {
               baseStoreRef = el.storeRef;
               break;

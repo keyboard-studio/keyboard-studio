@@ -36,6 +36,7 @@
 // (`ContextVariant.precomposedOutput`) and its NFD-normalized echo form
 // without recompiling.
 
+import { makeRule, storeItemText } from '@keyboard-studio/contracts';
 import type {
   ContextElement,
   ContextVariant,
@@ -62,6 +63,7 @@ import {
 } from '../validator/context-tolerance.js';
 import { entryGroupOf, insertBlockBeforeTerminalRules } from './ir-insert.js';
 import { markOrderNoteFor, oneMarkShorterPair, type OneMarkShorterPair } from './mark-decomposition.js';
+import { ruleLhsKind } from "../shared/rule-shape.js";
 
 // Named for what these rules DO (accept the canonically-decomposed form of a
 // context the keyboard already handles precomposed), not for the tool that
@@ -148,7 +150,7 @@ function targetsIncludeWeb(ir: KeyboardIR): boolean {
   const targets = ir.stores.find((s) => s.isSystem && s.name.toUpperCase() === 'TARGETS');
   if (targets === undefined) return false;
   const text = targets.items
-    .map((item) => (item.kind === 'char' ? item.value : item.kind === 'raw' ? item.text : ' '))
+    .map((item) => storeItemText(item, ' '))
     .join('');
   return text
     .toLowerCase()
@@ -195,7 +197,7 @@ function findInsertionPoint(
 ): { index: number; fallbackRuleId?: string } {
   for (let i = 0; i < rules.length; i++) {
     const r = rules[i]!;
-    if (r.matchKind === 'match' || r.matchKind === 'nomatch') {
+    if (ruleLhsKind(r) !== 'input') {
       return { index: i };
     }
     const split = splitRuleAtPlus(r);
@@ -385,11 +387,19 @@ export async function proposeContextVariants(
           if (precomposedOutput === decomposedOutput) continue; // this candidate is already tolerant
 
           const marker = `${GENERATED_MARKER_PREFIX}${rule.nodeId}_${variantIndex++}`;
-          generatedForRule.push({
-            nodeId: marker,
-            context: [...charsToContext(decomposed), { kind: 'raw', text: '+' }, ...literal],
-            output: charsToOutput(precomposedOutput),
-          });
+          // The generated rule always carries the `+` boundary, so it is built for a
+          // `using keys` group whatever group the source rule sits in.
+          generatedForRule.push(
+            makeRule(
+              {
+                nodeId: marker,
+                preContext: charsToContext(decomposed),
+                keystroke: literal[0]!,
+                output: charsToOutput(precomposedOutput),
+              },
+              { usingKeys: true },
+            ),
+          );
           variants.push({
             sourceRuleId: rule.nodeId,
             kind: 'added-rule',
@@ -676,7 +686,7 @@ function addBackspaceUnwrap(
   // as unobservable so the author is never shown a false simulated success.
   const isMnemonic = isMnemonicLayout(ir);
 
-  const bkspKey: ContextElement[] = [{ kind: 'vkey', name: 'K_BKSP', modifiers: [] }];
+  const bkspKey: ContextElement = { kind: 'vkey', name: 'K_BKSP', modifiers: [] };
 
   const fromStore: IRStore = {
     nodeId: `${BACKSPACE_UNWRAP_FROM_STORE}_store`,
@@ -690,21 +700,27 @@ function addBackspaceUnwrap(
     isSystem: false,
     items: pairs.map((p) => ({ kind: 'char' as const, value: p.to })),
   };
-  const precomposedRule: IRRule = {
-    nodeId: BACKSPACE_UNWRAP_RULE_PREFIX,
-    context: [
-      { kind: 'any', storeRef: BACKSPACE_UNWRAP_FROM_STORE },
-      { kind: 'raw', text: '+' },
-      ...bkspKey,
-    ],
-    output: [{ kind: 'index', storeRef: BACKSPACE_UNWRAP_TO_STORE, offset: 1 }],
-  };
+  const precomposedRule: IRRule = makeRule(
+    {
+      nodeId: BACKSPACE_UNWRAP_RULE_PREFIX,
+      preContext: [{ kind: 'any', storeRef: BACKSPACE_UNWRAP_FROM_STORE }],
+      keystroke: bkspKey,
+      output: [{ kind: 'index', storeRef: BACKSPACE_UNWRAP_TO_STORE, offset: 1 }],
+    },
+    entry,
+  );
 
-  const decomposedRules: IRRule[] = pairs.map((p, i) => ({
-    nodeId: `${BACKSPACE_UNWRAP_RULE_PREFIX}_decomposed_${i}`,
-    context: [...charsToContext(p.nfd.join('')), { kind: 'raw', text: '+' }, ...bkspKey],
-    output: charsToOutput(p.to),
-  }));
+  const decomposedRules: IRRule[] = pairs.map((p, i) =>
+    makeRule(
+      {
+        nodeId: `${BACKSPACE_UNWRAP_RULE_PREFIX}_decomposed_${i}`,
+        preContext: charsToContext(p.nfd.join('')),
+        keystroke: bkspKey,
+        output: charsToOutput(p.to),
+      },
+      entry,
+    ),
+  );
 
   const groups = ir.groups.map((g) =>
     g.nodeId === entry.nodeId

@@ -108,4 +108,35 @@ describe("checkDeprecatedHeaders (7.27)", () => {
     const { findings } = checkDeprecatedHeaders(MODERN_KMN, ir, "demo");
     expect(findings).toEqual([]);
   });
+
+  // Spec 116: set / save / reset / call and a store body's outs() are typed, so a store
+  // they name counts as referenced from the IR alone (no kmn text fallback needed).
+  it.each([
+    ["set", { kind: "set", storeRef: "opt", value: [{ kind: "char", value: "1" }] }],
+    ["save", { kind: "save", storeRef: "opt" }],
+    ["reset", { kind: "reset", storeRef: "opt" }],
+    ["call", { kind: "call", storeRef: "opt" }],
+  ] as const)("a store used only by a typed %s is referenced", (_name, el) => {
+    const ir = irWithStores([{ name: "opt", isSystem: false }], []);
+    ir.groups[0]!.rules[0]!.output = [el];
+    expect(checkDeprecatedHeaders(undefined, ir, "demo").findings).toEqual([]);
+  });
+
+  it("a store named only inside a set() value, or by another store's outs(), is referenced", () => {
+    const ir = irWithStores(
+      [
+        { name: "opt", isSystem: false },
+        { name: "pool", isSystem: false },
+        { name: "all", isSystem: false },
+        { name: "base", isSystem: false },
+      ],
+      [],
+    );
+    ir.groups[0]!.rules[0]!.output = [
+      { kind: "set", storeRef: "opt", value: [{ kind: "outs", storeRef: "pool" }] },
+      { kind: "call", storeRef: "all" },
+    ];
+    ir.stores.find((s) => s.name === "all")!.items = [{ kind: "outs", storeRef: "base" }];
+    expect(checkDeprecatedHeaders(undefined, ir, "demo").findings).toEqual([]);
+  });
 });

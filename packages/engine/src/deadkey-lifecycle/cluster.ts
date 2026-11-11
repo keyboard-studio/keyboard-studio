@@ -22,7 +22,7 @@
  * removes).
  */
 
-import { isPlusSeparator } from "@keyboard-studio/contracts";
+import { ruleContextElements } from "../shared/rule-shape.js";
 import type {
   ContextElement,
   IRGroup,
@@ -37,18 +37,11 @@ export interface LocatedRule {
   rule: IRRule;
 }
 
-/** Context/output elements with the codec's synthetic `+` separators removed. */
-function withoutPlus<T extends { kind: string; text?: string }>(
-  els: readonly T[],
-): T[] {
-  return els.filter((el) => !isPlusSeparator(el));
-}
-
 /** The single context element when the rule has exactly one (post-filter). */
 function singleContextElement(
   rule: IRRule,
 ): ContextElement | null {
-  const ctx = withoutPlus(rule.context);
+  const ctx = ruleContextElements(rule);
   return ctx.length === 1 ? (ctx[0] ?? null) : null;
 }
 
@@ -76,7 +69,7 @@ export function matchFanoutRule(
   rule: IRRule,
   id: number,
 ): { baseStore: string; outputStore: string } | null {
-  const ctx = withoutPlus(rule.context);
+  const ctx = ruleContextElements(rule);
   if (ctx.length !== 2) return null;
   const d = ctx[0] as ContextElement | undefined;
   const a = ctx[1] as ContextElement | undefined;
@@ -98,7 +91,7 @@ export function matchFanoutRule(
  * becoming a delete-blocking referrer.
  */
 export function matchEscapeRule(rule: IRRule, id: number): boolean {
-  const ctx = withoutPlus(rule.context);
+  const ctx = ruleContextElements(rule);
   if (ctx.length !== 2) return false;
   const d = ctx[0] as ContextElement | undefined;
   const k = ctx[1] as ContextElement | undefined;
@@ -127,7 +120,7 @@ export function findContextRules(ir: KeyboardIR, id: number): LocatedRule[] {
   const out: LocatedRule[] = [];
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      if (rule.context.some((el) => el.kind === "deadkey" && el.id === id)) {
+      if (ruleContextElements(rule).some((el) => el.kind === "deadkey" && el.id === id)) {
         out.push({ group, rule });
       }
     }
@@ -179,7 +172,7 @@ export function findFanoutRules(
  */
 export function storeRefsOfRule(rule: IRRule): string[] {
   const refs: string[] = [];
-  for (const el of rule.context) {
+  for (const el of ruleContextElements(rule)) {
     if (el.kind === "any" || el.kind === "notany" || el.kind === "index") {
       refs.push(el.storeRef);
     }
@@ -201,7 +194,7 @@ export function describeRule(group: IRGroup, rule: IRRule, id: number): string {
   const inOutput = rule.output.some(
     (el) => el.kind === "deadkey" && el.id === id,
   );
-  const inContext = rule.context.some(
+  const inContext = ruleContextElements(rule).some(
     (el) => el.kind === "deadkey" && el.id === id,
   );
   const where = [

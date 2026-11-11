@@ -25,6 +25,15 @@ import type {
   KeyboardIR,
   OutputElement,
 } from "@keyboard-studio/contracts";
+import {
+  isPlusSeparator,
+  makeRule,
+  ruleContextElements,
+  ruleConditions,
+  ruleHasNulContext,
+  ruleKeystroke,
+  rulePreContext,
+} from "../shared/rule-shape.js";
 import { parseSlotId } from "./slotId.js";
 import { analyzeStores } from "./applyStoreSlotRemovals.js";
 
@@ -109,7 +118,8 @@ function suppressionVerb(context: ContextElement[]): OutputElement[] {
  * bare-key LHS, single deadkey output), or undefined for any other shape.
  */
 function armingDeadkeyId(rule: IRRule): number | undefined {
-  if (rule.context.length === 0 || !rule.context.every((el) => el.kind === "vkey")) {
+  const context = ruleContextElements(rule);
+  if (context.length === 0 || !context.every((el) => el.kind === "vkey")) {
     return undefined;
   }
   if (rule.output.length !== 1 || rule.output[0]?.kind !== "deadkey") {
@@ -233,66 +243,71 @@ function compileSlotGuards(
         // char can no longer be typed, so a rule keyed on it protects nothing
         // (and would break e.g. Backspace after a pasted char). No `+` means
         // no key element, hence no guard.
-        const plusIdx = rule.context.findIndex((el) => el.kind === "raw" && el.text === "+");
+        // Whether an inline `+` separator is present is a codec artifact (the parser
+        // drops a leading `+`), not something the keystroke accessors expose, and this
+        // gate deliberately keys on it: a rule with no inline `+` gets no guard.
+        // eslint-disable-next-line no-restricted-syntax -- separator presence is not exposed by the rule-shape accessors; gate preserved as-is
+        const plusIdx = rule.context.findIndex(isPlusSeparator);
         if (plusIdx === -1) return;
+        // The `any()` replaced by its selector char is the rule's keystroke; an
+        // element after the keystroke is ignored by kmcmplib, so it needs no guard.
+        // A `+` separator is present (checked above), so the rule is a keystroke
+        // rule whatever the group's flag says.
+        const keysGroup = { usingKeys: true };
+        const anyEl = ruleKeystroke(rule, keysGroup);
+        if (anyEl === undefined || anyEl.kind !== "any" || !selectorChars.has(anyEl.storeRef)) return;
         // Guards are emitted per slot, so a store whose EVERY item is carved is
         // only known once all slot dispositions have been seen; the dead
         // consumer sweep below handles it after this loop.
-        const occurrences: number[] = [];
-        rule.context.forEach((el, contextIdx) => {
-          if (contextIdx > plusIdx && el.kind === "any" && selectorChars.has(el.storeRef)) {
-            occurrences.push(contextIdx);
-          }
-        });
-        occurrences.forEach((contextIdx, occNum) => {
-          const anyEl = rule.context[contextIdx];
-          if (!anyEl || anyEl.kind !== "any") return;
-          const selectorChar = selectorChars.get(anyEl.storeRef);
-          if (selectorChar === undefined) return;
+        const selectorChar = selectorChars.get(anyEl.storeRef);
+        if (selectorChar === undefined) return;
 
-          const guardNodeId =
-            `${slotGuardNodeIdPrefix(slot.storeNodeId, slot.itemsIndex)}${rule.nodeId}-${occNum}`;
-          // Idempotent recompile: never emit the same guard twice.
-          if (nextGroup.rules.some((r) => r.nodeId === guardNodeId)) return;
+        const guardNodeId =
+          `${slotGuardNodeIdPrefix(slot.storeNodeId, slot.itemsIndex)}${rule.nodeId}-0`;
+        // Idempotent recompile: never emit the same guard twice.
+        if (nextGroup.rules.some((r) => r.nodeId === guardNodeId)) return;
 
-          const guardContext: ContextElement[] = rule.context.map((el, idx) =>
-            idx === contextIdx ? { kind: "char", value: selectorChar } : el,
-          );
-          // Dedupe by emitted LHS, not nodeId: positionally paired stores
-          // carved at the same index (or two consuming rules sharing an LHS
-          // after substitution) would otherwise yield identical guards, and
-          // every copy after the first is an unreachable rule.
-          const lhsKey = JSON.stringify(guardContext);
-          if (
-            nextGroup.rules.some(
-              (r) =>
-                r.ownedByBehaviour === CARVE_SUPPRESSION_OWNER &&
-                JSON.stringify(r.context) === lhsKey,
-            )
-          ) {
-            return;
-          }
-          const verb = suppressionVerb(guardContext);
-          const guard: IRRule = {
-            nodeId: guardNodeId,
-            context: guardContext,
-            output: loud ? [...verb, { kind: "beep" }] : verb,
-            ownedByBehaviour: CARVE_SUPPRESSION_OWNER,
-          };
+        const lhs = {
+          nodeId: guardNodeId,
+          nulContext: ruleHasNulContext(rule),
+          conditions: ruleConditions(rule),
+          preContext: rulePreContext(rule, keysGroup),
+          keystroke: { kind: "char", value: selectorChar } satisfies ContextElement,
+          ownedByBehaviour: CARVE_SUPPRESSION_OWNER,
+        };
+        const guardContext: ContextElement[] = ruleContextElements(makeRule({ ...lhs, output: [] }, keysGroup));
+        // Dedupe by emitted LHS, not nodeId: positionally paired stores
+        // carved at the same index (or two consuming rules sharing an LHS
+        // after substitution) would otherwise yield identical guards, and
+        // every copy after the first is an unreachable rule.
+        const lhsKey = JSON.stringify(guardContext);
+        if (
+          nextGroup.rules.some(
+            (r) =>
+              r.ownedByBehaviour === CARVE_SUPPRESSION_OWNER &&
+              JSON.stringify(ruleContextElements(r)) === lhsKey,
+          )
+        ) {
+          return;
+        }
+        const verb = suppressionVerb(guardContext);
+        const guard: IRRule = makeRule(
+          { ...lhs, output: loud ? [...verb, { kind: "beep" }] : verb },
+          keysGroup,
+        );
 
-          // Immediately ahead of the paired rule (its shadowing position).
-          // Defensive fallback: the paired rule is guaranteed present here
-          // (rule dispositions run after this pass), but if it ever is not,
-          // land at its original index, clamped.
-          const at = nextGroup.rules.findIndex((r) => r.nodeId === rule.nodeId);
-          const insertAt = at === -1 ? Math.min(originalIndex, nextGroup.rules.length) : at;
-          nextGroup.rules.splice(insertAt, 0, guard);
-          restorations.push({
-            kind: "guard",
-            groupNodeId: group.nodeId,
-            index: insertAt,
-            synthesizedNodeId: guardNodeId,
-          });
+        // Immediately ahead of the paired rule (its shadowing position).
+        // Defensive fallback: the paired rule is guaranteed present here
+        // (rule dispositions run after this pass), but if it ever is not,
+        // land at its original index, clamped.
+        const at = nextGroup.rules.findIndex((r) => r.nodeId === rule.nodeId);
+        const insertAt = at === -1 ? Math.min(originalIndex, nextGroup.rules.length) : at;
+        nextGroup.rules.splice(insertAt, 0, guard);
+        restorations.push({
+          kind: "guard",
+          groupNodeId: group.nodeId,
+          index: insertAt,
+          synthesizedNodeId: guardNodeId,
         });
       });
     }
@@ -352,11 +367,11 @@ function removeDeadConsumers(
     group.rules.forEach((rule, originalIndex) => {
       if (rule.ownedByBehaviour !== undefined) return;
       if (ruleDispositionIds.has(rule.nodeId)) return;
-      const plusIdx = rule.context.findIndex((el) => el.kind === "raw" && el.text === "+");
-      if (plusIdx === -1) return;
-      const dead = rule.context.some(
-        (el, idx) => idx > plusIdx && el.kind === "any" && fullyCarved.has(el.storeRef),
-      );
+      // As in the guard pass above, a rule with no inline `+` is never swept here.
+      // eslint-disable-next-line no-restricted-syntax -- separator presence is not exposed by the rule-shape accessors; gate preserved as-is
+      if (rule.context.findIndex(isPlusSeparator) === -1) return;
+      const keystroke = ruleKeystroke(rule, { usingKeys: true });
+      const dead = keystroke !== undefined && keystroke.kind === "any" && fullyCarved.has(keystroke.storeRef);
       if (!dead) return;
       const at = nextGroup.rules.findIndex((r) => r.nodeId === rule.nodeId);
       if (at === -1) return;
@@ -408,7 +423,7 @@ export function compileCarveSuppression(
   const carvedNodeIds = new Set<string>();
 
   const verbOutput = (rule: IRRule): OutputElement[] => {
-    const verb = suppressionVerb(rule.context);
+    const verb = suppressionVerb(ruleContextElements(rule));
     return loud ? [...verb, { kind: "beep" }] : verb;
   };
 

@@ -36,6 +36,7 @@
  */
 
 import type { KeyboardIR, IRStore } from "@keyboard-studio/contracts";
+import { withoutOutsStores } from "@keyboard-studio/contracts";
 import { isDeadkeyOnlyOutput } from "../shared/rule-shape.js";
 import { makeSlotId } from "./slotId.js";
 
@@ -53,7 +54,9 @@ export type ProducerIndex = ReadonlyMap<string, number>;
  * @param ir The KeyboardIR to scan.
  * @returns  A read-only char -> producer-count map.
  */
-export function buildProducerIndex(ir: KeyboardIR): ProducerIndex {
+export function buildProducerIndex(source: KeyboardIR): ProducerIndex {
+  // Pairs stores by position: read without outs() stores (see withoutOutsStores).
+  const ir = withoutOutsStores(source);
   const counts = new Map<string, number>();
 
   const storeMap = new Map<string, IRStore>(ir.stores.map((s) => [s.name, s]));

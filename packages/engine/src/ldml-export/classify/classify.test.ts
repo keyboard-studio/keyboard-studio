@@ -135,14 +135,58 @@ describe("classifyForLdml: one assertion per mapping row (sections 1-4 and 6)", 
     expect(classify(`${ctx} + [K_A] > ${out}\n`).items.some((i) => i.rowId === "3.13")).toBe(true);
   });
 
-  it("row 3.18 and 6.1: fragments route by reason, one item each", () => {
-    const r = classify("+ [K_A] > set(opt = '1')\n+ [K_B] > call(other)\n", {
-      extra: "",
-    });
+  // A draft saved before `set` / `call` were typed holds these rules as fragments; the
+  // classifier keeps routing them by reason.
+  it("row 3.18 and 1.12: a persisted fragment routes by reason, one item each", () => {
+    const { ir } = parse(HEAD + "+ [K_A] > 'x'\n", "t");
+    ir.raw.push(
+      { nodeId: "f1", origin: "imported", sourceText: "+ [K_A] > set(opt = '1')", reason: "option-store-directive", sourceLine: 90 },
+      { nodeId: "f2", origin: "imported", sourceText: "+ [K_B] > call(other)", reason: "call-return", sourceLine: 91 },
+    );
+    const r = classifyForLdml({ ir, touchLayout: null, visualKeyboard: null, baseLayout: US_BASE }, resolveLdmlProfile("46"));
     const frags = r.items.filter((i) => i.nodeKey.startsWith("fragment#"));
     expect(frags.map((i) => i.rowId).sort()).toEqual(["1.12", "3.18"]);
     expect(frags.find((i) => i.rowId === "3.18")?.params["reason"]).toBe("option-store-directive");
     expect(frags.find((i) => i.rowId === "1.12")?.code).toBe("KM_LINT_LDML_CALL");
+  });
+
+  // Before and after typing: the same construct gives the same row, code, status, severity
+  // and reason, whether the IR holds a fragment or the typed rule. Only the node key differs.
+  it("row 3.18 and 1.12: the typed rule gives the verdict its fragment gave", () => {
+    const typed = classify("+ [K_A] > set(opt = '1')\n+ [K_B] > call(other)\n+ [K_C] > save(opt)\n+ [K_D] > return\n");
+    expect(typed.items.some((i) => i.nodeKey.startsWith("fragment#"))).toBe(false);
+    const verdict = (i: CompatibilityItem) => [i.rowId, i.code, i.status, i.severity, i.params["reason"]];
+    const lines = typed.items.filter((i) => i.rowId === "3.18" || i.rowId === "1.12").map((i) => i.line);
+    expect(lines).toHaveLength(4);
+    const as = (reason: string, rowId: string) => {
+      const { ir } = parse(HEAD + "+ [K_A] > 'x'\n", "t");
+      ir.raw.push({ nodeId: "f", origin: "imported", sourceText: "x", reason, sourceLine: 90, groupNodeId: (ir.groups[0] as { nodeId: string }).nodeId });
+      const c = classifyForLdml({ ir, touchLayout: null, visualKeyboard: null, baseLayout: US_BASE }, resolveLdmlProfile("46"));
+      return verdict(c.items.find((i) => i.nodeKey.startsWith("fragment#") && i.rowId === rowId) as CompatibilityItem);
+    };
+    const set = typed.items.find((i) => i.rowId === "3.18") as CompatibilityItem;
+    const call = typed.items.find((i) => i.rowId === "1.12") as CompatibilityItem;
+    expect(verdict(set)).toEqual(as("option-store-directive", "3.18"));
+    expect(verdict(call)).toEqual(as("call-return", "1.12"));
+  });
+
+  // layer() and platform() in the IR as typed members, or as the raw elements an older
+  // draft holds: identical classifier output.
+  it("rows 3.21 and 3.19: typed layer and platform classify as their raw forms did", () => {
+    const run = (typedForm: boolean) => {
+      const { ir } = parse(HEAD + "platform('touch') + [K_A] > 'x'\n+ [K_B] > layer('shift')\n", "t");
+      if (!typedForm) {
+        for (const r of ir.groups[0]?.rules ?? []) {
+          r.context = r.context.map((el) => (el.kind === "platform" ? { kind: "raw", text: `platform('${el.value}')` } : el));
+          r.output = r.output.map((el) => (el.kind === "layer" ? { kind: "raw", text: `layer('${el.value}')` } : el));
+        }
+      }
+      const c = classifyForLdml({ ir, touchLayout: null, visualKeyboard: null, baseLayout: US_BASE }, resolveLdmlProfile("46"));
+      return c.items.map((i) => [i.siteKey, i.rowId, i.status, i.code, i.severity, i.params]);
+    };
+    expect(run(true)).toEqual(run(false));
+    expect(run(true).some((x) => x[1] === "3.19")).toBe(true);
+    expect(run(true).some((x) => x[1] === "3.21")).toBe(true);
   });
 
   it("row 6.1: an unrecognised fragment reason is OPAQUE and names its reason", () => {
@@ -298,7 +342,7 @@ describe("classifyForLdml: invariants", () => {
     const i = c.items.find((x) => x.rowId === "2.5") as CompatibilityItem;
     expect(i.nodeKey).toMatch(/^group:main#\d+$/);
     expect(i.siteKey).toBe(`${i.code}|${i.rowId}|${i.nodeKey}`);
-    const frag = classify("+ [K_A] > call(x)\n").items.find((x) => x.nodeKey.startsWith("fragment#"));
+    const frag = classify("if(opt <> '1') + [K_A] > 'x'\n").items.find((x) => x.nodeKey.startsWith("fragment#"));
     expect(frag?.nodeKey).toMatch(/^fragment#\d+$/);
     expect(classify("+ [K_A] > 'x'\n", { extra: "store(&HOTKEY) 'x'\n" }).items.some((x) => x.nodeKey === "store:HOTKEY")).toBe(true);
   });

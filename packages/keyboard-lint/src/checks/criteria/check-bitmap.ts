@@ -8,6 +8,7 @@
 // by other producers), plus the judged VFS inventory for existence.
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { storeItemText } from "@keyboard-studio/contracts";
 import {
   baseNameLower,
   checkFailed,
@@ -25,13 +26,7 @@ export function bitmapReference(ir: KeyboardIR): string | undefined {
   for (const store of ir.stores) {
     if (!store.isSystem || store.name.toUpperCase() !== "BITMAP") continue;
     const value = store.items
-      .map((item) =>
-        item.kind === "char"
-          ? item.value
-          : item.kind === "raw"
-            ? item.text
-            : "",
-      )
+      .map((item) => storeItemText(item))
       .join("")
       .trim();
     if (value !== "") return value;

@@ -74,7 +74,7 @@ describe("computeContextTolerance (spec 062, US2)", () => {
       HEADER,
       "group(main) using keys",
       "",
-      "U+1F600 + 'y' > 'z'",
+      "'x' + 'y' > 'z' outs(opt)",
       "+ 'a' > 'a'",
       "",
     ].join("\n");
@@ -160,7 +160,7 @@ describe("computeContextTolerance (spec 062, US2)", () => {
       "store(acute) U+00E2",
       "store(key.act) ']'",
       "",
-      "U+1F600 + 'y' > 'z'",
+      "'x' + 'y' > 'z' outs(opt)",
       "any(base) + any(key.act) > index(acute,1)",
       "+ ']' > U+00B4",
       "+ 'a' > 'a'",
