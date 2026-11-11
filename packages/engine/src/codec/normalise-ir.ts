@@ -34,6 +34,9 @@ export function normaliseForComparison(ir: KeyboardIR): unknown {
     JSON.stringify(ir, (key, value) => {
       if (key === "nodeId") return "__stripped__";
       if (key === "sourceLine") return undefined;
+      // Likewise a parser annotation, not a semantic field: the lines a
+      // node consumes are a function of the source text, not of the IR.
+      if (key === "consumedSourceLines") return undefined;
       // Dropped (not placeholder-replaced): the #2404 dependency pass may
       // relocate a store-declaration fragment across the pre-begin/group
       // boundary, so one side can lack groupNodeId while the other has it.

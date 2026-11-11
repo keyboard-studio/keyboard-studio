@@ -1884,6 +1884,28 @@ export function parse(text: string, keyboardId: string): ParseResult {
   // Deprecated-form finalisation (#2633) — post-loop passes.
   // ---------------------------------------------------------------------------
 
+  // A merge-dropped twin's source line has no IR node left to own it, so
+  // the text-splice carve path could never delete it: deleting the survivor
+  // (or its group) would orphan the line, and a re-parse would resurrect
+  // the twin — or re-attribute it to the preceding group (main-CI run
+  // 42906157256: korean_rr's dropped `$keymanweb: nomatch > nul` line
+  // survived a group deletion and re-parsed as an extra rule in
+  // combineJamo). The survivor therefore consumes the loser's line(s):
+  // the splice deletes them together with the survivor.
+  function absorbDroppedLines(
+    survivor: IRStore | IRRule | RawKmnFragment,
+    loser: { sourceLine?: number; consumedSourceLines?: number[] },
+  ): void {
+    const lines = [
+      ...(loser.sourceLine !== undefined ? [loser.sourceLine] : []),
+      ...(loser.consumedSourceLines ?? []),
+    ];
+    if (lines.length === 0) return;
+    const next = new Set(survivor.consumedSourceLines ?? []);
+    for (const l of lines) next.add(l);
+    survivor.consumedSourceLines = [...next].sort((a, b) => a - b);
+  }
+
   // Merge target-prefixed store twins: group typed stores by lowercased
   // name; when a group has targeted stores and NO unprefixed store, the
   // desktop (`keymanonly`) body wins (first desktop wins; if no desktop,
@@ -1925,6 +1947,9 @@ export function parse(text: string, keyboardId: string): ParseResult {
           `$${loser.targetSelector}: ${loserLine}`,
           `(dropped — store(${loser.name}) keeps the ${desktop !== undefined ? "desktop" : "first web"} body)`,
         );
+        // The survivor consumes the loser's line: it has no node left to
+        // own it, so a splice deletion of the survivor must remove it too.
+        absorbDroppedLines(survivor, loser);
         const idx = stores.indexOf(loser);
         if (idx >= 0) stores.splice(idx, 1);
       }
@@ -1971,6 +1996,8 @@ export function parse(text: string, keyboardId: string): ParseResult {
     );
     const idx = stores.indexOf(dropDesktop);
     if (idx >= 0) stores.splice(idx, 1);
+    // The kept store consumes the dropped line (see absorbDroppedLines).
+    absorbDroppedLines(keepWeb, dropDesktop);
     delete sysStores[dropDesktop.name];
   }
 
@@ -2009,6 +2036,9 @@ export function parse(text: string, keyboardId: string): ParseResult {
           );
           const idx = group.rules.indexOf(loser);
           if (idx >= 0) group.rules.splice(idx, 1);
+          // The survivor consumes the loser's line: it has no node left to
+          // own it, so a splice deletion of the survivor must remove it too.
+          absorbDroppedLines(survivor, loser);
         }
         delete survivor.targetSelector;
       }
@@ -2043,6 +2073,11 @@ export function parse(text: string, keyboardId: string): ParseResult {
           header.sourceText,
           `(dropped — store(&${name}) already declared; header value '${header.value}' not used)`,
         );
+        // The dropped header line has no node of its own: the node that
+        // already declares the value consumes it, so deleting that node
+        // removes the header too instead of letting a re-parse
+        // re-synthesise the store from the surviving header line.
+        absorbDroppedLines(existingTyped ?? existingFrag!, { sourceLine: header.line });
         continue;
       }
       // Synthesise the system store. HOTKEY translates to the virtual-key
