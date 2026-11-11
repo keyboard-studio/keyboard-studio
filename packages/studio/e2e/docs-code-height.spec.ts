@@ -40,7 +40,7 @@ import {
   driveDeadkeysStep,
   driveMechanismsGallery,
   driveTouchGallery,
-  driveCssEditorStep,
+  drivePhaseFToGate,
   seedReturningVisitor,
   surveyAdvance,
 } from "./helpers/surveyFlow";
@@ -202,62 +202,14 @@ async function docsGeometry(page: Page, mode: "rich" | "code"): Promise<DocsGeom
 }
 
 /**
- * Walk Phase F up to (not past) the Documentation step: the welcome
- * paragraph, font guidance, first usage tip, undecided history entry and
- * the more-detail "No" gate, then any remaining optional Phase F questions
- * until the html-continue footer button appears.
+ * Walk Phase F up to (not past) the Documentation step: the shared
+ * Phase F prefix (drivePhaseFToGate — welcome paragraph, font guidance,
+ * first usage tip, undecided history entry, more-detail "No" gate),
+ * then any remaining optional Phase F questions until the html-continue
+ * footer button appears.
  */
 async function driveToHtmlStep(page: Page): Promise<void> {
-  const welcome = page.locator("#pf_welcome_paragraph");
-  const cssContinue = page.getByTestId("css-continue");
-  await Promise.race([
-    welcome.waitFor({ state: "visible", timeout: 30_000 }),
-    cssContinue.waitFor({ state: "visible", timeout: 30_000 }),
-  ]).catch(() => {
-    // Neither landmark showed: the fill below names the stall.
-  });
-  if (await cssContinue.isVisible().catch(() => false)) {
-    await driveCssEditorStep(page);
-  }
-  await welcome.fill("Welcome to the keyboard.");
-  await surveyAdvance(page).click();
-
-  const fontGuidance = page.locator("#pf_font_guidance");
-  const usageTip = page.locator("#pf_usage_tip_1");
-  await Promise.race([
-    fontGuidance.waitFor({ state: "visible", timeout: 30_000 }),
-    usageTip.waitFor({ state: "visible", timeout: 30_000 }),
-  ]).catch(() => {
-    // Neither landmark showed within the combined window — fall through
-    // to the bounded check below, which names the stuck state.
-  });
-  if (await fontGuidance.isVisible().catch(() => false)) {
-    await surveyAdvance(page).click();
-  }
-  const usageTipShown = await usageTip
-    .waitFor({ state: "visible", timeout: 30_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (!usageTipShown) {
-    throw new Error(
-      "driveToHtmlStep: #pf_usage_tip_1 never appeared within 30s after the " +
-        `welcome paragraph (url: ${page.url()}) — the walk is parked on an ` +
-        "unhandled Phase F question.",
-    );
-  }
-  await usageTip.fill("Press a key to start.");
-  await surveyAdvance(page).click();
-
-  // pf_history_entry (spec 080 US5) — optional; leave undecided and
-  // advance straight through to the gate.
-  await surveyAdvance(page).click();
-
-  // pf_more_detail_gate — required. "No" routes straight past the
-  // opt-in battery.
-  const moreDetailNo = page.getByRole("radio", { name: "No" });
-  await moreDetailNo.waitFor({ state: "visible", timeout: 15_000 });
-  await moreDetailNo.check();
-  await surveyAdvance(page).click();
+  await drivePhaseFToGate(page);
 
   // Remaining optional Phase F questions, if any, until Documentation.
   for (let guard = 0; guard < 20; guard++) {
@@ -308,6 +260,7 @@ test.describe("Documentation code view height", () => {
     await page.getByRole("heading", { name: "Documentation" }).waitFor({ timeout: 30_000 });
     await page.locator(".tiptap").first().waitFor({ state: "visible", timeout: 120_000 });
     const rich = await docsGeometry(page, "rich");
+    // eslint-disable-next-line no-console
     console.log(`RICH richBox=${rich.richBox?.height} rightCol=${rich.rightCol.height} treeRow=${rich.treeRow.height} root=${rich.root.height}`);
 
     // Switch to Code mode. The pane mounts as soon as the lazy chunk
@@ -319,6 +272,7 @@ test.describe("Documentation code view height", () => {
     await page.waitForTimeout(1_000);
 
     const geo = await docsGeometry(page, "code");
+    // eslint-disable-next-line no-console
     console.log(
       `CODE monaco=${geo.monaco?.height} wrapper=${geo.monacoWrapper?.height} ` +
         `codeBranch=${geo.codeBranch?.height} paneRoot=${geo.paneRoot?.height} ` +
@@ -326,6 +280,7 @@ test.describe("Documentation code view height", () => {
         `treeRow=${geo.treeRow.height} tree=${geo.tree.height} root=${geo.root.height}`,
     );
     for (const link of geo.chain) {
+      // eslint-disable-next-line no-console
       console.log(
         `  chain[${link.depth}] <${link.tag}> h=${link.height} display=${link.display} ` +
           `alignItems=${link.alignItems} minHeight=${link.minHeight} flexGrow=${link.flexGrow}`,
