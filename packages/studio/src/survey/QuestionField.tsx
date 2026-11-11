@@ -3,14 +3,17 @@
 // and calls onChange when the user modifies it.
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
-import { Suspense, lazy, useState, useEffect, useRef } from "react";
+import { Suspense, lazy, useState, useEffect, useRef, useMemo } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { I18n } from "@lingui/core";
 import type { FlowQuestion, SurveyContext } from "./types.ts";
-import type { LintFinding, LanguageSummary } from "@keyboard-studio/contracts";
+import type { LintFinding, LanguageSummary, SearchMatch } from "@keyboard-studio/contracts";
 import { LintChip } from "../lint/LintChip.tsx";
 import { getLoadedLangtags, loadLangtags } from "../lib/langtagsDefaults.ts";
 import { checkLanguageCode } from "./languageCodeCheck.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
+import { proposeDialect, validateDialectSubtag, type DialectProposal } from "./dialectProposal.ts";
+import { buildTargetBcp47 } from "./targetBcp47.ts";
 import {
   TextField,
   Textarea,
@@ -192,6 +195,12 @@ function TextFieldControl({ question, value, onChange }: FieldProps) {
 
 function AutocompleteField({ question, value, onChange, onEntryResolved, onSelectAdvance }: FieldProps) {
   const { t } = useLingui();
+  // Spec 115 US2: the dialect question is a confirmation of the chooser's
+  // result, like il_language_code — its own renderer, not the generic
+  // options dropdown.
+  if (question.id === "il_language_dialect") {
+    return <DialectField question={question} value={value} onChange={onChange} />;
+  }
   // `@langtags_names` (spec 030 US1): the English-name-first picker. It shows
   // the language NAME in the field and reports the resolved entry via
   // onEntryResolved so homonyms (same name, different code) can be told apart.
@@ -329,6 +338,322 @@ function LanguageCodeField({ question, value, onChange, onSelectAdvance }: Field
           {status}
         </p>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DialectField — il_language_dialect as a CONFIRMATION of the chooser's result
+// (spec 115 US2). The dialect arrives from the search match the language was
+// reached through; the field shows the proposal (dialect name + full tag) with
+// Confirm / Edit / No dialect, or — with no proposal — the language's
+// registered variants and tagset dialects as a list plus a name box that
+// proposes from a typed name.
+//
+// Confirming records the proposal's source and the dialect's Glottolog code
+// alongside the answer (the module's rendererWrites, written directly to the
+// decision store — the LanguageChooser.enterDialectMode precedent); editing
+// records source "typed" and drops the glottocode; "No dialect" clears the
+// answer and both records. Nothing is written until the author confirms
+// (Article X). The edit is validated per keystroke with the parser's reason
+// in words.
+// ---------------------------------------------------------------------------
+
+/** A string decision's value, or "" when absent. */
+function decisionString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function DialectField({ question, value, onChange }: FieldProps) {
+  const { t } = useLingui();
+  const decisions = useDecisionStore((s) => s.decisions);
+  const [loadedTick, setLoadedTick] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [edit, setEdit] = useState("");
+  const [typedName, setTypedName] = useState("");
+  const [typedMatch, setTypedMatch] = useState<SearchMatch | null>(null);
+
+  // The proposal reads the loaded langtags module; subscribe to its arrival
+  // so a question reached before the chunk lands still proposes.
+  useEffect(() => {
+    let live = true;
+    void loadLangtags()
+      .then(() => {
+        if (live) setLoadedTick((n) => n + 1);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  // Re-render when the module lands: the proposal below is computed from it.
+  void loadedTick;
+
+  const code = decisionString(decisions["language-code"]?.value);
+  const script = decisionString(decisions["target-script"]?.value);
+  const region = decisionString(decisions["language-region"]?.value);
+  const match = (decisions["language-search-match"]?.value ?? null) as SearchMatch | null;
+  const current = stringValue(value);
+  const source = decisionString(decisions["language-dialect-source"]?.value);
+  const proposal = useMemo(
+    () =>
+      proposeDialect(
+        {
+          language: code,
+          ...(script !== "" ? { script } : {}),
+          ...(region !== "" ? { region } : {}),
+        },
+        typedMatch ?? match,
+      ),
+    [code, script, region, typedMatch, match],
+  );
+
+  const recordProposal = (p: DialectProposal): void => {
+    const store = useDecisionStore.getState();
+    store.record({
+      id: "language-dialect-source",
+      value: p.source,
+      provenance: "derived",
+      source: "il_language_dialect",
+    });
+    if (p.glottocode !== undefined) {
+      store.record({
+        id: "dialect-glottocode",
+        value: p.glottocode,
+        provenance: "derived",
+        source: "il_language_dialect",
+      });
+    } else {
+      store.forget("dialect-glottocode");
+    }
+  };
+  const forgetDialectMeta = (): void => {
+    const store = useDecisionStore.getState();
+    store.forget("language-dialect-source");
+    store.forget("dialect-glottocode");
+  };
+  // A pick from the list (no proposal): the subtag is a registered variant
+  // or a langtags tagset by construction, and it carries no Glottolog code
+  // of its own — the match's code belongs to the dialect the author did
+  // not pick, so it is forgotten.
+  const recordListPick = (subtag: string): void => {
+    const store = useDecisionStore.getState();
+    const mod = getLoadedLangtags();
+    const tag = [code, script, region].filter((p) => p !== "").join("-");
+    // A partial module (a test mock predating the dialect surface) cannot
+    // tell a variant from a tagset — record "langtags" and move on.
+    const isVariant =
+      mod !== null && typeof mod.variantAllowed === "function" && subtag !== "" && mod.variantAllowed(tag, subtag);
+    store.record({
+      id: "language-dialect-source",
+      value: isVariant ? "registered-variant" : "langtags",
+      provenance: "derived",
+      source: "il_language_dialect",
+    });
+    store.forget("dialect-glottocode");
+  };
+
+  const confirmProposal = (): void => {
+    if (proposal === null) return;
+    onChange(proposal.subtag);
+    recordProposal(proposal);
+  };
+  const chooseNoDialect = (): void => {
+    onChange("");
+    forgetDialectMeta();
+  };
+  const proposeFromName = (): void => {
+    const name = typedName.trim();
+    if (name === "") return;
+    setTypedMatch({ name, relation: "dialect", source: "typed" });
+  };
+
+  const confirmed = proposal !== null && current === proposal.subtag && source === proposal.source;
+  const proposalName = (typedMatch ?? match)?.name ?? proposal?.subtag ?? "";
+  const buttonRow = {
+    display: "flex",
+    gap: 8,
+    marginTop: 6,
+    flexWrap: "wrap" as const,
+  };
+
+  if (editing) {
+    const check = validateDialectSubtag(edit);
+    const reason =
+      !check.ok && check.reason !== "empty"
+        ? check.reason === "bad-private-use"
+          ? t({
+              id: "survey.dialectField.invalidPrivateUse",
+              message: "after x-, use 1–8 letters or digits in each part",
+            })
+          : t({
+              id: "survey.dialectField.invalidVariant",
+              message: "use 5–8 letters or digits, or a digit followed by 3 letters or digits",
+            })
+        : null;
+    const saveEdit = (): void => {
+      if (!check.ok) return;
+      const subtag = edit.trim();
+      onChange(subtag);
+      const store = useDecisionStore.getState();
+      store.record({
+        id: "language-dialect-source",
+        value: "typed",
+        provenance: "derived",
+        source: "il_language_dialect",
+      });
+      store.forget("dialect-glottocode");
+      setEditing(false);
+    };
+    return (
+      <div>
+        <input
+          type="text"
+          id={question.id}
+          value={edit}
+          onChange={(e) => setEdit(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") saveEdit();
+          }}
+          aria-label={t({ id: "survey.dialectField.editLabel", message: "Dialect subtag" })}
+          aria-required={question.required === true}
+          autoComplete="off"
+          className="ks-control ks-focus-ring ks-hit-target"
+          style={{ width: "100%", height: 42, padding: "0 12px", boxSizing: "border-box" }}
+        />
+        {reason !== null && (
+          <p role="note" style={{ margin: "6px 0 0", fontSize: 13, color: TEXT_DIM }}>
+            {t({ id: "survey.dialectField.invalid", message: `Not a valid dialect subtag (${reason}).` })}
+          </p>
+        )}
+        <div style={buttonRow}>
+          <button type="button" className="ks-focus-ring" onClick={saveEdit} disabled={!check.ok}>
+            {t({ id: "survey.dialectField.save", message: "Save" })}
+          </button>
+          <button type="button" className="ks-focus-ring" onClick={() => setEditing(false)}>
+            {t({ id: "survey.dialectField.cancel", message: "Cancel" })}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // The proposal, offered (arrival: the seeded default) or confirmed.
+  if (proposal !== null && (current === "" || current === proposal.subtag)) {
+    return (
+      <div>
+        <p style={{ margin: 0 }}>
+          <strong data-testid="dialect-proposal-tag">{proposal.fullTag}</strong>
+          <span style={{ color: TEXT_DIM }}>
+            {" — "}
+            {proposalName}
+          </span>
+          {confirmed && (
+            <span style={{ color: TEXT_DIM }}>
+              {" — "}
+              {t({ id: "survey.dialectField.confirmed", message: "Confirmed" })}
+            </span>
+          )}
+        </p>
+        <div style={buttonRow}>
+          {!confirmed && (
+            <button type="button" className="ks-focus-ring" onClick={confirmProposal}>
+              {t({ id: "survey.dialectField.confirm", message: "Confirm" })}
+            </button>
+          )}
+          <button
+            type="button"
+            className="ks-focus-ring"
+            onClick={() => {
+              setEdit(proposal.subtag);
+              setEditing(true);
+            }}
+          >
+            {t({ id: "survey.dialectField.edit", message: "Edit" })}
+          </button>
+          <button type="button" className="ks-focus-ring" onClick={chooseNoDialect}>
+            {t({ id: "survey.dialectField.noDialect", message: "No dialect" })}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // An edited subtag is the answer: show it with its composed tag, and keep
+  // the proposal one click away.
+  if (current !== "" && proposal !== null) {
+    return (
+      <div>
+        <p style={{ margin: 0 }}>
+          <strong data-testid="dialect-current-tag">{buildTargetBcp47(code, script, region, current)}</strong>
+          <span style={{ color: TEXT_DIM }}>
+            {" — "}
+            {current}
+          </span>
+        </p>
+        <p style={{ margin: "6px 0 0", fontSize: 13, color: TEXT_DIM }}>
+          {t({ id: "survey.dialectField.suggestion", message: `Suggested: ${proposal.fullTag} (${proposalName}).` })}
+        </p>
+        <div style={buttonRow}>
+          <button type="button" className="ks-focus-ring" onClick={confirmProposal}>
+            {t({ id: "survey.dialectField.useSuggestion", message: "Use suggestion" })}
+          </button>
+          <button
+            type="button"
+            className="ks-focus-ring"
+            onClick={() => {
+              setEdit(current);
+              setEditing(true);
+            }}
+          >
+            {t({ id: "survey.dialectField.edit", message: "Edit" })}
+          </button>
+          <button type="button" className="ks-focus-ring" onClick={chooseNoDialect}>
+            {t({ id: "survey.dialectField.noDialect", message: "No dialect" })}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // No proposal: the language's variants and tagset dialects as a list
+  // (question.options, from IdentityLite.getSeedOptions), plus a name box
+  // that proposes from a typed name.
+  return (
+    <div>
+      <StyledOptionsField
+        question={question}
+        value={value}
+        onChange={(v) => {
+          const subtag = stringValue(v);
+          onChange(subtag);
+          if (subtag !== "") recordListPick(subtag);
+          else forgetDialectMeta();
+        }}
+      />
+      <div style={{ marginTop: 12 }}>
+        <input
+          type="text"
+          value={typedName}
+          onChange={(e) => setTypedName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") proposeFromName();
+          }}
+          aria-label={t({ id: "survey.dialectField.nameLabel", message: "Dialect name" })}
+          placeholder={t({ id: "survey.dialectField.namePlaceholder", message: "Type a dialect name…" })}
+          autoComplete="off"
+          className="ks-control ks-focus-ring ks-hit-target"
+          style={{ width: "100%", height: 42, padding: "0 12px", boxSizing: "border-box" }}
+        />
+        <div style={buttonRow}>
+          <button type="button" className="ks-focus-ring" onClick={proposeFromName} disabled={typedName.trim() === ""}>
+            {t({ id: "survey.dialectField.nameButton", message: "Find dialect" })}
+          </button>
+          <button type="button" className="ks-focus-ring" onClick={chooseNoDialect}>
+            {t({ id: "survey.dialectField.noDialect", message: "No dialect" })}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

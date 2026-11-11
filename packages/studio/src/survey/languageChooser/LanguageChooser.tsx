@@ -215,11 +215,29 @@ export default function LanguageChooser({
     setCustom({});
   }
 
-  /** The Customize region rides on the language as a proposal the author confirms at the region question. */
+  /**
+   * The Customize region rides on the language as a proposal the author
+   * confirms at the region question; the Customize dialect rides the same
+   * way (spec 115 US2) — a typed dialect name attaches a typed dialect
+   * match to the reported entry, overriding the pick's own match while it
+   * is non-empty. Clearing it restores the pick's match. Both reach the
+   * survey only as proposals: the match gates the dialect question and
+   * feeds its proposal, and nothing is written until the author confirms.
+   */
   function withCustom<T extends ChosenSummary | null>(summary: T): T {
     const region = customRef.current.region;
-    if (summary === null || region === undefined) return summary;
-    return { ...summary, extras: { ...summary.extras, region: { code: region.code, source: "the region you specified" } } };
+    const dialect = customRef.current.dialect?.trim();
+    if (summary === null) return summary;
+    if (region === undefined && (dialect === undefined || dialect === "")) return summary;
+    return {
+      ...summary,
+      ...(dialect !== undefined && dialect !== ""
+        ? { match: { name: dialect, relation: "dialect", source: "typed" } satisfies SearchMatch }
+        : {}),
+      ...(region !== undefined
+        ? { extras: { ...summary.extras, region: { code: region.code, source: "the region you specified" } } }
+        : {}),
+    };
   }
 
   function keyOf(entry: ChosenSummary | null): string {

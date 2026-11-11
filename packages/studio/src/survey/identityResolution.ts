@@ -17,11 +17,12 @@
 import type { LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { questionRegistry } from "./questions/registry.ts";
+import { answerFilledIds } from "./questions/answerFilledIds.ts";
 import type { ExtractContext, IdentityLookupInputs } from "../decisions/extractContext.ts";
 import { loadLangtags, getLoadedLangtags, scriptToTargetOption } from "../lib/langtagsDefaults.ts";
 import { extrasOf, type ChosenExtras } from "./chosenLanguage.ts";
 
-const SEEDED_QUESTIONS = ["il_language_autonym", "il_language_code", "il_target_script"] as const;
+const SEEDED_QUESTIONS = ["il_language_autonym", "il_language_code", "il_target_script", "il_language_dialect"] as const;
 
 export interface IdentityResolution {
   /** The author selected (entry) or cleared / free-texted (null) a language at il_language_english. */
@@ -65,12 +66,14 @@ export function createIdentityResolution(): IdentityResolution {
   // a customized region), so il_language_region is routed for the author to confirm.
   let regionRequested = false;
 
-  // Evaluate the three declared lookup defaults against the accumulated
-  // inputs and record each result as a `default` decision record. Write rule
-  // (the extraction pass's merge rule, G-12): seed when absent, replace a
-  // record this mechanism itself seeded (`default` provenance), and NEVER
-  // touch an author-shaped record. Re-evaluating an unchanged snapshot writes
-  // nothing.
+  // Evaluate the declared lookup defaults against the accumulated inputs
+  // and record each result as a `default` decision record. Write rule (the
+  // extraction pass's merge rule, G-12): seed when absent, replace a record
+  // this mechanism itself seeded (`default` provenance), and NEVER touch an
+  // author-shaped record. Re-evaluating an unchanged snapshot writes
+  // nothing. Only the answer-filled ids are seeded — a module's
+  // rendererWrites (il_language_dialect's source and glottocode) are the
+  // renderer's, never a default's.
   function evaluateIdentityDefaults(): void {
     const ctx: ExtractContext = { ir: null, catalog: null, identity: identityInputs };
     const store = useDecisionStore.getState();
@@ -79,7 +82,7 @@ export function createIdentityResolution(): IdentityResolution {
       if (mod?.lookupDefault === undefined || mod.provides === undefined) continue;
       const dflt = mod.lookupDefault(ctx);
       if (dflt === undefined || dflt.value === undefined || dflt.value === null) continue;
-      for (const id of mod.provides) {
+      for (const id of answerFilledIds(mod)) {
         const existing = store.decisions[id];
         if (existing !== undefined && existing.provenance !== "default") continue;
         if (existing !== undefined && existing.value === dflt.value && existing.source === dflt.source) {
@@ -132,13 +135,18 @@ export function createIdentityResolution(): IdentityResolution {
     const q1 = defaults.englishName ?? (q1English !== "" ? q1English : undefined);
     // The new entry's inputs REPLACE the previous entry's wholesale —
     // destructure the entry-derived keys out first so a field this entry lacks
-    // cannot survive from the superseded resolution.
+    // cannot survive from the superseded resolution. languageRegion is
+    // entry-derived too: the new entry's region is unknown until the author
+    // answers il_language_region (or a Customize region arrives via
+    // applyExtras). searchMatch is NOT destructured — recordSearchMatch set
+    // it for this entry just before seedFromEntry ran.
     const {
       localNames: _ln,
       languageCode: _lc,
       targetScript: _ts,
       targetScriptSource: _tss,
       q1English: _q1,
+      languageRegion: _lr,
       ...restInputs
     } = identityInputs;
     identityInputs = {
@@ -156,14 +164,21 @@ export function createIdentityResolution(): IdentityResolution {
   // Record why the picked language matched a dialect or variety name (spec 115),
   // or forget the record when the pick was a direct hit. This is the question's
   // own decision (`language-search-match`), a fact derived from the pick; the
-  // code, script and autonym seeds below stay `default` proposals.
+  // code, script and autonym seeds below stay `default` proposals. The match
+  // also feeds the dialect question's lookupDefault (ctx.identity.searchMatch)
+  // and its routing gate, so it is kept in the lookup inputs in step.
   function recordSearchMatch(match: LanguageSummary["match"]): void {
     const store = useDecisionStore.getState();
     if (match === undefined) {
       if (store.decisions["language-search-match"] !== undefined) store.forget("language-search-match");
+      const { searchMatch: _sm, ...restInputs } = identityInputs;
+      identityInputs = restInputs;
       return;
     }
     const existing = store.decisions["language-search-match"];
+    // The lookup inputs carry the match regardless of whether the decision
+    // record changed (a reset can clear the inputs while the record stands).
+    identityInputs = { ...identityInputs, searchMatch: match };
     if (existing !== undefined && JSON.stringify(existing.value) === JSON.stringify(match)) return;
     store.record({
       id: "language-search-match",
@@ -203,8 +218,12 @@ export function createIdentityResolution(): IdentityResolution {
       if (region === undefined || region.provenance === "default") {
         store.record({ id: "language-region", value: extras.region.code, provenance: "default", source: "region" });
       }
+      // A Customize region feeds the dialect proposal's full tag (spec 115 US2).
+      identityInputs = { ...identityInputs, languageRegion: extras.region.code };
     } else if (region?.provenance === "default" && region.source === "region") {
       store.forget("language-region");
+      const { languageRegion: _lr, ...restInputs } = identityInputs;
+      identityInputs = restInputs;
     }
     if (extras?.script !== undefined) {
       const option = scriptToTargetOption(extras.script.script) ?? "other";
@@ -287,6 +306,15 @@ export function createIdentityResolution(): IdentityResolution {
         // Skipping (blank) leaves the primary-variant seeds in place. englishNames
         // stay the entry-level set (region variants carry no English names).
         const region = typeof value === "string" ? value.trim() : "";
+        // The region feeds the dialect proposal's full tag (spec 115 US2):
+        // answering it re-proposes the dialect against the narrowed variant.
+        // Skipping clears it, so the proposal falls back to the language default.
+        if (region !== "") {
+          identityInputs = { ...identityInputs, languageRegion: region };
+        } else {
+          const { languageRegion: _lr, ...restInputs } = identityInputs;
+          identityInputs = restInputs;
+        }
         const variant = resolvedEntry?.regionVariants?.find((v) => v.region === region);
         if (variant !== undefined) {
           localNames = variant.localNames.length > 0 ? variant.localNames : undefined;
@@ -318,6 +346,22 @@ export function createIdentityResolution(): IdentityResolution {
     nextOverride(questionId) {
       if (questionId === "il_language_english" && (resolvedSummary?.hasRegionVariants === true || regionRequested)) {
         return "il_language_region";
+      }
+      // Spec 115 US2: route il_target_script -> il_language_dialect only when
+      // the language was reached through a search match carrying a dialect —
+      // a dialect or variety relation, or a dialect tag — and NOT merely
+      // because the language has registered variants. A typed dialect from
+      // the Customize panel arrives here as a typed dialect match, so it
+      // gates the same way. Reads the match recordSearchMatch stored at
+      // pick time, so it is current at render time.
+      if (questionId === "il_target_script") {
+        const match = identityInputs.searchMatch;
+        if (
+          match !== undefined &&
+          (match.relation === "dialect" || match.relation === "variety" || match.dialectTag !== undefined)
+        ) {
+          return "il_language_dialect";
+        }
       }
       return undefined;
     },

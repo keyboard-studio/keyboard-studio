@@ -11,6 +11,8 @@
   "content.flowQuestion.il_language_autonym.prompt": "What is your language called in your own language?",
   "content.flowQuestion.il_language_code.help_text": "This is the standard code for the language you picked — it goes on the finished keyboard. It is filled in from your choice above; change it only if you need a different code, or type one directly if your language was not in the list.",
   "content.flowQuestion.il_language_code.prompt": "Confirm your language's code",
+  "content.flowQuestion.il_language_dialect.help_text": "A tag names a dialect only when your keyboard is for one variety of the language. Confirm the dialect we found, type a different one, or choose \"No dialect\" — the tag then has no dialect subtag. Skip if you are unsure.",
+  "content.flowQuestion.il_language_dialect.prompt": "Which dialect is this keyboard for?",
   "content.flowQuestion.il_language_english.audit_label": "Language name (English)",
   "content.flowQuestion.il_language_english.help_text": "Start typing your language's English name and pick it from the list (for example: Hausa, Swahili, Hindi). When two languages share a name, the list shows the region and local name so you can choose the right one. If your language is not listed, just type its English name and continue — free text is always accepted.",
   "content.flowQuestion.il_language_english.prompt": "What is your language called in English?",

@@ -40,6 +40,12 @@ type LangtagsModule = {
   }) => string;
   /** The raw IANA variant registry (spec 115 R5). */
   allRegisteredVariants: readonly { subtag: string; descriptions: readonly string[]; prefixes: readonly string[]; deprecated: boolean }[];
+  /** The IANA variant registry, prefix-aware (spec 115 R5, T047). */
+  variantEntry: (subtag: string) => { subtag: string; descriptions: readonly string[]; prefixes: readonly string[]; deprecated: boolean } | undefined;
+  variantsFor: (tag: string) => readonly { subtag: string; descriptions: readonly string[]; prefixes: readonly string[]; deprecated: boolean }[];
+  variantAllowed: (tag: string, variant: string) => boolean;
+  /** The langtags dialect tagsets of one language (spec 115 R3, T047). */
+  dialectTagsetsFor: (language: string) => readonly DialectTagset[];
 };
 
 let _modulePromise: Promise<LangtagsModule> | null = null;

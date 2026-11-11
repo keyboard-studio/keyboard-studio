@@ -6,7 +6,7 @@
 // touch layout, and character inventory live in the IR. Each decision reads
 // from whichever holds it.
 
-import type { StartKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
+import type { SearchMatch, StartKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
 import { getLoadedLangtags } from "../lib/langtagsDefaults.ts";
 
 /**
@@ -130,6 +130,14 @@ export interface IdentityLookupInputs {
   q1English?: string;
   /** The stored author profile; a missing name/email seeds nothing. */
   authorProfile?: { name?: string | null; email?: string | null };
+  /** The recorded region answer, when one exists (the dialect proposal's full tag reads it, spec 115 US2). */
+  languageRegion?: string;
+  /**
+   * The search match the language was reached through, when it carries a
+   * dialect (spec 115 US2): the dialect question proposes from it, and a
+   * resume re-proposes from the recorded decision.
+   */
+  searchMatch?: SearchMatch;
 }
 
 /**

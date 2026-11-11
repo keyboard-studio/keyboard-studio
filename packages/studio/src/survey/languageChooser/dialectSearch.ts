@@ -64,10 +64,12 @@ export interface DialectRow {
   requires?: string;
 }
 
-/** Fold for comparison: NFD, combining marks dropped, lowercase. */
-export function fold(text: string): string {
-  return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
-}
+// Re-exported from lib/foldName.ts: the same fold the dialect proposal
+// uses (spec 115 US2). It lives in lib/ so the entry chunk can import it
+// without pulling in this module's static @ethnolib/find-language import
+// (spec 115 FR-037 lazy boundary).
+import { fold } from "../../lib/foldName.ts";
+export { fold };
 
 /** ISO 639-3 macrolanguage representatives the chooser lists under their two-letter tag. */
 export const MACROLANGUAGE_PARENT: Readonly<Record<string, string>> = { cmn: "zh", arb: "ar" };

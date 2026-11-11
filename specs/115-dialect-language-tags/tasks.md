@@ -303,8 +303,8 @@ Commit: `spec 115 T038-T043`.
 
 **Wave 1 — tests:**
 
-- [ ] T044 [P] [US2] Write failing tests for `variantEntry`, `variantsFor(tag)`, `variantAllowed(tag, variant)` and `dialectTagsetsFor(language)`: `gascon` allowed after `oc` and not after `en`; `1994` only after `sl-rozaj…`; `biske` only after `sl-rozaj` — packages/engine/src/langtags/variants.test.ts, packages/engine/src/langtags/dialects.test.ts
-- [ ] T045 [P] [US2] Write failing proposal tests (data-model.md § DialectProposal):
+- [x] T044 [P] [US2] Write failing tests for `variantEntry`, `variantsFor(tag)`, `variantAllowed(tag, variant)` and `dialectTagsetsFor(language)`: `gascon` allowed after `oc` and not after `en`; `1994` only after `sl-rozaj…`; `biske` only after `sl-rozaj` — packages/engine/src/langtags/variants.test.ts, packages/engine/src/langtags/dialects.test.ts
+- [x] T045 [P] [US2] Write failing proposal tests (data-model.md § DialectProposal):
   - the preference order registered variant → langtags → made from the name;
   - a `typed` pending name from US6;
   - the variant linked by folded description plus allowed prefix;
@@ -312,7 +312,7 @@ Commit: `spec 115 T038-T043`.
   - an ill-formed edit blocked with the parser's reason.
 
   File: packages/studio/src/survey/dialectProposal.test.ts
-- [ ] T046 [P] [US2] Write failing decision tests:
+- [x] T046 [P] [US2] Write failing decision tests:
   - the new DecisionIds persist through the draft snapshot and resume;
   - `deriveIdentityResult` composes `oc-gascon`;
   - changing `language-code` re-proposes `language-dialect` via `recalculate` (FR-013);
@@ -322,14 +322,14 @@ Commit: `spec 115 T038-T043`.
 
 **Wave 2 — implementation:**
 
-- [ ] T047 [P] [US2] Implement `variantEntry`, `variantsFor`, `variantAllowed` (prefix rule in data-model.md) and `dialectTagsetsFor`; export them from the langtags barrel — packages/engine/src/langtags/variants.ts, packages/engine/src/langtags/dialects.ts, packages/engine/src/langtags/index.ts
-- [ ] T048 [P] [US2] Add the DecisionIds `language-dialect`, `language-dialect-source` and `dialect-glottocode` (IR paths `[]`), provided by `il_language_dialect` (T051). `language-search-match` (T027) and `language-glottocode` (T072) already exist. Read all five in `deriveIdentityResult` into `LanguageChoice` (data-model § LanguageChoice: `languageGlottocode`, `dialectGlottocode`). Test the Olmos case, which keeps both codes (`sech1236` and `olmo1234`). Add an `IDENTITY_QUESTIONS` row — packages/studio/src/decisions/decisionTypes.ts, packages/studio/src/decisions/identitySelectors.ts, packages/studio/src/survey/identityLiteResult.ts
-- [ ] T049 [P] [US2] Add `languageGlottocode?` and `dialectGlottocode?` to the identity patch, filled from their decisions — packages/studio/src/stores/identityPatch.ts, packages/studio/src/lib/identityLanguagePatch.ts
+- [x] T047 [P] [US2] Implement `variantEntry`, `variantsFor`, `variantAllowed` (prefix rule in data-model.md) and `dialectTagsetsFor`; export them from the langtags barrel — packages/engine/src/langtags/variants.ts, packages/engine/src/langtags/dialects.ts, packages/engine/src/langtags/index.ts
+- [x] T048 [P] [US2] Add the DecisionIds `language-dialect`, `language-dialect-source` and `dialect-glottocode` (IR paths `[]`), provided by `il_language_dialect` (T051). `language-search-match` (T027) and `language-glottocode` (T072) already exist. Read all five in `deriveIdentityResult` into `LanguageChoice` (data-model § LanguageChoice: `languageGlottocode`, `dialectGlottocode`). Test the Olmos case, which keeps both codes (`sech1236` and `olmo1234`). Add an `IDENTITY_QUESTIONS` row — packages/studio/src/decisions/decisionTypes.ts, packages/studio/src/decisions/identitySelectors.ts, packages/studio/src/survey/identityLiteResult.ts
+- [x] T049 [P] [US2] Add `languageGlottocode?` and `dialectGlottocode?` to the identity patch, filled from their decisions — packages/studio/src/stores/identityPatch.ts, packages/studio/src/lib/identityLanguagePatch.ts
 
 **Wave 3 — after wave 2:**
 
-- [ ] T050 [US2] Implement `proposeDialect(choice, searchMatch)` per T045 — packages/studio/src/survey/dialectProposal.ts
-- [ ] T051 [US2] Create the question module `il_language_dialect` (contracts § Question modules).
+- [x] T050 [US2] Implement `proposeDialect(choice, searchMatch)` per T045 — packages/studio/src/survey/dialectProposal.ts
+- [x] T051 [US2] Create the question module `il_language_dialect` (contracts § Question modules).
   - Declaration: `provides: ["language-dialect"]`; `requires: ["language-code", "target-script", "language-region"]`; optional; `outputs` bcp47; `lookupDefault` → `proposeDialect`.
   - Add it to `flowModules.identity_lite` and to `SEEDED_QUESTIONS`.
   - Order comes only from `orderDecisions` (Article IX). Routing is separate and stored in `next`, gated the same way region is (research R8, R9):
@@ -342,7 +342,7 @@ Commit: `spec 115 T038-T043`.
   - T053 covers both endings: the resume test and the parity pins, with and without the dialect question.
 
   Files: packages/studio/src/survey/questions/a/il_language_dialect.ts, packages/studio/src/survey/questions/a/il_target_script.ts, packages/studio/src/survey/questions/flowModules.ts, packages/studio/src/survey/identityResolution.ts
-- [ ] T052 [US2] Render the dialect question.
+- [x] T052 [US2] Render the dialect question.
   - With a proposal: one line with **Confirm**, **Edit** and **No dialect**.
   - Without one: a list of `variantsFor` and `dialectTagsetsFor`, plus a "Dialect name" box.
   - The chooser's **Customize** dialect field feeds the same proposal.
@@ -352,7 +352,7 @@ Commit: `spec 115 T038-T043`.
   - Pass `dialectSubtag` into `buildTargetBcp47` from both producers (`IdentityLite.tsx:53`, `identitySelectors.ts:87`).
 
   Files: packages/studio/src/survey/IdentityLite.tsx, packages/studio/src/survey/questions/a/il_language_dialect.ts, packages/studio/src/survey/languageChooser/CustomizePanel.tsx, packages/studio/src/locales/
-- [ ] T053 [US2] Update the step and order parity pins, and the resume test, for the new question.
+- [x] T053 [US2] Update the step and order parity pins, and the resume test, for the new question.
   - **Without a dialect gate** (e.g. Ewondo picked by name): `il_target_script` is still the last question, and the existing resume behaviour is unchanged.
   - **With the gate** (e.g. Gascon): `il_language_dialect` is last, and a draft resumed after `il_target_script` lands on it.
   - A draft saved before this change resumes as today.

@@ -55,6 +55,8 @@ function canonicalLanguage(language: string): string {
   return code !== undefined && code !== "" ? code : key;
 }
 
+export { canonicalLanguage };
+
 const titleCase = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 
 export function minimalTag(choice: TagChoice): string {
