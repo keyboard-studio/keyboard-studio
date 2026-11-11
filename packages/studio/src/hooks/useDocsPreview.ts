@@ -22,7 +22,7 @@ import {
 } from "@keyboard-studio/engine";
 import { buildDocContent, parseTouchLayoutOrNull } from "../lib/docContent.ts";
 import { buildReadmeFacts } from "../lib/readmeFacts.ts";
-import { readmeFactsInputFrom } from "../lib/readmeFactsInput.ts";
+import { markInputOrderFromDecisions, readmeFactsInputFrom } from "../lib/readmeFactsInput.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
 import { applyCarveMutate } from "../steps/editorMutate.ts";
@@ -64,6 +64,10 @@ export function useDocsPreview(): DocsPreview {
   const isAdaptation = useWorkingCopyStore((s) => s.instantiationMode === "adapt-existing");
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const carveChars = useWorkingCopyStore((s) => s.carveChars);
+  // Spec 110: the recorded S4 output-form answer, so the README states the
+  // composition the author chose instead of inferring it from the produced
+  // set (which NFC-folds and cannot tell NFD from NFC).
+  const marksOutputForm = useWorkingCopyStore((s) => s.session.marksOutputForm);
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const fallbackPolicy = useWorkingCopyStore((s) => s.fallbackPolicy);
@@ -104,12 +108,17 @@ export function useDocsPreview(): DocsPreview {
             ...(fallbackPolicy !== undefined ? { fallbackPolicy } : {}),
           })
         : uncarvedIr;
+    // The recorded mark-input-order answer, so the "How This Keyboard
+    // Works" section states the order the author chose instead of sniffing
+    // the produced set (which NFC-folds and cannot see letter-then-mark).
+    const markInputOrder = markInputOrderFromDecisions(decisions);
     const docContent =
       ir !== null
         ? buildDocContent({
             ir,
             touchLayout: parseTouchLayoutOrNull(touchLayoutJson),
             inheritedProse: startWelcomeHtmText ?? startHelpPhpText,
+            ...(markInputOrder !== undefined ? { markInputOrder } : {}),
           })
         : null;
     // Only ACCEPTED proposals become render fixes; a declined or unanswered
@@ -140,6 +149,7 @@ export function useDocsPreview(): DocsPreview {
           ...(identity?.bcp47 !== undefined && identity.bcp47 !== "" ? { primaryBcp47: identity.bcp47 } : {}),
           ...(identity?.languageName !== undefined ? { languageName: identity.languageName } : {}),
           carveChars,
+          ...(marksOutputForm !== undefined ? { outputForm: marksOutputForm } : {}),
           fallbackPolicy,
           helpDocs,
           startVfs,
@@ -169,5 +179,5 @@ export function useDocsPreview(): DocsPreview {
       ),
       typingGuideSuppressed: docContent?.typingGuideSuppressed ?? false,
     };
-  }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText, docFixProposals, isAdaptation, startVfs, carveChars, deletedNodeIds, deletedItemIds, fallbackPolicy, decisions, authoredWelcomeHtm, authoredReadmeHtm, authoredReadmeMd, authoredHelpPhp]);
+  }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText, docFixProposals, isAdaptation, startVfs, carveChars, marksOutputForm, deletedNodeIds, deletedItemIds, fallbackPolicy, decisions, authoredWelcomeHtm, authoredReadmeHtm, authoredReadmeMd, authoredHelpPhp]);
 }
