@@ -6,6 +6,8 @@
 
 import { describe, it, expect } from "vitest";
 import { parse } from "../codec/parse.js";
+import { normaliseForComparison } from "../codec/normalise-ir.js";
+import { carveFilterIr } from "./carveFilterIr.js";
 import { carveViaSplice } from "./carveViaSplice.js";
 
 describe("carveViaSplice", () => {
@@ -305,5 +307,193 @@ describe("carveViaSplice", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.text).toBe(kmn);
+  });
+});
+
+describe("carveViaSplice — #2633 target-selector lines (main-CI run 42906157256)", () => {
+  // One source line can expand to several IR rules ($keymanweb: -> three
+  // platform-guarded copies sharing its sourceLine) or to none (a merge
+  // drops a twin line that no IR node owns). The splice deletes by
+  // physical line, so both shapes broke the splice/filter agreement the
+  // corpus sweep checks: deleting one copy deleted the whole line, and
+  // deleting a group orphaned the dropped twin's line for re-parse to
+  // re-attribute to the preceding group.
+
+  /** The corpus sweep's property, on a minimal fixture: the spliced text must re-parse to exactly what the filter path produces. */
+  function assertSpliceAgreesWithFilter(kmn: string, deleted: ReadonlySet<string>): void {
+    const { ir } = parse(kmn, "test");
+    const result = carveViaSplice(kmn, ir, deleted);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const reparsed = parse(result.text, "test").ir;
+    expect(normaliseForComparison(reparsed)).toEqual(
+      normaliseForComparison(carveFilterIr(ir, deleted)),
+    );
+  }
+
+  const webRuleKmn =
+    `store(&VERSION) '10.0'\n` +
+    `store(&NAME) 'Test'\n` +
+    `store(punctua) '.,;!?'\n` +
+    `\n` +
+    `begin Unicode > use(main)\n` +
+    `\n` +
+    `group(main) using keys\n` +
+    `\n` +
+    `$keymanweb: ' ' + any(punctua) > index(punctua, 2) ' '\n` +
+    `+ [K_A] > 'a'\n`;
+
+  it("deleting one $keymanweb: copy re-emits the surviving copies instead of deleting the line", () => {
+    const { ir } = parse(webRuleKmn, "test");
+    const copies = ir.groups[0]!.rules.slice(0, 3);
+    // Fixture sanity: the three copies share one source line (eo_plus shape).
+    expect(copies.map((r) => r.sourceLine)).toEqual([9, 9, 9]);
+    expect(copies.map((r) => (r.context[0]?.kind === "raw" ? r.context[0].text : ""))).toEqual([
+      "platform('web')",
+      "platform('phone native')",
+      "platform('tablet native')",
+    ]);
+
+    assertSpliceAgreesWithFilter(webRuleKmn, new Set([copies[0]!.nodeId]));
+
+    const result = carveViaSplice(webRuleKmn, ir, new Set([copies[0]!.nodeId]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // The web copy is gone; the phone/tablet copies survive as explicit
+    // platform-guarded rules (the $keymanweb: line cannot express "two of three").
+    expect(result.text).not.toContain("$keymanweb:");
+    expect(result.text).not.toContain("platform('web')");
+    expect(result.text).toContain("platform('phone native')");
+    expect(result.text).toContain("platform('tablet native')");
+    expect(result.text).toContain("+ [K_A] > 'a'");
+  });
+
+  it("deleting a group holding a $keymanweb: rule removes the line once, not as overlapping edits", () => {
+    const { ir } = parse(webRuleKmn, "test");
+    const main = ir.groups.find((g) => g.name === "main")!;
+
+    // Pre-fix this returned { ok: false } — three delete edits on one line
+    // tripped spliceKmn's overlap guard.
+    assertSpliceAgreesWithFilter(webRuleKmn, new Set([main.nodeId]));
+
+    const result = carveViaSplice(webRuleKmn, ir, new Set([main.nodeId]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.text).not.toContain("$keymanweb:");
+    expect(result.text).not.toContain("platform('");
+    expect(result.text).toContain("store(punctua) '.,;!?'");
+  });
+
+  const nomatchPairKmn =
+    `store(&VERSION) '10.0'\n` +
+    `store(&NAME) 'Test'\n` +
+    `\n` +
+    `begin Unicode > use(first)\n` +
+    `\n` +
+    `group(first) using keys\n` +
+    `\n` +
+    `+ [K_X] > 'x'\n` +
+    `\n` +
+    `group(main) using keys\n` +
+    `\n` +
+    `+ [K_A] > 'a'\n` +
+    `$keymanonly: nomatch > beep\n` +
+    `$keymanweb: nomatch > nul\n` +
+    `\n` +
+    `group(other) using keys\n` +
+    `\n` +
+    `+ [K_B] > 'b'\n`;
+
+  it("deleting a group also removes its merge-dropped $keymanweb: twin line (korean_rr shape)", () => {
+    const { ir } = parse(nomatchPairKmn, "test");
+    const main = ir.groups.find((g) => g.name === "main")!;
+    // Fixture sanity: the merge dropped the web twin; the survivor (beep)
+    // consumes its line.
+    const survivor = main.rules.find((r) => r.matchKind === "nomatch")!;
+    expect(survivor.output).toEqual([{ kind: "raw", text: "beep" }]);
+    expect(survivor.consumedSourceLines).toEqual([14]);
+
+    assertSpliceAgreesWithFilter(nomatchPairKmn, new Set([main.nodeId]));
+
+    const result = carveViaSplice(nomatchPairKmn, ir, new Set([main.nodeId]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Pre-fix the `$keymanweb: nomatch > nul` line survived the group
+    // deletion and re-parsed as an extra rule in the preceding group.
+    expect(result.text).not.toContain("nomatch > nul");
+    expect(result.text).not.toContain("$keymanweb:");
+    expect(result.text).toContain("group(first)");
+    expect(result.text).toContain("+ [K_X] > 'x'");
+    expect(result.text).toContain("group(other)");
+  });
+
+  it("deleting the surviving nomatch rule also removes its dropped twin line", () => {
+    const { ir } = parse(nomatchPairKmn, "test");
+    const main = ir.groups.find((g) => g.name === "main")!;
+    const survivor = main.rules.find((r) => r.matchKind === "nomatch")!;
+
+    assertSpliceAgreesWithFilter(nomatchPairKmn, new Set([survivor.nodeId]));
+
+    const result = carveViaSplice(nomatchPairKmn, ir, new Set([survivor.nodeId]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.text).not.toContain("nomatch > beep");
+    expect(result.text).not.toContain("nomatch > nul");
+    expect(result.text).toContain("+ [K_A] > 'a'");
+  });
+
+  it("deleting a merge-survivor store also removes its dropped twin line", () => {
+    const kmn =
+      `store(&VERSION) '10.0'\n` +
+      `store(&NAME) 'Test'\n` +
+      `$keymanweb: store(letters) 'ab'\n` +
+      `$keymanonly: store(letters) 'abc'\n` +
+      `\n` +
+      `begin Unicode > use(main)\n` +
+      `\n` +
+      `group(main) using keys\n` +
+      `\n` +
+      `+ any(letters) > 'x'\n`;
+    const { ir } = parse(kmn, "test");
+    const store = ir.stores.find((s) => s.name === "letters")!;
+    // Fixture sanity: desktop body won; the survivor consumes the web line.
+    expect(store.items).toEqual([
+      { kind: "char", value: "a" },
+      { kind: "char", value: "b" },
+      { kind: "char", value: "c" },
+    ]);
+    expect(store.consumedSourceLines).toEqual([3]);
+
+    assertSpliceAgreesWithFilter(kmn, new Set([store.nodeId]));
+
+    const result = carveViaSplice(kmn, ir, new Set([store.nodeId]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.text).not.toContain("store(letters)");
+    expect(result.text).toContain("+ any(letters) > 'x'");
+  });
+
+  it("deleting a store also removes a dropped header statement for the same value", () => {
+    const kmn =
+      `VERSION 10.0\n` +
+      `store(&NAME) 'Test'\n` +
+      `store(&VERSION) '10.0'\n` +
+      `\n` +
+      `begin Unicode > use(main)\n` +
+      `\n` +
+      `group(main) using keys\n` +
+      `\n` +
+      `+ [K_A] > 'a'\n`;
+    const { ir } = parse(kmn, "test");
+    const store = ir.stores.find((s) => s.isSystem && s.name === "VERSION")!;
+    expect(store.consumedSourceLines).toEqual([1]);
+
+    assertSpliceAgreesWithFilter(kmn, new Set([store.nodeId]));
+
+    const result = carveViaSplice(kmn, ir, new Set([store.nodeId]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.text).not.toContain("VERSION");
+    expect(result.text).toContain("+ [K_A] > 'a'");
   });
 });

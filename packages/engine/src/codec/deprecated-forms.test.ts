@@ -153,6 +153,11 @@ describe("deprecated header statements", () => {
     const rw = rewritesOf(result, "header-statement");
     expect(rw).toHaveLength(1);
     expect(rw[0]?.rewrittenText).toContain("already declared");
+    // The surviving store (line 2) consumes the dropped header line (3):
+    // deleting the store must remove the header too, or a re-parse
+    // re-synthesises the store from it.
+    const nameStore = result.ir.stores.find((s) => s.isSystem && s.name === "NAME");
+    expect(nameStore?.consumedSourceLines).toEqual([3]);
     expect(emit(result.ir)).toContain(`store(&NAME) 'Real'`);
     expect(emit(result.ir)).not.toContain(`'Other'`);
   });
@@ -165,6 +170,10 @@ describe("deprecated header statements", () => {
     );
     expect(result.ir.header.name).toBe("Real");
     expect(rewritesOf(result, "header-statement")).toHaveLength(1);
+    // Same consumption the other way round: the store (line 3) consumes
+    // the dropped header line (2).
+    const nameStore = result.ir.stores.find((s) => s.isSystem && s.name === "NAME");
+    expect(nameStore?.consumedSourceLines).toEqual([2]);
     expect(emit(result.ir)).toContain(`store(&NAME) 'Real'`);
   });
 });
@@ -308,6 +317,10 @@ describe("deprecated target-selector prefixes", () => {
     const stores = result.ir.stores.filter((s) => s.name === "s");
     expect(stores).toHaveLength(1);
     expect(stores[0]?.targetSelector).toBeUndefined();
+    // The survivor consumes the dropped web twin's line (line 7): a splice
+    // deletion of the survivor must remove it too, or a re-parse resurrects
+    // the twin (main-CI run 42906157256).
+    expect(stores[0]?.consumedSourceLines).toEqual([7]);
     expect(stores[0]?.items).toEqual([
       { kind: "char", value: "d" },
       { kind: "char", value: "e" },
@@ -353,7 +366,10 @@ describe("deprecated target-selector prefixes", () => {
       "platform('phone native')",
       "platform('tablet native')",
     ]);
-    // The three copies share one output and distinct nodeIds.
+    // The three copies share one output and distinct nodeIds — and one
+    // source line: the splice deletes by line, so deleting one copy must
+    // re-emit the survivors, not delete the line (main-CI 42906157256).
+    expect(rules.map((r) => r.sourceLine)).toEqual([7, 7, 7]);
     expect(new Set(rules.map((r) => r.nodeId)).size).toBe(3);
     expect(rules.every((r) => r.output.length === 1)).toBe(true);
     expect(rewritesOf(result, "target-selector")).toHaveLength(1);
@@ -465,6 +481,11 @@ describe("deprecated target-selector prefixes", () => {
     expect(rules).toHaveLength(1);
     expect(rules[0]?.targetSelector).toBeUndefined();
     expect(rules[0]?.output).toEqual([{ kind: "raw", text: "beep" }]);
+    // The survivor (line 8) consumes the dropped web twin's line (line 7):
+    // deleting the survivor — or its group — must remove it too, or a
+    // re-parse resurrects `nomatch > nul` in the preceding group
+    // (korean_rr, main-CI run 42906157256).
+    expect(rules[0]?.consumedSourceLines).toEqual([7]);
     expect(rewritesOf(result, "target-selector")).toHaveLength(2);
     const emitted = emit(result.ir);
     expect(emitted).toContain(`nomatch > beep`);
@@ -506,6 +527,8 @@ describe("deprecated target-selector prefixes", () => {
     );
     expect(result.ir.stores.find((s) => s.name === "CasedKeys")).toBeDefined();
     expect(result.ir.stores.find((s) => s.name === "MNEMONICLAYOUT")).toBeUndefined();
+    // The kept web store (line 8) consumes the dropped desktop line (line 7).
+    expect(result.ir.stores.find((s) => s.name === "CasedKeys")?.consumedSourceLines).toEqual([7]);
     const rw = rewritesOf(result, "target-selector");
     expect(rw.some((r) => r.sourceText.includes("mnemonicLayout") && r.rewrittenText.includes("dropped"))).toBe(true);
     expect(rw.some((r) => r.rewrittenText.includes("cannot coexist"))).toBe(true);

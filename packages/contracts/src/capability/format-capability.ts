@@ -97,12 +97,13 @@ type FieldClass = "row" | "internal";
 const IR_RULE_FIELDS = {
   nodeId: "internal", context: "row", output: "row", trailingComment: "row",
   ownedByPattern: "internal", ownedByBehaviour: "internal", matchKind: "row",
-  targetSelector: "row", sourceLine: "internal", rulesStepAdded: "internal",
+  targetSelector: "row", sourceLine: "internal", consumedSourceLines: "internal", rulesStepAdded: "internal",
 } as const satisfies Record<keyof IRRule, FieldClass>;
 
 const IR_STORE_FIELDS = {
   nodeId: "internal", name: "row", items: "row", isSystem: "row", ownedByBehaviour: "internal",
-  targetSelector: "row", sourceLine: "internal", trailingComment: "row", rulesStepAdded: "internal",
+  targetSelector: "row", sourceLine: "internal", consumedSourceLines: "internal", trailingComment: "row",
+  rulesStepAdded: "internal",
 } as const satisfies Record<keyof IRStore, FieldClass>;
 
 const IR_GROUP_FIELDS = {
@@ -119,7 +120,7 @@ const IR_HEADER_FIELDS = {
 const RAW_FRAGMENT_FIELDS = {
   nodeId: "internal", origin: "internal", sourceText: "internal", reason: "internal",
   storeSketch: "internal", sourceLine: "internal", groupNodeId: "internal",
-  producedOutput: "internal",
+  consumedSourceLines: "internal", producedOutput: "internal",
 } as const satisfies Record<keyof RawKmnFragment, FieldClass>;
 
 function kindPaths(prefix: string, kinds: Record<string, true>): string[] {
