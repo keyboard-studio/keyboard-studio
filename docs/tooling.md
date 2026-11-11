@@ -352,7 +352,7 @@ run on the schedule, not on pull requests.
 | Where | `e2e desktop` runs | Approx. time |
 |---|---|---|
 | Pull request | `boot-smoke`, `decision-store-reload`, and spec 104 walk 1 (`touch-key-identity`, narrowed by `--grep "boot-smoke|decision-store-reload|spec 104 walk 1:"`; one command, so one results summary) | about 3 min |
-| Nightly schedule (07:17 UTC), push to `main`, `workflow_dispatch`, the nightly dev soak | `boot-smoke`, `copy-edit`, `decision-store-reload`, `touch-key-identity` (all walks), `preview-longpress-popup`, `preview-touch-height` | about 19 min |
+| Nightly schedule (07:17 UTC), push to `main`, `workflow_dispatch`, the nightly dev soak | `boot-smoke`, `copy-edit`, `decision-store-reload`, `touch-key-identity` (all walks), `preview-longpress-popup`, `preview-touch-height`, `docs-code-height` | about 19 min |
 
 - **Playwright container image.** The three e2e jobs (`e2e-desktop`, `e2e-mobile`,
   `e2e-golden`) run in `mcr.microsoft.com/playwright:v1.61.1-noble` with
@@ -376,7 +376,7 @@ run on the schedule, not on pull requests.
 - **Failures on the schedule.** The `e2e nightly failure report` job opens (or comments on) one
   open issue titled `Nightly e2e desktop failure (<ref>)` when the full set fails on a non-PR run.
 - **Run the nightly set by hand.** Locally:
-  `pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload touch-key-identity preview-longpress-popup preview-touch-height`.
+  `pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload touch-key-identity preview-longpress-popup preview-touch-height docs-code-height`.
   On GitHub: Actions, CI, "Run workflow" (`workflow_dispatch`) on the branch.
 - **Adding a walk.** Estimate its time first. Under about 1 minute it may join the PR filter list
   in the `e2e-desktop` job; longer goes in the full-set step only.
@@ -430,6 +430,11 @@ Live and passing:
   Touch gallery Mobile KB keys stay roughly square at desktop width (Matthew's 2026-11-11
   report: the phone profile's pinned 290px height squashed the keys at a ~1000px pane).
   Full-set only (nightly / push to main), ~3 min walk at 1920x1080.
+- [docs-code-height.spec.ts](../packages/studio/e2e/docs-code-height.spec.ts) —
+  Documentation step Code mode Monaco fills the page height at desktop width
+  (Matthew's 2026-11-11 report: the code view is only a few lines tall, a short
+  strip that does not fill the page). Full-set only (nightly / push to main),
+  ~6 min walk at 1920x1080.
 - [tab-roundtrip.spec.ts](../packages/studio/e2e/tab-roundtrip.spec.ts) and
   [compare-isolation.spec.ts](../packages/studio/e2e/compare-isolation.spec.ts) — spec 057's two
   gating specs, written and recorded RED against the pre-fix tree before the fix landed
