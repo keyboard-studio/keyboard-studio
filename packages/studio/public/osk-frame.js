@@ -210,7 +210,9 @@
 
   // The keyboard fills the host's width. Below the profile's own width the
   // height scales in proportion, so every row stays visible; wider hosts keep
-  // the profile height (keys widen, they do not grow taller).
+  // the profile height (keys widen, they do not grow taller) — for
+  // touch/tablet modes fitTouchHeight below grows the box back to square
+  // keys once the layout has rendered.
   function oskSizeFor(profile) {
     var w = oskHost.clientWidth || profile.dimensions[0];
     var h = profile.dimensions[1];
@@ -218,6 +220,73 @@
       h = Math.max(120, Math.round((h * w) / profile.dimensions[0]));
     }
     return { width: w, height: h };
+  }
+
+  function isPaintedKey(el) {
+    if (!el.offsetParent && getComputedStyle(el).position !== "fixed") return false;
+    var n = el;
+    while (n) {
+      var cs = getComputedStyle(n);
+      if (cs.visibility === "hidden" || cs.display === "none") return false;
+      n = n.parentElement;
+    }
+    return true;
+  }
+
+  // Touch/tablet height fit (Matthew 2026-11-11): a phone-profile keyboard
+  // stretched across a desktop pane gets wide, flat keys — at ~1000px wide
+  // the 320x290 phone box gives ~90px-wide keys in 58px rows, while the
+  // tablet box at the same width is 420 tall with roughly square keys. The
+  // layout's own geometry says what the height should be: KMW divides the
+  // box height by rows and the width by keys, so square keys need
+  // height = width * rows / cols. Grow the box to that height when the host
+  // is wider than the profile — never shrink, so the phone's designed tall
+  // keys at phone widths are untouched, and never touch desktop mode (its
+  // own profile, out of scope). Rows/cols come from the rendered default
+  // layer, so a re-measure after the bump converges immediately (key widths
+  // depend on width only). Runs after the view is built (setOsk) and after
+  // every host resize (resizeOsk); retries briefly if the keys have not
+  // painted yet.
+  function fitTouchHeight(tries) {
+    if (!currentOsk) return;
+    if (currentMode !== "touch" && currentMode !== "tablet") return;
+    var profile = devices[currentMode] || devices.desktop;
+    var w = oskHost.clientWidth || profile.dimensions[0];
+    if (w <= profile.dimensions[0]) return;
+    var rows = 0;
+    var cols = 0;
+    try {
+      var rowEls = oskHost.querySelectorAll(".kmw-key-row");
+      for (var i = 0; i < rowEls.length; i++) {
+        var keys = rowEls[i].querySelectorAll(".kmw-key");
+        var painted = 0;
+        for (var j = 0; j < keys.length; j++) {
+          if (isPaintedKey(keys[j])) painted++;
+        }
+        if (painted > 0) {
+          rows++;
+          if (painted > cols) cols = painted;
+        }
+      }
+    } catch (_) {
+      return;
+    }
+    if (rows === 0 || cols === 0) {
+      if ((tries || 0) < 40) {
+        setTimeout(function () {
+          fitTouchHeight((tries || 0) + 1);
+        }, 50);
+      }
+      return;
+    }
+    var target = Math.round((w * rows) / cols);
+    var box = oskHost.querySelector(".kmw-osk-frame");
+    var current = box ? box.getBoundingClientRect().height : profile.dimensions[1];
+    if (target > current + 1) {
+      try {
+        currentOsk.setSize(w + "px", target + "px");
+      } catch (_) {}
+    }
   }
 
   function resizeOsk() {
@@ -229,6 +298,7 @@
     try {
       currentOsk.setSize(size.width + "px", size.height + "px");
     } catch (_) {}
+    fitTouchHeight(0);
   }
 
   var lastReportedHeight = 0;
@@ -347,6 +417,9 @@
       postError("InlinedOSKView creation failed: " + (err && err.message || err));
       currentOsk = null;
     }
+    // Touch/tablet modes: grow the box to square keys at wide hosts once
+    // the view has rendered (no-op at phone widths, and for desktop mode).
+    fitTouchHeight(0);
   }
 
   function loadKeyboard(jsUrl, keyboardId, fontFaceUrl, fontFaceFamily, keyboardCssUrls, bcp47) {
