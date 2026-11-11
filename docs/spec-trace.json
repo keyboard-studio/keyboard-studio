@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-11-07",
+  "lastUpdated": "2026-11-11",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -1224,6 +1224,14 @@
     "specs/113-trial-and-publish-steps": {
       "title": "Feature Specification: Trial and Publish steps (split of the Output screen)",
       "hash": "sha256:697628078cf2c793",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/115-dialect-language-tags": {
+      "title": "Feature Specification: Language tags that describe dialects and variants",
+      "hash": "sha256:ee3f7c0d3219ad16",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

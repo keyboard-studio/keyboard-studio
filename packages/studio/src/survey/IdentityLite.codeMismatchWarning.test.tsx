@@ -75,7 +75,9 @@ async function reachLanguageCode(): Promise<void> {
 
   const q1 = await screen.findByRole<HTMLInputElement>("combobox");
   fireEvent.change(q1, { target: { value: "Hausa" } });
-  const option = await screen.findByRole("option", { name: /^Hausa, / });
+  // Spec 115: pin the PLAIN row (name ends with the code) — a dialect row
+  // for Hausa starts with "Hausa, " too and would match a bare prefix.
+  const option = await screen.findByRole("option", { name: /^Hausa, .*ha$/ });
   fireEvent.mouseDown(option); // resolves Hausa + auto-advances (advanceOnSelect)
 
   // il_language_autonym: accept whatever seeded default is pre-filled.

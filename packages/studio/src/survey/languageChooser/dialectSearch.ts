@@ -173,9 +173,17 @@ function namesOf(l: ILanguage): string[] {
     .filter((n) => n !== "");
 }
 
-/** Own names only (no region names): what a dialect name is compared to for FR-003. */
-function ownNamesOf(l: ILanguage): string[] {
-  return [l.exonym, l.autonym, ...l.names].map(PLAIN).filter((n) => n !== "");
+/** True when the query names the language itself: its code, or a word prefix of its exonym. */
+function namesLanguageItself(l: ILanguage, q: string): boolean {
+  if (PLAIN(l.languageSubtag) === q || PLAIN(l.iso639_3_code) === q) return true;
+  return hasWordPrefix(PLAIN(l.exonym), q);
+}
+
+/** True when two matches are the same dialect (same tagset, or same Glottolog row). */
+function sameMatch(a: SearchMatch | undefined, b: SearchMatch): boolean {
+  if (a === undefined) return false;
+  if (a.dialectTag !== undefined || b.dialectTag !== undefined) return a.dialectTag === b.dialectTag;
+  return a.glottocode !== undefined && a.glottocode === b.glottocode;
 }
 
 const squash = (s: string): string => s.replace(/[^\p{L}\p{N}]+/gu, " ").trim();
@@ -239,9 +247,16 @@ export function dialectResultModifier(
 ): (results: ILanguage[], searchString: string) => ChooserLanguage[] {
   return (results, searchString) => {
     const q = fold(searchString);
+    // Short queries skip EthnoLib's modifier entirely: its match-marker
+    // (Ah) loops forever on an empty needle — `c += r.length` never
+    // advances when r is "" — pushing until RangeError: Invalid array
+    // length. The chooser clears the search string while results are still
+    // listed (dialect fallback, clearing the field), so that render would
+    // hang the page and crash it. For a short query there is nothing to
+    // mark, so the raw rows are the base list.
+    if (q.length < 2) return results.map((r) => ({ ...r }));
     // Cloned: attaching a match must not mutate rows the chooser holds in state.
     const base = (defaultSearchResultModifier(results, searchString) as ChooserLanguage[]).map((r) => ({ ...r }));
-    if (q.length < 2) return base;
 
     const closeChooser: ChooserLanguage[] = [];
     const fuzzyChooser: ChooserLanguage[] = [];
@@ -272,12 +287,19 @@ export function dialectResultModifier(
       const close = hasWordPrefix(hit.folded, q);
       const listed = findListed(target) ?? findListed(hit.parent);
       if (listed !== undefined) {
-        // The row already stands for this language: a dialect name that is the
-        // row's own name is a direct hit and needs no match line.
-        // A langtags tagset is always a dialect or variety of the language, even
-        // when the language lists the same words among its own names ("Achi - Rabinal").
-        const isOwnName = hit.match.source === "glottolog" && ownNamesOf(listed).includes(hit.folded);
-        if (listed.match === undefined && !isOwnName) {
+        // The query names the language itself ("French" for fr): the plain row
+        // stands, and the dialect is its own row (SC-002 shape). Otherwise the
+        // first dialect hit hijacks the language row and plain French is
+        // unpickable from its own name — every one of French, English, German,
+        // Spanish and Occitan showed an arbitrary first dialect instead.
+        if (namesLanguageItself(listed, q)) {
+          const alreadyListed = [closeChooser, closeDialect, fuzzyChooser, fuzzyDialect]
+            .flat()
+            .some((l) => sameMatch(l.match, hit.match));
+          if (!alreadyListed) (close ? closeDialect : fuzzyDialect).push({ ...listed, match: hit.match });
+          continue;
+        }
+        if (listed.match === undefined) {
           listed.match = hit.match;
         }
         // Several langtags tagsets of one language can share a name ("Urama-Kope"):

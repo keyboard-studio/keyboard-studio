@@ -76,9 +76,13 @@ describe("autosuggest (FR-038)", () => {
   it("suggestions update as the author types", async () => {
     const { input } = await renderChooser();
     fireEvent.change(input, { target: { value: "Ewon" } });
-    await screen.findByRole("option", { name: /^Ewondo, / });
+    await screen.findByRole("option", { name: /^Ewondo, .*ewo$/ });
     fireEvent.change(input, { target: { value: "Bafut" } });
-    await screen.findByRole("option", { name: /Bafut/ });
+    // Spec 115: "Bafut" names the language itself, so the plain row stands
+    // (its accessible name ends with the code) and the West Hills Bafut
+    // dialect gets its own row — a bare /Bafut/ matches both.
+    await screen.findByRole("option", { name: /^Bafut, .*bfd$/ });
+    await screen.findByRole("option", { name: /West Hills Bafut: a dialect of Bafut/ });
     await waitFor(() => expect(screen.queryByRole("option", { name: /Ewondo/ })).toBeNull());
   });
 
@@ -105,7 +109,7 @@ describe("picking and auto-resolve (FR-038)", () => {
     const onChange = vi.fn();
     const { input } = await renderChooser({ onEntryResolved, onSelectAdvance, onChange });
     fireEvent.change(input, { target: { value: "Ewon" } });
-    fireEvent.mouseDown(await screen.findByRole("option", { name: /^Ewondo, / }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: /^Ewondo, .*ewo$/ }));
     expect(onChange).toHaveBeenLastCalledWith("Ewondo");
     expect(lastCode(onEntryResolved)).toBe("ewo");
     expect(onSelectAdvance).toHaveBeenCalledWith("Ewondo");

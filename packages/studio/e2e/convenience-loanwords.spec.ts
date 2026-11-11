@@ -38,6 +38,7 @@ import {
   acceptProjectName,
   confirmPrefill,
   seedReturningVisitor,
+  dismissTextSamplePrompt,
   driveMarksSeries,
   drivePunctuationStep,
   driveInvisiblesStep,
@@ -86,6 +87,10 @@ async function continueToConvenience(
   const done = page.getByTestId("charlist-done");
   await expect(done).toBeEnabled();
   await done.click();
+  // The completion may defer behind the #1784 text-sample prompt — dismiss
+  // it when it renders (Bafut's resolved exemplar marks trigger it), else
+  // no-op.
+  await dismissTextSamplePrompt(page);
   // Bafut's main tier carries combining tone marks, so the marks series renders.
   await driveMarksSeries(page);
   await drivePunctuationStep(page);

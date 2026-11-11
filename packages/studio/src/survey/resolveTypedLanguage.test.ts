@@ -26,6 +26,23 @@ describe("resolveTypedLanguage over ILanguage", () => {
     expect(resolveTypedLanguage("Bafut", [row("a", "Bafut"), row("b", "Bafut")])).toBeNull();
   });
 
+  it("several rows of ONE language (plain + dialect cards) resolve to the plain row", () => {
+    // The chooser lists French once per dialect card; every card shares the
+    // exonym "French". Those rows are one language, not several matches —
+    // otherwise typing "French" resolves, then un-resolves to null when the
+    // Glottolog tier streams in and the Customize panel unmounts (walk 3).
+    const plainFr = row("fr", "French");
+    const card = (name: string): ChooserLanguage =>
+      ({ ...row("fr", "French"), match: { name, relation: "dialect", source: "glottolog" } }) as ChooserLanguage;
+    expect(resolveTypedLanguage("French", [plainFr, card("American Koine French"), card("San Miguel Creole French")])).toBe(
+      plainFr,
+    );
+    // Order must not matter: the plain row wins even when a card comes first.
+    expect(resolveTypedLanguage("French", [card("American Koine French"), plainFr])).toBe(plainFr);
+    // Two DIFFERENT languages sharing the name stay ambiguous.
+    expect(resolveTypedLanguage("French", [plainFr, row("fra", "French")])).toBeNull();
+  });
+
   it("falls back to a unique alias only when no primary name matches", () => {
     const ghotuo = row("aaa", "Ghotuo", ["Otuo"]);
     expect(resolveTypedLanguage("Otuo", [ghotuo, row("zzz", "Other")])).toBe(ghotuo);

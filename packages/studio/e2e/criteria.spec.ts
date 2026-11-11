@@ -6,12 +6,15 @@
  * navigateTo) renders the full catalog with a summary header.
  *
  * Foreign: on the Compare tab, loading an existing keyboard and clicking
- * "Check criteria" renders the same catalog in foreign mode — 149 rows,
- * a judged-note, and NO attestation/confirmation controls (spec 057
+ * "Check criteria" renders the same catalog in foreign mode — every catalog
+ * row, a judged-note, and NO attestation/confirmation controls (spec 057
  * FR-023: the foreign surface can judge, never record).
  */
 
 import { test, expect, type Page } from "playwright/test";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   acceptProjectName,
   confirmCopyTrack,
@@ -27,6 +30,17 @@ const OWN_BASE = "basic_kbdfr";
 // A small catalog keyboard present in every catalog (and in the partial
 // local keyboards checkout the dev server enumerates).
 const FOREIGN_BASE = "basic_kbdus";
+
+// No pinned census (lists grow — CriteriaPage renders every catalog row):
+// the expected row count is the live catalog length.
+const CRITERIA_COUNT = (
+  JSON.parse(
+    readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), "../../contracts/data/criteria.json"),
+      "utf8",
+    ),
+  ) as unknown[]
+).length;
 
 async function establishWorkingCopy(page: Page): Promise<void> {
   await driveIdentityLite(page, {
@@ -58,10 +72,10 @@ test.describe("Criteria page — authored surface (spec 084)", () => {
     await switchTab(page, "criteria");
 
     await expect(page.getByTestId("criteria-page")).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId("criteria-summary-resolved")).toContainText("of 149", {
+    await expect(page.getByTestId("criteria-summary-resolved")).toContainText(`of ${CRITERIA_COUNT}`, {
       timeout: 60_000,
     });
-    await expect(page.getByTestId("criteria-row")).toHaveCount(149);
+    await expect(page.getByTestId("criteria-row")).toHaveCount(CRITERIA_COUNT);
   });
 });
 
@@ -88,7 +102,7 @@ test.describe("Criteria check — Compare surface (spec 084 US6)", () => {
     const panel = page.getByTestId("compare-criteria");
     await expect(panel.getByTestId("criteria-page")).toBeVisible({ timeout: 60_000 });
     await expect(panel.getByTestId("criteria-judged-note")).toBeVisible();
-    await expect(panel.getByTestId("criteria-row")).toHaveCount(149);
+    await expect(panel.getByTestId("criteria-row")).toHaveCount(CRITERIA_COUNT);
 
     // Foreign mode offers no way to record anything: expand a needs-author
     // row and a needs-human row — neither may show its controls.

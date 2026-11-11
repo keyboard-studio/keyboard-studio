@@ -20,7 +20,11 @@ import { seedReturningVisitor, selectMenuOption } from "./helpers/surveyFlow";
 // is each language's autonym — "English"/"Français" — which never contains
 // "Language"/"Langue").
 function navBar(page: import("playwright/test").Page) {
-  return page.getByRole("navigation", { name: "Studio navigation" });
+  // Locale-independent: the nav's aria-label is the translated `nav.ariaLabel`
+  // message ("Studio navigation" in en, "Navigation dans le studio" in fr),
+  // so a role+name lookup breaks the moment the locale switches. Anchor on
+  // the language select (unique id) and take its ancestor nav instead.
+  return page.locator("#nav-language-select").locator("xpath=ancestor::nav[1]");
 }
 
 /**
@@ -108,7 +112,10 @@ test.describe("Compare tab label (spec 057 FR-020)", () => {
     // "Aperçu" was `nav.preview`'s French. Inheriting it here would mean the
     // retired id's translation had been reused for a different meaning.
     await expect(navBar(page).getByText("Aperçu", { exact: true })).toHaveCount(0);
-    await expect(compareLink(page)).toHaveText(/^Compare$/);
+    // `nav.compare` now has a real French translation ("Comparer") — the
+    // fallback-to-English premise this test was written under no longer
+    // holds, but the point stands: never the retired id's "Aperçu".
+    await expect(compareLink(page)).toHaveText(/^Comparer$/);
 
     await chooseLocale(page, "en");
     await expect(navBar(page).getByText("Language")).toBeVisible();

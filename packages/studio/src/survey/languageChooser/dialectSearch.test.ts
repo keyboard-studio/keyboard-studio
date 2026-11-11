@@ -45,6 +45,29 @@ describe("dialect names find their parent, with a match", () => {
     expect(codes(rs).indexOf("oc")).toBeLessThan(3);
   });
 
+  it("Aranese -> Occitan once, with the Aranese match (not Baish Aranes)", () => {
+    // The Glottolog row "Aranese" is also an alternate name of Occitan, so the
+    // old own-name guard dropped its match and the next hit (Baish Aranes) won
+    // the row instead. The first hit wins now.
+    const rs = merged("Aranese");
+    expect(rs.filter((r) => r.languageSubtag === "oc")).toHaveLength(1);
+    const oc = rs.find((r) => r.languageSubtag === "oc");
+    expect(oc?.match).toMatchObject({ relation: "dialect", source: "glottolog", glottocode: "aran1260" });
+    expect(codes(rs).indexOf("oc")).toBeLessThan(3);
+  });
+
+  it("a query naming the language leaves its row plain; dialects are separate rows", () => {
+    // "French" used to hijack the fr row with "American Koine French" as its
+    // match, so plain French was unpickable from its own name. Same for
+    // English, German, Spanish and Occitan.
+    const rs = merged("French");
+    expect(rs[0]?.languageSubtag).toBe("fr");
+    expect(rs[0]?.match).toBeUndefined();
+    const frRows = rs.filter((r) => r.languageSubtag === "fr");
+    expect(frRows.length).toBeGreaterThan(1);
+    expect(frRows.some((r) => r.match?.name === "American Koine French")).toBe(true);
+  });
+
   it("Sursilvan -> Romansh", () => {
     const rs = merged("Sursilvan");
     expect(rs[0]?.languageSubtag).toBe("rm");
@@ -95,6 +118,10 @@ describe("merge rule (C1)", () => {
 
   it("a language with its own ISO code ranks above a dialect of the same name (Gheg -> aln, FR-003)", () => {
     expect(merged("Gheg")[0]?.languageSubtag).toBe("aln");
+    // The query names the language, so its row stands plain; the dialects are
+    // separate rows behind it.
+    expect(merged("Gheg")[0]?.match).toBeUndefined();
+    expect(merged("Gheg").filter((r) => r.languageSubtag === "aln").length).toBeGreaterThan(1);
   });
 
   it("does not duplicate a parent that is already listed; its row gains the match", () => {
@@ -160,6 +187,18 @@ describe("merge rule (C1)", () => {
 
   it("leaves a query shorter than two characters alone", () => {
     expect(dialectResultModifier(searcher, () => undefined)([], "G")).toEqual([]);
+  });
+
+  it("a short query with listed rows returns them instead of hanging (walk 6c)", () => {
+    // EthnoLib's match-marker loops forever on an empty needle, and the
+    // chooser clears the search string while results are still listed
+    // (dialect fallback, clearing the field). Before the guard this hung
+    // the page and crashed it with RangeError: Invalid array length.
+    const occitan = lang("oc", "Occitan");
+    const empty = modify([occitan], "");
+    expect(empty).toHaveLength(1);
+    expect(empty[0]?.languageSubtag).toBe("oc");
+    expect(modify([occitan], "o")).toHaveLength(1);
   });
 
   it("keeps the chooser's match markers on rows it passes through", () => {

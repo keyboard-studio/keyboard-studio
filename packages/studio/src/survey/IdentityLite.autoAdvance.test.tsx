@@ -66,7 +66,9 @@ describe("IdentityLite auto-advance seed race (PR #1050 regression)", () => {
     // Pick "Zeta" at Q1. hasRegionVariants:false → no region step → auto-advance
     // lands directly on Q2 (own-language name).
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "Amharic" } });
-    const option = await screen.findByRole("option", { name: /^Amharic/ });
+    // Spec 115: pin the PLAIN row (name ends with the code) — a dialect row
+    // for Amharic starts with "Amharic, " too and would match a bare prefix.
+    const option = await screen.findByRole("option", { name: /^Amharic, .*am$/ });
     fireEvent.mouseDown(option);
 
     await waitFor(() => {
@@ -91,7 +93,7 @@ describe("IdentityLite auto-advance seed race (PR #1050 regression)", () => {
 
     // Q1: pick Amharic → auto-advance to Q2 (no region variants).
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "Amharic" } });
-    fireEvent.mouseDown(await screen.findByRole("option", { name: /^Amharic/ }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: /^Amharic, .*am$/ }));
     await waitFor(() => {
       expect(screen.getByText(/What is your language called in your own language\?/)).toBeTruthy();
     });

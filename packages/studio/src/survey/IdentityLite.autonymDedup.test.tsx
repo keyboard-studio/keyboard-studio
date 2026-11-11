@@ -82,7 +82,9 @@ describe("IdentityLite getSeedOptions autonym dedup (PR #1055 regression)", () =
 
     // Q1: pick "Amharic" → auto-advance to Q2 (no region variants).
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "Amharic" } });
-    const option = await screen.findByRole("option", { name: /^Amharic/ });
+    // Spec 115: pin the PLAIN row (name ends with the code) — a dialect row
+    // for Amharic starts with "Amharic, " too and would match a bare prefix.
+    const option = await screen.findByRole("option", { name: /^Amharic, .*am$/ });
     fireEvent.mouseDown(option);
     await waitFor(() => {
       expect(

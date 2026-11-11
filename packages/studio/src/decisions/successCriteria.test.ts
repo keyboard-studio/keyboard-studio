@@ -241,12 +241,16 @@ describe("SC-003: zero ordering artifacts + parity", () => {
     const ids = flow.questions.map((q) => q.id);
     // The frozen legacy order (from the deleted YAML), as amended by
     // #1901: the author/copyright tail moved to the attribution flow.
+    // Spec 115 US2 inserts il_language_dialect after il_target_script
+    // (gated on a dialect-carrying search match) and before the
+    // script-not-supported notice.
     expect(ids).toEqual([
       "il_language_english",
       "il_language_region",
       "il_language_autonym",
       "il_language_code",
       "il_target_script",
+      "il_language_dialect",
       "il_script_not_supported",
     ]);
     // The moved questions keep their legacy relative order in their new

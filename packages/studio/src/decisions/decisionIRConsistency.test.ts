@@ -27,6 +27,13 @@ const IR_LESS_DECISIONS: ReadonlySet<DecisionId> = new Set<DecisionId>([
   "language-search-match",
   // spec 115: the Glottolog code of a language with no ISO code lands in the decision record only.
   "language-glottocode",
+  // spec 115: the dialect subtag reaches the descriptor through `outputs`
+  // (package-descriptor bcp47), not the IR — same as language-code/region/script.
+  "language-dialect",
+  // spec 115: how the dialect was found (registered-variant / from-name / typed).
+  "language-dialect-source",
+  // spec 115: the Glottolog code of the dialect, decision record only.
+  "dialect-glottocode",
   "language-region",
   "language-autonym",
   "language-code",

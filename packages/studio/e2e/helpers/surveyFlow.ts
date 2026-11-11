@@ -216,19 +216,39 @@ export async function driveIdentityLite(
   await surveyAdvance(page).click();
 
   // Q4: Language code — ALWAYS rendered (its `next` is static/unconditional;
-  // only the VALUE is optional). Interact with it unconditionally — a
-  // short-timeout presence poll here would misread a slow cold-server render
-  // (>2s) as "absent," silently skip the advance click, and desync the walk
-  // by one question instead of failing loudly. Wait with the same timeout
-  // used elsewhere and leave the field blank (the value is optional).
-  await page.waitForSelector("#il_language_code", { timeout: 15_000 });
-  if (languageCode !== undefined) {
-    // Same autocomplete control as il_language_english/il_language_autonym:
-    // typing a real code like "fr" opens a suggestion listbox, and a stray
-    // option (e.g. "Arpitan — France (frp)") sitting over the Next button
-    // would otherwise intercept the click below. fillComboboxFreeText fills
-    // the value and presses Escape to dismiss the listbox without clearing it.
-    await fillComboboxFreeText(page, "#il_language_code", languageCode);
+  // only the VALUE is optional). It renders TWO ways (spec 115 FR-033): the
+  // picker input `#il_language_code` when the code is blank/unknown, or a
+  // confirmation (`<strong data-testid="language-code-value">` + Change)
+  // when the code already arrived from the chooser/typed resolution — a typed
+  // name that resolves (e.g. "French" -> fr) takes the confirmation form, so
+  // waiting for the input alone stalls the walk. Wait for either form with
+  // the same timeout used elsewhere; a short-timeout presence poll here would
+  // misread a slow cold-server render (>2s) as "absent," silently skip the
+  // advance click, and desync the walk by one question instead of failing
+  // loudly.
+  await page.waitForSelector('#il_language_code, [data-testid="language-code-value"]', {
+    timeout: 15_000,
+  });
+  const codeInput = page.locator("#il_language_code");
+  const codeValue = page.locator('[data-testid="language-code-value"]');
+  if ((await codeInput.count()) > 0) {
+    if (languageCode !== undefined) {
+      // Same autocomplete control as il_language_english/il_language_autonym:
+      // typing a real code like "fr" opens a suggestion listbox, and a stray
+      // option (e.g. "Arpitan — France (frp)") sitting over the Next button
+      // would otherwise intercept the click below. Fill the value, then
+      // dismiss the listbox with a keyboard Escape — NOT a locator press on
+      // the input: filling a valid code flips the field to its confirmation
+      // form and unmounts the input, and a locator press would wait on the
+      // unmounted element until the test budget dies.
+      await codeInput.fill(languageCode);
+      await page.keyboard.press("Escape");
+    }
+  } else if (languageCode !== undefined) {
+    // Confirmation form: the code arrived from the resolution above. It must
+    // be the code the caller asked for — otherwise the typed name resolved
+    // to a different language than the walk expects.
+    await expect(codeValue).toHaveText(languageCode, { timeout: 15_000 });
   }
   await surveyAdvance(page).click();
 
@@ -508,6 +528,25 @@ export async function confirmPrefill(page: Page): Promise<void> {
  * @param page Page instance
  * @param charToAdd Character to add (e.g. "é")
  */
+/**
+ * Text-sample prompt (#1784) — after a characters Done, the completion may
+ * defer behind the text-sample prompt when the alphabet's marks lack pairing
+ * evidence (shouldPromptTextSample): the prompt's Continue is "Continue
+ * without a text sample" (footer nav, testId marks-text-sample-prompt-skip),
+ * NOT the step's own Continue. A resolved language's exemplar data can put
+ * marks on the alphabet that free-text entry never did (spec 115: typing
+ * "Bafut" now resolves to bfd, so Bafut's tone marks arrive), which is how
+ * walks that never met the prompt before stall on it. Dismiss it when
+ * present; no-op when the completion advanced past it. Call after every
+ * charlist-done click.
+ */
+export async function dismissTextSamplePrompt(page: Page): Promise<void> {
+  const skip = page.getByTestId("marks-text-sample-prompt-skip");
+  if (await skip.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await skip.click();
+  }
+}
+
 export async function buildOneCharacterList(
   page: Page,
   charToAdd: string = "é",
@@ -526,6 +565,10 @@ export async function buildOneCharacterList(
     timeout: 5_000,
   });
   await page.click('[data-testid="charlist-done"]');
+
+  // The completion may defer behind the #1784 text-sample prompt (see
+  // dismissTextSamplePrompt): dismiss it when it renders, else no-op.
+  await dismissTextSamplePrompt(page);
 
   // The marks series (spec 071) sits immediately after alphabet confirmation,
   // BEFORE carve — a mark-bearing charToAdd (e.g. "é") makes it render here.

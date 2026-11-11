@@ -124,9 +124,11 @@ async function draftKeysInStorage(page: Page): Promise<string[]> {
 }
 
 /**
- * Build to L3 (base A confirmed; at the track step) via the shared fixture:
- * identity (free-text "Test" / script "other") -> preview+confirm base A.
- * Matches switch-base-exploration.spec.ts's buildToLevel("L3-base-confirmed").
+ * Build to L3 (base A confirmed; at attribution — no track step since
+ * track_choice was removed 2026-11-06, 77cefa97, copy is the default) via
+ * the shared fixture: identity (free-text "Test" / script "other") ->
+ * preview+confirm base A. Matches
+ * switch-base-exploration.spec.ts's buildToLevel("L3-base-confirmed").
  */
 async function buildToBaseAConfirmed(page: Page): Promise<void> {
   await seedReturningVisitor(page);
@@ -134,7 +136,7 @@ async function buildToBaseAConfirmed(page: Page): Promise<void> {
   await driveIdentityLite(page, { english: "Test", autonym: "Test Autonym", script: "other" });
   await previewStart(page, BASE_A);
   await clickConfirm(page);
-  await expect(page.getByRole("radio", { name: /^Copy/i })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("#il_author_name")).toBeVisible({ timeout: 30_000 });
 }
 
 test.describe.configure({ mode: "serial" });
@@ -153,7 +155,7 @@ test.describe("F1 — switch-base rebase confirm", () => {
     expect(beforeState.startId).toBe(BASE_A);
     expect(beforeState.phaseResultsCount).toBeGreaterThan(0);
     const draftsBefore = await draftKeysInStorage(page);
-    expect(draftsBefore).toContain(`ks.draft.${BASE_A}.v1`);
+    expect(draftsBefore).toContain(`ks.draft.${BASE_A}.v2`);
 
     await backToStartPicker(page);
     await previewStart(page, BASE_B);
@@ -177,14 +179,14 @@ test.describe("F1 — switch-base rebase confirm", () => {
     expect(afterCancel.startId).toBe(BASE_A);
     expect(afterCancel.phaseResultsCount).toBe(beforeState.phaseResultsCount);
     const draftsAfterCancel = await draftKeysInStorage(page);
-    expect(draftsAfterCancel).toContain(`ks.draft.${BASE_A}.v1`);
-    expect(draftsAfterCancel).not.toContain(`ks.draft.${BASE_B}.v1`);
+    expect(draftsAfterCancel).toContain(`ks.draft.${BASE_A}.v2`);
+    expect(draftsAfterCancel).not.toContain(`ks.draft.${BASE_B}.v2`);
 
     // Now accept the SAME confirm (still previewing base B) — OK switches
     // cleanly: working copy, draft key, AND the wizard all move to base B.
     dialogs.setAction("accept");
     await clickConfirm(page);
-    await expect(page.getByRole("radio", { name: /^Copy/i })).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator("#il_author_name")).toBeVisible({ timeout: 30_000 });
 
     expect(dialogs.dialogCount()).toBe(2);
     const afterOk = await hookState(page);
@@ -194,8 +196,8 @@ test.describe("F1 — switch-base rebase confirm", () => {
     // recorded against base A no longer applies to base B's working copy.
     expect(afterOk.phaseResultsCount).toBe(0);
     const draftsAfterOk = await draftKeysInStorage(page);
-    expect(draftsAfterOk).toContain(`ks.draft.${BASE_B}.v1`);
-    expect(draftsAfterOk).not.toContain(`ks.draft.${BASE_A}.v1`);
+    expect(draftsAfterOk).toContain(`ks.draft.${BASE_B}.v2`);
+    expect(draftsAfterOk).not.toContain(`ks.draft.${BASE_A}.v2`);
   });
 
   test("re-confirming the SAME base: no popup, phaseResults preserved, wizard advances", async ({ page }) => {
@@ -211,7 +213,7 @@ test.describe("F1 — switch-base rebase confirm", () => {
 
     dialogs.setAction("accept"); // should never be consulted
     await clickConfirm(page);
-    await expect(page.getByRole("radio", { name: /^Copy/i })).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator("#il_author_name")).toBeVisible({ timeout: 30_000 });
 
     expect(dialogs.dialogCount()).toBe(0);
     const after = await hookState(page);

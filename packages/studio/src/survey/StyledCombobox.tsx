@@ -51,6 +51,7 @@ export function StyledCombobox<T = LanguageSummary>({
   onOpen,
 }: StyledComboboxProps<T>) {
   const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [highlight, setHighlight] = useState(-1);
   const isMountedRef = useRef(true);
   useEffect(() => {
@@ -143,7 +144,16 @@ export function StyledCombobox<T = LanguageSummary>({
         onKeyDown={handleKeyDown}
         onFocus={openList}
         // Delay close so an option's onMouseDown registers before blur.
-        onBlur={() => setTimeout(() => isMountedRef.current && setOpen(false), 120)}
+        // Only close when the input is still unfocused at fire time: the
+        // timer can fire late while the main thread is busy (the language
+        // search runs synchronous Fuse rounds), and a stale close would
+        // otherwise shut a list the author has already reopened (walk 6c).
+        onBlur={() =>
+          setTimeout(() => {
+            if (isMountedRef.current && document.activeElement !== inputRef.current) setOpen(false);
+          }, 120)
+        }
+        ref={inputRef}
         className="ks-control ks-focus-ring ks-hit-target"
         style={inputStyle}
       />

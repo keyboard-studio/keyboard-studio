@@ -395,7 +395,7 @@ Commit: `spec 115 T038-T043`.
 
 ## Phase 9: Polish and integration (Article XI)
 
-- [ ] T061 Script the quickstart §5 manual walk with the Playwright CLI against `pnpm dev`, covering both the Copy and Open paths:
+- [x] T061 Script the quickstart §5 manual walk with the Playwright CLI against `pnpm dev`, covering both the Copy and Open paths:
   - the autosuggest-kept checks;
   - Gascon, Rabinal, Aranese and Yabekolo;
   - region on demand;
@@ -404,14 +404,14 @@ Commit: `spec 115 T038-T043`.
   - the Open-list hint and error.
 
   Record the result in the commit message. File: specs/115-dialect-language-tags/walk/
-- [ ] T062 Run the full gates: `pnpm build`; vitest for contracts, engine, glottolog, keyboard-lint and studio; the facet-index and `/api` suites per docs/tooling.md; desktop e2e including the golden walk; `pnpm lint`. Record the counts in the commit message — (no file)
-- [ ] T063 [P] Update docs:
+- [x] T062 Run the full gates: `pnpm build`; vitest for contracts, engine, glottolog, keyboard-lint and studio; the facet-index and `/api` suites per docs/tooling.md; desktop e2e including the golden walk; `pnpm lint`. Record the counts in the commit message — (no file)
+- [x] T063 [P] Update docs:
   - the identity rows in the workflow-model question inventory (chooser, `language-dialect`, region on demand, no free-text code);
   - the criteria doc for rows 12.8, 12.9 and 10.4;
   - the package inventory: EthnoLib dependency and the vendored hook.
 
   Files: docs/workflow-model.md, docs/criteria.md, docs/packages.md
-- [ ] T064 [P] File upstream issues on sillsdev/EthnoLib, as research R7 lists:
+- [x] T064 [P] File upstream issues on sillsdev/EthnoLib, as research R7 lists:
   - the hook package is published without its `.d.ts`;
   - data embedded in code (not tree-shakeable, no way to supply pinned data);
   - `createTag` neither lowercases private use nor offers registered variants.

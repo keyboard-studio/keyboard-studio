@@ -120,10 +120,16 @@ async function renderReady(): Promise<HTMLElement> {
 // (spec 030 US1). Selection — not typing — fires onEntryResolved with the entry.
 // The identity flow auto-advances on selection (advanceOnSelect), so picking the
 // row routes to the region step with no explicit Next click.
+// The row is pinned by its code-ending name: spec 115 lists a dialect row
+// beside the plain row for a language with dialects, and both start with
+// "<name>, " — only the plain row ends with the code.
 async function selectLanguage(name: string): Promise<void> {
+  const code: Record<string, string> = { Ewondo: "ewo", Bafut: "bfd" };
   const input = screen.getByRole<HTMLInputElement>("combobox");
   fireEvent.change(input, { target: { value: name } }); // the chooser lists nothing until text is typed
-  const option = await screen.findByRole("option", { name: new RegExp("^" + name + ", ") });
+  const option = await screen.findByRole("option", {
+    name: new RegExp("^" + name + ", .*" + code[name] + "$"),
+  });
   fireEvent.mouseDown(option);
   await waitFor(() => {
     expect(screen.getByText(/Which region is your language from\?/)).toBeTruthy();

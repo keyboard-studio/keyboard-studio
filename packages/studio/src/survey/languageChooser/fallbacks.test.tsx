@@ -99,7 +99,9 @@ describe("the two fallback rows (FR-029)", () => {
   it("are absent when a result is close, but always reachable through Can't find it?", async () => {
     const { input } = await mount();
     fireEvent.change(input, { target: { value: "Ewondo" } });
-    await screen.findByRole("option", { name: /^Ewondo, / });
+    // Spec 115: pin the PLAIN row (name ends with the code) — a dialect row
+    // for Ewondo starts with "Ewondo, " too and would match a bare prefix.
+    await screen.findByRole("option", { name: /^Ewondo, .*ewo$/ });
     expect(screen.queryByRole("option", { name: /isn't listed/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Can't find it?" }));
     expect(screen.getByRole("button", { name: /is a dialect: find its language/ })).toBeTruthy();
@@ -127,7 +129,7 @@ describe('"is a dialect" (FR-030)', () => {
     expect(input.value).toBe("");
     // Picking the parent keeps the pending name.
     fireEvent.change(input, { target: { value: "Ewondo" } });
-    fireEvent.mouseDown(await screen.findByRole("option", { name: /^Ewondo, / }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: /^Ewondo, .*ewo$/ }));
     await waitFor(() => expect(code()).not.toBe(""));
     expect(decision("language-search-match")?.value).toMatchObject({ name: "Zzyxqw", source: "typed" });
   });
@@ -188,7 +190,7 @@ describe("SC-008: each input reaches a confirmed code within four actions", () =
     const { input } = await mount();
     const c = clicker();
     fireEvent.change(input, { target: { value: "Ewondo" } });
-    c.pick(await screen.findByRole("option", { name: /^Ewondo, / }));
+    c.pick(await screen.findByRole("option", { name: /^Ewondo, .*ewo$/ }));
     await confirmed();
     expect(c.count).toBeLessThanOrEqual(4);
   });
@@ -197,7 +199,10 @@ describe("SC-008: each input reaches a confirmed code within four actions", () =
     const { input } = await mount();
     const c = clicker();
     fireEvent.change(input, { target: { value: "Gascon" } });
-    c.pick(await screen.findByRole("option", { name: /Occitan/ }));
+    // "Gascon" yields exactly one Occitan row, carrying the dialect match
+    // (dialectSearch: "Gascon -> Occitan once, with the Glottolog match") —
+    // its name ends with the countries, not the code, so pin the match line.
+    c.pick(await screen.findByRole("option", { name: /Gascon: a dialect of Occitan/ }));
     await confirmed();
     expect(c.count).toBeLessThanOrEqual(4);
   });
@@ -235,7 +240,7 @@ describe("SC-008: each input reaches a confirmed code within four actions", () =
     fireEvent.change(input, { target: { value: "Zzyxqw" } });
     c.pick(await screen.findByRole("option", { name: /is a dialect/ }));
     fireEvent.change(input, { target: { value: "Ewondo" } });
-    c.pick(await screen.findByRole("option", { name: /^Ewondo, / }));
+    c.pick(await screen.findByRole("option", { name: /^Ewondo, .*ewo$/ }));
     await confirmed();
     expect(c.count).toBeLessThanOrEqual(4);
   });

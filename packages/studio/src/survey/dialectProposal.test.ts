@@ -117,6 +117,28 @@ describe("proposeDialect — variant linked by folded description plus allowed p
     expect(proposal?.source).toBe("registered-variant");
   });
 
+  it("links Sursilvan to sursilv for Romansh: the name is the description's first word", () => {
+    const proposal = proposeDialect(
+      { language: "rm", script: "Latn", region: "CH" },
+      { name: "Sursilvan", relation: "dialect", source: "glottolog", glottocode: "surs1244" },
+    );
+    expect(proposal).toEqual({
+      subtag: "sursilv",
+      source: "registered-variant",
+      fullTag: "rm-sursilv",
+      glottocode: "surs1244",
+    });
+  });
+
+  it("does not link a later word of a description: Romansh is not sursilv", () => {
+    const proposal = proposeDialect(
+      { language: "rm", script: "Latn", region: "CH" },
+      { name: "Romansh", relation: "dialect", source: "glottolog" },
+    );
+    expect(proposal?.subtag).toBe("x-romansh");
+    expect(proposal?.source).toBe("from-name");
+  });
+
   it("does not link a variant whose prefixes forbid the language", () => {
     // gascon is registered for oc only; against Catalan it must not propose gascon.
     const proposal = proposeDialect(

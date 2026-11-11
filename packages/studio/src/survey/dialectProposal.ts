@@ -200,9 +200,12 @@ export function proposeDialect(
   }
 
   // 2. A registered variant whose description matches the dialect name
-  // (folded) and whose prefixes allow the choice.
+  // (folded) and whose prefixes allow the choice. A description matches when
+  // it IS the name ("Gascon") or when the name is its first word ("Sursilvan
+  // idiom of Romansh" for Sursilvan) — a later word does not count, so a
+  // dialect named "Romansh" never links to sursilv through that description.
   for (const variant of env.variantsFor(tag)) {
-    if (variant.descriptions.some((d) => fold(d) === foldedName)) {
+    if (variant.descriptions.some((d) => descriptionMatches(d, foldedName))) {
       return proposal(env, choice, variant.subtag, "registered-variant", glottocode);
     }
   }
@@ -246,6 +249,13 @@ export function proposeDialect(
     searchMatch.source === "typed" ? "typed" : "from-name",
     glottocode,
   );
+}
+
+/** A variant description matches a dialect name when the folded description
+ * is the folded name, or the folded name is the description's first word. */
+function descriptionMatches(description: string, foldedName: string): boolean {
+  const folded = fold(description);
+  return folded === foldedName || folded.startsWith(`${foldedName} `);
 }
 
 /**
