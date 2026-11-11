@@ -21,6 +21,7 @@ import type {
   LayerCombo,
   LayoutOperation,
 } from "@keyboard-studio/contracts";
+import { makeRule } from "@keyboard-studio/contracts";
 import { canonicalizeCombo } from "../pattern-apply/modifierCombos.js";
 import { insertBeforeTerminalRules } from "../pattern-apply/ir-insert.js";
 import {
@@ -135,13 +136,20 @@ export function applyLayoutOp(ir: KeyboardIR, op: LayoutOperation): ApplyLayoutO
   if (op.op !== "remove-row") {
     const vkeyEl = { kind: "vkey" as const, name: op.vkey, modifiers: [...modifiers] };
     const preContext = op.op === "set-key" ? [] : toContextElements(op.context);
+    // makeRule writes the `+` separator exactly when there is pre-context
+    // in a using-keys group (the entry group, by entryGroupForEdit) — the
+    // shape the hand-built literal used to spell out. `authorEdit` is not a
+    // makeRule part, so it rides on the spread.
     const rule: IRRule = {
-      nodeId: freshNodeId(usedNodeIds(next), op.seq),
-      context:
-        preContext.length === 0
-          ? [vkeyEl]
-          : [...preContext, { kind: "raw", text: "+" }, vkeyEl],
-      output: toOutputElements(op.op === "set-key" ? singleOutput(op.output) : op.becomes),
+      ...makeRule(
+        {
+          nodeId: freshNodeId(usedNodeIds(next), op.seq),
+          preContext,
+          keystroke: vkeyEl,
+          output: toOutputElements(op.op === "set-key" ? singleOutput(op.output) : op.becomes),
+        },
+        group,
+      ),
       authorEdit: "layout-tab",
     };
     group.rules = insertBeforeTerminalRules(group.rules, rule);

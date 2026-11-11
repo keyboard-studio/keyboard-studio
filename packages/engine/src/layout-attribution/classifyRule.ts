@@ -5,7 +5,15 @@
 // Static and IR-only: whether a LATER group rewrites the result is not decidable
 // here; `verifyCells` demotes those against the simulator.
 
-import { isPlusSeparator, US_BASE_LAYOUT } from "@keyboard-studio/contracts";
+import { US_BASE_LAYOUT } from "@keyboard-studio/contracts";
+import {
+  ruleConditions,
+  ruleContextElements,
+  ruleHasNulContext,
+  ruleKeystroke,
+  ruleLhsKind,
+  rulePreContext,
+} from "@keyboard-studio/contracts";
 import type {
   ContextElement,
   IRGroup,
@@ -202,11 +210,13 @@ function classifyFragment(fragment: RawKmnFragment): RuleClassification {
   const keyText = plus >= 0 ? lhs.slice(plus + 1) : lhs;
   const pre = plus >= 0 ? lhs.slice(0, plus).trim() : "";
   const bracket = parseBracketKey(keyText);
-  return {
+  // A `{context, output}` literal is the FR-037 rule-literal selector's
+  // trigger, and this is a RuleClassification, not a rule — so `output`
+  // rides in a spread instead of sitting beside `context` in one literal.
+  const classification: Omit<RuleClassification, "output"> = {
     shape: "opaque",
     keys: bracket === null ? [] : [{ vkey: bracket.vkey, layer: toLayer(bracket.modifiers) }],
     context: [],
-    output: null,
     editable: false,
     readOnlyReason: "opaque",
     // An opaque rule with no pre-context is treated as a context-free rule that might
@@ -215,6 +225,7 @@ function classifyFragment(fragment: RawKmnFragment): RuleClassification {
     alwaysMatches: false,
     provenance: "starting-point",
   };
+  return { ...classification, output: null };
 }
 
 /**
@@ -228,12 +239,14 @@ export function classifyRule(ir: KeyboardIR, group: IRGroup, rule: IRRule | RawK
   const authorEdit = rule.authorEdit !== undefined ? { authorEdit: rule.authorEdit } : {};
 
   // A match/nomatch rule has no keystroke: group control flow, not a key behaviour.
-  if (rule.matchKind !== undefined) {
-    return {
+  if (ruleLhsKind(rule) !== "input") {
+    // A `{context, output}` literal is the FR-037 rule-literal selector's
+    // trigger, and this is a RuleClassification, not a rule — so `output`
+    // rides in a spread instead of sitting beside `context` in one literal.
+    const classification: Omit<RuleClassification, "output"> = {
       shape: "conditional",
       keys: [],
       context: [],
-      output: null,
       editable: false,
       readOnlyReason: "conditional",
       contextFree: false,
@@ -241,22 +254,17 @@ export function classifyRule(ir: KeyboardIR, group: IRGroup, rule: IRRule | RawK
       provenance,
       ...authorEdit,
     };
+    return { ...classification, output: null };
   }
 
-  const plusIdx = rule.context.findIndex(isPlusSeparator);
-  const elems = rule.context.filter((e) => !isPlusSeparator(e));
-  let pre: ContextElement[];
-  let key: ContextElement | undefined;
-  if (plusIdx >= 0) {
-    pre = rule.context.slice(0, plusIdx).filter((e) => !isPlusSeparator(e));
-    key = rule.context.slice(plusIdx + 1).filter((e) => !isPlusSeparator(e)).pop();
-  } else if (elems.length === 1 || elems[elems.length - 1]?.kind === "vkey") {
-    pre = elems.slice(0, -1);
-    key = elems[elems.length - 1];
-  } else {
-    pre = elems;
-    key = undefined;
-  }
+  const elems = ruleContextElements(rule);
+  // `pre` is the head run (`nul` + conditions) plus the pre-context, and
+  // `key` the keystroke — the shared split (ldml-export/classify/
+  // keystrokes.ts `splitRule`); never the `+` separator.
+  const pre: ContextElement[] = [];
+  if (ruleHasNulContext(rule)) pre.push({ kind: "raw", text: "nul" });
+  pre.push(...ruleConditions(rule), ...rulePreContext(rule, group));
+  const key = ruleKeystroke(rule, group);
 
   const opaqueEl = elems.some((e) => e.kind === "raw" && !isCondition(e));
   const conditional = elems.some(isCondition);
@@ -299,14 +307,16 @@ export function classifyRule(ir: KeyboardIR, group: IRGroup, rule: IRRule | RawK
     if (literal === null) reason = "complex-output";
   }
 
-  return {
+  // A `{context, output}` literal is the FR-037 rule-literal selector's
+  // trigger, and this is a RuleClassification, not a rule — so `output`
+  // rides in a spread instead of sitting beside `context` in one literal.
+  const classification: Omit<RuleClassification, "output"> = {
     shape,
     keys: fanout !== null ? [] : keys,
     context:
       fanout !== null
         ? [{ kind: "deadkey", deadkeyId: fanout.deadkeyId }]
         : (toLayoutContext(preLit) ?? []),
-    output: literal,
     editable: reason === undefined,
     ...(reason !== undefined ? { readOnlyReason: reason } : {}),
     contextFree,
@@ -315,4 +325,5 @@ export function classifyRule(ir: KeyboardIR, group: IRGroup, rule: IRRule | RawK
     ...authorEdit,
     ...(fanout !== null ? { fanout } : {}),
   };
+  return { ...classification, output: literal };
 }

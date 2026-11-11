@@ -124,7 +124,7 @@ export function AfterContextView({ deadkeyId, layer, layers, displayChar, onFoll
       if (cell.frame) continue;
       const step = attribution.steps.find((s) => s.vkey === cell.vkey && s.context !== undefined && contextKey(s.context) === wanted);
       if (step === undefined) continue;
-      const matching = cell.rows.filter((r) => contextKey(r.context) === wanted);
+      const matching = cell.rows.filter((row) => contextKey(row.context) === wanted);
       const row = matching.find((r) => r.readOnlyReason !== "never-fires");
       const neverFires = matching.filter((r) => r.readOnlyReason === "never-fires").map((r) => ({ ruleNodeId: r.ruleNodeId }));
       // The simulator reports the compiler's numbers; name them by the working copy's ids.

@@ -20,6 +20,7 @@ import type {
   SimulationStep,
   SimulatorContextSeed,
 } from "@keyboard-studio/contracts";
+import { ruleContextElements } from "@keyboard-studio/contracts";
 import { DESKTOP_ISO_GEOMETRY, attributeLayer, isMnemonic, verifyCells } from "@keyboard-studio/engine";
 import type { CellStep, FiredRuleCheck, KeyCellAttribution, RowAttribution } from "@keyboard-studio/engine";
 import { extractFiredRule } from "../../components/rules/demoSimulation.ts";
@@ -126,7 +127,7 @@ export function deadkeyOrdinals(ir: KeyboardIR): Map<number, number> {
   for (const group of ir.groups) {
     for (const rule of group.rules) {
       if (!("context" in rule)) continue;
-      for (const el of rule.context) note(el);
+      for (const el of ruleContextElements(rule)) note(el);
       if ("output" in rule) for (const el of rule.output) note(el);
     }
   }
@@ -230,7 +231,7 @@ export function computeLayerAttribution(args: {
     if (c.frame) continue;
     want([], c.vkey);
     if (chosen !== null) want(chosen, c.vkey);
-    for (const r of c.rows) if (r.context.length > 0) want(r.context, c.vkey);
+    for (const row of c.rows) if (row.context.length > 0) want(row.context, c.vkey);
   }
 
   const steps: CellStep[] = [];

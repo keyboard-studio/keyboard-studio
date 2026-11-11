@@ -130,7 +130,7 @@ export function KeyEditPanel({ cell, onViewInCode, onCommitted, onDeadkeyDefined
     return !buildSlotOccupancy(ir, selectDesktopAssignments(phaseResults)).has(slotKeyFor(cell.vkey, altgrLayer));
   }, [ir, phaseResults, layer, cell.vkey, altgrLayer]);
 
-  const deadkeyRows = cell.attribution.rows.filter((r) => r.context.some((c) => c.kind === "deadkey"));
+  const deadkeyRows = cell.attribution.rows.filter((row) => row.context.some((c) => c.kind === "deadkey"));
 
   function lostLabel(): string {
     return displacement?.displaced === null || displacement === null
@@ -398,11 +398,11 @@ export function KeyEditPanel({ cell, onViewInCode, onCommitted, onDeadkeyDefined
                 {t({ id: "editor.layout.edit.previewDeadkeys", message: "After a deadkey, this key still does the following:" })}
               </p>
               <ul style={{ margin: 0, paddingLeft: 18 }} data-testid="key-edit-preview-deadkeys">
-                {deadkeyRows.map((r) => (
-                  <li key={r.ruleNodeId}>
+                {deadkeyRows.map((row) => (
+                  <li key={row.ruleNodeId}>
                     {t({
                       id: "editor.layout.edit.previewDeadkeyRow",
-                      message: `After ${{ context: r.context.map((c) => (c.kind === "deadkey" ? c.deadkeyId : c.text)).join(" ") }}: ${{ result: rowResult(r.output) }}`,
+                      message: `After ${{ context: row.context.map((c) => (c.kind === "deadkey" ? c.deadkeyId : c.text)).join(" ") }}: ${{ result: rowResult(row.output) }}`,
                     })}
                   </li>
                 ))}

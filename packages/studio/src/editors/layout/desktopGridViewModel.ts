@@ -222,7 +222,7 @@ function buildCell(g: DesktopIsoGeometryKey, input: DesktopGridViewModelInput, a
     frame: a.frame,
     state: input.state,
     provisional: false,
-    hasContextualRows: a.rows.some((r) => r.context.length > 0),
+    hasContextualRows: a.rows.some((row) => row.context.length > 0),
     ruleCount: (a.plain === null ? 0 : 1) + a.rows.length,
     attribution: a,
   };

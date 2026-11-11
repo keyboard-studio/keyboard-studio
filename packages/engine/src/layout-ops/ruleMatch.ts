@@ -4,8 +4,9 @@
 import {
   deadkeyNameKey,
   isNamedDeadkeyName,
-  isPlusSeparator,
   listDeadkeys,
+  ruleContextElements,
+  ruleLhsKind,
 } from "@keyboard-studio/contracts";
 import type {
   ContextElement,
@@ -102,8 +103,8 @@ export function ruleOnSlot(
   layer: LayerCombo,
   ctx: readonly string[],
 ): boolean {
-  if (rule.matchKind !== undefined) return false;
-  const elems = rule.context.filter((e) => !isPlusSeparator(e));
+  if (ruleLhsKind(rule) !== "input") return false;
+  const elems = ruleContextElements(rule);
   const last = elems[elems.length - 1];
   if (last === undefined || last.kind !== "vkey") return false;
   if (last.name !== vkey || !sameLayer(last.modifiers, layer)) return false;
@@ -117,7 +118,7 @@ export function ruleOnSlot(
  * keyboard's rule in the working copy, whose node ids and source lines it does not share.
  */
 export function sameRuleIdentity(a: IRRule, b: IRRule): boolean {
-  if (a.matchKind !== b.matchKind || a.targetSelector !== b.targetSelector) return false;
+  if (ruleLhsKind(a) !== ruleLhsKind(b) || a.targetSelector !== b.targetSelector) return false;
   if (a.context.length !== b.context.length) return false;
   return a.context.every((x, i) => {
     const y = b.context[i]!;

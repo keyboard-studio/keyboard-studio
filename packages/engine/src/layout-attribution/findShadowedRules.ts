@@ -1,7 +1,7 @@
 // Rules that can never fire: an earlier rule in the same group with the same context and
 // key element always matches first (shared by never-fires rows and review flag (c)).
 
-import { isPlusSeparator } from "@keyboard-studio/contracts";
+import { ruleContextElements, ruleLhsKind } from "@keyboard-studio/contracts";
 import type { ContextElement, KeyboardIR } from "@keyboard-studio/contracts";
 
 function elementKey(el: ContextElement): string {
@@ -16,8 +16,8 @@ export function findShadowedRules(ir: KeyboardIR): Array<{ ruleNodeId: string; s
     const seen = new Map<string, string>();
     for (const rule of group.rules) {
       // match/nomatch rules have no key element; a bare transition is never "the same" as another.
-      if (rule.matchKind !== undefined) continue;
-      const key = rule.context.filter((e) => !isPlusSeparator(e)).map(elementKey).join("\u0001");
+      if (ruleLhsKind(rule) !== "input") continue;
+      const key = ruleContextElements(rule).map(elementKey).join("\u0001");
       const earlier = seen.get(key);
       if (earlier !== undefined) out.push({ ruleNodeId: rule.nodeId, shadowedBy: earlier });
       else seen.set(key, rule.nodeId);

@@ -19,6 +19,7 @@ import type {
   KeyboardIR,
   RawKmnFragment,
 } from "@keyboard-studio/contracts";
+import { ruleContextElements } from "@keyboard-studio/contracts";
 import type { KmnEditEffect } from "../layout-ops/types.js";
 import {
   isFrag,
@@ -85,8 +86,12 @@ function lineBetween(seq: readonly SeqItem[], idx: number): number | undefined {
 
 /** Whether `rule` is a single-key rule on `key` (the key's vkey and exact modifier set). */
 function answersKey(rule: IRRule, key: { vkey: string; modifiers: readonly string[] }): boolean {
-  if (rule.context.length !== 1) return false;
-  const el = rule.context[0]!;
+  // No group in scope here (the rule comes from a sequence item), so the
+  // loose whole-LHS reader is the right accessor (spec 116 FR-037) — the
+  // same single-key check claimedInputs.sameKey makes.
+  const els = ruleContextElements(rule);
+  if (els.length !== 1) return false;
+  const el = els[0]!;
   if (el.kind !== "vkey" || el.name !== key.vkey) return false;
   const have = new Set(el.modifiers);
   return have.size === key.modifiers.length && key.modifiers.every((m) => have.has(m));

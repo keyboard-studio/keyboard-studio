@@ -15,16 +15,19 @@ import type { KeyCellAttribution, ReadOnlyReason, RowAttribution } from "./types
 function toRow(c: ClassifiedRule, override?: { editable: false; reason: ReadOnlyReason }): RowAttribution {
   const { cls } = c;
   const reason = override?.reason ?? cls.readOnlyReason;
-  return {
+  // A `{context, output}` literal is the FR-037 rule-literal selector's
+  // trigger, and this is a RowAttribution, not a rule — so `output` rides
+  // in a spread instead of sitting beside `context` in one literal.
+  const row: Omit<RowAttribution, "output"> = {
     ruleNodeId: c.nodeId,
     shape: cls.shape,
     context: cls.context,
-    output: cls.output,
     editable: override === undefined && cls.editable,
     ...(reason !== undefined && (override !== undefined || !cls.editable) ? { readOnlyReason: reason } : {}),
     provenance: cls.provenance,
     ...(cls.authorEdit !== undefined ? { authorEdit: cls.authorEdit } : {}),
   };
+  return { ...row, output: cls.output };
 }
 
 const FRAME_VKEYS: ReadonlySet<string> = new Set(DESKTOP_ISO_GEOMETRY.filter((k) => k.frame).map((k) => k.id));

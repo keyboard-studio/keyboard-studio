@@ -1,7 +1,7 @@
 // Shared fixture for the layout-ops tests: a small keys-group keyboard with
 // duplicate context-free rules, a contextual row, a deadkey, and terminal rules.
 
-import { isPlusSeparator } from "@keyboard-studio/contracts";
+import { ruleContextElements } from "@keyboard-studio/contracts";
 import type { IRRule, KeyboardIR, LayerCombo } from "@keyboard-studio/contracts";
 import { emitRule } from "../codec/emit.js";
 import { parse } from "../codec/parse.js";
@@ -40,7 +40,7 @@ export function slotLines(ir: KeyboardIR, vkey: string, layer: LayerCombo): stri
   const want = new Set<string>(layer);
   return entryRules(ir)
     .filter((r) => {
-      const els = r.context.filter((e) => !isPlusSeparator(e));
+      const els = ruleContextElements(r);
       const el = els[0];
       return (
         els.length === 1 &&
