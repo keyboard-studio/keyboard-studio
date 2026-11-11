@@ -10,12 +10,15 @@ import {
   getLanguageDefaults,
   langtagsScripts,
   macrolanguageMembers,
+  minimalTagOf,
   resolveLangtag,
+  variantAllowed,
+  variantEntry,
 } from "@keyboard-studio/engine/langtags";
 import { getLanguoid } from "@keyboard-studio/glottolog";
 
 import { EMPTY_CRITERIA_RECORD } from "./criteriaTypes.ts";
-import type { CriteriaInput } from "./criteriaTypes.ts";
+import type { CriteriaAssemblyVerdict, CriteriaInput } from "./criteriaTypes.ts";
 import { ARTIFICIAL_LANGUAGE_FAMILY } from "./judgeForeign.ts";
 import {
   ISO_639_3_REQUEST_POINTER,
@@ -23,6 +26,7 @@ import {
   isPrivateUseLanguage,
   languageTagContextLines,
   languageTagFacts,
+  languageTagFindings,
   languageTagVerdicts,
   type ConlangLookup,
   type LangtagsTagLookup,
@@ -35,6 +39,9 @@ const LANGTAGS: LangtagsTagLookup = {
   scripts: langtagsScripts,
   iso639_3: (lang) => getLanguageDefaults(lang)?.iso639_3,
   members: macrolanguageMembers,
+  minimalTagOf,
+  variantAllowed,
+  variantEntry,
 };
 // Glottolog lists individual languages only: macrolanguage codes are absent.
 const MACRO_ISOS = new Set(["que", "swa", "ara"]);
@@ -63,13 +70,32 @@ describe("10.3 minimal tags", () => {
   });
 
   it("an extra-region tag keeps its region and drops the default script", () => {
-    const a = analyze(["fr-Latn-BF"]);
-    expect(a.tags[0]!.shorterEquivalents).toEqual(["fr-BF"]);
+    const v = languageTagVerdicts(analyze(["fr-Latn-BF"]));
+    expect(v.get("10.3-kps-tags-minimal")).toEqual({
+      status: "not-met",
+      lines: ["fr-Latn-BF is not minimal: langtags reads fr-BF as the same tag (fr-Latn-BF)."],
+    });
   });
 
-  it("two equally short equivalents are both named", () => {
-    const a = analyze(["pa-Arab-PK"], profile("Arab"));
-    expect(a.tags[0]!.shorterEquivalents).toEqual(["pa-PK", "pa-Arab"]);
+  it("one minimal form is named, not every equally short equivalent", () => {
+    // pa-Arab-PK has two equally short equivalents under the old
+    // drop-a-subtag rule (pa-PK, pa-Arab); minimalTagOf names pa-PK.
+    const v = languageTagVerdicts(analyze(["pa-Arab-PK"], profile("Arab")));
+    expect(v.get("10.3-kps-tags-minimal")).toEqual({
+      status: "not-met",
+      lines: ["pa-Arab-PK is not minimal: langtags reads pa-PK as the same tag (pa-Arab-PK)."],
+    });
+  });
+
+  it("a duplicate minimal form is Not met on the duplicate's line", () => {
+    const v = languageTagVerdicts(analyze(["fr-FR", "fr"]));
+    expect(v.get("10.3-kps-tags-minimal")).toEqual({
+      status: "not-met",
+      lines: [
+        "fr-FR is not minimal: langtags reads fr as the same tag (fr-Latn-FR).",
+        "fr has the same minimal form (fr) as fr-FR.",
+      ],
+    });
   });
 
   it("Met when every tag is known and none can drop a subtag", () => {
@@ -87,6 +113,193 @@ describe("10.3 minimal tags", () => {
     expect(languageTagVerdicts(a).has("10.3-kps-tags-minimal")).toBe(false);
     expect(languageTagContextLines("10.3-kps-tags-minimal", a)).toEqual([
       "xyz-Abcd: not in langtags, so minimality cannot be checked.",
+    ]);
+  });
+});
+
+describe("languageTagFindings (FR-019 to FR-022)", () => {
+  it("an ill-formed tag is an error, and nothing else is checked for it", () => {
+    expect(languageTagFindings(["sq-AL-gheg"], LANGTAGS)).toEqual([
+      {
+        tag: "sq-AL-gheg",
+        kind: "error",
+        message: "sq-AL-gheg is not a well-formed BCP 47 tag.",
+      },
+    ]);
+    // A 4-letter alpha subtag can never be a variant: the error is
+    // grammatical, not a registry miss. A duplicated variant fails the
+    // same way, and draws no warning on top of the error.
+    expect(languageTagFindings(["fr-1694acad-1694acad"], LANGTAGS)).toEqual([
+      {
+        tag: "fr-1694acad-1694acad",
+        kind: "error",
+        message: "fr-1694acad-1694acad is not a well-formed BCP 47 tag.",
+      },
+    ]);
+  });
+
+  it("a non-minimal tag is a hint naming its minimal form (FR-020)", () => {
+    expect(languageTagFindings(["sr-Latn-RS"], LANGTAGS)).toEqual([
+      {
+        tag: "sr-Latn-RS",
+        kind: "hint",
+        message: "sr-Latn-RS is not minimal: use sr-Latn.",
+        replacement: "sr-Latn",
+      },
+    ]);
+    expect(languageTagFindings(["fr-FR", "en-Latn-US", "fr-Latn-BF"], LANGTAGS)).toEqual([
+      {
+        tag: "fr-FR",
+        kind: "hint",
+        message: "fr-FR is not minimal: use fr.",
+        replacement: "fr",
+      },
+      {
+        tag: "en-Latn-US",
+        kind: "hint",
+        message: "en-Latn-US is not minimal: use en.",
+        replacement: "en",
+      },
+      {
+        tag: "fr-Latn-BF",
+        kind: "hint",
+        message: "fr-Latn-BF is not minimal: use fr-BF.",
+        replacement: "fr-BF",
+      },
+    ]);
+    // One minimal form only: pa-Arab-PK has two equally short equivalents
+    // under the old drop-a-subtag rule, but minimalTagOf names pa-PK.
+    expect(languageTagFindings(["pa-Arab-PK"], LANGTAGS)).toEqual([
+      {
+        tag: "pa-Arab-PK",
+        kind: "hint",
+        message: "pa-Arab-PK is not minimal: use pa-PK.",
+        replacement: "pa-PK",
+      },
+    ]);
+    // Case alone is non-minimal: tags are emitted in conventional case (FR-016).
+    expect(languageTagFindings(["FR"], LANGTAGS)).toEqual([
+      {
+        tag: "FR",
+        kind: "hint",
+        message: "FR is not minimal: use fr.",
+        replacement: "fr",
+      },
+    ]);
+  });
+
+  it("a minimal tag passes: dialects, private use and bare languages", () => {
+    expect(
+      languageTagFindings(
+        ["oc-gascon", "oc-aranes", "acr-x-rabinal", "ewo-x-yabekolo", "fr", "en", "qaa-Latn-PE-x-sechuran-olmos"],
+        LANGTAGS,
+      ),
+    ).toEqual([]);
+  });
+
+  it("a registered variant its prefixes do not allow is a warning (FR-021)", () => {
+    expect(languageTagFindings(["ca-gascon"], LANGTAGS)).toEqual([
+      {
+        tag: "ca-gascon",
+        kind: "warning",
+        message: "ca-gascon: the registered variant gascon is allowed after oc, not after ca.",
+      },
+    ]);
+    // abl1943 needs pt-BR: the bare pt tag does not allow it.
+    expect(languageTagFindings(["pt-abl1943"], LANGTAGS)).toEqual([
+      {
+        tag: "pt-abl1943",
+        kind: "warning",
+        message: "pt-abl1943: the registered variant abl1943 is allowed after pt-BR, not after pt.",
+      },
+    ]);
+    // Allowed variants pass, including a prefix that needs an earlier variant.
+    expect(
+      languageTagFindings(["oc-gascon", "fr-1694acad", "sl-rozaj-biske-1994"], LANGTAGS),
+    ).toEqual([]);
+  });
+
+  it("an unregistered variant shape is well-formed and draws no finding", () => {
+    // gasco is 5 letters, so grammatically a variant, but the registry has
+    // no such variant: FR-021 covers registered variants only, and kmc's
+    // Intl.Locale accepts it too, so parity holds by saying nothing.
+    expect(languageTagFindings(["en-gasco"], LANGTAGS)).toEqual([]);
+  });
+
+  it("two tags with the same minimal form are a duplicate hint (FR-022)", () => {
+    expect(languageTagFindings(["fr-FR", "fr"], LANGTAGS)).toEqual([
+      {
+        tag: "fr-FR",
+        kind: "hint",
+        message: "fr-FR is not minimal: use fr.",
+        replacement: "fr",
+      },
+      {
+        tag: "fr",
+        kind: "hint",
+        message: "fr has the same minimal form (fr) as fr-FR.",
+        duplicateOf: "fr-FR",
+      },
+    ]);
+    // The duplicate attaches to the later tag, whatever the order.
+    expect(languageTagFindings(["fr", "fr-FR"], LANGTAGS)).toEqual([
+      {
+        tag: "fr-FR",
+        kind: "hint",
+        message: "fr-FR is not minimal: use fr.",
+        replacement: "fr",
+      },
+      {
+        tag: "fr-FR",
+        kind: "hint",
+        message: "fr-FR has the same minimal form (fr) as fr.",
+        duplicateOf: "fr",
+      },
+    ]);
+  });
+});
+
+describe("12.8 / 12.9 verdicts (FR-019, FR-021)", () => {
+  it("12.8 Not met names the ill-formed tag; Met lists the tags", () => {
+    const bad = languageTagVerdicts(analyze(["sq-AL-gheg", "fr"]));
+    expect(bad.get("12.8-bcp47-tag-well-formed")).toEqual({
+      status: "not-met",
+      lines: ["sq-AL-gheg is not a well-formed BCP 47 tag."],
+    });
+    // An ill-formed tag cannot be judged for minimality: 10.3 stays with
+    // the reviewer, and 12.8 is the row that speaks.
+    expect(bad.has("10.3-kps-tags-minimal")).toBe(false);
+    expect(languageTagVerdicts(analyze(["oc-gascon"])).get("12.8-bcp47-tag-well-formed")).toEqual({
+      status: "met",
+      lines: ["All 1 .kps language tag(s) are well-formed BCP 47 tags:", "oc-gascon"],
+    });
+    expect(
+      languageTagContextLines("12.8-bcp47-tag-well-formed", analyze(["sq-AL-gheg", "fr"])),
+    ).toEqual(["sq-AL-gheg is not a well-formed BCP 47 tag.", "fr: well-formed."]);
+  });
+
+  it("12.9 Not met names the disallowed variant; Met lists the variant tags", () => {
+    expect(languageTagVerdicts(analyze(["ca-gascon"])).get("12.9-bcp47-variant-prefix")).toEqual({
+      status: "not-met",
+      lines: ["ca-gascon: the registered variant gascon is allowed after oc, not after ca."],
+    });
+    expect(languageTagVerdicts(analyze(["oc-gascon"])).get("12.9-bcp47-variant-prefix")).toEqual({
+      status: "met",
+      lines: [
+        "Every registered variant in the .kps language tags is used with a language its registry prefixes allow:",
+        "oc-gascon",
+      ],
+    });
+    expect(languageTagVerdicts(analyze(["fr"])).get("12.9-bcp47-variant-prefix")).toEqual({
+      status: "met",
+      lines: ["No .kps language tag carries a registered variant."],
+    });
+    expect(
+      languageTagContextLines("12.9-bcp47-variant-prefix", analyze(["ca-gascon", "oc-gascon", "fr"])),
+    ).toEqual([
+      "ca-gascon: the registered variant gascon is allowed after oc, not after ca.",
+      "oc-gascon: its registered variants are allowed here.",
+      "fr: no registered variant.",
     ]);
   });
 });
@@ -203,9 +416,16 @@ describe("12.1 / 12.5 script", () => {
     const a = analyze(["ajp-Arab"], profile("Arab"));
     expect(a.tags[0]!.recordedScripts).toContain("Arab");
     expect(languageTagFacts(a).outputScriptRecordedByLangtags).toBe(true);
-    expect(languageTagVerdicts(a).get("10.3-kps-tags-minimal")?.lines).toEqual([
-      "ajp-Arab is not minimal: langtags reads ajp as the same tag (apc-Arab-JO). langtags folds ajp into apc.",
-    ]);
+    // 10.3 is now judged by minimalTagOf, which never renames a language:
+    // ajp-Arab is already minimal, so the row is Met and the fold shows in
+    // the Met line's full form instead of a Not-met line.
+    expect(languageTagVerdicts(a).get("10.3-kps-tags-minimal")).toEqual({
+      status: "met",
+      lines: [
+        "No script or region subtag in the 1 .kps language tag(s) can be dropped without changing what langtags reads the tag as:",
+        "ajp-Arab (apc-Arab-JO)",
+      ],
+    });
   });
 
   it("12.5's fact when langtags records the output script for every language", () => {
@@ -224,13 +444,16 @@ describe("12.1 / 12.5 script", () => {
 
 describe("the resolver takes reviewer verdicts in foreign mode only", () => {
   const verdicts = languageTagVerdicts(analyze(["fr-FR"]));
-  const input = (mode: CriteriaInput["mode"]): CriteriaInput => ({
+  const input = (
+    mode: CriteriaInput["mode"],
+    reviewerVerdicts: Map<string, CriteriaAssemblyVerdict> = verdicts,
+  ): CriteriaInput => ({
     criteria: ALL_CRITERIA,
     mode,
     lintFindings: [],
     record: EMPTY_CRITERIA_RECORD,
     facts: { fontBundled: true, deprecated: true, partnerPackage: true },
-    reviewerVerdicts: verdicts,
+    reviewerVerdicts,
   });
   const row103 = (mode: CriteriaInput["mode"]) =>
     resolveCriteria(input(mode)).rows.find((r) => r.criterion.id === "10.3-kps-tags-minimal")!;
@@ -247,5 +470,15 @@ describe("the resolver takes reviewer verdicts in foreign mode only", () => {
 
   it("authored: the author's attestation decides, not the verdict", () => {
     expect(row103("authored").status).toBe("needs-author");
+  });
+
+  it("12.8/12.9: the verdicts decide in foreign mode too", () => {
+    const v2 = languageTagVerdicts(analyze(["sq-AL-gheg", "ca-gascon"]));
+    const row = (mode: CriteriaInput["mode"], id: string) =>
+      resolveCriteria(input(mode, v2)).rows.find((r) => r.criterion.id === id)!;
+    expect(row("foreign", "12.8-bcp47-tag-well-formed").status).toBe("not-met");
+    expect(row("foreign", "12.9-bcp47-variant-prefix").status).toBe("not-met");
+    expect(row("authored", "12.8-bcp47-tag-well-formed").status).toBe("needs-author");
+    expect(row("authored", "12.9-bcp47-variant-prefix").status).toBe("needs-author");
   });
 });

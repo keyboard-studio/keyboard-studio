@@ -285,6 +285,8 @@ const LANG_ROWS = new Set([
   "10.4-kps-unusual-tag-flagged",
   "12.1-bcp47-tag-correct",
   "12.5-script-mismatch-flagged",
+  "12.8-bcp47-tag-well-formed",
+  "12.9-bcp47-variant-prefix",
 ]);
 
 /**

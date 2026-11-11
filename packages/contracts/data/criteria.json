@@ -920,7 +920,7 @@
     "id": "10.3-kps-tags-minimal",
     "section": "10. Package metadata (`.kps`)",
     "band": "yellow-survey",
-    "description": "Language tags are minimal \u2014 no unnecessary script/region subtags",
+    "description": "[content review] Language tags are minimal \u2014 no unnecessary script/region subtags, and no two tags share a minimal form",
     "surveyQuestionId": "lang-tags-minimal"
   },
   {
@@ -1453,6 +1453,20 @@
     "band": "yellow-survey",
     "description": "Each language tag is the minimal registered BCP 47 tag for the language/script (no dead, collective, or redundant subtags); every tag resolves in the current langtags registry",
     "surveyQuestionId": "bcp47-tags-minimal-registered"
+  },
+  {
+    "id": "12.8-bcp47-tag-well-formed",
+    "section": "12. Language tagging (BCP47)",
+    "band": "yellow-survey",
+    "description": "[content review] Every language tag is a well-formed BCP 47 tag",
+    "surveyQuestionId": "bcp47-tag-well-formed"
+  },
+  {
+    "id": "12.9-bcp47-variant-prefix",
+    "section": "12. Language tagging (BCP47)",
+    "band": "yellow-survey",
+    "description": "[content review] A registered variant subtag is used only with a language or script its registry prefixes allow",
+    "surveyQuestionId": "bcp47-variant-prefix"
   },
   {
     "id": "1.15-filenames-follow-convention",

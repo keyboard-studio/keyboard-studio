@@ -44,6 +44,9 @@ export async function loadLangtagsLookup(): Promise<
         scripts: mod.langtagsScripts,
         iso639_3: (lang) => mod.getLanguageDefaults(lang)?.iso639_3,
         members: mod.macrolanguageMembers,
+        minimalTagOf: mod.minimalTagOf,
+        variantAllowed: mod.variantAllowed,
+        variantEntry: mod.variantEntry,
       },
     };
   } catch {

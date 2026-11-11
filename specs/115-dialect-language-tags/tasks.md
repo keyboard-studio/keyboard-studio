@@ -373,9 +373,9 @@ Commit: `spec 115 T038-T043`.
 
 **Wave 1 — tests and rows:**
 
-- [ ] T054 [P] [US4] Add criteria rows `12.8-bcp47-tag-well-formed` (FR-019) and `12.9-bcp47-variant-prefix` (FR-021), both yellow-survey. Update the `10.3-kps-tags-minimal` text to cover variants and duplicates (FR-020, FR-022). Mark ids and wording for content-team review (Article VI) — packages/contracts/data/criteria.json, packages/contracts/data/criteria-summary.md
-- [ ] T055 [P] [US4] Write failing `languageTagFindings` tests: error, hint with replacement, warning, and duplicate minimal forms — packages/studio/src/criteria/languageTags.test.ts
-- [ ] T056 [P] [US4] Write the kmc parity corpus test.
+- [x] T054 [P] [US4] Add criteria rows `12.8-bcp47-tag-well-formed` (FR-019) and `12.9-bcp47-variant-prefix` (FR-021), both yellow-survey. Update the `10.3-kps-tags-minimal` text to cover variants and duplicates (FR-020, FR-022). Mark ids and wording for content-team review (Article VI) — packages/contracts/data/criteria.json, packages/contracts/data/criteria-summary.md
+- [x] T055 [P] [US4] Write failing `languageTagFindings` tests: error, hint with replacement, warning, and duplicate minimal forms — packages/studio/src/criteria/languageTags.test.ts
+- [x] T056 [P] [US4] Write the kmc parity corpus test.
   - For every `.kps` `<Language ID>` in `../keyboards`, compare `PackageValidation.checkForDuplicatedOrNonMinimalLanguages` (`@keymanapp/kmc-package`) with `isWellFormedBcp47` and `minimalTagOf`.
   - Disagreements must equal the fixture list, each with a reason.
   - The test skips visibly without the corpus (FR-023, SC-004).
@@ -384,10 +384,10 @@ Commit: `spec 115 T038-T043`.
 
 **Wave 2 — implementation:**
 
-- [ ] T057 [US4] Implement `languageTagFindings(tags)`. Judge row 10.3 with `minimalTagOf` instead of `shorterEquivalents`, and add the well-formed and variant-prefix findings. Wire them into `languageTagVerdicts` for the identity tag — packages/studio/src/criteria/languageTags.ts
-- [ ] T058 [US4] Register the new rows in implemented checks, gate coverage and the review battery (`node scripts/generate-review-battery.mjs`), and keep the criteria schema tests green — packages/studio/src/criteria/implementedChecks.ts, packages/studio/src/test/gateCoverage.ts, packages/studio/src/review/battery.generated.json
-- [ ] T059 [US4] Show per-tag findings in the Open mode language list: inline on each row and on the add form. A hint's "Use `<replacement>`" button edits through the existing `onChange` and `setIdentity` path. The add form also offers the chooser (US1) and the typed-tag check (US6) — packages/studio/src/survey/languageList/LanguageListPanel.tsx
-- [ ] T060 [US4] Populate the kmc parity fixture from a first run of T056, writing a reason for each disagreement (CLDR vs langtags default). Fail on anything unexplained — packages/engine/src/langtags/kmcParity.fixture.json
+- [x] T057 [US4] Implement `languageTagFindings(tags)`. Judge row 10.3 with `minimalTagOf` instead of `shorterEquivalents`, and add the well-formed and variant-prefix findings. Wire them into `languageTagVerdicts` for the identity tag — packages/studio/src/criteria/languageTags.ts
+- [x] T058 [US4] Register the new rows in implemented checks, gate coverage and the review battery (`node scripts/generate-review-battery.mjs`), and keep the criteria schema tests green — packages/studio/src/criteria/implementedChecks.ts, packages/studio/src/test/gateCoverage.ts, packages/studio/src/review/battery.generated.json
+- [x] T059 [US4] Show per-tag findings in the Open mode language list: inline on each row and on the add form. A hint's "Use `<replacement>`" button edits through the existing `onChange` and `setIdentity` path. The add form also offers the chooser (US1) and the typed-tag check (US6) — packages/studio/src/survey/languageList/LanguageListPanel.tsx
+- [x] T060 [US4] Populate the kmc parity fixture from a first run of T056, writing a reason for each disagreement (CLDR vs langtags default). Fail on anything unexplained — packages/engine/src/langtags/kmcParity.fixture.json
 
 **Checkpoint**: T055 and T056 pass; `pnpm lint` green (criteria, facet and battery drift). Commit: `spec 115 T054-T060`.
 

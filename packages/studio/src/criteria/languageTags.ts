@@ -6,9 +6,14 @@
 // Pure: the lookups are injected (judgeForeign loads them lazily), so this
 // module imports no engine or Glottolog data. It decides only what the
 // data settles; anything it cannot settle stays with the reviewer:
-//   - 10.3 Met/Not met: a script or region subtag is unnecessary when
-//     dropping it leaves a tag langtags resolves to the same full tag
-//     (`fr-FR` -> `fr`). A tag langtags does not know is not judged.
+//   - 10.3 Met/Not met: a tag is not minimal when `minimalTagOf` names a
+//     shorter form, or when two tags share a minimal form (FR-020/FR-022).
+//     A tag langtags does not know is not judged.
+//   - 12.8 Met/Not met: every tag well-formed BCP 47, or the ill-formed
+//     ones named (FR-019).
+//   - 12.9 Met/Not met: every registered variant used with a language or
+//     script its registry prefixes allow, or the disallowed ones named
+//     (FR-021).
 //   - 12.1 Not met only: the tag's script is absent from output that is
 //     confidently in another script. Agreement is not Met — a matching
 //     script does not show the language is right.
@@ -18,8 +23,9 @@
 //     CONTENT REVIEW (Article VI): the 10.4 wording below is review text owned by
 //     the content team.
 
-import { parseBcp47, scriptSubtagOf } from "@keyboard-studio/contracts";
+import { formatBcp47, isWellFormedBcp47, parseBcp47, scriptSubtagOf } from "@keyboard-studio/contracts";
 import type { CriteriaAssemblyVerdict, CriteriaFacts } from "./criteriaTypes.ts";
+import type { VariantEntry } from "@keyboard-studio/contracts";
 
 /** The langtags lookups (engine `@keyboard-studio/engine/langtags`). */
 export interface LangtagsTagLookup {
@@ -31,6 +37,12 @@ export interface LangtagsTagLookup {
   iso639_3(lang: string): string | undefined;
   /** A macrolanguage's member language subtags; [] for any other language. */
   members(lang: string): readonly string[];
+  /** The minimal form of a well-formed tag, or null when it is not well-formed. */
+  minimalTagOf(tag: string): string | null;
+  /** Whether a registered variant may follow a tag (its prefixes allow it). */
+  variantAllowed(tag: string, variant: string): boolean;
+  /** The registry row for a variant subtag, or undefined when unregistered. */
+  variantEntry(subtag: string): VariantEntry | undefined;
 }
 
 /** Glottolog on an ISO 639-3 code; null when Glottolog does not have it. */
@@ -48,8 +60,6 @@ export interface LanguageTagFacts {
   tag: string;
   /** langtags' full equivalent; absent when langtags does not know the tag. */
   full?: string;
-  /** The shortest equivalent tags, when the tag carries an unnecessary subtag. */
-  shorterEquivalents?: readonly string[];
   /** The script the tag denotes: its own subtag, else langtags'. */
   script?: string;
   /** Scripts langtags records for the tag's language. */
@@ -67,6 +77,8 @@ export interface LanguageTagFacts {
 
 export interface LanguageTagAnalysis {
   tags: readonly LanguageTagFacts[];
+  /** Per-tag findings (FR-019 to FR-022), in tag order. */
+  findings: readonly LanguageTagFinding[];
   /** Absent when the output has no scripted characters. */
   output?: { dominant: string; share: number; evidence: number };
   /** Script -> share of the output, for the per-tag share lines. */
@@ -113,36 +125,94 @@ function covers(script: string): readonly string[] {
 }
 
 
-/** The shortest tags formed by dropping the script and/or region that still mean `full`. */
-function shorterEquivalents(
-  tag: string,
-  full: string,
-  lookup: LangtagsTagLookup,
-): string[] {
-  const parts = tag.split("-");
-  // Only the grammatical script and region slots are droppable, never a
-  // subtag past a variant, extension or private-use singleton.
+/** One thing wrong (or worth fixing) about one tag. */
+export type LanguageTagFindingKind = "error" | "hint" | "warning";
+export interface LanguageTagFinding {
+  tag: string;
+  kind: LanguageTagFindingKind;
+  message: string;
+  /** The minimal replacement, for a non-minimal hint. */
+  replacement?: string;
+  /** The first tag sharing this minimal form, for a duplicate hint. */
+  duplicateOf?: string;
+}
+
+/** The tag with one variant removed, for the prefix check (FR-021). */
+function tagWithoutVariant(tag: string, variant: string): string | null {
   const parsed = parseBcp47(tag);
-  const droppable: number[] = [];
-  if (parsed.ok) {
-    const slot = 1 + parsed.parts.extlang.length;
-    if (parsed.parts.script !== undefined) droppable.push(slot);
-    if (parsed.parts.region !== undefined) {
-      droppable.push(slot + (parsed.parts.script !== undefined ? 1 : 0));
+  if (!parsed.ok) return null;
+  const p = parsed.parts;
+  return formatBcp47({
+    ...p,
+    variants: p.variants.filter((v) => v.toLowerCase() !== variant.toLowerCase()),
+  });
+}
+
+/**
+ * Per-tag findings (spec 115 FR-019 to FR-022), in tag order: an ill-formed
+ * tag is an error and nothing else is checked for it; a well-formed
+ * non-minimal tag is a hint naming its minimal form; a registered variant
+ * its tag's prefixes do not allow is a warning; a second tag with the same
+ * minimal form is a duplicate hint on the later tag.
+ *
+ * The variant check tests the variant against the tag with that variant
+ * removed: `variantAllowed` refuses a variant already in the tag (BCP 47
+ * forbids duplicate variants), so testing the tag as written would warn
+ * about every variant it carries.
+ */
+export function languageTagFindings(
+  tags: readonly string[],
+  lookup: LangtagsTagLookup,
+): LanguageTagFinding[] {
+  const findings: LanguageTagFinding[] = [];
+  const seenMinimal = new Map<string, string>();
+  for (const tag of tags) {
+    if (!isWellFormedBcp47(tag)) {
+      findings.push({ tag, kind: "error", message: `${tag} is not a well-formed BCP 47 tag.` });
+      continue;
+    }
+    const minimal = lookup.minimalTagOf(tag);
+    if (minimal !== null && minimal !== tag) {
+      findings.push({
+        tag,
+        kind: "hint",
+        message: `${tag} is not minimal: use ${minimal}.`,
+        replacement: minimal,
+      });
+    }
+    const parsed = parseBcp47(tag);
+    if (parsed.ok) {
+      for (const variant of parsed.parts.variants) {
+        const entry = lookup.variantEntry(variant);
+        // An unregistered variant shape (e.g. `en-gasco`) is grammatically
+        // valid; FR-021 covers registered variants only.
+        if (entry === undefined) continue;
+        const stripped = tagWithoutVariant(tag, variant);
+        if (stripped !== null && !lookup.variantAllowed(stripped, variant)) {
+          findings.push({
+            tag,
+            kind: "warning",
+            message: `${tag}: the registered variant ${variant} is allowed after ${entry.prefixes.join(", ")}, not after ${stripped}.`,
+          });
+        }
+      }
+    }
+    if (minimal !== null) {
+      const key = minimal.toLowerCase();
+      const first = seenMinimal.get(key);
+      if (first !== undefined) {
+        findings.push({
+          tag,
+          kind: "hint",
+          message: `${tag} has the same minimal form (${minimal}) as ${first}.`,
+          duplicateOf: first,
+        });
+      } else {
+        seenMinimal.set(key, tag);
+      }
     }
   }
-  const found: string[][] = [];
-  // Every non-empty subset of the droppable subtags.
-  for (let mask = 1; mask < 1 << droppable.length; mask++) {
-    const drop = new Set(droppable.filter((_, b) => (mask >> b) & 1));
-    const candidate = parts.filter((_, i) => !drop.has(i));
-    if (lookup.resolve(candidate.join("-"))?.full.toLowerCase() === full.toLowerCase()) {
-      found.push(candidate);
-    }
-  }
-  if (found.length === 0) return [];
-  const min = Math.min(...found.map((c) => c.length));
-  return found.filter((c) => c.length === min).map((c) => c.join("-"));
+  return findings;
 }
 
 /**
@@ -186,7 +256,6 @@ export function analyzeLanguageTags(
     const lang = (tag.split("-")[0] ?? "").toLowerCase();
     const resolved = lookup.resolve(tag);
     const script = scriptSubtagOf(tag) ?? resolved?.script;
-    const shorter = resolved !== null ? shorterEquivalents(tag, resolved.full, lookup) : [];
     // A deprecated code langtags folds into another (ajp -> apc) records
     // its scripts under the language it resolves to.
     const resolvedLang = resolved?.full.split("-")[0]?.toLowerCase();
@@ -194,7 +263,6 @@ export function analyzeLanguageTags(
     return {
       tag,
       ...(resolved !== null ? { full: resolved.full } : {}),
-      ...(shorter.length > 0 ? { shorterEquivalents: shorter } : {}),
       ...(script !== undefined ? { script } : {}),
       recordedScripts: lookup.scripts(resolvedLang ?? lang),
       ...(isPrivateUseLanguage(lang) ? { privateUseLanguage: true } : {}),
@@ -204,6 +272,7 @@ export function analyzeLanguageTags(
   });
   return {
     tags,
+    findings: languageTagFindings(kpsTags, lookup),
     ...(profile?.dominant !== undefined && profile.evidenceSize > 0
       ? {
           output: {
@@ -266,31 +335,41 @@ export function languageTagFacts(
   return facts;
 }
 
-/** 10.3 Met/Not met and 12.1 Not met, keyed by criterion id. */
+/** 10.3 Met/Not met, 12.8 Met/Not met, 12.9 Met/Not met and 12.1 Not met, keyed by criterion id. */
 export function languageTagVerdicts(
   analysis: LanguageTagAnalysis | undefined,
 ): Map<string, CriteriaAssemblyVerdict> {
   const verdicts = new Map<string, CriteriaAssemblyVerdict>();
   if (analysis === undefined || analysis.tags.length === 0) return verdicts;
+  const findings = analysis.findings ?? [];
 
-  const notMinimal = analysis.tags.filter((t) => t.shorterEquivalents !== undefined);
-  if (notMinimal.length > 0) {
+  const fullOf = (tag: string): string | undefined =>
+    analysis.tags.find((t) => t.tag === tag)?.full;
+  const notMinimal = findings.filter(
+    (f): f is LanguageTagFinding & { replacement: string } =>
+      f.kind === "hint" && f.replacement !== undefined,
+  );
+  const duplicates = findings.filter((f) => f.kind === "hint" && f.duplicateOf !== undefined);
+  if (notMinimal.length > 0 || duplicates.length > 0) {
     verdicts.set("10.3-kps-tags-minimal", {
       status: "not-met",
       lines: capped(
-        notMinimal.map((t) => {
-          const eq = t.shorterEquivalents!;
-          const line =
-            eq.length === 1
-              ? `${t.tag} is not minimal: langtags reads ${eq[0]} as the same tag (${t.full}).`
-              : `${t.tag} is not minimal: langtags reads each of ${eq.join(", ")} as the same tag (${t.full}).`;
-          // A deprecated code: the shorter tag still uses it.
-          const tagLang = (t.tag.split("-")[0] ?? "").toLowerCase();
-          const fullLang = (t.full!.split("-")[0] ?? "").toLowerCase();
-          return tagLang !== fullLang
-            ? `${line} langtags folds ${tagLang} into ${fullLang}.`
-            : line;
-        }),
+        [
+          ...notMinimal.map((f) => {
+            const full = fullOf(f.tag);
+            const line =
+              full !== undefined
+                ? `${f.tag} is not minimal: langtags reads ${f.replacement} as the same tag (${full}).`
+                : f.message;
+            // A deprecated code: the shorter tag still uses it.
+            const tagLang = (f.tag.split("-")[0] ?? "").toLowerCase();
+            const fullLang = full?.split("-")[0]?.toLowerCase();
+            return full !== undefined && fullLang !== undefined && tagLang !== fullLang
+              ? `${line} langtags folds ${tagLang} into ${fullLang}.`
+              : line;
+          }),
+          ...duplicates.map((f) => f.message),
+        ],
         MAX_NOT_MET_LINES,
         "non-minimal tags",
       ),
@@ -306,6 +385,61 @@ export function languageTagVerdicts(
           "tags",
         ),
       ],
+    });
+  }
+
+  const illFormed = findings.filter((f) => f.kind === "error");
+  if (illFormed.length > 0) {
+    verdicts.set("12.8-bcp47-tag-well-formed", {
+      status: "not-met",
+      lines: capped(
+        illFormed.map((f) => f.message),
+        MAX_NOT_MET_LINES,
+        "ill-formed tags",
+      ),
+    });
+  } else {
+    verdicts.set("12.8-bcp47-tag-well-formed", {
+      status: "met",
+      lines: [
+        `All ${analysis.tags.length} .kps language tag(s) are well-formed BCP 47 tags:`,
+        ...capped(
+          analysis.tags.map((t) => t.tag),
+          MAX_CONTEXT_LINES,
+          "tags",
+        ),
+      ],
+    });
+  }
+
+  const disallowed = findings.filter((f) => f.kind === "warning");
+  if (disallowed.length > 0) {
+    verdicts.set("12.9-bcp47-variant-prefix", {
+      status: "not-met",
+      lines: capped(
+        disallowed.map((f) => f.message),
+        MAX_NOT_MET_LINES,
+        "disallowed variants",
+      ),
+    });
+  } else {
+    const withVariants = analysis.tags.filter((t) => {
+      const parsed = parseBcp47(t.tag);
+      return parsed.ok && parsed.parts.variants.length > 0;
+    });
+    verdicts.set("12.9-bcp47-variant-prefix", {
+      status: "met",
+      lines:
+        withVariants.length > 0
+          ? [
+              "Every registered variant in the .kps language tags is used with a language its registry prefixes allow:",
+              ...capped(
+                withVariants.map((t) => t.tag),
+                MAX_CONTEXT_LINES,
+                "tags",
+              ),
+            ]
+          : ["No .kps language tag carries a registered variant."],
     });
   }
 
@@ -429,6 +563,38 @@ export function languageTagContextLines(
         "in a script the output uses",
       ),
     ];
+  }
+  if (criterionId.startsWith("12.8")) {
+    return problemsFirst(
+      tags.map((t) => {
+        const error = (analysis.findings ?? []).find(
+          (f) => f.tag === t.tag && f.kind === "error",
+        );
+        return {
+          problem: error !== undefined,
+          line: error !== undefined ? error.message : `${t.tag}: well-formed.`,
+        };
+      }),
+      "well-formed",
+    );
+  }
+  if (criterionId.startsWith("12.9")) {
+    return problemsFirst(
+      tags.map((t) => {
+        const warning = (analysis.findings ?? []).find(
+          (f) => f.tag === t.tag && f.kind === "warning",
+        );
+        const parsed = parseBcp47(t.tag);
+        const line =
+          warning !== undefined
+            ? warning.message
+            : parsed.ok && parsed.parts.variants.length > 0
+              ? `${t.tag}: its registered variants are allowed here.`
+              : `${t.tag}: no registered variant.`;
+        return { problem: warning !== undefined, line };
+      }),
+      "whose variants are allowed here",
+    );
   }
   if (criterionId.startsWith("12.5") || criterionId.startsWith("12.6")) {
     return [
