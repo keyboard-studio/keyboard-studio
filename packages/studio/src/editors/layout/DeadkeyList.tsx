@@ -1,4 +1,4 @@
-// DeadkeyList -- every deadkey the keyboard defines (spec 113 US3, FR-028, edge cases).
+// DeadkeyList -- every deadkey the keyboard defines (spec 117 US3, FR-028, edge cases).
 //
 // A deadkey on several keys or layers is one entry with one table; a deadkey on no key is listed
 // so it can be placed on the selected key or deleted (deleting goes through the spec 083 lifecycle,

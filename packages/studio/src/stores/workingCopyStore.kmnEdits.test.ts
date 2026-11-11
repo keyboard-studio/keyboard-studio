@@ -1,4 +1,4 @@
-// workingCopyStore commitKmnEdit / undoKmnEdit (spec 113 T050): a Layout-tab edit is applied to
+// workingCopyStore commitKmnEdit / undoKmnEdit (spec 117 T050): a Layout-tab edit is applied to
 // the live IR through applyMutatePatch and recorded as the `kmn-edits` decision (provenance
 // "asked"); undo records the log without the entry and restores the IR from the effect, with
 // no rebuild. Commits are refused, writing nothing, when the cell is read-only, the artifact is
@@ -145,7 +145,7 @@ describe("undoKmnEdit", () => {
   });
 });
 
-// Spec 113 T079: undo kind `ld` -- a Layout-tab deadkey lifecycle edit (spec 083 ops).
+// Spec 117 T079: undo kind `ld` -- a Layout-tab deadkey lifecycle edit (spec 083 ops).
 describe("commitLayoutDeadkeyOp / undo kind ld", () => {
   const define = { kind: "define", triggerKey: "K_D", id: 0x3000, accentChar: "\u00b4" } as const;
   const recorded = (): DeadkeysDefinedValue | undefined =>

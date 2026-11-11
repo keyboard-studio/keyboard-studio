@@ -403,7 +403,7 @@ export interface ProjectWorkingCopyVfsInput {
    */
   ruleAdditions?: DerivedRuleAdditions;
   /**
-   * The Layout tab's `kmn-edits` decision value (spec 113). Replayed at step 2.2, only when it
+   * The Layout tab's `kmn-edits` decision value (spec 117). Replayed at step 2.2, only when it
    * has entries, so an unedited keyboard keeps a byte-identical artifact.
    */
   kmnEdits?: KmnEditsValue;
@@ -1135,7 +1135,7 @@ export function projectWorkingCopyVfs(
     }
   }
 
-  // Step 2.2: Layout-tab edits (spec 113, research R12). Replays the `kmn-edits` log over the
+  // Step 2.2: Layout-tab edits (spec 117, research R12). Replays the `kmn-edits` log over the
   // projected .kmn: parse, replayKmnEdits, emit. After the deadkey ops (1.8) and the assignments
   // (2), so a key-first edit wins over an earlier character-first one on the same key; before
   // layer propagation (2.5), mark guards (2.6) and context tolerance (2.7), so those see the

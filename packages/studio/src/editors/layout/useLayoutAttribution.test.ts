@@ -1,5 +1,5 @@
 // useLayoutAttribution — reads only the D3 artifact store, never compiles, never times
-// (spec 113 FR-017/FR-018, decision D3).
+// (spec 117 FR-017/FR-018, decision D3).
 
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

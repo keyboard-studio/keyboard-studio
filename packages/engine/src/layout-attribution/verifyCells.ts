@@ -1,4 +1,4 @@
-// Verification pass (spec 113 FR-013, research R4): an editable plain or row whose
+// Verification pass (spec 117 FR-013, research R4): an editable plain or row whose
 // simulated output differs from its own output is changed by a later rule or group, so it
 // is demoted to read-only (`later-group-change`). Pure: the caller runs `simulateEach`
 // (empty seed for plain, the row's context as the seed for a row) and passes the steps in.

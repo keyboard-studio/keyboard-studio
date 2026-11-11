@@ -1,4 +1,4 @@
-// Spec 113 T097 (SC-010 engine half): on the code-edit set, diff -> apply reproduces the edited
+// Spec 117 T097 (SC-010 engine half): on the code-edit set, diff -> apply reproduces the edited
 // text, and the same changes replayed onto a re-parse of the starting text reproduce it too.
 // A missing corpus is a failed precondition, never a skip (same rule as corpusSet.corpus.test.ts).
 import { describe, expect, it } from "vitest";
@@ -12,7 +12,7 @@ import { CODE_EDIT_SET } from "./__fixtures__/codeEditSet.js";
 import { applyIRChanges } from "./applyIRChanges.js";
 import { diffIR } from "./diffIR.js";
 
-describe("kmn-diff corpus (spec 113 T097)", () => {
+describe("kmn-diff corpus (spec 117 T097)", () => {
   it("the sibling ../keyboards corpus is present", () => {
     expect(corpusAvailable, `${RELEASE_ROOT} is missing: the code-edit corpus proves nothing without it`).toBe(true);
   });

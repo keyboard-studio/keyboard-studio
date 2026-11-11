@@ -1,4 +1,4 @@
-// Spec 113 T027 / T046: the attribution corpus harness.
+// Spec 117 T027 / T046: the attribution corpus harness.
 //
 // For every corpus-set keyboard: parse, compile, list its layers, attribute
 // every DESKTOP_ISO_GEOMETRY key in every layer, simulate the grid with an

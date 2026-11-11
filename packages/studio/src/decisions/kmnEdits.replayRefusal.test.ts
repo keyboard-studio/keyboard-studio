@@ -1,4 +1,4 @@
-// Spec 113 (research R12, T056 follow-up): what a rebuild does when a recorded kmn-edits entry can
+// Spec 117 (research R12, T056 follow-up): what a rebuild does when a recorded kmn-edits entry can
 // no longer be applied, e.g. the starting point is switched to a mnemonic keyboard after Layout
 // edits were recorded. replayKmnEdits throws on a refusal (misses stay empty until US8), so this
 // pins the CURRENT behaviour: the rebuild throws. If US8 turns refusals into misses, flip this.

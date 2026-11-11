@@ -1,6 +1,6 @@
-// Spec 113 T002: the fixed corpus set resolves and parses.
+// Spec 117 T002: the fixed corpus set resolves and parses.
 //
-// A missing corpus is a failed precondition, never a skip: every spec 113
+// A missing corpus is a failed precondition, never a skip: every spec 117
 // corpus suite iterates CORPUS_SET, and a pick that no longer parses is
 // replaced in corpusSet.ts rather than skipped here.
 import { describe, expect, it } from "vitest";
@@ -21,9 +21,9 @@ const CATEGORIES: readonly CorpusCategory[] = [
   "iso",
 ];
 
-describe("spec 113 corpus set", () => {
+describe("spec 117 corpus set", () => {
   it("the sibling ../keyboards corpus is present", () => {
-    expect(corpusAvailable, `${RELEASE_ROOT} is missing: the spec 113 corpus suites prove nothing without it`).toBe(true);
+    expect(corpusAvailable, `${RELEASE_ROOT} is missing: the spec 117 corpus suites prove nothing without it`).toBe(true);
   });
 
   it("has at least 20 distinct keyboards covering every category", () => {

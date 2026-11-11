@@ -1,4 +1,4 @@
-// Spec 113 T011: simulateEach parity over the fixed corpus set.
+// Spec 117 T011: simulateEach parity over the fixed corpus set.
 //
 // For every corpus-set keyboard, every key of DESKTOP_ISO_GEOMETRY in every
 // layer listLayers returns: simulateEach's step equals the single trace step of

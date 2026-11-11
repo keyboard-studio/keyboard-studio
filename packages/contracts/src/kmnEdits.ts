@@ -1,4 +1,4 @@
-// The `kmn-edits` decision value (spec 113, contracts/layout-ops.md and
+// The `kmn-edits` decision value (spec 117, contracts/layout-ops.md and
 // contracts/code-edits.md).
 //
 // Every confirmed Layout-tab edit is one entry; entries replay in order and

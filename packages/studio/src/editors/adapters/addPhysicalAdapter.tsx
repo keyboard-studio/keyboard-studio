@@ -80,7 +80,7 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
   const [activeTab, setActiveTab] = useState<EditorTab>("assign");
   const [layoutVisited, setLayoutVisited] = useState(false);
   const [revealNodeId, setRevealNodeId] = useState<string | undefined>(undefined);
-  // Review flags on Code-tab edits (spec 113 US8): the count rides on the tab so it is announced
+  // Review flags on Code-tab edits (spec 117 US8): the count rides on the tab so it is announced
   // as part of the tab's name. Flags never gate completion or download.
   const codeReview = useCodeReviewFlags();
   const tabIdBase = useId();

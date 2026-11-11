@@ -1,4 +1,4 @@
-// AfterContextView, deadkey mode (spec 113 T078): every key shows what typing it after the chosen
+// AfterContextView, deadkey mode (spec 117 T078): every key shows what typing it after the chosen
 // deadkey produces, from `simulateEach` seeded with `pendingDeadkeys`; a key with no row shows what
 // actually happens instead; chains are followed; a named deadkey (which cannot be seeded) shows
 // nothing rather than a guess. Literal-context mode (T117, US4): the context list, a new context
@@ -146,7 +146,7 @@ describe("AfterContextView (deadkey mode)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Literal-context mode (spec 113 US4)
+// Literal-context mode (spec 117 US4)
 // ---------------------------------------------------------------------------
 
 const LIT_KMN = `store(&VERSION) '10.0'

@@ -254,16 +254,16 @@ export type UndoEntry =
   | { k: "batch"; nodeIds: string[]; itemIds: string[]; chars: string[] }
   | { k: "k"; seq: number }
   | { k: "kb"; seqs: number[] }
-  // Spec 113: one Layout-tab edit (`l`) or one edit plus its accepted case partner (`lb`). The
+  // Spec 117: one Layout-tab edit (`l`) or one edit plus its accepted case partner (`lb`). The
   // effect is what the edit did to the live IR, so undo is a local inverse, never a rebuild.
   | { k: "l"; seq: number; effect: KmnEditEffect }
   | { k: "lb"; seqs: number[]; effects: KmnEditEffect[] }
-  // Spec 113: one Layout-tab deadkey lifecycle edit (spec 083; one confirm, one undo step). Holds
+  // Spec 117: one Layout-tab deadkey lifecycle edit (spec 083; one confirm, one undo step). Holds
   // the inverse `DeadkeyOperation`s in the order undo applies them, each captured from the IR
   // before its op ran; undo applies them and appends them to the (append-only) deadkey overlay, so
   // the emitted .kmn after undo equals the text before the edit.
   | { k: "ld"; inverse: DeadkeyOperation[] }
-  // Spec 113 US8: one Code-tab Apply. Holds the inverse of its changes, content-anchored, so undo
+  // Spec 117 US8: one Code-tab Apply. Holds the inverse of its changes, content-anchored, so undo
   // is `applyIRChanges(ir, inverse)` and never a rebuild.
   | { k: "c"; seq: number; inverse: IRChange[] };
 
@@ -1281,7 +1281,7 @@ export interface WorkingCopyState {
    */
   commitDeadkeyOp: (op: DeadkeyOperation) => void;
   /**
-   * Commit a deadkey lifecycle op from the Layout tab (spec 113 US3, FR-027, FR-029b): refused,
+   * Commit a deadkey lifecycle op from the Layout tab (spec 117 US3, FR-027, FR-029b): refused,
    * writing nothing, when there is no working copy, the step is locked, the artifact is not
    * compiled, or the lifecycle refuses the op. Otherwise applies `op` to the live IR through the
    * deadkey write seam, appends it to the deadkey overlay, records `deadkeys-defined` with the
@@ -1292,7 +1292,7 @@ export interface WorkingCopyState {
    */
   commitLayoutDeadkeyOp: (op: DeadkeyOperation | readonly DeadkeyOperation[]) => CommitKmnEditResult;
   /**
-   * Commit a Layout-tab edit (spec 113, research R12): applies `op` (and the accepted case
+   * Commit a Layout-tab edit (spec 117, research R12): applies `op` (and the accepted case
    * `partner`, same confirm) to the live IR through `applyMutatePatch` / `LAYOUT_WRITES`, then
    * records the `kmn-edits` decision with the entries appended (provenance `asked`) and pushes
    * one undo entry (`l`, or `lb` with a partner). Recording does not rebuild (R12); the live IR
@@ -2077,7 +2077,7 @@ const INITIAL_STATE: WorkingCopyData = {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Layout-tab edits (spec 113, research R12): commitKmnEdit / undoKmnEdit
+// Layout-tab edits (spec 117, research R12): commitKmnEdit / undoKmnEdit
 // ---------------------------------------------------------------------------
 
 type StoreGet = () => WorkingCopyState;
@@ -2107,7 +2107,7 @@ function slotIsReadOnly(ir: KeyboardIR, entry: KmnEdit): boolean {
 }
 
 /**
- * A Code-tab entry (spec 113 US8). `code-apply` applies its changes to the live IR through
+ * A Code-tab entry (spec 117 US8). `code-apply` applies its changes to the live IR through
  * `applyMutatePatch(..., CODE_WRITES)` and pushes undo kind `c`; a change whose anchor is gone
  * refuses the whole entry, so nothing is half-applied. `review-kept` has no IR effect and no undo
  * step. Neither needs the Layout tab's compiled artifact: the Apply gate already compiled the text.
@@ -2345,7 +2345,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     }),
 
   undoDelete: () => {
-    // A Layout-tab edit (spec 113) is undone through its own action: it also records the
+    // A Layout-tab edit (spec 117) is undone through its own action: it also records the
     // `kmn-edits` decision without the entry, which this store's set() cannot do.
     const top = get().undoStack[get().undoStack.length - 1];
     if (top !== undefined && (top.k === "l" || top.k === "lb" || top.k === "ld" || top.k === "c")) {

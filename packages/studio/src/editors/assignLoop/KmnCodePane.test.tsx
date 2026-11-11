@@ -225,7 +225,7 @@ describe("KmnCodePane", () => {
   });
 });
 
-describe("KmnCodePane Apply (spec 113 US8)", () => {
+describe("KmnCodePane Apply (spec 117 US8)", () => {
   const KMN = [
     "store(&NAME) 'testkbd'",
     "begin Unicode > use(main)",

@@ -317,7 +317,7 @@ export function useWorkingCopyTransform(
   const marksTreatment = useDecisionStore(
     (s) => s.decisions["marks-treatment"]?.value as MarksTreatmentValue | undefined,
   );
-  // spec 113: the Layout tab's edit log. Every confirmed edit and undo re-records it, so the
+  // spec 117: the Layout tab's edit log. Every confirmed edit and undo re-records it, so the
   // projection closure rebuilds (and the one compile cycle re-runs) when it changes.
   const kmnEdits = useDecisionStore((s) => selectKmnEdits(s.decisions));
   const kmnEditsKey = useMemo(() => JSON.stringify(kmnEdits?.entries ?? []), [kmnEdits]);

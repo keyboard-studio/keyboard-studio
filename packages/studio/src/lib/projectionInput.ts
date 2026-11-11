@@ -82,7 +82,7 @@ export interface ProjectionExtras {
   /** The recorded marks-treatment value, or undefined when none is recorded. */
   marksTreatment: MarksTreatmentValue | undefined;
   /**
-   * The recorded `kmn-edits` value (spec 113), or undefined when none is recorded. Required for
+   * The recorded `kmn-edits` value (spec 117), or undefined when none is recorded. Required for
    * the same reason as `marksTreatment`: the preview and the download must both pass it.
    */
   kmnEdits: KmnEditsValue | undefined;

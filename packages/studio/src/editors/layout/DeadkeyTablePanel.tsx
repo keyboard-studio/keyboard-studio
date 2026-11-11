@@ -1,4 +1,4 @@
-// DeadkeyTablePanel -- one deadkey's combination table (spec 113 US3, FR-028, FR-029b).
+// DeadkeyTablePanel -- one deadkey's combination table (spec 117 US3, FR-028, FR-029b).
 //
 // Fan-out rows (spec 083's shape) are keyed by the base character and shown with the key that
 // types it; keystroke-keyed rows are keyed by key and layer. Fan-out rows are written through the

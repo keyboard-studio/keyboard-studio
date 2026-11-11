@@ -1,4 +1,4 @@
-// Types for the Layout-tab attribution engine (spec 113, contracts/attribution.md).
+// Types for the Layout-tab attribution engine (spec 117, contracts/attribution.md).
 
 import type { LayerCombo, LayoutBecomes, LayoutContext, LayoutOutput } from "@keyboard-studio/contracts";
 

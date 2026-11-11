@@ -1,5 +1,5 @@
 /**
- * Tests for `applyLayoutOp` (spec 113 T021): context-free replacement,
+ * Tests for `applyLayoutOp` (spec 117 T021): context-free replacement,
  * exact-context rows, the effect record, and the refusals.
  */
 import { describe, it, expect } from "vitest";

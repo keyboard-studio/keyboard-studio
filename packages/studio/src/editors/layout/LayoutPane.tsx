@@ -1,4 +1,4 @@
-// LayoutPane — the Layout tab: layer selector, desktop key grid, key detail (spec 113 US1,
+// LayoutPane — the Layout tab: layer selector, desktop key grid, key detail (spec 117 US1,
 // FR-010..FR-018). Read-only in this phase: it shows what every key really types and where that
 // comes from, and links read-only behaviour to the Code tab. The edit controls of the next phase
 // attach to the detail panel's `editSlot`.

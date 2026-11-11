@@ -1,5 +1,5 @@
 // desktopGridViewModel — geometry x attribution x base fallback -> one view model per grid cell
-// (spec 113 FR-010..FR-014, FR-018). Pure: a grid component renders `DesktopCellViewModel`
+// (spec 117 FR-010..FR-014, FR-018). Pure: a grid component renders `DesktopCellViewModel`
 // without knowing the engine. Provenance and output are the two axes of FR-012; the
 // has-contextual-rows flag is separate and never makes a cell read-only.
 

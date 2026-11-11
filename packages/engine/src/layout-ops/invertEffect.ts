@@ -1,6 +1,6 @@
 /**
  * invertEffect — the local inverse of one applied layout edit
- * (spec 113, contracts/layout-ops.md "Undo"): drop the inserted nodes,
+ * (spec 117, contracts/layout-ops.md "Undo"): drop the inserted nodes,
  * restore the removed ones at their recorded positions. No rebuild.
  *
  * `ir` is the IR the edit produced; the result emits identically to the IR the

@@ -126,7 +126,7 @@ function isDeadkeyOnlyOutput(output: readonly { kind: string }[]): boolean {
  * @param ir           The working IR (carve state), or null before the
  *                     working copy exists — the session overlay still runs.
  * @param assignments  This session's physical MechanismAssignments.
- * @param kmnEdits     The Layout tab edit log (spec 113), overlaid LAST: the projection replays
+ * @param kmnEdits     The Layout tab edit log (spec 117), overlaid LAST: the projection replays
  *                     it after the assignments (step 2.2), so an edit wins over an assignment on
  *                     the same slot. A set-key of one grapheme names the slot occupant; any other
  *                     output (a deadkey, several glyphs, nothing) leaves the slot with no single

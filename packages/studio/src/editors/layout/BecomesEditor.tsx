@@ -1,4 +1,4 @@
-// BecomesEditor -- set what a context plus one keystroke becomes (spec 113 US4, FR-029a, FR-029b).
+// BecomesEditor -- set what a context plus one keystroke becomes (spec 117 US4, FR-029a, FR-029b).
 //
 // The author enters exactly the text the context and keystroke turn into, optionally followed by a
 // deadkey, or chooses "nothing". The studio writes exactly that: it never decides which part of

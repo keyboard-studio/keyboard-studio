@@ -1,4 +1,4 @@
-// DeadkeyList (spec 113 T083): every deadkey the keyboard defines, including one on no key (place
+// DeadkeyList (spec 117 T083): every deadkey the keyboard defines, including one on no key (place
 // it on the selected key or delete it through spec 083), the "no combinations yet" flag, and one
 // deadkey on several keys or layers shown once.
 

@@ -1,4 +1,4 @@
-// casePartner (spec 113 T052): Unicode simple case mapping, the paired layer, read-only partners
+// casePartner (spec 117 T052): Unicode simple case mapping, the paired layer, read-only partners
 // reported not offered, and a declined partner not proposed again.
 
 import { describe, expect, it } from "vitest";

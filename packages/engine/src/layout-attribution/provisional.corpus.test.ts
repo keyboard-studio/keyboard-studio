@@ -1,4 +1,4 @@
-// Spec 113 T113 (SC-006): over the corpus set, every key the keyboard does not handle is provisional
+// Spec 117 T113 (SC-006): over the corpus set, every key the keyboard does not handle is provisional
 // (it has no rule, so the Layout tab shows the base keyboard's proposal), and no key the author
 // assigned is. Attribution alone decides this, so no compile is needed. A key is provisional exactly
 // when attribution reports it `unhandled`; marking every rule as author-edited must not change which

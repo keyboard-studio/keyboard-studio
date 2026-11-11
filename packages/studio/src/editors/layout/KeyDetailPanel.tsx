@@ -1,4 +1,4 @@
-// KeyDetailPanel — everything the Layout tab knows about the selected key (spec 113 FR-015,
+// KeyDetailPanel — everything the Layout tab knows about the selected key (spec 117 FR-015,
 // FR-016, FR-014). Read-only in this phase: the output with an empty context, the class and
 // its provenance, how many rules match, why a read-only cell is read-only, the contextual rows
 // the key takes part in (each marked editable or read-only), what every picked base keyboard

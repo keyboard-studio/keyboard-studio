@@ -1,4 +1,4 @@
-// Layout-tab edit operations (spec 113, contracts/layout-ops.md).
+// Layout-tab edit operations (spec 117, contracts/layout-ops.md).
 //
 // One confirmed Layout-tab edit is one `LayoutOperation`, recorded as an entry
 // in the bundled `kmn-edits` decision (./kmnEdits) and replayed by the

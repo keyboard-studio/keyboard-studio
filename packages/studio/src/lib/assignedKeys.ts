@@ -1,4 +1,4 @@
-// assignedKeys -- the keys this session's physical assignments claim (spec 113 ruling 10).
+// assignedKeys -- the keys this session's physical assignments claim (spec 117 ruling 10).
 //
 // The Code tab's Apply asks which keys the Assign tab owns, so an edit to a rule on one of them is
 // anchored by key and flagged. The claim is computed fresh from the recorded assignments, the same

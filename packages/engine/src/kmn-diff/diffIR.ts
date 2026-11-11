@@ -1,6 +1,6 @@
 /**
  * diffIR -- the structural difference between two IRs as content-anchored changes
- * (spec 113 US8, contracts/code-edits.md; research R13).
+ * (spec 117 US8, contracts/code-edits.md; research R13).
  *
  * The diff sees only what the emitter writes, so it is empty when two IRs emit
  * the same text (FR-066: a formatting-only edit records nothing). Groups and

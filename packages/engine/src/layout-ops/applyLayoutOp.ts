@@ -1,6 +1,6 @@
 /**
  * applyLayoutOp — one Layout-tab edit as a pure IR-to-IR mutation
- * (spec 113, contracts/layout-ops.md).
+ * (spec 117, contracts/layout-ops.md).
  *
  * Operates on the entry keys-group (the group `begin Unicode` uses). Like the
  * deadkey-lifecycle mutations it deep-clones the input and never mutates it;

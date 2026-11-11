@@ -199,7 +199,7 @@ describe("orphan-input lint — every manifested input has a prior producer", ()
     // RELOCATED/RESERVE: their content IS author-reachable (through the
     // hosting steps), and membership derives from the registry's gallery
     // group so the exemption cannot drift from the module list.
-    // Spec 113: the kmn-edits module is likewise hosted (recorded by the Layout tab at edit time).
+    // Spec 117: the kmn-edits module is likewise hosted (recorded by the Layout tab at edit time).
     const HOSTED_EXEMPT = new Set([...galleryModules, ...layoutEditModules].map((m) => m.definition.id));
     const registryIds = Object.keys(questionRegistry);
     const nonManifested = registryIds.filter(

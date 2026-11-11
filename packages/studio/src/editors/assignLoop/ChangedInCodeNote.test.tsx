@@ -1,4 +1,4 @@
-// "Changed in code" markers (spec 113 US8 T100): the Assign tab and deadkey editor note, and the
+// "Changed in code" markers (spec 117 US8 T100): the Assign tab and deadkey editor note, and the
 // Layout tab's key detail line driven by authorEdit "code-tab".
 
 import { cleanup, screen } from "@testing-library/react";

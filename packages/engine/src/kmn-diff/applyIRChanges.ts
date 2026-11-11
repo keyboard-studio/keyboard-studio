@@ -1,5 +1,5 @@
 /**
- * applyIRChanges -- apply content-anchored changes to an IR (spec 113 US8,
+ * applyIRChanges -- apply content-anchored changes to an IR (spec 117 US8,
  * contracts/code-edits.md). Pure: the input is never mutated.
  *
  * Untouched nodes keep their ids. Inserted and replaced nodes get fresh ids above

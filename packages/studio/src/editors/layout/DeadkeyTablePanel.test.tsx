@@ -1,4 +1,4 @@
-// DeadkeyTablePanel (spec 113 T077): fan-out rows (base character -> result, with the key that
+// DeadkeyTablePanel (spec 117 T077): fan-out rows (base character -> result, with the key that
 // types it) and keystroke-keyed rows (key + layer -> result); add, change, remove for both; a
 // store-using row outside the fan-out shape read-only with "view in code" while the others stay
 // editable; the space row proposed (not written) for a new deadkey; chains link to "after"; and a

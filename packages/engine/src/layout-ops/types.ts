@@ -1,4 +1,4 @@
-// Types for the Layout-tab edit operations (spec 113, contracts/layout-ops.md).
+// Types for the Layout-tab edit operations (spec 117, contracts/layout-ops.md).
 
 import type { IRRule } from "@keyboard-studio/contracts";
 

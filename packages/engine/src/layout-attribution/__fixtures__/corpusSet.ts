@@ -1,4 +1,4 @@
-// The fixed corpus set every spec 113 harness uses (T002): the attribution
+// The fixed corpus set every spec 117 harness uses (T002): the attribution
 // corpus suite (T027, T046), the simulateEach parity suite (T011), and the
 // SC-001 / SC-002 / SC-007 / SC-009 / SC-010 assertions.
 //

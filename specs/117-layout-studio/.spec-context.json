@@ -1,7 +1,7 @@
 {
   "workflow": "companion",
   "specName": "Layout tab — a visual desktop-layout editor that never shows what it can't produce",
-  "branch": "km/113-layout-studio",
+  "branch": "km/117-layout-studio",
   "currentStep": "implement",
   "status": "completed",
   "history": [
@@ -704,7 +704,7 @@
       "status": "DONE",
       "did": "settled recording-vs-rebuild and ordering; recorded in research R12",
       "files": [
-        "specs/113-layout-studio/research.md"
+        "specs/117-layout-studio/research.md"
       ]
     },
     "T057": {
@@ -941,7 +941,7 @@
       "status": "DONE",
       "did": "km-validator approved the Apply gate against D3; recorded in R13, no amendment",
       "files": [
-        "specs/113-layout-studio/research.md"
+        "specs/117-layout-studio/research.md"
       ]
     },
     "T090": {
@@ -1200,7 +1200,7 @@
       "did": "SC-007 literal-context half and SC-009 corpus cases; editable-share table in research.md R14",
       "files": [
         "packages/engine/src/layout-attribution/layout-attribution.corpus.test.ts",
-        "specs/113-layout-studio/research.md"
+        "specs/117-layout-studio/research.md"
       ]
     },
     "T120": {
@@ -1230,23 +1230,23 @@
       "status": "DONE",
       "did": "manual cross-artifact consistency pass; drift fixed in plan, spec, layout-ops contract",
       "files": [
-        "specs/113-layout-studio/plan.md",
-        "specs/113-layout-studio/spec.md",
-        "specs/113-layout-studio/contracts/layout-ops.md"
+        "specs/117-layout-studio/plan.md",
+        "specs/117-layout-studio/spec.md",
+        "specs/117-layout-studio/contracts/layout-ops.md"
       ]
     },
     "T124": {
       "status": "DONE",
       "did": "quickstart unit, corpus and layout-tab E2E (11 rows) all green",
       "files": [
-        "specs/113-layout-studio/quickstart.md"
+        "specs/117-layout-studio/quickstart.md"
       ]
     },
     "T125": {
       "status": "DONE",
       "did": "Art XI deferrals have owner+trigger; spec 109 dependency given one",
       "files": [
-        "specs/113-layout-studio/spec.md"
+        "specs/117-layout-studio/spec.md"
       ]
     }
   },
@@ -1256,7 +1256,7 @@
       "step": "implement"
     },
     {
-      "note": "useKeyboardArtifact.startDocs test is slow (~12-19s) and flaked once under the full parallel run; unrelated to spec 113",
+      "note": "useKeyboardArtifact.startDocs test is slow (~12-19s) and flaked once under the full parallel run; unrelated to spec 117",
       "step": "implement"
     },
     {

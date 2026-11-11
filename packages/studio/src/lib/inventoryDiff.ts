@@ -70,7 +70,7 @@ export interface InventoryDiff {
 }
 
 /**
- * The starting rules as the Code tab's recorded edits leave them (spec 113 ruling 10). A code edit
+ * The starting rules as the Code tab's recorded edits leave them (spec 117 ruling 10). A code edit
  * that replaces or removes a rule changes what the keyboard types, so a character it displaces
  * must return to the letters to place. Only `code-apply` entries are replayed; with none, the
  * starting IR itself is returned (the common case stays reference-stable for the hook's memos).

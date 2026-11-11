@@ -1,4 +1,4 @@
-// Compile a spec 113 corpus-set keyboard in Node (T011, T027). Test-only.
+// Compile a spec 117 corpus-set keyboard in Node (T011, T027). Test-only.
 //
 // The minimal VirtualFS holds no &LAYOUTFILE / &BITMAP / &VISUALKEYBOARD files,
 // and kmcmplib emits nothing when a store names a file it cannot open, so the

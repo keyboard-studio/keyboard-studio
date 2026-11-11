@@ -1271,7 +1271,7 @@ export type {
 } from "./ldml-export/index.js";
 export type { ClassifyOptions, ProfileRow, ProfileRowStatus, ReportContext, RowDelta, TargetProfile } from "./ldml-export/index.js";
 
-// Spec 113 (Layout tab): per-key attribution and the kmn-edits operations.
+// Spec 117 (Layout tab): per-key attribution and the kmn-edits operations.
 export {
   attributeLayer,
   classifyRule,
@@ -1309,7 +1309,7 @@ export type {
   ReplayResult,
 } from "./layout-ops/index.js";
 
-// Spec 113 US8: the Code tab's structural IR diff (contracts/code-edits.md).
+// Spec 117 US8: the Code tab's structural IR diff (contracts/code-edits.md).
 export { applyIRChanges, diffIR, findOwners, invertChanges } from "./kmn-diff/index.js";
 export type { ApplyIRChangesResult } from "./kmn-diff/index.js";
 

@@ -1,4 +1,4 @@
-// AddLayerDialog — add any modifier combination as a layer (spec 113 FR-010a).
+// AddLayerDialog — add any modifier combination as a layer (spec 117 FR-010a).
 //
 // The author builds a combination from the four modifier families (Shift, Ctrl, Alt, Caps Lock);
 // at most one token comes from each family, so an impossible combination cannot be assembled.

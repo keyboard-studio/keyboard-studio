@@ -1,4 +1,4 @@
-// Keys set by kmn-edits entries are labelled "set in the Layout tab" in the Assign tab (spec 113
+// Keys set by kmn-edits entries are labelled "set in the Layout tab" in the Assign tab (spec 117
 // T067). The label is a standalone component mounted by MechanismGallery, so it is tested on its
 // own over the real decision store.
 

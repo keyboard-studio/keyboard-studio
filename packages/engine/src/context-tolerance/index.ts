@@ -62,7 +62,7 @@ export {
 export { loadCharNames } from '../character-discovery/charNames.js';
 /**
  * `simulate`: for `applyFacetTransform`'s injected behavioural verification.
- * `simulateEach`: the Layout tab's verification pass (spec 113), one keyboard
+ * `simulateEach`: the Layout tab's verification pass (spec 117), one keyboard
  * load per grid instead of one per key.
  */
 export { simulate, simulateEach } from '../simulator/index.js';

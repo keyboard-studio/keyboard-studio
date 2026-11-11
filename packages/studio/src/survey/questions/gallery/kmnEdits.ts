@@ -1,4 +1,4 @@
-// kmnEdits -- decision module for `kmn-edits` (spec 113, research R12).
+// kmnEdits -- decision module for `kmn-edits` (spec 117, research R12).
 //
 // The value is the Layout tab's ordered edit log (`KmnEditsValue`). Unlike the wizard's gallery
 // modules it is recorded at EDIT time -- the Layout tab applies each confirmed edit to the live

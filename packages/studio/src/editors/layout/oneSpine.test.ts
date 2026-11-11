@@ -1,4 +1,4 @@
-// SC-004 guard (spec 113 T055): the Layout tab has one write spine. A static scan of the Layout
+// SC-004 guard (spec 117 T055): the Layout tab has one write spine. A static scan of the Layout
 // tab, the kmn-edits module, and the commitKmnEdit path fails on a text write path (kmnFragment,
 // parseKmn in a write path), a timer (decision D3), or a compile-service import.
 
@@ -19,7 +19,7 @@ function layoutFiles(): string[] {
 /** The commitKmnEdit path inside the working-copy store, from its section banner to the next one. */
 function commitPathSource(): string {
   const store = readFileSync(join(src, "stores/workingCopyStore.ts"), "utf-8");
-  const start = store.indexOf("// Layout-tab edits (spec 113, research R12)");
+  const start = store.indexOf("// Layout-tab edits (spec 117, research R12)");
   const end = store.indexOf("export const useWorkingCopyStore");
   expect(start).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(start);

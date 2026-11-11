@@ -1,4 +1,4 @@
-// Whether a new "after ..." context can be typed at all (spec 113 FR-029a): can some listed
+// Whether a new "after ..." context can be typed at all (spec 117 FR-029a): can some listed
 // layer type each character, and produce each deadkey, the context is made of? Static: reads the IR.
 
 import { US_BASE_LAYOUT } from "@keyboard-studio/contracts";

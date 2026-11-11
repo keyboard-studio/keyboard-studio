@@ -1,5 +1,5 @@
 /**
- * findOwners -- who produced the nodes a Code-tab change overrides (spec 113 US8, FR-062).
+ * findOwners -- who produced the nodes a Code-tab change overrides (spec 117 US8, FR-062).
  *
  * A target identical to a `startIr` node has no owner: it is the starting point, not
  * another decision's work. Otherwise the owner comes from markers (`@deadkey` comment

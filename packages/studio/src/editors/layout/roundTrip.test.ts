@@ -1,4 +1,4 @@
-// SC-003 round trip (spec 113 T068): change three keys in two layers, then undo each. After every
+// SC-003 round trip (spec 117 T068): change three keys in two layers, then undo each. After every
 // step the emitted .kmn (the Code tab's text) equals the expected text, and the artifact
 // projection (what the preview compiles and the download ships) and the Assign tab's slot ledger
 // agree with it. The simulator itself needs the compiled .js, which the Node harness does not

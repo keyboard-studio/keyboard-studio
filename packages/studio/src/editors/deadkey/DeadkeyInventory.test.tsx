@@ -119,7 +119,7 @@ describe("DeadkeyInventory", () => {
   });
 });
 
-describe("DeadkeyInventory changed in code (spec 113 US8)", () => {
+describe("DeadkeyInventory changed in code (spec 117 US8)", () => {
   it("notes a Code tab edit that overrode the deadkey editor", async () => {
     const { useDecisionStore } = await import("../../stores/decisionStore.ts");
     useDecisionStore.getState().reset();

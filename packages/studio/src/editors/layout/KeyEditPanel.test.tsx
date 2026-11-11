@@ -1,4 +1,4 @@
-// KeyEditPanel (spec 113 T054): text, inventory pick and nothing; the preview; the case partner
+// KeyEditPanel (spec 117 T054): text, inventory pick and nothing; the preview; the case partner
 // accepted or declined in the same confirm; duplicate and displacement choices; the warning before
 // overriding an Assign-tab assignment; the base character on a provisional key becoming hand-set;
 // and at most three interactions from selecting a key to confirming.
@@ -182,7 +182,7 @@ describe("KeyEditPanel", () => {
     expect(screen.getByTestId("key-edit-refusal")).toBeTruthy();
     expect(logged()).toBeUndefined();
   });
-  describe("the deadkey option (spec 113 US3)", () => {
+  describe("the deadkey option (spec 117 US3)", () => {
     const deadkeysDefined = () =>
       useDecisionStore.getState().decisions["deadkeys-defined"]?.value as { ops: Array<{ kind: string }> } | undefined;
 

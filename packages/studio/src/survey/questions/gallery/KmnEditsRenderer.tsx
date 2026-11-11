@@ -1,4 +1,4 @@
-// KmnEditsRenderer -- the trail view of the `kmn-edits` decision (spec 113): the Layout tab's
+// KmnEditsRenderer -- the trail view of the `kmn-edits` decision (spec 117): the Layout tab's
 // edits listed in plain words, in the order they were made. Read-only; edits are made in the
 // Layout tab. Content-team copy (FR-041).
 

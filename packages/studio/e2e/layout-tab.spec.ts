@@ -1,4 +1,4 @@
-// E2E: spec 113 (Layout Studio) T048 — US1 row; US2 (T070), US3 (T087), US4 (T121), US6 (T115) and US8 (T105) rows below.
+// E2E: spec 117 (Layout Studio) T048 — US1 row; US2 (T070), US3 (T087), US4 (T121), US6 (T115) and US8 (T105) rows below.
 //
 // Copy a simple positional keyboard, open Mechanical Gallery -> Layout, and check that:
 //   - the default-layer cells show the copied keyboard's characters, labelled "from the starting
@@ -62,7 +62,7 @@ async function openLayoutTab(page: Page): Promise<void> {
   await expect(page.getByRole("grid")).toBeVisible({ timeout: 60_000 });
 }
 
-test.describe("spec 113 Layout tab - US1", () => {
+test.describe("spec 117 Layout tab - US1", () => {
   test.setTimeout(600_000);
 
   test("default layer shows the copied characters, labelled from the starting point", async ({ page }) => {
@@ -113,7 +113,7 @@ test.describe("spec 113 Layout tab - US1", () => {
   });
 });
 
-test.describe("spec 113 Layout tab - US5", () => {
+test.describe("spec 117 Layout tab - US5", () => {
   test.setTimeout(600_000);
 
   test("a read-only key's detail shows its rules and view in code reveals the rule's line", async ({ page }) => {
@@ -157,7 +157,7 @@ async function expectCodeHas(page: Page, text: string): Promise<void> {
   await page.keyboard.press("Escape");
 }
 
-test.describe("spec 113 Layout tab - US2", () => {
+test.describe("spec 117 Layout tab - US2", () => {
   test.setTimeout(600_000);
 
   test("assign eng and accept its capital in one confirm; both tabs, the download, undo and reload agree", async ({ page }) => {
@@ -216,7 +216,7 @@ test.describe("spec 113 Layout tab - US2", () => {
   });
 });
 
-test.describe("spec 113 Layout tab - US3", () => {
+test.describe("spec 117 Layout tab - US3", () => {
   test.setTimeout(600_000);
 
   test("make a key a deadkey, add three rows and the proposed space row; after-this-deadkey, the simulator and the download agree", async ({ page }) => {
@@ -312,7 +312,7 @@ async function openAfterText(page: Page, context: string): Promise<Locator> {
   return after;
 }
 
-test.describe("spec 113 Layout tab - US4", () => {
+test.describe("spec 117 Layout tab - US4", () => {
   test.setTimeout(600_000);
 
   test("after n, set g to eng; typing n g gives it; the download has the rule; a never-fires duplicate shows read-only", async ({ page }) => {
@@ -360,7 +360,7 @@ test.describe("spec 113 Layout tab - US4", () => {
   });
 });
 
-test.describe("spec 113 Layout tab - US6", () => {
+test.describe("spec 117 Layout tab - US6", () => {
   test.setTimeout(600_000);
 
   test("provisional keys are marked and counted per layer; the detail reaches the fallback policy surface", async ({ page }) => {
@@ -387,7 +387,7 @@ test.describe("spec 113 Layout tab - US6", () => {
   });
 });
 
-test.describe("spec 113 Layout tab - US8", () => {
+test.describe("spec 117 Layout tab - US8", () => {
   test.setTimeout(900_000);
 
   test("change, add and delete a rule in the Code tab; the download has exactly those changes and reload keeps them; errors record nothing", async ({ page }) => {

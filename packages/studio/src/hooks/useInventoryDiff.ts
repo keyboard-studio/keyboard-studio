@@ -131,7 +131,7 @@ export type { InventoryDiff };
  */
 export function useInventoryDiff(): InventoryDiff {
   const rawStartIr = useWorkingCopyStore((s) => s.startIr);
-  // The Code tab's recorded edits change what the keyboard types (spec 113 ruling 10), so the
+  // The Code tab's recorded edits change what the keyboard types (spec 117 ruling 10), so the
   // produced sets read the starting rules as those edits leave them; `startIr` below is that view.
   const kmnEntries = useDecisionStore(
     (s) => (s.decisions["kmn-edits"]?.value as KmnEditsValue | undefined)?.entries ?? NO_EDITS,

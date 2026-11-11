@@ -1,5 +1,5 @@
 // AssignedKeysChangedInCode -- keys the Assign tab owns that a Code-tab edit then changed
-// (spec 113 ruling 10, scenario 4a). On an assigned key the most recent edit wins, so the Code
+// (spec 117 ruling 10, scenario 4a). On an assigned key the most recent edit wins, so the Code
 // edit is in the download; this lists each such key as "changed in code" so the author is not
 // surprised that the assignment no longer answers it. Read-only: it reads the recorded
 // `kmn-edits` decision and writes nothing.

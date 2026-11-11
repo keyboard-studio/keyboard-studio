@@ -1,5 +1,5 @@
 // layerList — which layers the Layout tab's selector offers, and how an added layer is checked
-// (spec 113 FR-010, FR-010a). Pure: the pane keeps the session-added layers in state and
+// (spec 117 FR-010, FR-010a). Pure: the pane keeps the session-added layers in state and
 // hands them in.
 //
 // The list is the default layer, Shift, and every layer the starting-point keyboard or the

@@ -1,4 +1,4 @@
-// DesktopKeyCell — one key of the desktop layout grid (spec 113 FR-010..FR-012, FR-040).
+// DesktopKeyCell — one key of the desktop layout grid (spec 117 FR-010..FR-012, FR-040).
 //
 // A `role="gridcell"` button rendered from a `DesktopCellViewModel`: the output display, a
 // provenance word, and a padlock when the cell is read-only. Everything visual is also in the

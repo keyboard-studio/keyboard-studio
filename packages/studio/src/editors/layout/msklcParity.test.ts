@@ -1,4 +1,4 @@
-// SC-008 MSKLC parity (spec 113 T085): a layout MSKLC can express -- characters and ligatures in
+// SC-008 MSKLC parity (spec 117 T085): a layout MSKLC can express -- characters and ligatures in
 // four shift states, and two deadkeys with combination tables and space rows -- is built from
 // nothing but `kmn-edits` entries (Layout-tab key edits) and spec 083 deadkey ops, the very calls
 // the Layout tab's panels make. The result is projected the way the preview and the download

@@ -72,7 +72,7 @@ starting point ──▶ extraction (spec 092) ──▶ proposals ──▶ aut
   `instantiateFromExisting`), recalculated from the decision set as above.
   It is what renders and what output projects from — never what is stored
   directly (see Persistence).
-- **KMN edits (spec 113).** Every Layout-tab or Code-tab edit to the `.kmn` is one entry in the
+- **KMN edits (spec 117).** Every Layout-tab or Code-tab edit to the `.kmn` is one entry in the
   `kmn-edits` decision (`KmnEditsValue`, `packages/contracts/src/kmnEdits.ts`), the single record of
   KMN edits; entries replay in order and later entries win. The projection replays the log at
   step 2.2 (`replayKmnEdits`: parse, replay, emit), after the deadkey ops and assignments, and only

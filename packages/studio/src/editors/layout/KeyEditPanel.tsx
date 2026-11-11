@@ -1,4 +1,4 @@
-// KeyEditPanel -- change what one key types in one layer (spec 113 US2, FR-020..FR-026).
+// KeyEditPanel -- change what one key types in one layer (spec 117 US2, FR-020..FR-026).
 //
 // The author picks a key (the grid), types or picks the new text (or chooses "nothing"), reads
 // the preview, and confirms: select, enter, confirm is three interactions (SC-005). One confirm
@@ -7,7 +7,7 @@
 // store's `commitKmnEdit`; it never touches .kmn text or the compiler (decision D3: it starts no
 // timer). Content-team copy (FR-041).
 //
-// The deadkey option (spec 113 US3, FR-027) makes the key start a deadkey. A NEW deadkey goes
+// The deadkey option (spec 117 US3, FR-027) makes the key start a deadkey. A NEW deadkey goes
 // through spec 083's lifecycle (`commitLayoutDeadkeyOp`, a `define` op, with its disclosure of
 // what the key does on the likely base keyboards); when the key already types something, the
 // lifecycle puts the new trigger ahead of that rule, so one confirm is one undo step and the

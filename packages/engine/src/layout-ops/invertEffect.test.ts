@@ -1,5 +1,5 @@
 /**
- * Tests for `invertEffect` (spec 113 T025): for every op kind, inverting the
+ * Tests for `invertEffect` (spec 117 T025): for every op kind, inverting the
  * recorded effect restores the IR the edit started from.
  */
 import { describe, it, expect } from "vitest";

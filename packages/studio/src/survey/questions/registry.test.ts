@@ -21,7 +21,7 @@ import {
 
 describe("questionRegistry", () => {
   // 142 question modules, including the body-parity, trial, and publish gallery
-  // modules; track_choice is no longer registered. + 1 layout-edit module (spec 113
+  // modules; track_choice is no longer registered. + 1 layout-edit module (spec 117
   // kmn-edits, registered for replay but not a wizard step) = 143.
   // (re-verified 2026-11-11 -- update this count in the same change that adds
   // or removes a questionRegistry entry.)

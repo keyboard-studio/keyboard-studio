@@ -1,5 +1,5 @@
 // deadkeyInverse -- the inverse of a spec 083 DeadkeyOperation, read from the IR before the op runs
-// (spec 113 undo kind `ld`). Undo appends the inverse to the overlay (the log is append-only) and
+// (spec 117 undo kind `ld`). Undo appends the inverse to the overlay (the log is append-only) and
 // applies it to the live IR, so the emitted .kmn after undo equals the text before the edit.
 //
 // `null` means the op has no faithful inverse (delete, rename, merge, repair ...): the caller

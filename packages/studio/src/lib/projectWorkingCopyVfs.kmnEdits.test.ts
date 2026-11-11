@@ -1,4 +1,4 @@
-// projectWorkingCopyVfs step 2.2 (spec 113): the `kmn-edits` log is replayed into the projected
+// projectWorkingCopyVfs step 2.2 (spec 117): the `kmn-edits` log is replayed into the projected
 // .kmn, which both the preview compile and the download read. Only when the log has entries, so
 // a keyboard with no edits keeps a byte-identical artifact. It runs after the deadkey ops
 // (step 1.8) and the assignments (step 2), and before layer propagation (2.5) and context

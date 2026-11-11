@@ -1,6 +1,6 @@
 // Classify one rule or opaque fragment for the Layout tab: which key(s) and layer(s)
 // it answers, its structural shape, its literal output, and whether the tab may edit
-// it (spec 113 FR-012 / FR-013, research R3; contracts/attribution.md).
+// it (spec 117 FR-012 / FR-013, research R3; contracts/attribution.md).
 //
 // Static and IR-only: whether a LATER group rewrites the result is not decidable
 // here; `verifyCells` demotes those against the simulator.

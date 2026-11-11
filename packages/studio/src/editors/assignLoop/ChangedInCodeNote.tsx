@@ -1,5 +1,5 @@
 // ChangedInCodeNote -- "changed in code" where a Code-tab edit overrode another editor's work
-// (spec 113 US8, FR-062). Read-only: it reads the recorded `kmn-edits` decision. Each editor that
+// (spec 117 US8, FR-062). Read-only: it reads the recorded `kmn-edits` decision. Each editor that
 // owns some of the keyboard mounts it with the owner it cares about, so the Assign tab names
 // rules-step edits and the deadkey editor names deadkey edits.
 

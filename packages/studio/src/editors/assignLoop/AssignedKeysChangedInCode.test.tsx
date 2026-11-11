@@ -1,4 +1,4 @@
-// Assigned keys a Code edit changed are labelled "changed in code" in the Assign tab (spec 113
+// Assigned keys a Code edit changed are labelled "changed in code" in the Assign tab (spec 117
 // ruling 10). A standalone component mounted by MechanismGallery, tested over the real decision
 // store.
 

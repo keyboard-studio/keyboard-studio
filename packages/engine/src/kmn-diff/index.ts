@@ -1,4 +1,4 @@
-// kmn-diff barrel export -- spec 113 US8 (contracts/code-edits.md).
+// kmn-diff barrel export -- spec 117 US8 (contracts/code-edits.md).
 //
 // Pure IR-to-IR structural diff, content-anchored apply, owner lookup, and inversion for the
 // Code tab's Apply.

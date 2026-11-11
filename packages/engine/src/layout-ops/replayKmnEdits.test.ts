@@ -1,5 +1,5 @@
 /**
- * Tests for `replayKmnEdits` and the live `clearKeyLive` (spec 113 T023):
+ * Tests for `replayKmnEdits` and the live `clearKeyLive` (spec 117 T023):
  * idempotence, later-wins, the clear-key normalising pre-pass, and live
  * clear-key == replay for the slot, with and without the in-memory history.
  */
@@ -140,7 +140,7 @@ describe("clearKeyLive", () => {
   });
 });
 
-describe("replayKmnEdits: Code-tab entries (spec 113 T096)", () => {
+describe("replayKmnEdits: Code-tab entries (spec 117 T096)", () => {
   const edited = (ir: ReturnType<typeof parseKmn>, from: string, to: string) =>
     parse(emit(ir).replace(from, to), "layout-ops-test").ir;
 

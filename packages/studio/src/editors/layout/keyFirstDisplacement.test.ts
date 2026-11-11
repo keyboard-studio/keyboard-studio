@@ -1,4 +1,4 @@
-// keyFirstDisplacementFor (spec 113 T053, research R9): the Layout tab's key-first view of the
+// keyFirstDisplacementFor (spec 117 T053, research R9): the Layout tab's key-first view of the
 // Assign tab's displacement ledger. Given a key, layer and incoming text, it reports what the key
 // types now and loses, and where the incoming text is already typed, using the same occupancy
 // ledger and the same decline key (`displaced|vkey|mods|incoming`).

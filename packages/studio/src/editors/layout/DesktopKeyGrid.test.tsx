@@ -1,4 +1,4 @@
-// DesktopKeyGrid — the grid's accessible model (spec 113 FR-040): role="grid", roving tabindex,
+// DesktopKeyGrid — the grid's accessible model (spec 117 FR-040): role="grid", roving tabindex,
 // arrow-key navigation, and a name on every cell that carries key, layer, output, and class.
 //
 // The "axe" check follows KeyGrid.test.tsx: the structural invariant axe enforces (every child

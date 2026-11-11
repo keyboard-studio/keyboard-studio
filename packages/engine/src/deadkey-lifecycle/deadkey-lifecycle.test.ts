@@ -522,7 +522,7 @@ describe("retargetDeadkey", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Modifier-layer triggers (spec 113 T076)
+// Modifier-layer triggers (spec 117 T076)
 // ---------------------------------------------------------------------------
 
 describe("modifier-layer triggers", () => {
@@ -616,7 +616,7 @@ describe("modifier-layer triggers", () => {
 });
 
 // ---------------------------------------------------------------------------
-// setDeadkeyDisplay (spec 113 T075)
+// setDeadkeyDisplay (spec 117 T075)
 // ---------------------------------------------------------------------------
 
 describe("setDeadkeyDisplay", () => {

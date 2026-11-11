@@ -1,4 +1,4 @@
-// CodeReviewList -- the Code tab's review flags (spec 113 US8, FR-063, FR-064).
+// CodeReviewList -- the Code tab's review flags (spec 117 US8, FR-063, FR-064).
 //
 // Each flag says what changed, why it is flagged, and offers "view in code", keep, and revert.
 // Real buttons with accessible names; the list is a labelled region. Flags block neither

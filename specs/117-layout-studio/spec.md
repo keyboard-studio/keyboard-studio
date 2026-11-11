@@ -1,6 +1,6 @@
 # Feature Specification: Layout tab — a visual desktop-layout editor that never shows what it can't produce
 
-**Feature Branch**: `km/113-layout-studio`
+**Feature Branch**: `km/117-layout-studio`
 
 **Created**: 2026-11-04
 

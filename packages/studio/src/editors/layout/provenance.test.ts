@@ -1,4 +1,4 @@
-// SC-006 (spec 113 US6): every key the keyboard does not handle is provisional, and no key the
+// SC-006 (spec 117 US6): every key the keyboard does not handle is provisional, and no key the
 // author assigned is. Over inline sparse keyboards here; the corpus set is swept in the engine's
 // `layout-attribution/provisional.corpus.test.ts`, which needs no studio state.
 

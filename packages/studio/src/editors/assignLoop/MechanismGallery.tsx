@@ -4537,11 +4537,11 @@ export function MechanismGallery({
           </>
         )}
 
-        {/* Keys the Layout tab set key-first (spec 113): not assignments, so labelled here. */}
+        {/* Keys the Layout tab set key-first (spec 117): not assignments, so labelled here. */}
         <LayoutEditedKeys />
-        {/* Rules the Code tab changed over a rules-step edit (spec 113 US8). */}
+        {/* Rules the Code tab changed over a rules-step edit (spec 117 US8). */}
         <ChangedInCodeNote owner="rules-step" />
-        {/* Assigned keys a Code-tab edit then changed (spec 113 ruling 10). */}
+        {/* Assigned keys a Code-tab edit then changed (spec 117 ruling 10). */}
         <AssignedKeysChangedInCode />
 
         {/* Added chip row — characters already configured, removable */}

@@ -1,4 +1,4 @@
-// KeyDetailPanel — the selected key's detail (spec 113 FR-014..FR-016, US1 scenarios 3, 3a, 4, 6).
+// KeyDetailPanel — the selected key's detail (spec 117 FR-014..FR-016, US1 scenarios 3, 3a, 4, 6).
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
@@ -186,7 +186,7 @@ describe("KeyDetailPanel", () => {
   });
 });
 
-describe("KeyDetailPanel changed in code (spec 113 US8)", () => {
+describe("KeyDetailPanel changed in code (spec 117 US8)", () => {
   it("says so when a Code tab edit set the key", () => {
     show(cellOf(attribution("K_A", { plain: row({ provenance: "hand-set", authorEdit: "code-tab" }) })));
     expect(screen.getByTestId("key-detail-changed-in-code").textContent).toContain("Code tab");
@@ -198,7 +198,7 @@ describe("KeyDetailPanel changed in code (spec 113 US8)", () => {
   });
 });
 
-describe("KeyDetailPanel rules and replaced value (spec 113 US5, FR-016)", () => {
+describe("KeyDetailPanel rules and replaced value (spec 117 US5, FR-016)", () => {
   it("counts the matching rules and lists each with its shape and editability", () => {
     show(
       cellOf(

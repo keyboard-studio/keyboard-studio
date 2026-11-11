@@ -1,4 +1,4 @@
-// isContextReachable (spec 113 T116, FR-029a): can some listed layer type the characters (and
+// isContextReachable (spec 117 T116, FR-029a): can some listed layer type the characters (and
 // deadkeys) a new "after ..." context is made of?
 
 import { describe, expect, it } from "vitest";

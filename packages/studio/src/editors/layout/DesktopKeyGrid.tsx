@@ -1,4 +1,4 @@
-// DesktopKeyGrid — the desktop layout as an ARIA grid (spec 113 FR-010, FR-040).
+// DesktopKeyGrid — the desktop layout as an ARIA grid (spec 117 FR-010, FR-040).
 //
 // The same accessible grid model as the touch key grid (spec 063): `role="grid"` over
 // `role="row"` over `role="gridcell"`, one cell selected, a roving tabindex so the grid is a

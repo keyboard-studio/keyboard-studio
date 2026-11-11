@@ -1,4 +1,4 @@
-// AfterContextView -- the "after this deadkey" view of the Layout tab (spec 113 US3, FR-029).
+// AfterContextView -- the "after this deadkey" view of the Layout tab (spec 117 US3, FR-029).
 //
 // Every key is shown with what typing it after the chosen deadkey produces, from the compiled
 // keyboard: `useLayoutAttribution(layer, context)` simulates each key with that deadkey pending
@@ -7,7 +7,7 @@
 // A named deadkey cannot be seeded (the compiler numbers it), so nothing is guessed for it. The
 // view reads the shared compile artifact and starts no timer (decision D3).
 //
-// Literal-context mode (spec 113 US4, FR-029, FR-029a): with no deadkey given, the view lists the
+// Literal-context mode (spec 117 US4, FR-029, FR-029a): with no deadkey given, the view lists the
 // contexts the keyboard uses (literal text and deadkeys, with how many keys each affects) and lets
 // the author enter a new one, flagged before it is used when no listed layer can type it. Once a
 // context is chosen each key is shown the same way, and its row can be set, changed, or removed

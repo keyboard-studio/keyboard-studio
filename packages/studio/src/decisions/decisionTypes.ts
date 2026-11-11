@@ -167,7 +167,7 @@ export type DecisionId =
   | "custom-css"
   | "help-docs"
   | "welcome-htm"
-  // Spec 113: the Layout tab's replayable edit log. Recorded at each confirm (edit time),
+  // Spec 117: the Layout tab's replayable edit log. Recorded at each confirm (edit time),
   // not at a step completion; registered outside the wizard's gallery modules.
   | "kmn-edits"
   | "icon"
@@ -452,7 +452,7 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "custom-css": [],
   "help-docs": [],
   "welcome-htm": [],
-  // spec 113: the module's apply replays the Layout-tab edit log over the groups array
+  // spec 117: the module's apply replays the Layout-tab edit log over the groups array
   // (LAYOUT_WRITES; an array is one patch leaf, so the declared path is the whole array). A
   // Code-tab entry (US8) also reaches stores, raw fragments, and the header (CODE_WRITES).
   "kmn-edits": [["groups"], ["stores"], ["comments"], ["raw"], ["header"]],

@@ -517,7 +517,7 @@ export interface IRRule {
    */
   rulesStepAdded?: true;
   /**
-   * Which editor wrote this rule as a `kmn-edits` entry (spec 113). Its only
+   * Which editor wrote this rule as a `kmn-edits` entry (spec 117). Its only
    * writers are the engine's `applyLayoutOp` (`"layout-tab"`) and
    * `applyIRChanges` (`"code-tab"`); never the codec parser. Layout
    * attribution reads it to label the rule hand-set. The emitter ignores it:

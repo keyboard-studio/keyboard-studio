@@ -1,4 +1,4 @@
-// Spec 113 T097: the code-edit set. Each entry names a corpus keyboard and the Code-tab edits an
+// Spec 117 T097: the code-edit set. Each entry names a corpus keyboard and the Code-tab edits an
 // author could make to it, as text-to-text functions over the keyboard's canonical emitted text.
 // A pattern that is absent throws, so a corpus drift fails loudly instead of testing nothing.
 

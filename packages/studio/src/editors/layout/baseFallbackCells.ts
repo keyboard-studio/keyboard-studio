@@ -1,5 +1,5 @@
 // baseFallbackCells — what a picked base keyboard types at a position the working copy has
-// no rule for (spec 113 FR-014; contracts/attribution.md "Studio: base fallback join").
+// no rule for (spec 117 FR-014; contracts/attribution.md "Studio: base fallback join").
 //
 // Joins spec 109's enumerator of unhandled positions (engine) with the reference base
 // keyboard data (`referenceBaseLayouts.lookupHostOutput`) for each keyboard the author

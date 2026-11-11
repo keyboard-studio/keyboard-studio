@@ -1,4 +1,4 @@
-// Per-key attribution of one desktop layer (spec 113 FR-012 / FR-013 / FR-014,
+// Per-key attribution of one desktop layer (spec 117 FR-012 / FR-013 / FR-014,
 // research R4; contracts/attribution.md). Static: reads the IR only. The studio
 // then verifies the editable results against the compiled artifact (`verifyCells`).
 

@@ -1,4 +1,4 @@
-// reviewFlags (spec 113 US8, FR-063/FR-064): the three flag kinds, keep clearing (a), and the two
+// reviewFlags (spec 117 US8, FR-063/FR-064): the three flag kinds, keep clearing (a), and the two
 // revert routes (latest entry undone; an older one reverted by an appended inverse entry).
 
 import { beforeEach, describe, expect, it } from "vitest";

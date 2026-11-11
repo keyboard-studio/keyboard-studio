@@ -1,4 +1,4 @@
-// kmnEdits module tests (spec 113 T049): the decision module that replays the Layout tab's
+// kmnEdits module tests (spec 117 T049): the decision module that replays the Layout tab's
 // edit log. apply replays through replayKmnEdits; with no value it composes from the recorded
 // decision (the deadkeysDefined precedent); an empty log writes nothing.
 

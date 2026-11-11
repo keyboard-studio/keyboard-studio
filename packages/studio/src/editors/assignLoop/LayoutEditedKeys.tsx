@@ -1,4 +1,4 @@
-// LayoutEditedKeys -- the keys the Layout tab has set, labelled in the Assign tab (spec 113 T067).
+// LayoutEditedKeys -- the keys the Layout tab has set, labelled in the Assign tab (spec 117 T067).
 //
 // A key set by a `kmn-edits` entry is not an assignment, so the Assign tab would otherwise not
 // mention it. This lists each such key and layer as "set in the Layout tab", so an author working

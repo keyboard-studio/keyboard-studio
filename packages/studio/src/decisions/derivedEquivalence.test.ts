@@ -341,7 +341,7 @@ describe("B. registry integrity", () => {
 
 
 // ---------------------------------------------------------------------------
-// Spec 113: the kmn-edits surface (born derived). Layout-tab edits are recorded at edit
+// Spec 117: the kmn-edits surface (born derived). Layout-tab edits are recorded at edit
 // time; arms C and D prove replay and draft reload reproduce the entry group's rules.
 // ---------------------------------------------------------------------------
 

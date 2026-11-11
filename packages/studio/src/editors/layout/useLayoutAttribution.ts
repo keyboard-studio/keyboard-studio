@@ -1,5 +1,5 @@
 // useLayoutAttribution — the Layout tab's per-key attribution for one layer, verified against
-// the one published compile artifact (spec 113 FR-011/FR-013/FR-017/FR-018;
+// the one published compile artifact (spec 117 FR-011/FR-013/FR-017/FR-018;
 // contracts/attribution.md "Studio: verification").
 //
 // A pure reader of `rulesDemoArtifactStore` (the D3 artifact): it starts no timer and calls no

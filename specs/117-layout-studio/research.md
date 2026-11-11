@@ -1,4 +1,4 @@
-# Research: Layout tab (spec 113)
+# Research: Layout tab (spec 117)
 
 Phase 0 of [plan.md](plan.md). Each section resolves one unknown from the spec's "Plan-phase
 research" assumption. Paths are relative to `packages/`.

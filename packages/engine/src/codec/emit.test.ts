@@ -58,7 +58,7 @@ function makeIR(): KeyboardIR {
 }
 
 describe("emit", () => {
-  it("emits a rule carrying authorEdit byte-identically to the same rule without it (spec 113 T008)", () => {
+  it("emits a rule carrying authorEdit byte-identically to the same rule without it (spec 117 T008)", () => {
     const plain = makeIR();
     const stamped = makeIR();
     for (const rule of stamped.groups[0]!.rules) rule.authorEdit = "layout-tab";
@@ -1363,7 +1363,7 @@ describe("emit — store-declaration dependency order (#2404)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Line map (spec 113 T012)
+// Line map (spec 117 T012)
 // ---------------------------------------------------------------------------
 
 const FRAGMENT_FREE_KMN = `store(&VERSION) '10.0'

@@ -980,7 +980,7 @@ export const IRRuleOwnershipSchema = z
   });
 
 // ---------------------------------------------------------------------------
-// Layout-tab edits (spec 113, contracts/layout-ops.md) — layoutOps.ts and
+// Layout-tab edits (spec 117, contracts/layout-ops.md) — layoutOps.ts and
 // kmnEdits.ts mirrors. The `kmn-edits` decision persists with the decision set,
 // so a value this build writes must be one it can read back.
 // ---------------------------------------------------------------------------
@@ -1037,7 +1037,7 @@ export const LayoutOperationSchema = z.discriminatedUnion("op", [
 ]);
 
 // ---------------------------------------------------------------------------
-// Code-tab edits (spec 113 US8, contracts/code-edits.md). IR nodes and stores
+// Code-tab edits (spec 117 US8, contracts/code-edits.md). IR nodes and stores
 // are persisted whole; their shapes are owned by the codec and written only by
 // this build, so they are checked structurally (an object with the fields every
 // consumer reads) rather than field by field.
@@ -1145,7 +1145,7 @@ export const KmnEditsValueSchema = z
       if (value.entries[i]!.seq <= value.entries[i - 1]!.seq) {
         ctx.addIssue({
           code: "custom",
-          message: "kmn-edits entries MUST have strictly increasing seq (spec 113, contracts/layout-ops.md).",
+          message: "kmn-edits entries MUST have strictly increasing seq (spec 117, contracts/layout-ops.md).",
           path: ["entries", i, "seq"],
         });
       }
@@ -1378,7 +1378,7 @@ type _DocFixProposalsGuard = Expect<
   AssignableTo<z.infer<typeof DocFixProposalsSchema>, DocFixProposals>
 >;
 type _DocLintInputGuard = Expect<AssignableTo<z.infer<typeof DocLintInputSchema>, DocLintInput>>;
-// Layout-tab edits (spec 113). The forward guards pin every field; the `op` /
+// Layout-tab edits (spec 117). The forward guards pin every field; the `op` /
 // `kind` key-set guards catch a union member added to the type but not the
 // schema (structural assignability cannot see a schema that is narrower).
 type _ModifierTokenGuard = Expect<Equal<z.infer<typeof ModifierTokenSchema>, ModifierToken>>;

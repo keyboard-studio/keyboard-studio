@@ -82,7 +82,7 @@ describe("deriveInventoryDiff / deriveInventoryCoverageGate equal the hooks", ()
   }
 });
 
-describe("Code-tab edits count (spec 113 ruling 10)", () => {
+describe("Code-tab edits count (spec 117 ruling 10)", () => {
   const KMN = [
     "store(&NAME) 'inv'",
     "begin Unicode > use(main)",

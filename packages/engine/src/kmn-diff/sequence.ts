@@ -1,5 +1,5 @@
 /**
- * The emitted item sequence of a container (spec 113 US8, contracts/code-edits.md).
+ * The emitted item sequence of a container (spec 117 US8, contracts/code-edits.md).
  *
  * Diff, apply, and owner lookup all work on the same view: the ordered list of
  * items a group (or the global fragment list) emits, each with its canonical

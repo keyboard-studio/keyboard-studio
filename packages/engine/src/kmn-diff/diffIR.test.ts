@@ -1,5 +1,5 @@
 /**
- * diffIR (spec 113 T089): empty for a formatting-only edit (FR-066), one test per
+ * diffIR (spec 117 T089): empty for a formatting-only edit (FR-066), one test per
  * IRChange kind, LCS alignment (an early insert is one insert), an opaque fragment edit is
  * one replace, a renamed group is remove + add.
  */

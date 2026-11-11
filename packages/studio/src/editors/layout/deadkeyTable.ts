@@ -1,4 +1,4 @@
-// deadkeyTable -- one deadkey's combination table as the Layout tab shows it (spec 113 US3,
+// deadkeyTable -- one deadkey's combination table as the Layout tab shows it (spec 117 US3,
 // FR-028, FR-029). Pure: derived from the working IR and the static attribution of each layer.
 //
 // Two row shapes feed one table:

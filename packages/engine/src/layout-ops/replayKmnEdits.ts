@@ -1,6 +1,6 @@
 /**
  * replayKmnEdits — rebuild the Layout-tab edits from the `kmn-edits` log
- * (spec 113, contracts/layout-ops.md "Replay is not a plain reduce").
+ * (spec 117, contracts/layout-ops.md "Replay is not a plain reduce").
  *
  * The list is normalised first: a `clear-key` drops the earlier `set-key`
  * entries for its `(vkey, layer)` (and is itself spent: it has no IR effect of

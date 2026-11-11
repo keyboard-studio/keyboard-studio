@@ -1,4 +1,4 @@
-// compileCandidateKmn -- one explicit compile of a Code-tab candidate (spec 113 US8, FR-061).
+// compileCandidateKmn -- one explicit compile of a Code-tab candidate (spec 117 US8, FR-061).
 //
 // The Code tab's Apply gate compiles the candidate once, on the author's click, through the
 // compile service the download path uses (`buildOutputBundle`). It is not part of the 300 ms

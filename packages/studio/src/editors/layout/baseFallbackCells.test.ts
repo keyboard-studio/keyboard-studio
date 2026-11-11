@@ -1,5 +1,5 @@
 // baseFallbackCells — the base keyboard answer for positions the working copy does not handle
-// (spec 113 FR-014).
+// (spec 117 FR-014).
 
 import { describe, expect, it } from "vitest";
 import { parseKmn } from "@keyboard-studio/engine";

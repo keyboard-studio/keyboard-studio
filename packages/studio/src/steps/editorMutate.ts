@@ -338,7 +338,7 @@ export const DEADKEY_WRITES: readonly IRPath[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Layout-tab key edits (spec 113)
+// Layout-tab key edits (spec 117)
 // ---------------------------------------------------------------------------
 
 /**
@@ -351,7 +351,7 @@ export const DEADKEY_WRITES: readonly IRPath[] = [
 export const LAYOUT_WRITES: readonly IRPath[] = [irPath("groups")];
 
 // ---------------------------------------------------------------------------
-// Code-tab edits (spec 113 US8)
+// Code-tab edits (spec 117 US8)
 // ---------------------------------------------------------------------------
 
 /**

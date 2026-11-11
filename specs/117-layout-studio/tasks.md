@@ -1,5 +1,5 @@
 ---
-description: "Task list for spec 113: Layout tab and the kmn-edits decision"
+description: "Task list for spec 117: Layout tab and the kmn-edits decision"
 ---
 
 # Tasks: Layout tab — a visual desktop-layout editor
@@ -29,10 +29,10 @@ in [quickstart.md](quickstart.md).
 **Commit cadence** (CLAUDE.md):
 
 - One commit per phase, pushed when its gates are green. The message names the tasks it closes
-  (`spec 113 T0NN-T0NN`). Out-of-scope repairs get their own commit.
-- **PR 1 = Phases 1–5 (Setup, Foundational, US1, US2, US3)** on `km/113-layout-studio`. Check the
+  (`spec 117 T0NN-T0NN`). Out-of-scope repairs get their own commit.
+- **PR 1 = Phases 1–5 (Setup, Foundational, US1, US2, US3)** on `km/117-layout-studio`. Check the
   upstream before every push: `git rev-parse --abbrev-ref --symbolic-full-name '@{u}'` must print
-  `origin/km/113-layout-studio`.
+  `origin/km/117-layout-studio`.
 - Phases 6–9 (US8, US5, US6, US4) go on a follow-up branch cut from `main` after PR 1 merges.
 
 **Gates for every phase**: `pnpm typecheck`, `pnpm -r test`, `pnpm lint`, plus the phase's corpus
@@ -111,7 +111,7 @@ and the pure edit operations and replay.
 - [x] T027 Create `EN/layout-attribution/layout-attribution.corpus.test.ts`: for every keyboard in T002's set, parse, compile through the Node compile path the existing engine corpus suites use (`EN/ldml-export/compile.corpus.test.ts` shows it), `listLayers`, `attributeLayer` for every layer over `DESKTOP_ISO_GEOMETRY`, `simulateEach`, `verifyCells`. Assert nothing throws (SC-002 precursor) and print per-keyboard cell counts by class. Honesty assertions are added in T046
 
 **Checkpoint**: contracts, engine attribution, `simulateEach`, line map, geometry, and the pure
-edit ops are green. Commit `spec 113 T001-T027`.
+edit ops are green. Commit `spec 117 T001-T027`.
 
 ---
 
@@ -151,7 +151,7 @@ refused (SC-001, SC-002).
 - [x] T047 [US1] US1 scenario 7 in `LY/LayoutPane.test.tsx`: after an Assign-tab assignment and a republished artifact, the cell reflects it. Add the Code-tab half as `it.todo` naming T101, which asserts it once US8 ships (research R1: a Code-tab Apply never reaches the artifact today) — it must not pass silently
 - [x] T048 [US1] E2E US1 row in `E2E`: copy a simple positional keyboard; open Mechanical Gallery → Layout; default-layer cells show the copied characters labelled "from the starting point"; a store-based key shows its read-only reason; "view in code" opens the Code tab at the rule
 
-**Checkpoint**: US1 reachable in the gallery and honest on the corpus. Commit `spec 113 T028-T048`.
+**Checkpoint**: US1 reachable in the gallery and honest on the corpus. Commit `spec 117 T028-T048`.
 
 ---
 
@@ -196,7 +196,7 @@ tab, the Code tab, the simulator, and the downloaded `.kmn` show them; undo each
 - [x] T070 [US2] E2E US2 rows in `E2E`: assign `ŋ` and accept `Ŋ` on Shift in one confirm; Assign and Code tabs show both; the downloaded `.kmp`/source zip's `.kmn` has both rules; one undo removes both; reload keeps the edit (the decision persisted); at most three interactions per key
 
 **Checkpoint**: US2 edits are decisions, reach the build, and the equivalence gate is green.
-Commit `spec 113 T049-T070`.
+Commit `spec 117 T049-T070`.
 
 ---
 
@@ -235,7 +235,7 @@ deadkey keyboard, every table row matches the compiled keyboard (SC-007 deadkey 
 - [x] T086 [US3] i18n for Phase 5 (as T045)
 - [x] T087 [US3] E2E US3 row in `E2E`: make a key a new deadkey (spec 083 disclosure shown), add three rows and confirm the proposed space row; "after this deadkey" shows them; simulator typing matches; the download contains the rules
 
-**Checkpoint — PR 1**: Phases 1–5 green. Commit `spec 113 T071-T087`, push, then km-archivist
+**Checkpoint — PR 1**: Phases 1–5 green. Commit `spec 117 T071-T087`, push, then km-archivist
 opens PR 1 against `main` with `refs #N` (US4–US6, US8 remain), reconciling the issue's AC per the
 `issue-closure` skill.
 
@@ -278,7 +278,7 @@ tab and the edit still wins, flagged; a syntax error and a compile error each re
 - [x] T104 [US8] i18n for Phase 6 (as T045)
 - [x] T105 [US8] E2E US8 row in `E2E`: change, add, and delete a rule and Apply; the download has exactly those changes; reload keeps them; a syntax error and a compile error each record nothing; overriding a Layout-tab rule shows the owner confirm and a review flag; **(ruling 9)** re-assigning an edited key in the Assign tab leaves that code edit not applied in the download and flagged with the reason (scenario 4) — done in `76b8d874`, with flag (c) on the projected keyboard. **(ruling 10, remaining)** the other order, scenario 4a: on a key already assigned, a code edit is accepted, wins in the download, is flagged (a) with owner `assign-tab`, and the Assign tab shows the key as changed in code; a confirmed-inventory character it displaces returns to the letters to place. Work, per [contracts/code-edits.md](contracts/code-edits.md) "Assigned keys": (1) `ContentAnchor.keystroke` and owner `assign-tab` in `CT/kmnEdits.ts` + schemas + drift guard (additive); (2) `applyIRChanges` resolves a keystroke anchor when the text anchor misses, with cases in `EN/kmn-diff/applyIRChanges.test.ts`; (3) Apply in `ST/editors/assignLoop/KmnCodePane.tsx` sets `at.keystroke` and the `assign-tab` override for claimed single-key rules before the T098 gate, with cases in `KmnCodePane.test.tsx` (the gate no longer refuses this order); (4) "changed in code" on the assigned key in `ST/editors/assignLoop/MechanismGallery.tsx`; (5) the inventory coverage (`ST/hooks/useInventoryDiff.ts` and its lib helpers) counts `kmn-edits`, with a unit case: replacing `g` with `ĝ` in code puts `g` back in the letters to place; (6) replace the `test.fixme` assign-first row in `layout-tab.spec.ts` with scenario 4a and make it pass
 
-**Checkpoint**: Commit `spec 113 T088-T105`.
+**Checkpoint**: Commit `spec 117 T088-T105`.
 
 ---
 
@@ -294,7 +294,7 @@ follow "view in code"; the Code tab opens at the rule that fires.
 - [x] T108 [US5] i18n for Phase 7 (as T045)
 - [x] T109 [US5] E2E US5 row in `E2E`: open a read-only key's detail; "view in code" reveals the rule's line
 
-**Checkpoint**: Commit `spec 113 T106-T109`.
+**Checkpoint**: Commit `spec 117 T106-T109`.
 
 ---
 
@@ -314,7 +314,7 @@ provisional; nothing else changes (SC-006).
 - [x] T114 [US6] i18n for Phase 8 (as T045)
 - [x] T115 [US6] E2E US6 row in `E2E` (uses `packages/studio/e2e/fallback-policy.spec.ts`'s helpers where they fit)
 
-**Checkpoint**: Commit `spec 113 T110-T115`.
+**Checkpoint**: Commit `spec 117 T110-T115`.
 
 ---
 
@@ -334,7 +334,7 @@ gives `æ`.
 - [x] T120 [US4] i18n for Phase 9 (as T045)
 - [x] T121 [US4] E2E US4 row in `E2E`: "after `n`", set `g` → `ŋ`; typing `n g` gives `ŋ`; the download has the rule; a never-fires duplicate shows read-only
 
-**Checkpoint**: Commit `spec 113 T116-T121`.
+**Checkpoint**: Commit `spec 117 T116-T121`.
 
 ---
 
@@ -349,9 +349,9 @@ the retirement pass → FR-050 and US7 are removed from the spec, not rolled for
 ## Phase 10: Polish & cross-cutting
 
 - [x] T122 [P] Update [docs/packages.md](docs/packages.md) (new engine modules `layout-attribution`, `layout-ops`, `kmn-diff`; contracts `layoutOps`, `kmnEdits`) and [docs/architecture.md](docs/architecture.md) (the `kmn-edits` decision as the record of all KMN edits; projection step 2.2)
-- [x] T123 [P] Run `/speckit-analyze` over spec, plan, and tasks; fix the drift it reports in `specs/113-layout-studio/spec.md`, `plan.md`, `research.md`, `data-model.md`, and `contracts/*.md`
+- [x] T123 [P] Run `/speckit-analyze` over spec, plan, and tasks; fix the drift it reports in `specs/117-layout-studio/spec.md`, `plan.md`, `research.md`, `data-model.md`, and `contracts/*.md`
 - [x] T124 Run every command and E2E row in [quickstart.md](quickstart.md) and record the results in the final PR body
-- [x] T125 Close out the Art XI notes in `specs/113-layout-studio/spec.md` (Assumptions): the store-based next frontier (owner + trigger) and the tray gate stay as written; confirm no other deferred item in `spec.md` or `plan.md` lacks an owner and trigger
+- [x] T125 Close out the Art XI notes in `specs/117-layout-studio/spec.md` (Assumptions): the store-based next frontier (owner + trigger) and the tray gate stay as written; confirm no other deferred item in `spec.md` or `plan.md` lacks an owner and trigger
 
 ---
 

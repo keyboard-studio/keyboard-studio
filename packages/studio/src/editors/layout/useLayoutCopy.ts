@@ -1,5 +1,5 @@
 // useLayoutCopy — the Layout tab's plain-words copy: cell classes, provenance, read-only reasons,
-// and the text a cell's output is read out as (spec 113 FR-012, FR-015, FR-040, FR-041).
+// and the text a cell's output is read out as (spec 117 FR-012, FR-015, FR-040, FR-041).
 //
 // These are Content-team strings (FR-041). They live in one hook so the grid cell, the detail
 // panel, and the banners cannot word the same fact two ways. The helpers are declared inside the

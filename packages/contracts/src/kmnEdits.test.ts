@@ -1,4 +1,4 @@
-// Spec 113 T007: the `kmn-edits` decision value round-trips through its zod
+// Spec 117 T007: the `kmn-edits` decision value round-trips through its zod
 // mirror, and malformed entries are refused at the load boundary.
 import { describe, expect, it } from "vitest";
 import type { IRChange, KmnEdit, KmnEditsValue, LayoutOperation } from "./index";
@@ -70,7 +70,7 @@ describe("KmnEditsValueSchema", () => {
   });
 });
 
-// Spec 113 T090: Code-tab entries are additive arms of the same union.
+// Spec 117 T090: Code-tab entries are additive arms of the same union.
 const RULE = {
   nodeId: "rule#9",
   context: [{ kind: "vkey" as const, name: "K_A", modifiers: [] }],

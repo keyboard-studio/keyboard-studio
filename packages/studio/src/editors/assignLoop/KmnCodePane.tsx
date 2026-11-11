@@ -8,7 +8,7 @@
 //   `ir === null` renders the empty state.
 // - Lint: debounced per keystroke through kmnCodeLint.ts (parseKmn;
 //   syntax errors become positioned Monaco markers).
-// - Apply (spec 113 US8): the edit becomes one structural `CodeEdit` in the `kmn-edits`
+// - Apply (spec 117 US8): the edit becomes one structural `CodeEdit` in the `kmn-edits`
 //   decision, never a wholesale re-parsed IR. The gate runs in order: parse and lint, Layer A
 //   validator errors, then ONE candidate compile on the author's click (no timer: D3). Any
 //   error records nothing and is shown at its line. Then `diffIR(workingIr, parsed)` (empty =

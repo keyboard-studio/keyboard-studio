@@ -1,8 +1,8 @@
 # Implementation Plan: Layout tab — a visual desktop-layout editor
 
-**Branch**: `km/113-layout-studio` | **Date**: 2026-11-04 | **Spec**: [spec.md](spec.md)
+**Branch**: `km/117-layout-studio` | **Date**: 2026-11-04 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from `specs/113-layout-studio/spec.md`
+**Input**: Feature specification from `specs/117-layout-studio/spec.md`
 
 ## Summary
 
@@ -92,7 +92,7 @@ item for phase E (the candidate compile on Apply).
 
 ## Phases and ship order
 
-Each phase is one commit (or a short series) on `km/113-layout-studio`, pushed when its gates are
+Each phase is one commit (or a short series) on `km/117-layout-studio`, pushed when its gates are
 green. **PR 1 = phases A–D (US1–US3).** Later phases go on a follow-up branch cut from `main`
 after PR 1 merges.
 
@@ -113,7 +113,7 @@ after PR 1 merges.
 ### Documentation (this feature)
 
 ```text
-specs/113-layout-studio/
+specs/117-layout-studio/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 (R1–R14)
 ├── data-model.md        # Phase 1

@@ -1,5 +1,5 @@
 // LayoutPane — the Layout tab end to end over the real stores and the real attribution hook
-// (spec 113 US1: FR-010a, FR-011, FR-017, FR-018, scenarios 1, 6, 7). Only the compiled keyboard
+// (spec 117 US1: FR-010a, FR-011, FR-017, FR-018, scenarios 1, 6, 7). Only the compiled keyboard
 // is faked: `fetch` returns placeholder bytes and the simulator is replaced by a table of what
 // "the compiled keyboard" types, which a test changes to republish the artifact.
 
@@ -333,7 +333,7 @@ describe("LayoutPane", () => {
   });
 });
 
-describe("LayoutPane undo (spec 113 US2)", () => {
+describe("LayoutPane undo (spec 117 US2)", () => {
   it("offers undo only when the top undo entry is a Layout edit, and undoes it", async () => {
     load(KMN);
     publish();

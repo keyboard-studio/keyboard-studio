@@ -1,4 +1,4 @@
-# Data model: Layout tab (spec 113)
+# Data model: Layout tab (spec 117)
 
 Types are specified in [contracts/layout-ops.md](contracts/layout-ops.md),
 [contracts/code-edits.md](contracts/code-edits.md), and

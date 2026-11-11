@@ -1,4 +1,4 @@
-// casePartner -- the case partner the Layout tab proposes alongside an edit (spec 113 FR-020a).
+// casePartner -- the case partner the Layout tab proposes alongside an edit (spec 117 FR-020a).
 //
 // Typing a lowercase letter on the default layer usually means its capital belongs on the Shift
 // layer of the same key, and the reverse. The partner of a layer is the same combination with

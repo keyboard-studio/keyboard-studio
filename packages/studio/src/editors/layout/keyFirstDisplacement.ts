@@ -1,5 +1,5 @@
 // keyFirstDisplacement -- the Layout tab's key-first view of the Assign tab's displacement
-// ledger (spec 113, research R9).
+// ledger (spec 117, research R9).
 //
 // The Assign tab starts from a character and asks where it goes; the Layout tab starts from a
 // key and asks what it will type. Both read the same slot-occupancy ledger

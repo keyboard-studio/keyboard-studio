@@ -1,4 +1,4 @@
-// reviewFlags -- what the Code tab asks the author to review (spec 113 US8, FR-063).
+// reviewFlags -- what the Code tab asks the author to review (spec 117 US8, FR-063).
 //
 // Pure. A flag is raised for: (a) a Code-tab entry that overrode another editor's work and has
 // no `ReviewKept` for it, (b) an entry change that no longer finds its anchor on replay, and

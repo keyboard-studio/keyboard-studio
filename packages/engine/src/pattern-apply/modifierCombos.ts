@@ -74,7 +74,7 @@ import type { KeyboardIR, IRRule, ModifierToken, StoreItem } from "@keyboard-stu
 // Types
 // ---------------------------------------------------------------------------
 
-// Defined in contracts (spec 113: `LayerCombo` is persisted in `kmn-edits`);
+// Defined in contracts (spec 117: `LayerCombo` is persisted in `kmn-edits`);
 // re-exported so existing engine imports keep working.
 export type { ModifierToken };
 

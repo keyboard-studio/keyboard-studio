@@ -158,7 +158,7 @@ export const galleryModules: readonly QuestionModule[] = galleryModuleList.map(
 );
 
 /**
- * Decision modules that are replayed and looked up but are NOT wizard steps (spec 113,
+ * Decision modules that are replayed and looked up but are NOT wizard steps (spec 117,
  * research R12): they are recorded at edit time by an editor tab, so they are in
  * `questionRegistry` / `decisionIndex` but deliberately absent from `galleryModules` and
  * `decisionModules` -- a gallery module would form its own wizard screen.

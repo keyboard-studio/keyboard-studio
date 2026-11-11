@@ -1,4 +1,4 @@
-// Three paths must agree (spec 113 T103, the R1 trap). For the SC-010 code-edit set, each edit is
+// Three paths must agree (spec 117 T103, the R1 trap). For the SC-010 code-edit set, each edit is
 // applied live (`commitKmnEdit` on the working IR); then `projectWorkingCopyVfs` replays the
 // recorded entry at step 2.2 onto the IR it assembles from `startIr` plus overlays, which is a
 // different IR from the live one. The projected .kmn must carry every edit with zero misses, and
@@ -28,7 +28,7 @@ beforeEach(() => {
   resetRebuildTrail();
 });
 
-describe("projectWorkingCopyVfs: Code-tab edits (spec 113 T103)", () => {
+describe("projectWorkingCopyVfs: Code-tab edits (spec 117 T103)", () => {
   it("the sibling ../keyboards corpus is present", () => {
     expect(corpusAvailable, `${RELEASE_ROOT} is missing: this test proves nothing without it`).toBe(true);
   });

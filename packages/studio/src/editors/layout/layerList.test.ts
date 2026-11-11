@@ -1,4 +1,4 @@
-// layerList — the selector's list and the Add layer checks (spec 113 FR-010, FR-010a).
+// layerList — the selector's list and the Add layer checks (spec 117 FR-010, FR-010a).
 
 import { describe, expect, it } from "vitest";
 import { parseKmn } from "@keyboard-studio/engine";

@@ -1,4 +1,4 @@
-# Quickstart: validating the Layout tab (spec 113)
+# Quickstart: validating the Layout tab (spec 117)
 
 How to prove each shipped story works. Commands run from the repo root of the worktree. Never run
 bare `vitest` at the root; use the package filters below.

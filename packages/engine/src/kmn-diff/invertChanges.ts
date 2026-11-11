@@ -1,5 +1,5 @@
 /**
- * invertChanges -- the changes that undo `changes` (spec 113 US8). Pure.
+ * invertChanges -- the changes that undo `changes` (spec 117 US8). Pure.
  *
  * The inverse of a list is the inverses in reverse order: insert and remove swap,
  * replace swaps `old` and `node`, store / group / begin / header changes carry

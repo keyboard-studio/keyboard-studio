@@ -1,5 +1,5 @@
 /**
- * applyIRChanges, findOwners, invertChanges (spec 113 T091).
+ * applyIRChanges, findOwners, invertChanges (spec 117 T091).
  */
 import { describe, expect, it } from "vitest";
 import type { IRChange, IRRule, KeyboardIR } from "@keyboard-studio/contracts";

@@ -81,7 +81,7 @@ const KB = { id: "sil_euro_latin", group: "sil", script: "Latn" } as const;
 const RUNS = 15;
 const WARMUPS = 3;
 
-/** Spec 113 T063: when set (e.g. KMN_EDITS_COUNT=20), the decision set also carries that many
+/** Spec 117 T063: when set (e.g. KMN_EDITS_COUNT=20), the decision set also carries that many
  *  `kmn-edits` entries (set-key on distinct keys), so the same two scenarios measure replay
  *  with the Layout tab's log. Unset or 0 reproduces the 093 baseline setup exactly. */
 const KMN_EDITS_COUNT = Number(process.env["KMN_EDITS_COUNT"] ?? "0");
@@ -210,7 +210,7 @@ describe("rebuildPerf.measure — spec 093 SC-004 replay path (T021)", () => {
       const vfs = loadVfs();
       let kmnText = readVfsText(vfs, `source/${KB.id}.kmn`);
       if (kmnText === undefined) throw new Error("fixture .kmn present in VFS");
-      // sil_euro_latin is mnemonic, which the Layout tab refuses to edit (spec 113 FR-018), so a
+      // sil_euro_latin is mnemonic, which the Layout tab refuses to edit (spec 117 FR-018), so a
       // kmn-edits replay on it throws. KMN_EDITS_STRIP_MNEMONIC=1 drops the mnemonic store from
       // the source for the whole run (set it for BOTH the baseline and the with-edits run so the
       // comparison is like for like).

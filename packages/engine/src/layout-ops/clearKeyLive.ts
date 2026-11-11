@@ -1,5 +1,5 @@
 /**
- * clearKeyLive — the live `clear-key` (spec 113, contracts/layout-ops.md).
+ * clearKeyLive — the live `clear-key` (spec 117, contracts/layout-ops.md).
  *
  * The live path applies one entry and records its effect rather than
  * replaying, but a `clear-key` cannot be an IR inverse: it must give back the

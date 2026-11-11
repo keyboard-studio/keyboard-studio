@@ -14,7 +14,7 @@ earlier "contracts only" status.
 The locked Day-1 shared contract: TS types, the seven service interfaces + mocks, fixtures, the
 criteria catalog at `packages/contracts/data/criteria.json`, and the runtime **zod schemas**
 (`src/schemas.ts`) that mirror the locked `Pattern`/`Criterion` types. The dependency root —
-everything else builds to it. Spec 113 adds `layoutOps.ts` (`LayoutOperation` and its layer,
+everything else builds to it. Spec 117 adds `layoutOps.ts` (`LayoutOperation` and its layer,
 context and output types) and `kmnEdits.ts` (`KmnEdit`, `KmnEditsValue`, `CodeEdit`, `IRChange`).
 
 The criteria catalog currently holds 149 rows (133 repo-hygiene + 12 §18 DISCUS design-heuristic
@@ -30,7 +30,7 @@ The real engine. Subsystems under `packages/engine/src/`: `codec` (.kmn ↔ Keyb
 `pattern-library`, `strategy-selector`, `character-discovery`, `inventory`, `loader`,
 `base-browser`, `stub-mutator`, `langtags` (SIL langtags slim-index lookup; exposed as
 `@keyboard-studio/engine/langtags`), `layout-chart` (deterministic SVG layout charts per
-platform/layer, spec 080), `decision-audit`, and the Layout-tab modules (spec 113):
+platform/layer, spec 080), `decision-audit`, and the Layout-tab modules (spec 117):
 `layout-attribution` (per-key attribution of a desktop layout: `attributeLayer`, `classifyRule`,
 `listLayers`, `listContexts`, `verifyCells`), `layout-ops` (pure IR-to-IR `applyLayoutOp`, and
 `replayKmnEdits` for the `kmn-edits` log), and `kmn-diff` (`diffIR`, `applyIRChanges`,

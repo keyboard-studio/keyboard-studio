@@ -145,7 +145,7 @@ describe("AddPhysicalAdapter tab bar", () => {
   });
 });
 
-describe("AddPhysicalAdapter review flags (spec 113 US8)", () => {
+describe("AddPhysicalAdapter review flags (spec 117 US8)", () => {
   it("puts the review-flag count in the Code tab's name and shows the list there; flags do not gate anything", async () => {
     const { useDecisionStore } = await import("../../stores/decisionStore.ts");
     useDecisionStore.getState().reset();
