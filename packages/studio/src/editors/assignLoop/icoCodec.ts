@@ -163,7 +163,19 @@ function decodeBmpEntry(
   return { width, height, pixels };
 }
 
-/** Apply the 1-bit AND mask (1 = transparent) over the decoded pixels. */
+/**
+ * Apply the 1-bit AND mask (1 = transparent) over the decoded pixels.
+ *
+ * Real-world .ico files (Keyman/TIKE and most Windows icon writers)
+ * store 0 in the 32-bit BMP alpha byte for EVERY pixel and carry
+ * transparency only in the AND mask — so a mask-0 pixel whose alpha byte
+ * is 0 is OPAQUE, not transparent. Per pixel: mask 1 → alpha 0; else
+ * keep the stored alpha byte if it says anything (> 0), otherwise 255.
+ * (The census over the keyboards corpus found zero pixels where a
+ * nonzero alpha byte disagreed with the mask, so the mask wins on
+ * conflict and the alpha byte is only ever a fallback for opacity.)
+ * 24-bit entries already decoded to alpha 255, so this is a no-op there.
+ */
 function applyAndMask(
   data: Uint8Array,
   pxOffset: number,
@@ -182,8 +194,13 @@ function applyAndMask(
     const srcY = topDown ? y : height - 1 - y;
     for (let x = 0; x < width; x++) {
       const byte = data[maskOffset + srcY * maskStride + (x >> 3)]!;
+      const i = (y * width + x) * 4 + 3;
       if (byte & (0x80 >> (x & 7))) {
-        pixels[(y * width + x) * 4 + 3] = 0;
+        pixels[i] = 0;
+      } else if (pixels[i] === 0) {
+        // Mask says opaque but the alpha byte is 0: the writer stored
+        // no alpha — restore full opacity instead of a blank pixel.
+        pixels[i] = 255;
       }
     }
   }
