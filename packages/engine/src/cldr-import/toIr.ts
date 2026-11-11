@@ -19,6 +19,7 @@ import type {
   ContextElement,
   OutputElement,
 } from "@keyboard-studio/contracts";
+import { makeRule, ruleKeystroke } from "@keyboard-studio/contracts";
 import type { CldrLegacyKeyboard } from "./legacyXml.js";
 import { isoToVkey, expandModifiers, formForLocale } from "./isoKeys.js";
 
@@ -177,11 +178,16 @@ export function importCldrDesktopKeyboard(
           map.transformNo !== true
             ? [{ kind: "namedDeadkey", name: deadkeyByChar.get(map.to) as string }]
             : charsOut(map.to);
-        rules.push({
-          nodeId: nextNodeId(),
-          context: [{ kind: "vkey", name: vkey, modifiers }],
-          output,
-        });
+        rules.push(
+          makeRule(
+            {
+              nodeId: nextNodeId(),
+              keystroke: { kind: "vkey", name: vkey, modifiers },
+              output,
+            },
+            { usingKeys: true },
+          ),
+        );
         // First producer wins for the follower lookup (base layer first).
         if (!keyForChar.has(map.to)) {
           keyForChar.set(map.to, { vkey, modifiers });
@@ -211,21 +217,27 @@ export function importCldrDesktopKeyboard(
     const transformKey = `${dkName}|${t.from}`;
     if (seenTransforms.has(transformKey)) continue;
     seenTransforms.add(transformKey);
-    const context: ContextElement[] = [
+    // makeRule writes the `+` separator itself (spec 116 FR-037): the
+    // pre-context is everything before the struck key.
+    const preContext: ContextElement[] = [
       { kind: "namedDeadkey", name: dkName },
       ...rest.slice(0, -1).map((ch) => ({ kind: "char", value: ch }) as const),
-      { kind: "raw", text: "+" },
-      {
-        kind: "vkey",
-        name: struck.vkey,
-        modifiers: struck.modifiers,
-      },
     ];
-    rules.push({
-      nodeId: nextNodeId(),
-      context,
-      output: charsOut(t.to),
-    });
+    rules.push(
+      makeRule(
+        {
+          nodeId: nextNodeId(),
+          preContext,
+          keystroke: {
+            kind: "vkey",
+            name: struck.vkey,
+            modifiers: struck.modifiers,
+          },
+          output: charsOut(t.to),
+        },
+        { usingKeys: true },
+      ),
+    );
     transformRules++;
   }
 
@@ -241,7 +253,7 @@ export function importCldrDesktopKeyboard(
   // modifier+letter with CapsLock on falls through to the app.
   const capsKeys = new Set<string>();
   for (const rule of rules) {
-    const last = rule.context[rule.context.length - 1];
+    const last = ruleKeystroke(rule, { usingKeys: true });
     if (
       last?.kind === "vkey" &&
       last.modifiers.includes("CAPS")
@@ -250,7 +262,7 @@ export function importCldrDesktopKeyboard(
     }
   }
   for (const rule of rules) {
-    const last = rule.context[rule.context.length - 1];
+    const last = ruleKeystroke(rule, { usingKeys: true });
     if (
       last?.kind === "vkey" &&
       capsKeys.has(last.name) &&
