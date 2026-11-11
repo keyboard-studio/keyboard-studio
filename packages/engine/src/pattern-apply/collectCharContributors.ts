@@ -101,7 +101,8 @@
 
 import type { ContextElement, IRRule, KeyboardIR, StoreItem } from "@keyboard-studio/contracts";
 import { collectFromElements, contextHasDirectBackspace, isBackspaceVkeyName } from "@keyboard-studio/contracts";
-import { isDeadkeyOnlyOutput, isPlusSeparator } from "../shared/rule-shape.js";
+import { withoutOutsStores } from "@keyboard-studio/contracts";
+import { elementAtOffset, isDeadkeyOnlyOutput, ruleContextElements } from "../shared/rule-shape.js";
 import { makeSlotId } from "./slotId.js";
 import { buildProducerIndex } from "./producerIndex.js";
 import type { ProducerIndex } from "./producerIndex.js";
@@ -545,6 +546,7 @@ function contextElementTokenDisplay(
     case 'index':
     case 'baselayout':
     case 'if':
+    case 'platform':
       // A guard produces no character, so it has no contributor token —
       // explicitly invisible here, never a dropped condition: this switch
       // only renders characters a context element contributes.
@@ -563,9 +565,8 @@ function contextElementTokenDisplay(
  * Resolve WHICH `any()` context element is paired with a matched output
  * store slot, using the SAME offset convention as
  * `applyStoreSlotRemovals.ts`'s index()/context pairing invariant:
- * `effectiveContext[offset - 1]` — a 1-based `index()` `offset` into the
- * rule's context with the codec's synthetic `+` keystroke-boundary separator
- * filtered out first (see `isPlusSeparator`).
+ * `elementAtOffset` — a 1-based `index()` `offset` into the rule's context
+ * with the codec's synthetic `+` keystroke-boundary separator never counted.
  *
  * A rule's context may carry more than one `any()` element (e.g. two
  * fan-out stores consumed by the same rule); picking the FIRST one
@@ -589,17 +590,16 @@ function contextElementTokenDisplay(
  * abort rather than guess).
  */
 function resolveAlignedAnyElement(
-  context: readonly ContextElement[],
+  rule: IRRule,
+  group: { usingKeys: boolean },
   matchedOutputEl: { kind: string; offset: number | undefined } | undefined,
 ): (ContextElement & { kind: 'any' }) | undefined {
-  const effectiveContext = context.filter((el) => !isPlusSeparator(el));
-
   if (matchedOutputEl?.kind === 'index' && matchedOutputEl.offset !== undefined) {
-    const target = effectiveContext[matchedOutputEl.offset - 1];
+    const target = elementAtOffset(rule, group, matchedOutputEl.offset);
     return target !== undefined && target.kind === 'any' ? target : undefined;
   }
 
-  const anyEls = effectiveContext.filter(
+  const anyEls = ruleContextElements(rule).filter(
     (el): el is ContextElement & { kind: 'any' } => el.kind === 'any',
   );
   return anyEls.length === 1 ? anyEls[0] : undefined;
@@ -832,11 +832,11 @@ function classifyCarvedGrapheme(grapheme: string): 'diacritic' | 'base' {
  * (ruling §3), which is NEVER taint-tested. Resolved via the same
  * {@link resolveAlignedAnyElement} pairing the "(a)" loop uses.
  */
-function pairedSelectorElements(rule: IRRule): Set<ContextElement> {
+function pairedSelectorElements(rule: IRRule, group: { usingKeys: boolean }): Set<ContextElement> {
   const selectors = new Set<ContextElement>();
   for (const el of rule.output) {
     if ((el.kind !== 'index' && el.kind !== 'outs') || el.storeRef === undefined) continue;
-    const aligned = resolveAlignedAnyElement(rule.context, {
+    const aligned = resolveAlignedAnyElement(rule, group, {
       kind: el.kind,
       offset: el.kind === 'index' ? el.offset : 0,
     });
@@ -934,14 +934,16 @@ interface RuleProducedCandidates {
 function ruleProducedCandidates(
   outEls: { kind: string; value?: string; storeRef?: string; offset?: number }[],
   storeMap: ReadonlyMap<string, KeyboardIR['stores'][number]>,
-  context: readonly ContextElement[],
+  rule: IRRule,
+  group: { usingKeys: boolean },
 ): RuleProducedCandidates {
+  const context = ruleContextElements(rule);
   const storeIndices = new Map<string, Set<number>>();
   for (const el of outEls) {
     if ((el.kind === 'index' || el.kind === 'outs') && el.storeRef !== undefined) {
       const store = storeMap.get(el.storeRef);
       if (store === undefined) continue;
-      const alignedAnyEl = resolveAlignedAnyElement(context, {
+      const alignedAnyEl = resolveAlignedAnyElement(rule, group, {
         kind: el.kind,
         offset: el.kind === 'index' ? el.offset : 0,
       });
@@ -1144,7 +1146,7 @@ function collectIntoBuckets(ir: KeyboardIR, scope: TaintScope): Map<string, Cont
       if (!isTriggerRule(rule)) continue;
       const deadkeyId = (rule.output[0] as { kind: 'deadkey'; id: number }).id;
       if (ambiguousDeadkeyIds.has(deadkeyId)) continue;
-      const display = keystrokeDisplayForContext(rule.context);
+      const display = keystrokeDisplayForContext(ruleContextElements(rule));
       if (display === undefined) continue;
       const existing = triggerKeystrokeByDeadkeyId.get(deadkeyId);
       if (existing === undefined) {
@@ -1295,9 +1297,10 @@ function collectIntoBuckets(ir: KeyboardIR, scope: TaintScope): Map<string, Cont
       // whole-rule deletion and the `blocked` classification stay excluded
       // exactly as before — the surgical unit for a correction rule is always
       // the slot, never the rule, whose other rows serve other characters.
-      const isBackspaceCorrectionRule = contributorInputHasBackspace(rule.context, undefined);
+      const ruleContext = ruleContextElements(rule);
+      const isBackspaceCorrectionRule = contributorInputHasBackspace(ruleContext, undefined);
 
-      const isDeadkeyRule = rule.context.some((el) => el.kind === 'deadkey');
+      const isDeadkeyRule = ruleContext.some((el) => el.kind === 'deadkey');
 
       const outEls = rule.output as { kind: string; value?: string; storeRef?: string; offset?: number }[];
 
@@ -1306,14 +1309,14 @@ function collectIntoBuckets(ir: KeyboardIR, scope: TaintScope): Map<string, Cont
       // used to re-resolve this (with a context.filter allocation) per
       // (rule, slot, bucket) — millions of times on large keyboards.
       const alignedOutputStoresByAnyEl = new Map<object, string[]>();
-      for (const el of rule.context) {
+      for (const el of ruleContext) {
         if (el.kind !== 'any') continue;
         const names: string[] = [];
         for (const outEl of outEls) {
           if ((outEl.kind !== 'index' && outEl.kind !== 'outs') || outEl.storeRef === undefined) {
             continue;
           }
-          const aligned = resolveAlignedAnyElement(rule.context, {
+          const aligned = resolveAlignedAnyElement(rule, group, {
             kind: outEl.kind,
             offset: outEl.kind === 'index' ? outEl.offset : 0,
           });
@@ -1337,7 +1340,7 @@ function collectIntoBuckets(ir: KeyboardIR, scope: TaintScope): Map<string, Cont
         // Per bucket, only the FIRST tainted literal is nominated — replicates
         // the single-target `break` for each bucket independently.
         const contextHandled = new Set<string>();
-        for (const el of rule.context) {
+        for (const el of ruleContext) {
           if (el.kind !== 'char') continue;
           for (const key of scope.matchBuckets(el.value)) {
             if (contextHandled.has(key)) continue;
@@ -1365,7 +1368,7 @@ function collectIntoBuckets(ir: KeyboardIR, scope: TaintScope): Map<string, Cont
       // whether the same char also appears on that rule's input side; only a
       // char NOT produced on the output side gets to tag an input-side
       // occurrence "used".
-      const producedCandidates = ruleProducedCandidates(outEls, storeMap, rule.context);
+      const producedCandidates = ruleProducedCandidates(outEls, storeMap, rule, group);
       const producedForBucketCache = new Map<string, Set<string>>();
       const producedForBucket = (key: string): Set<string> => {
         let s = producedForBucketCache.get(key);
@@ -1381,7 +1384,7 @@ function collectIntoBuckets(ir: KeyboardIR, scope: TaintScope): Map<string, Cont
       // taint-tested. Only for deadkey fan-out rules (deadkey context, not a
       // backspace-correction rule); other rules' selectors are still tested.
       const skipSelectorElements =
-        isDeadkeyRule && !isBackspaceCorrectionRule ? pairedSelectorElements(rule) : undefined;
+        isDeadkeyRule && !isBackspaceCorrectionRule ? pairedSelectorElements(rule, group) : undefined;
 
       // (0) Input-store occurrences — any() context elements ("remove everywhere",
       //     #525 v2). Independent of the output-store/literal classification below
@@ -1393,7 +1396,7 @@ function collectIntoBuckets(ir: KeyboardIR, scope: TaintScope): Map<string, Cont
       //     spurious blue "used" row. `notany()` is excluded here — only `any()`
       //     (the carve-scoped `notany()` hygiene nomination runs as its own
       //     section below).
-      for (const el of rule.context) {
+      for (const el of ruleContext) {
         if (el.kind !== 'any') continue;
         if (skipSelectorElements?.has(el)) continue;
         const inputStore = storeMap.get(el.storeRef);
@@ -1470,7 +1473,7 @@ function collectIntoBuckets(ir: KeyboardIR, scope: TaintScope): Map<string, Cont
           // Hoisted per output element (#2406): the aligned any() element and
           // its store depend on the rule+element, not the slot — only the
           // aligned ITEM (baseItem below) is per-slot.
-          const alignedAnyEl = resolveAlignedAnyElement(rule.context, { kind: el.kind, offset: el.offset });
+          const alignedAnyEl = resolveAlignedAnyElement(rule, group, { kind: el.kind, offset: el.offset });
           const anyStore = alignedAnyEl !== undefined ? storeMap.get(alignedAnyEl.storeRef) : undefined;
           const outTaint = storeTaintIndex.get(store.name);
           const inTaint = anyStore !== undefined ? storeTaintIndex.get(anyStore.name) : undefined;
@@ -1521,7 +1524,7 @@ function collectIntoBuckets(ir: KeyboardIR, scope: TaintScope): Map<string, Cont
               // only for as long as its character does. See the
               // `isBackspaceCorrectionRule` comment above for the worked
               // sil_cameroon_qwerty case.
-              if (contributorInputHasBackspace(rule.context, baseItem)) {
+              if (contributorInputHasBackspace(ruleContext, baseItem)) {
                 addStoreSlot(acc, makeSlotId(store.nodeId, i), 'input', {
                   kind: 'store-slot',
                   producedChar: itemChar,
@@ -1599,12 +1602,12 @@ function collectIntoBuckets(ir: KeyboardIR, scope: TaintScope): Map<string, Cont
             if (!acc.seenRuleNodeIds.has(rule.nodeId)) {
               acc.seenRuleNodeIds.add(rule.nodeId);
               acc.ruleNodeIds.push(rule.nodeId);
-              const keystrokeDisplay = keystrokeDisplayForContext(rule.context);
+              const keystrokeDisplay = keystrokeDisplayForContext(ruleContext);
               // No aligned store slot for a plain literal-output rule — an
               // any()/index() context element (rare here) always falls back
               // (both slotIndex and alignedAnyElement are absent).
               const inputSequence = buildContextInputSequence(
-                rule.context,
+                ruleContext,
                 storeMap,
                 triggerKeystrokeByDeadkeyId,
                 undefined,
@@ -1631,9 +1634,9 @@ function collectIntoBuckets(ir: KeyboardIR, scope: TaintScope): Map<string, Cont
               if (!acc.seenRuleNodeIds.has(rule.nodeId)) {
                 acc.seenRuleNodeIds.add(rule.nodeId);
                 acc.ruleNodeIds.push(rule.nodeId);
-                const keystrokeDisplay = keystrokeDisplayForContext(rule.context);
+                const keystrokeDisplay = keystrokeDisplayForContext(ruleContext);
                 const inputSequence = buildContextInputSequence(
-                  rule.context,
+                  ruleContext,
                   storeMap,
                   triggerKeystrokeByDeadkeyId,
                   undefined,
@@ -1676,7 +1679,7 @@ function collectIntoBuckets(ir: KeyboardIR, scope: TaintScope): Map<string, Cont
   for (const group of ir.groups) {
     for (const rule of group.rules) {
       if (isTriggerRule(rule)) continue;
-      for (const el of rule.context) {
+      for (const el of ruleContextElements(rule)) {
         if (el.kind !== 'notany') continue;
         const store = storeMap.get(el.storeRef);
         if (store === undefined || store.isSystem) continue;
@@ -1781,7 +1784,7 @@ function collectIntoBuckets(ir: KeyboardIR, scope: TaintScope): Map<string, Cont
   const referencedStoreNames = new Set<string>();
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      for (const el of rule.context) {
+      for (const el of ruleContextElements(rule)) {
         const ref = (el as { storeRef?: string }).storeRef;
         if (ref !== undefined) referencedStoreNames.add(ref);
       }
@@ -1868,9 +1871,11 @@ function setTaintScope(
 }
 
 export function collectTaintedContributors(
-  ir: KeyboardIR,
+  source: KeyboardIR,
   carved: ReadonlySet<string>,
 ): CharContributors {
+  // Pairs stores by position: read without outs() stores (see withoutOutsStores).
+  const ir = withoutOutsStores(source);
   // Normalize the carved set to NFC so comparisons are canonical.
   const R = new Set([...carved].map((g) => g.normalize('NFC')));
   const carvedDiagnostics = [...R].map((grapheme) => ({
@@ -1909,9 +1914,11 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
  * instead of once per character.
  */
 export function collectCharContributorsBatched(
-  ir: KeyboardIR,
+  source: KeyboardIR,
   targetChars: ReadonlySet<string>,
 ): Map<string, CharContributors> {
+  // Pairs stores by position: read without outs() stores (see withoutOutsStores).
+  const ir = withoutOutsStores(source);
   // Normalize targets to NFC so comparisons are canonical (mirrors
   // collectTaintedContributors' R normalization).
   const keys = [...new Set([...targetChars].map((c) => c.normalize('NFC')))];
@@ -1988,7 +1995,7 @@ function buildOutputSlotDescriptor(
   baseItem: StoreItem | undefined,
 ): ContributorDescriptor {
   const inputSequence = buildContextInputSequence(
-    rule.context,
+    ruleContextElements(rule),
     storeMap,
     triggerKeystrokeByDeadkeyId,
     slotIndex,
@@ -2007,7 +2014,7 @@ function buildOutputSlotDescriptor(
     };
   }
 
-  const deadkeyEl = rule.context.find(
+  const deadkeyEl = ruleContextElements(rule).find(
     (el): el is { kind: 'deadkey'; id: number } => el.kind === 'deadkey',
   );
   const mark = deadkeyEl !== undefined ? triggerKeystrokeByDeadkeyId.get(deadkeyEl.id) : undefined;

@@ -72,7 +72,14 @@ import type {
   OutputElement,
   StoreItem,
 } from "../keyboard-ir.js";
-import { isPlusSeparator } from "../rule-shape.js";
+import {
+  ruleConditions,
+  ruleContextElements,
+  ruleExtraKeystrokeElements,
+  ruleHasNulContext,
+  ruleKeystrokeLoose,
+  rulePreContext,
+} from "../rule-shape.js";
 import { US_BASE_LAYOUT } from "./usBaseLayout.js";
 
 // ---------------------------------------------------------------------------
@@ -178,11 +185,24 @@ export interface DeadkeyInfo {
 // Cluster shape matchers
 // ---------------------------------------------------------------------------
 
-/** Context/output elements with the codec's synthetic `+` separators removed. */
-function withoutPlusSeparators<T extends { kind: string; text?: string }>(
-  els: readonly T[],
-): T[] {
-  return els.filter((el) => !isPlusSeparator(el));
+/**
+ * Every context element of a rule in source order, with the codec's synthetic
+ * `+` separator removed: `[nul?, ...conditions, ...preContext, keystroke?,
+ * ...extras]`. Read through the shared rule-shape accessors; the loose
+ * keystroke reader is right here because these shape matchers run on a rule
+ * with no group in scope.
+ */
+function nonSeparatorElements(rule: IRRule): ContextElement[] {
+  const nul: ContextElement[] = ruleHasNulContext(rule) ? [{ kind: "raw", text: "nul" }] : [];
+  const group = { usingKeys: true };
+  const keystroke = ruleKeystrokeLoose(rule);
+  return [
+    ...nul,
+    ...ruleConditions(rule),
+    ...rulePreContext(rule, group),
+    ...(keystroke !== undefined ? [keystroke] : []),
+    ...ruleExtraKeystrokeElements(rule, group),
+  ];
 }
 
 /**
@@ -193,7 +213,7 @@ function withoutPlusSeparators<T extends { kind: string; text?: string }>(
 function matchTriggerRule(
   rule: IRRule,
 ): { id: number; triggerKey: string; modifiers: string[] } | null {
-  const ctx = withoutPlusSeparators(rule.context);
+  const ctx = nonSeparatorElements(rule);
   if (ctx.length !== 1) return null;
   const c0 = ctx[0] as ContextElement | undefined;
   let triggerKey: string | null = null;
@@ -217,7 +237,7 @@ function matchTriggerRule(
 function matchFanoutRule(
   rule: IRRule,
 ): { id: number; baseStore: string; outputStore: string } | null {
-  const ctx = withoutPlusSeparators(rule.context);
+  const ctx = nonSeparatorElements(rule);
   if (ctx.length !== 2) return null;
   const d = ctx[0] as ContextElement | undefined;
   const a = ctx[1] as ContextElement | undefined;
@@ -361,7 +381,7 @@ function scanNamedRawEntries(ir: KeyboardIR): NamedRawEntry[] {
 function matchNamedTriggerRule(
   rule: IRRule,
 ): { name: string; triggerKey: string } | null {
-  const ctx = withoutPlusSeparators(rule.context);
+  const ctx = nonSeparatorElements(rule);
   if (ctx.length !== 1) return null;
   const c0 = ctx[0] as ContextElement | undefined;
   let triggerKey: string | null = null;
@@ -381,7 +401,7 @@ function matchNamedTriggerRule(
 function matchNamedFanoutRule(
   rule: IRRule,
 ): { name: string; baseStore: string; outputStore: string } | null {
-  const ctx = withoutPlusSeparators(rule.context);
+  const ctx = nonSeparatorElements(rule);
   if (ctx.length !== 2) return null;
   const d = ctx[0] as ContextElement | undefined;
   const a = ctx[1] as ContextElement | undefined;
@@ -425,7 +445,7 @@ function scanNamedTypedEntries(ir: KeyboardIR): NamedRawEntry[] {
         if (e.baseStore === null) e.baseStore = f.baseStore;
         if (e.outputStore === null) e.outputStore = f.outputStore;
       }
-      for (const el of rule.context) {
+      for (const el of nonSeparatorElements(rule)) {
         if (isNamedDeadkeyElement(el)) entryFor(el.name);
       }
       for (const el of rule.output) {
@@ -667,7 +687,7 @@ function escapeRuleDisplay(
 ): string | undefined {
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      const ctx = withoutPlusSeparators(rule.context);
+      const ctx = nonSeparatorElements(rule);
       if (ctx.length !== 2 || rule.output.length !== 1) continue;
       const [c0, c1] = ctx as [ContextElement, ContextElement];
       const o0 = rule.output[0] as OutputElement | undefined;
@@ -714,7 +734,7 @@ export function scanDeadkeyRefs(ir: KeyboardIR): DeadkeyRef[] {
   const refs: DeadkeyRef[] = [];
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      for (const el of rule.context) {
+      for (const el of ruleContextElements(rule)) {
         if (el.kind === "deadkey") {
           refs.push({ id: el.id, position: "rule-context", container: rule.nodeId });
         }

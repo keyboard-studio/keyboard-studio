@@ -22,9 +22,12 @@ import {
   isNulOutput,
   isSuppressionOnlyOutput,
   shapeContext,
+  splitShapeContext,
   shapeOutput,
 } from "./classify.js";
+import { ruleLhsKind } from "@keyboard-studio/contracts";
 import { getCategory, getName } from "./unicodeAdapter.js";
+import { fmtContextElement, fmtOutputElement } from "../codec/emit.js";
 
 /** Short modifier labels for author-language key descriptions. */
 const MODIFIER_LABELS: Record<string, string> = {
@@ -111,6 +114,9 @@ function describeContextElement(el: ContextElement): string {
       return `the "${el.value}" base layout`;
     case "if":
       return `the "${el.store}" store is set to "${el.value}"`;
+    case "platform":
+      // Shown as written, exactly as the raw element it replaces was.
+      return fmtContextElement(el);
     case "raw":
       return el.text;
   }
@@ -146,6 +152,14 @@ function describeOutputElement(el: OutputElement): string {
       return `every character in the "${el.storeRef}" store`;
     case "useGroup":
       return `a jump to the "${el.groupName}" group`;
+    case "layer":
+    case "set":
+    case "save":
+    case "reset":
+    case "call":
+    case "return":
+      // Shown as written, exactly as the raw element or fragment they replace was.
+      return fmtOutputElement(el);
     case "raw":
       if (isNulOutput(el)) return "nothing";
       if (isBareContextOutput(el)) return "the existing text, unchanged";
@@ -168,23 +182,8 @@ export function joinList(items: string[]): string {
   return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
-/**
- * Split shape context into the pre-context (everything before the struck
- * key) and the struck key itself (the trailing vkey, if present).
- */
-function splitKeyContext(ctx: ContextElement[]): {
-  pre: ContextElement[];
-  key?: Extract<ContextElement, { kind: "vkey" }>;
-} {
-  const last = ctx[ctx.length - 1];
-  if (last !== undefined && last.kind === "vkey") {
-    return { pre: ctx.slice(0, -1), key: last };
-  }
-  return { pre: ctx };
-}
-
 function describeBlocking(rule: IRRule): string {
-  const { pre, key } = splitKeyContext(shapeContext(rule));
+  const { guards: pre, key } = splitShapeContext(rule);
   const out = shapeOutput(rule);
   const hasBeep = out.some((el) => el.kind === "beep");
   const keepsContext = out.some(isBareContextOutput);
@@ -247,7 +246,7 @@ function describeReorder(rule: IRRule): string {
 }
 
 function describeOpaqueRule(rule: IRRule): string {
-  if (rule.matchKind !== undefined) {
+  if (ruleLhsKind(rule) !== "input") {
     const target = shapeOutput(rule).find(
       (el) =>
         el.kind === "useGroup" ||
@@ -262,10 +261,19 @@ function describeOpaqueRule(rule: IRRule): string {
         if (m?.[1] !== undefined) name = `"${m[1]}"`;
       }
     }
-    const when = rule.matchKind === "match"
+    const when = ruleLhsKind(rule) === "match"
       ? "When a rule in this group has matched"
       : "When nothing else in this group matched";
     return `${when}, processing moves to the ${name} group — a group transition, not a keystroke rule.`;
+  }
+  // Rules the codec used to keep as option-store / call-return fragments get the
+  // sentence those fragments had.
+  const out = shapeOutput(rule);
+  if (out.some((el) => el.kind === "set" || el.kind === "save" || el.kind === "reset")) {
+    return OPAQUE_REASON_LANGUAGE["option-store-directive"] as string;
+  }
+  if (out.some((el) => el.kind === "call" || el.kind === "return")) {
+    return OPAQUE_REASON_LANGUAGE["call-return"] as string;
   }
   return "This rule has a shape the assist layer doesn't recognise yet — it is shown as written.";
 }
@@ -592,6 +600,12 @@ const OPAQUE_REASON_LANGUAGE: Record<string, string> = {
     "A store with a backwards character range the editor can't expand safely.",
   "malformed-range":
     "A store with a malformed character range the editor can't expand safely.",
+  "foreign-compile-target":
+    "A line written for another keyboard engine (KMFL or Weaver), which Keyman ignores.",
+  "removed-statement":
+    "Uses a statement newer versions of Keyman no longer support; kept exactly as written.",
+  "multi-element-keystroke":
+    "A keystroke with more than one key; Keyman uses only the first, so the rule is kept as written.",
 };
 
 /**

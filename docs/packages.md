@@ -36,6 +36,11 @@ platform/layer, spec 080), `decision-audit`, and the Layout-tab modules (spec 11
 `replayKmnEdits` for the `kmn-edits` log), and `kmn-diff` (`diffIR`, `applyIRChanges`,
 `findOwners`, `invertChanges` for the Code tab's Apply).
 
+`codec/ng/` is **vendored** upstream code: Keyman's next-generation `.kmn` lexer and parser
+(MIT), pinned to one upstream commit. Don't edit it in place. Its source commit, file list and
+local patches are in `packages/engine/src/codec/ng/PROVENANCE.md`, and it is re-synced with
+`scripts/vendor-ng-parser.mjs`. Only the codec may import it (depcruise).
+
 Documentation rendering (specs 061 and 076) lives in `shared/`: `helpDocsRender.ts` (the four
 prose members, one body shared by welcome and help), `renderHistoryMd.ts` (the one HISTORY.md
 composer both tracks write through), `deriveDocMemberStates.ts` (the single source of each

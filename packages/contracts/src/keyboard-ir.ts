@@ -51,6 +51,15 @@ export type StoreItem =
    */
   | { kind: "namedDeadkey"; name: string }
   | { kind: "any" }
+  /**
+   * `outs(store)` in a store body: inline expansion of another store's content.
+   * A REFERENCE, never the expansion; `storeRef` keeps the name as written.
+   * Analyses that need the expanded items resolve it through
+   * `resolveStoreItems(ir, storeName)`, which guards against cycles. Additive
+   * member (spec 116): the codec used to keep such a store as an opaque
+   * `outs-expansion` fragment, and persisted drafts still hold that form.
+   */
+  | { kind: "outs"; storeRef: string }
   | { kind: "raw"; text: string };
 
 /** An element in a KMN rule's context (LHS). */
@@ -81,6 +90,14 @@ export type ContextElement =
    * stays an opaque fragment, never this variant.
    */
   | { kind: "if"; store: string; value: string }
+  /**
+   * A KMN `platform('touch')` condition in head position (spec 116). `value`
+   * is the platform string, unquoted; the codec owns quoting on emit. Like an
+   * `if` guard it produces no context character but occupies an element
+   * position. A `platform()` that is not in the head cluster, or whose
+   * argument is not a quoted literal, stays a `raw` element.
+   */
+  | { kind: "platform"; value: string }
   | { kind: "raw"; text: string };
 
 /** An element in a KMN rule's output (RHS). */
@@ -111,6 +128,27 @@ export type OutputElement =
    *  previously preserved this as an untyped `raw` blob; downstream consumers
    *  (recognizer, carve gallery) can now see the transition explicitly. */
   | { kind: "useGroup"; groupName: string }
+  /**
+   * `layer('shift')` layer switch (spec 116). `value` is the layer name,
+   * unquoted. Produces no output character. A `layer()` whose argument is not
+   * a quoted literal stays a `raw` element.
+   */
+  | { kind: "layer"; value: string }
+  /**
+   * `set(store = value)` — option or system store assignment such as
+   * `set(&layer = 'x')` or `set(opt = '1')` (spec 116). `storeRef` keeps the
+   * name as written, including the `&` of a system store. `value` holds the
+   * grammar's `text+`: chars, deadkeys and `outs`, nothing else.
+   */
+  | { kind: "set"; storeRef: string; value: OutputElement[] }
+  /** `save(store)` — persist an option store (spec 116). `storeRef` as written. */
+  | { kind: "save"; storeRef: string }
+  /** `reset(store)` — reset an option store to its saved or default value (spec 116). */
+  | { kind: "reset"; storeRef: string }
+  /** `call(store)` — call an external routine named by a store (spec 116). */
+  | { kind: "call"; storeRef: string }
+  /** `return` — return from a `call`ed rule set (spec 116). */
+  | { kind: "return" }
   | { kind: "raw"; text: string };
 
 /** A virtual key + modifier combination (used in the I2 round-trip enumeration corpus). */

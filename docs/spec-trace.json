@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-11-07",
+  "lastUpdated": "2026-11-10",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -317,7 +317,7 @@
     },
     "docs/architecture.md": {
       "title": "Keyboard Studio — architecture & meta-flow",
-      "hash": "sha256:7ea710972d4856f4",
+      "hash": "sha256:419f48d1fe1dd39c",
       "status": "reference",
       "implements": [],
       "decisions": [],
@@ -1216,6 +1216,14 @@
     "specs/icon-editor": {
       "title": "Feature Specification: Icon editor step",
       "hash": "sha256:b00bab60c9122b65",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/116-ng-parser-adoption": {
+      "title": "Feature Specification: Adopt the Keyman next-generation KMN parser, and type the IR as a multi-format hub",
+      "hash": "sha256:fcb4378dfa932e60",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

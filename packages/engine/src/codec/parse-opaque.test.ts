@@ -8,7 +8,9 @@ import { OPAQUE_REASONS } from "./opaque-reasons.js";
 //   2. outs(otherStore)    -> outs-expansion
 //   3. context(0)          -> indexed-context (degenerate offset; FR-004 types
 //                              context(N) with N > 1 in context position)
-//   4. U+1F600            -> smp-literal
+//   4. U+1F600            -> typed char (spec 116: the Keyman lexer reads SMP
+//                              literals as characters; smp-literal is no longer
+//                              produced and stays defined for persisted drafts)
 const OPAQUE_KMN = `store(&VERSION) '10.0'
 store(&NAME) 'Opaque Test'
 store(myFlag) 'x'
@@ -44,10 +46,16 @@ describe("parse opaque features", () => {
     expect(reasons).toContain(OPAQUE_REASONS.INDEXED_CONTEXT);
   });
 
-  it("produces RawKmnFragment for SMP literal U+1F600", () => {
+  // DELIBERATE FLIP (spec 116, allow-list class smp-literal-typed): the
+  // legacy reader opaqued SMP literals as smp-literal; the Keyman lexer reads
+  // U+1F600 as a character, so the rule is typed and no fragment exists.
+  it("types an SMP literal U+1F600 as a char — no smp-literal fragment (spec 116 flip)", () => {
     const { ir } = parse(OPAQUE_KMN, "opaque-test");
     const reasons = ir.raw.map(r => r.reason);
-    expect(reasons).toContain(OPAQUE_REASONS.SMP_LITERAL);
+    expect(reasons).not.toContain(OPAQUE_REASONS.SMP_LITERAL);
+    const main = ir.groups.find(g => g.name === "main");
+    const rule = main?.rules.find(r => r.context.some(c => c.kind === "vkey" && c.name === "K_D"));
+    expect(rule?.output).toEqual([{ kind: "char", value: "\u{1F600}" }]);
   });
 
   it("preserves sourceText verbatim in RawKmnFragment", () => {
@@ -65,12 +73,12 @@ describe("parse opaque features", () => {
 
   it("opaqueFeatures inventory reflects the counts", () => {
     const { opaqueFeatures } = parse(OPAQUE_KMN, "opaque-test");
-    // At least the 4 opaque reasons should appear
+    // The 3 opaque reasons should appear (the SMP literal is typed, spec 116)
     const features = opaqueFeatures.map(f => f.feature);
     expect(features).toContain(OPAQUE_REASONS.OPTION_STORE_DIRECTIVE);
     expect(features).toContain(OPAQUE_REASONS.OUTS_EXPANSION);
     expect(features).toContain(OPAQUE_REASONS.INDEXED_CONTEXT);
-    expect(features).toContain(OPAQUE_REASONS.SMP_LITERAL);
+    expect(features).not.toContain(OPAQUE_REASONS.SMP_LITERAL);
   });
 
   it("non-opaque rules are NOT in raw fragments", () => {
@@ -123,7 +131,7 @@ group(main) using keys
 });
 
 // ---------------------------------------------------------------------------
-// P1-D: System store with SMP content becomes RawKmnFragment
+// P1-D: System store with SMP content (typed since spec 116)
 // ---------------------------------------------------------------------------
 
 describe("parse opaque — SMP in system store (P1-D)", () => {
@@ -137,10 +145,14 @@ group(main) using keys
 + [K_A] > U+0061
 `;
 
-  it("produces RawKmnFragment (not a corrupted system store) for store(&NAME) U+1F600", () => {
+  // DELIBERATE FLIP (spec 116, class smp-literal-typed): the store was an
+  // smp-literal fragment; now it is a typed system store whose item is the
+  // astral character itself, never a corrupted (surrogate-split) value.
+  it("types store(&NAME) U+1F600 as a system store with one astral char item (spec 116 flip)", () => {
     const { ir } = parse(SMP_SYS_STORE_KMN, "smp-sys-store-test");
-    const reasons = ir.raw.map(r => r.reason);
-    expect(reasons).toContain(OPAQUE_REASONS.SMP_LITERAL);
+    expect(ir.raw.map(r => r.reason)).not.toContain(OPAQUE_REASONS.SMP_LITERAL);
+    const name = ir.stores.find(st => st.isSystem && st.name === "NAME");
+    expect(name?.items).toEqual([{ kind: "char", value: "\u{1F600}" }]);
   });
 });
 
@@ -202,16 +214,25 @@ group(main) using keys
 + [K_B] > return
 `;
 
-  it("produces RawKmnFragment with reason call-return for call()", () => {
+  // Spec 116: call() and return are typed output elements, so the rule is a
+  // typed rule and no call-return fragment is produced.
+  it("types call() as a call element — no fragment", () => {
     const { ir } = parse(CALL_KMN, "call-test");
-    const reasons = ir.raw.map(r => r.reason);
-    expect(reasons).toContain(OPAQUE_REASONS.CALL_RETURN);
+    expect(ir.raw.map(r => r.reason)).not.toContain(OPAQUE_REASONS.CALL_RETURN);
+    const rule = ir.groups.flatMap((g) => g.rules)[0]!;
+    expect(rule.output).toEqual([{ kind: "call", storeRef: "myCallback" }]);
   });
 
-  it("produces RawKmnFragment with reason call-return for return keyword", () => {
+  it("types the return keyword as a return element — no fragment", () => {
     const { ir } = parse(RETURN_KMN, "return-test");
-    const reasons = ir.raw.map(r => r.reason);
-    expect(reasons).toContain(OPAQUE_REASONS.CALL_RETURN);
+    expect(ir.raw.map(r => r.reason)).not.toContain(OPAQUE_REASONS.CALL_RETURN);
+    const rule = ir.groups.flatMap((g) => g.rules)[0]!;
+    expect(rule.output).toEqual([{ kind: "return" }]);
+  });
+
+  it("a call() with an argument list the typed member cannot hold stays a call-return fragment", () => {
+    const { ir } = parse(CALL_KMN.replace("call(myCallback)", "call(myCallback, 1)"), "call-args");
+    expect(ir.raw.map(r => r.reason)).toContain(OPAQUE_REASONS.CALL_RETURN);
   });
 });
 
@@ -228,28 +249,28 @@ group(main) using keys
 + [K_A] > U+0061
 `;
 
-  it("marks the store opaque with reason outs-expansion", () => {
+  // Spec 116: outs(store) in a store body is a typed `outs` item (a reference),
+  // not an opaque fragment. It must still never fall to a raw item.
+  it("types outs() as an outs store item — no outs-expansion fragment", () => {
     const { ir } = parse(OUTS_IN_STORE_KMN, "outs-in-store");
-    const reasons = ir.raw.map((r) => r.reason);
-    expect(reasons).toContain(OPAQUE_REASONS.OUTS_EXPANSION);
+    expect(ir.raw.map((r) => r.reason)).not.toContain(OPAQUE_REASONS.OUTS_EXPANSION);
+    const store = ir.stores.find((s) => s.name === "whitespace-dk");
+    expect(store?.items).toEqual([{ kind: "outs", storeRef: "whitespace" }, { kind: "deadkey", id: 1 }]);
   });
 
-  it("does NOT emit the opaque store into ir.stores (no malformed raw item)", () => {
+  it("no store carries a raw outs(...) item", () => {
     const { ir } = parse(OUTS_IN_STORE_KMN, "outs-in-store");
-    // whitespace-dk went opaque → it must not appear as a normal store, and no
-    // store may carry a raw "outs(...)" item.
-    expect(ir.stores.find((s) => s.name === "whitespace-dk")).toBeUndefined();
     const rawOutsItem = ir.stores
       .flatMap((s) => s.items)
       .some((it) => it.kind === "raw" && /outs\(/.test(it.text ?? ""));
     expect(rawOutsItem).toBe(false);
   });
 
-  it("preserves the store source verbatim in the RawKmnFragment", () => {
+  it("emits the store with its outs() reference, after the store it names", () => {
     const { ir } = parse(OUTS_IN_STORE_KMN, "outs-in-store");
-    const frag = ir.raw.find((r) => r.reason === OPAQUE_REASONS.OUTS_EXPANSION);
-    expect(frag?.sourceText).toContain("store(whitespace-dk)");
-    expect(frag?.sourceText).toContain("outs(whitespace)");
+    const text = emit(ir);
+    expect(text).toContain("store(whitespace-dk) outs(whitespace) dk(0001)");
+    expect(text.indexOf("store(whitespace) ")).toBeLessThan(text.indexOf("store(whitespace-dk)"));
   });
 });
 
@@ -368,5 +389,24 @@ group(main) using keys
       { kind: "char", value: "]" },
       { kind: "char", value: ";" },
     ]);
+  });
+
+  it("a vkey bracket whose key is a quoted ']' stays one item and round-trips", () => {
+    // bu_phonetic: store(keyBridgeB) [CTRL ALT SHIFT "]"]. The bracket scan
+    // used to stop at the quoted ']', splitting the item in two and emitting
+    // `[CTRL ALT SHIFT "] "]`, which kmc rejects.
+    const kmn = `store(&NAME) 'Quoted Bracket Key'
+store(keyBridgeB) [CTRL ALT SHIFT "]"]
+begin Unicode > use(main)
+group(main) using keys
++ [SHIFT "]"] > U+032A
+`;
+    const { ir } = parse(kmn, "quoted-bracket-key");
+    expect(ir.stores.find((s) => s.name === "keyBridgeB")?.items).toEqual([
+      { kind: "raw", text: '[CTRL ALT SHIFT "]"]' },
+    ]);
+    const out = emit(ir);
+    expect(out).toContain('store(keyBridgeB) [CTRL ALT SHIFT "]"]');
+    expect(out).toContain('+ [SHIFT "]"] > U+032A');
   });
 });

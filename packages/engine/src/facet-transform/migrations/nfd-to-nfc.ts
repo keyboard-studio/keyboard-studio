@@ -24,6 +24,7 @@ import type {
   SiteLedgerEntry,
   SourceFacetMeasurement,
 } from "../types.js";
+import { ruleContextElements } from "../../shared/rule-shape.js";
 
 function cloneIr(ir: KeyboardIR): KeyboardIR {
   return structuredClone(ir);
@@ -79,14 +80,15 @@ export function composeOutputToNfc(output: OutputElement[]): {
  */
 function isUnreachableBackspaceOverride(rule: IRRule): boolean {
   // The context must fire on K_BKSP.
-  const hasBackspace = rule.context.some(
+  const context = ruleContextElements(rule);
+  const hasBackspace = context.some(
     (el) => el.kind === "vkey" && el.name === "K_BKSP",
   );
   if (!hasBackspace) return false;
   // The look-back chars (ignoring the `+` keystroke separator and the vkey) must
   // end in a base char + a combining mark — the exact decomposed sequence that
   // composition removes from the produced set, making this override unreachable.
-  const chars = rule.context.filter((el) => el.kind === "char");
+  const chars = context.filter((el) => el.kind === "char");
   if (chars.length < 2) return false;
   const combining = chars[chars.length - 1];
   const base = chars[chars.length - 2];

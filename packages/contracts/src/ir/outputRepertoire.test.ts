@@ -40,6 +40,28 @@ describe("buildOutputRepertoire", () => {
     expect(r.unresolved).toEqual([]);
   });
 
+  it("expands a typed outs() store, pairing any() with index() by expanded position", () => {
+    // `store(all) outs(low) outs(up)`: Keyman expands it to four slots, so
+    // index(dia, 4) pairs with the fourth key, not an unexpanded second item.
+    const ir = makeTestIR({
+      groups: [
+        irGroup({
+          rules: [ruleOf([PLUS, { kind: "any", storeRef: "all" }], [{ kind: "index", storeRef: "dia", offset: 2 }])],
+        }),
+      ],
+      stores: [
+        charStore({ name: "low", items: [{ kind: "vkey", name: "K_A" }, { kind: "vkey", name: "K_E" }] }),
+        charStore({ name: "up", items: [{ kind: "vkey", name: "K_I" }, { kind: "vkey", name: "K_O" }] }),
+        charStore({ name: "all", items: [{ kind: "outs", storeRef: "low" }, { kind: "outs", storeRef: "up" }] }),
+        charStore({ name: "dia", items: [{ kind: "outs", storeRef: "lowc" }, { kind: "char", value: "ó" }] }),
+        charStore({ name: "lowc", chars: "áéí" }),
+      ],
+    });
+    const r = buildOutputRepertoire(ir);
+    expect(r.unresolved).toEqual([]);
+    expect(["á", "é", "í", "ó"].every((c) => r.clusters.has(c))).toBe(true);
+  });
+
   it("echoes context and context(n) in output", () => {
     const ir = makeTestIR({
       groups: [

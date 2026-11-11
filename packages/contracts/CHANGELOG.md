@@ -4,6 +4,39 @@ All notable changes to the `@keyboard-studio/contracts` package are documented
 here. The package follows [0ver](https://0ver.org/) semantics while pre-1.0: a
 breaking change bumps the **minor** version.
 
+## [Unreleased]
+
+### Spec 116: Keyman's parser reads `.kmn`; the IR types more constructs
+
+No field is renamed, retyped or removed. The new union members are additive,
+but an exhaustive switch over the element unions must now say what each one
+does.
+
+- **New reader (engine).** The codec reads `.kmn` with Keyman's vendored
+  next-generation lexer and parser (`engine/src/codec/ng/`, see its
+  `PROVENANCE.md`) plus a lowering pass, one logical line at a time. A
+  rejected line becomes an opaque fragment with a catalogued reason; the
+  rest of the file still parses. The legacy reader is gone. The IR, node ids
+  and opaque reasons match the old reader across the corpus
+  (`specs/116-ng-parser-adoption/evidence/reader-differential.md`).
+- **Comment fidelity (engine).** Comments come through the lexer's
+  `onTrivia` side-channel, so line and trailing comments survive import and
+  emit as text.
+- **Typed IR members.** `layer('…')`, `platform('…')`, `set(…)`,
+  `save(…)`, `reset(…)`, `call(…)`, `return`, and `outs(…)` inside a store
+  are typed elements instead of raw text or opaque fragments. New helpers:
+  `resolveStoreItems` (expands `outs` references, cycle-safe),
+  `storeItemText`, the `outsStores` helpers, and `assertNever`.
+- **Capability table.** `FORMAT_CAPABILITY_TABLE` (`capability/format-capability.ts`)
+  states, per IR construct and per format (`kmn`, `cldr-legacy`, `ldml`,
+  `klc`, `xkb`, `keylayout`), whether it is imported and exported as mapped,
+  approximated or not carried.
+- **Rule-shape API.** `rule-shape.ts` is the one way to read and build rule
+  shape: `ruleLhsKind`, `ruleConditions`, `rulePreContext`,
+  `ruleKeystroke`, `ruleContextElements`, `elementAtOffset`, `makeRule`,
+  `withRuleParts`, `classifyRawElement`. ESLint blocks direct reads of
+  `matchKind` and `rule.context` and hand-built rule literals elsewhere.
+
 ## [0.20.0] — 2026-10-16
 
 ### Breaking contract change (0ver minor bump; §18 price paid in full)

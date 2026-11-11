@@ -79,6 +79,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | GFF Geʾez Manuscript | `gff_geez_emufi` | `gez` | The Geʾez Frontier Foundation | `../keyboards/experimental/gff/gff_geez_emufi` |
 | Ghana | `ghana` | `ak-Latn`, `ee-Latn`, `ada-Latn`, `dga-Latn`, `hag-Latn`, `nzi-Latn`, `xsm-Latn` | © 2017-2020 SIL International | `../keyboards/release/g/ghana` |
 | Greek Classical | `greekclassical` | `cpg`, `el`, `grc-Grek`, `pnt`, `tsd`, `yej` | Manuel Lopez | `../keyboards/release/g/greekclassical` |
+| hakka | `hakka` | `hak-Latn-030` | cathaylab | `../keyboards/release/h/hakka` |
 | Haroi | `haroi` | `hro`, `vi` | © SIL Global | `../keyboards/release/h/haroi` |
 | Hausa Kano | `hausa_kano` | `ha-Latn` | Hamza Sulayman | `../keyboards/release/h/hausa_kano` |
 | Bengali Phonetic (ITRANS) | `itrans_bengali` | `bn`, `as` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_bengali` |

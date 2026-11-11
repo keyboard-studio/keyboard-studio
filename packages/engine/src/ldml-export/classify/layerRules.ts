@@ -14,10 +14,10 @@
 // Rule texts come only through rawText.ts (Constitution Art II).
 
 import type { ContextElement, IRGroup, IRRule, KeyboardIR } from "@keyboard-studio/contracts";
-import { isPlusSeparator } from "@keyboard-studio/contracts";
+import { ruleConditions, ruleHasNulContext, ruleLhsKind, rulePreContext } from "@keyboard-studio/contracts";
 import type { CallGraph } from "./callGraph.js";
 import type { ItemSink } from "./items.js";
-import { parseLayerCall, parsePlatformCall, parseSetLayer, parseUseCall, isNulToken } from "./rawText.js";
+import { layerOf, platformOf, setLayerOf, parseUseCall, isNulToken } from "./rawText.js";
 import { findStore, platformTruth, storeLiterals } from "./ruleElements.js";
 
 /** A KMN layer name's modifier state on a hardware keyboard (one place, shared with the touch lowering). */
@@ -96,8 +96,14 @@ interface Eval {
   behaviours: Map<string, LayerBehaviour>;
 }
 
-function plusFree(ctx: readonly ContextElement[]): ContextElement[] {
-  return ctx.filter((el) => !isPlusSeparator(el));
+/** Every context element of the rule, in source order, without the `+` separator. */
+function plusFree(rule: IRRule): ContextElement[] {
+  const group = { usingKeys: false };
+  return [
+    ...(ruleHasNulContext(rule) ? [{ kind: "raw", text: "nul" } as const] : []),
+    ...ruleConditions(rule),
+    ...rulePreContext(rule, group),
+  ];
 }
 
 function textBehaviour(rule: IRRule, group: IRGroup, guards: readonly ContextElement[], text: readonly ContextElement[], outcomes: Outcome[]): LayerBehaviour {
@@ -126,7 +132,7 @@ function classifyRule(
   const guards: ContextElement[] = [];
   const text: ContextElement[] = [];
   let falseGuard = false;
-  for (const el of plusFree(rule.context)) {
+  for (const el of plusFree(rule)) {
     if (el.kind === "if") {
       const s = key(el.store);
       if (s === "&layer") {
@@ -136,8 +142,8 @@ function classifyRule(
         guards.push(el);
         if (el.value !== "") falseGuard = true;
       } else guards.push(el);
-    } else if (el.kind === "raw" && parsePlatformCall(el.text) !== null) {
-      const t = platformTruth(parsePlatformCall(el.text) as string);
+    } else if (platformOf(el) !== null) {
+      const t = platformTruth(platformOf(el) as string);
       guards.push(el);
       if (!t.touch) falseGuard = true;
     } else if (el.kind === "baselayout") {
@@ -183,13 +189,11 @@ function outcomeOf(
         cur = [...next];
         continue;
       }
-      if (el.kind === "raw") {
-        const l = parseLayerCall(el.text) ?? parseSetLayer(el.text);
-        if (l !== null) {
-          cur = [l];
-          continue;
-        }
-      }
+    }
+    const l = layerOf(el) ?? setLayerOf(el);
+    if (l !== null) {
+      cur = [l];
+      continue;
     }
     // Any other output element is not a layer effect; a readonly group cannot output text.
   }
@@ -205,7 +209,7 @@ function runGroup(ev: Eval, g: IRGroup, layer: string, out: string | null | "*",
     if (!ev.behaviours.has(b.name)) ev.behaviours.set(b.name, b);
   };
   for (const rule of g.rules) {
-    if (rule.matchKind === "nomatch") {
+    if (ruleLhsKind(rule) === "nomatch") {
       if (unmatched) {
         const c = classifyRule(ev, rule, layer, out);
         if (c.match === "yes") {
@@ -216,7 +220,7 @@ function runGroup(ev: Eval, g: IRGroup, layer: string, out: string | null | "*",
       }
       continue;
     }
-    if (rule.matchKind === "match") {
+    if (ruleLhsKind(rule) === "match") {
       if (matched) for (const o of outcomeOf(ev, rule, layer, out, depth)) results.add(o);
       continue;
     }

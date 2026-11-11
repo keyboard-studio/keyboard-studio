@@ -31,7 +31,12 @@
 // the input.
 
 import {
+  ruleLhsKind,
+  ruleConditions,
+  ruleKeystroke,
+  rulePreContext,
   validateRulePack,
+  withRuleParts,
   type BehaviourRecord,
   type KeyboardIR,
   type RulePack,
@@ -223,7 +228,15 @@ function renameStoreRefs(
 ): KeyboardIR["groups"][number]["rules"][number] {
   const swap = <E extends { kind: string }>(el: E): E =>
     "storeRef" in el && el.storeRef === from ? { ...el, storeRef: to } : el;
-  return { ...rule, context: rule.context.map(swap), output: rule.output.map(swap) };
+  // Pack rules are parsed as `using keys` rules of the main group.
+  const group = { usingKeys: true };
+  const keystroke = ruleKeystroke(rule, group);
+  return withRuleParts(rule, group, {
+    conditions: ruleConditions(rule).map(swap),
+    preContext: rulePreContext(rule, group).map(swap),
+    keystroke: keystroke === undefined ? undefined : swap(keystroke),
+    output: rule.output.map(swap),
+  });
 }
 
 /**
@@ -327,7 +340,7 @@ export function installPack(ir: KeyboardIR, pack: RulePack): InstallPackResult {
   // Insert as one contiguous block before the group's match/nomatch rules:
   // kmcmplib requires those to be last in a group.
   const terminal = target.rules.findIndex(
-    (r) => r.matchKind === "match" || r.matchKind === "nomatch",
+    (r) => ruleLhsKind(r) !== "input",
   );
   target.rules.splice(terminal === -1 ? target.rules.length : terminal, 0, ...newRules);
 

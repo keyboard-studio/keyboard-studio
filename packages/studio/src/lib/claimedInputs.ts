@@ -33,6 +33,7 @@
 //     warning must not take the starting rule down with it.
 
 import type { IRChange, IRRule, KeyboardIR, MechanismAssignment, OwnerRef, Pattern } from "@keyboard-studio/contracts";
+import { elementAtOffset, ruleContextElements } from "@keyboard-studio/contracts";
 import { parseKeySpec } from "@keyboard-studio/engine";
 import { mechanismClaimedSlots } from "../survey/slotOccupancy.ts";
 
@@ -120,8 +121,9 @@ export function claimedInputRuleIds(
   if (claims.length === 0) return ids;
 
   for (const rule of main.rules) {
-    if (rule.context.length !== 1) continue;
-    const el = rule.context[0];
+    // Exactly one context element, and it must be the vkey.
+    if (elementAtOffset(rule, main, 2) !== undefined) continue;
+    const el = elementAtOffset(rule, main, 1);
     if (el === undefined || el.kind !== "vkey") continue;
     const k = keystrokeOf(el.name, el.modifiers);
     if (k === null) continue;
@@ -145,8 +147,9 @@ export function claimedKeystrokes(
   const ids = claimedInputRuleIds(startIr, assignments, getPattern);
   const main = startIr.groups.find((g) => g.name === "main");
   const keys: AssignedKey[] = [];
-  for (const rule of main?.rules ?? []) {
-    const el = rule.context[0];
+  if (main === undefined) return keys;
+  for (const rule of main.rules) {
+    const el = elementAtOffset(rule, main, 1);
     if (ids.has(rule.nodeId) && el !== undefined && el.kind === "vkey") {
       keys.push({ vkey: el.name, modifiers: el.modifiers });
     }
@@ -155,7 +158,10 @@ export function claimedKeystrokes(
 }
 
 function sameKey(rule: IRRule, key: AssignedKey): boolean {
-  const el = rule.context.length === 1 ? rule.context[0] : undefined;
+  // No group in scope here (the rule comes from a change record), so the
+  // loose whole-LHS reader is the right accessor (spec 116 FR-037).
+  const els = ruleContextElements(rule);
+  const el = els.length === 1 ? els[0] : undefined;
   if (el === undefined || el.kind !== "vkey" || el.name.toUpperCase() !== key.vkey.toUpperCase()) return false;
   const have = new Set(el.modifiers.map((m) => m.toUpperCase()));
   return have.size === key.modifiers.length && key.modifiers.every((m) => have.has(m.toUpperCase()));

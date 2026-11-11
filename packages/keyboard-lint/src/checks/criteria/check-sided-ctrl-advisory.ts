@@ -5,6 +5,7 @@
 // basic_* keyboards are exempt, as for the raw-Ctrl check.
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { ruleKeystrokeLoose } from "@keyboard-studio/contracts";
 import {
   checkFailed,
   checkPassed,
@@ -22,7 +23,8 @@ function sidedCtrlRules(ir: KeyboardIR, keyboardId: string): string[] {
   const found: string[] = [];
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      const vkey = rule.context.find((c) => c.kind === "vkey");
+      // Loose: these checks audit every group, deadkey and context groups included.
+      const vkey = ruleKeystrokeLoose(rule);
       if (vkey === undefined || vkey.kind !== "vkey") continue;
       const mods = vkey.modifiers.map((m) => m.toUpperCase());
       if (!mods.some((m) => SIDED_CTRL.has(m))) continue;

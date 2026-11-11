@@ -11,7 +11,47 @@
  * the same function.
  */
 
-export { isPlusSeparator } from "@keyboard-studio/contracts";
+import {
+  ruleConditions,
+  ruleExtraKeystrokeElements,
+  ruleHasNulContext,
+  ruleKeystrokeLoose,
+  rulePreContext,
+} from "@keyboard-studio/contracts";
+import type { ContextElement, IRRule } from "@keyboard-studio/contracts";
+
+export {
+  isPlusSeparator,
+  ruleLhsKind,
+  ruleHasNulContext,
+  ruleConditions,
+  rulePreContext,
+  ruleKeystroke,
+  ruleKeystrokeLoose,
+  ruleExtraKeystrokeElements,
+  elementAtOffset,
+  makeRule,
+  withRuleParts,
+} from "@keyboard-studio/contracts";
+export type { LhsKind, MakeRuleParts } from "@keyboard-studio/contracts";
+
+/**
+ * Every context element of a rule in source order with the `+` separator
+ * removed: `[nul?, ...conditions, ...preContext, keystroke?, ...extras]`. For
+ * shape matchers that look at the whole left-hand side and have no group in
+ * scope, hence the loose keystroke reader.
+ */
+export function ruleContextElements(rule: IRRule): ContextElement[] {
+  const group = { usingKeys: true };
+  const keystroke = ruleKeystrokeLoose(rule);
+  return [
+    ...(ruleHasNulContext(rule) ? [{ kind: "raw", text: "nul" } as const] : []),
+    ...ruleConditions(rule),
+    ...rulePreContext(rule, group),
+    ...(keystroke !== undefined ? [keystroke] : []),
+    ...ruleExtraKeystrokeElements(rule, group),
+  ];
+}
 
 /**
  * True when a rule's ENTIRE output is exactly one `{kind:"deadkey"}` element.

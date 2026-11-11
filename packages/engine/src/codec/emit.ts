@@ -85,7 +85,25 @@ function fmtDk(id: number): string {
 // Element serializers
 // ---------------------------------------------------------------------------
 
-function fmtContextElement(el: ContextElement): string {
+/** A quoted KMN literal for a layer / platform argument: single quotes unless the text holds one. */
+function fmtQuotedArg(what: string, value: string): string {
+  if (!value.includes("'")) return `'${value}'`;
+  if (!value.includes('"')) return `"${value}"`;
+  throw new Error(`${what} value must not contain both quote characters: ${value}`);
+}
+
+/** The value of a `set(store = value)`: a text run of chars, deadkeys and outs, with no range collapse. */
+function fmtSetValue(value: OutputElement[]): string {
+  const items: StoreItem[] = [];
+  for (const v of value) {
+    if (v.kind === "char" || v.kind === "deadkey" || v.kind === "namedDeadkey" || v.kind === "outs") items.push(v);
+    else throw new Error(`set() value cannot hold a ${v.kind} element`);
+  }
+  // An empty value is the empty string literal; `set(opt = )` is not valid KMN.
+  return items.length === 0 ? "''" : emitStoreItems(items, true);
+}
+
+export function fmtContextElement(el: ContextElement): string {
   switch (el.kind) {
     case "char":    return fmtCodepoint(el.value);
     case "vkey":    return el.modifiers.length > 0
@@ -99,11 +117,12 @@ function fmtContextElement(el: ContextElement): string {
     case "index":   return `index(${el.storeRef}, ${el.offset})`;
     case "baselayout": { if (el.value.includes("'")) throw new Error(`baselayout value must not contain single-quote: ${el.value}`); return el.value ? `baselayout('${el.value}')` : "baselayout"; }
     case "if":      { if (el.value.includes("'")) throw new Error(`if() guard value must not contain single-quote: ${el.value}`); return `if(${el.store} = '${el.value}')`; }
+    case "platform": return `platform(${fmtQuotedArg("platform()", el.value)})`;
     case "raw":     return el.text;
   }
 }
 
-function fmtOutputElement(el: OutputElement): string {
+export function fmtOutputElement(el: OutputElement): string {
   switch (el.kind) {
     case "char":    return fmtCodepoint(el.value);
     case "deadkey": return fmtDk(el.id);
@@ -114,6 +133,12 @@ function fmtOutputElement(el: OutputElement): string {
     case "index":   return `index(${el.storeRef}, ${el.offset})`;
     case "outs":    return `outs(${el.storeRef})`;
     case "useGroup": return `use(${el.groupName})`;
+    case "layer":   return `layer(${fmtQuotedArg("layer()", el.value)})`;
+    case "set":     return `set(${el.storeRef} = ${fmtSetValue(el.value)})`;
+    case "save":    return `save(${el.storeRef})`;
+    case "reset":   return `reset(${el.storeRef})`;
+    case "call":    return `call(${el.storeRef})`;
+    case "return":  return "return";
     case "raw":     return el.text;
   }
 }
@@ -125,6 +150,7 @@ function fmtStoreItem(item: StoreItem): string {
     case "deadkey": return fmtDk(item.id);
     case "namedDeadkey": return `dk(${item.name})`;
     case "any":     return "any";
+    case "outs":    return `outs(${item.storeRef})`;
     case "raw":     return item.text;
   }
 }

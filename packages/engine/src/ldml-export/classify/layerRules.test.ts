@@ -82,3 +82,33 @@ describe("touch layer names", () => {
     expect(touchLayerId("shift")).toBe("shift");
   });
 });
+
+// Spec 116: `set(&layer = 'x')` is a typed output element. It must read as the layer effect
+// the raw element of an older draft did, and must not be reported as option state (row 3.18).
+describe("analyseLayerRules: a typed set(&layer) reads as the raw form did", () => {
+  const SET = `group(PostKeystroke) readonly
+if(&layer = 'default') > set(&layer = 'shift')
+`;
+  const build = (asRaw: boolean) => {
+    const { ir } = parse(HEAD + SET, "t");
+    if (asRaw) {
+      for (const g of ir.groups) {
+        for (const r of g.rules) {
+          r.output = r.output.map((el) => (el.kind === "set" ? { kind: "raw", text: "set(&layer = 'shift')" } : el));
+        }
+      }
+    }
+    return ir;
+  };
+
+  it("gives the same next layer typed and raw", () => {
+    const layers = ["default", "shift"];
+    const typed = build(false);
+    expect(typed.groups.some((g) => g.rules.some((r) => r.output.some((el) => el.kind === "set")))).toBe(true);
+    const a = analyseLayerRules(typed, buildCallGraph(typed), layers);
+    const raw = build(true);
+    const b = analyseLayerRules(raw, buildCallGraph(raw), layers);
+    expect(a.next("default", "a")).toBe(b.next("default", "a"));
+    expect(a.next("default", "a")).toBe("shift");
+  });
+});

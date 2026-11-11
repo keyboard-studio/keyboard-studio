@@ -31,6 +31,7 @@
 // Pure: no store reads, no I/O, no mutation of `ir`.
 
 import type { KeyboardIR, MechanismRef } from "@keyboard-studio/contracts";
+import { elementAtOffset } from "@keyboard-studio/contracts";
 import { extractMechanismBaseKey } from "./extractMechanismBaseKey.js";
 
 /**
@@ -43,14 +44,16 @@ function candidateRefs(ir: KeyboardIR): MechanismRef[] {
 
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      const ctx0 = rule.context[0];
+      const ctx0 = elementAtOffset(rule, group, 1);
+      const ctx1 = elementAtOffset(rule, group, 2);
+      const hasThirdElement = elementAtOffset(rule, group, 3) !== undefined;
       const out0 = rule.output[0];
 
       // simple_swap shape: exactly one vkey context element, exactly one char
       // output element.
       if (
-        rule.context.length === 1 &&
         ctx0 !== undefined &&
+        ctx1 === undefined &&
         ctx0.kind === "vkey" &&
         rule.output.length === 1 &&
         out0 !== undefined &&
@@ -67,10 +70,9 @@ function candidateRefs(ir: KeyboardIR): MechanismRef[] {
       // deadkey_single_tap shape (the form-independent write shape; a ref read
       // back from a decomposed keyboard is the same S-02 to every reader): a deadkey marker followed by the literal
       // base-letter character being matched.
-      const ctx1 = rule.context[1];
       if (
-        rule.context.length === 2 &&
         ctx0 !== undefined &&
+        !hasThirdElement &&
         ctx0.kind === "deadkey" &&
         ctx1 !== undefined &&
         ctx1.kind === "char"

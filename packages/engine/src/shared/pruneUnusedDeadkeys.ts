@@ -20,6 +20,7 @@
 
 import type { IRRule, KeyboardIR, OutputElement } from "@keyboard-studio/contracts";
 import { deadkeyNameKey } from "@keyboard-studio/contracts";
+import { ruleContextElements } from "./rule-shape.js";
 
 export interface PruneDeadkeysResult {
   ir: KeyboardIR;
@@ -56,7 +57,7 @@ export function consumedDeadkeyKeys(ir: KeyboardIR): { keys: Set<string>; unknow
   for (const g of ir.groups) {
     for (const r of g.rules) {
       if (r.ownedByBehaviour !== undefined) continue;
-      for (const el of r.context) {
+      for (const el of ruleContextElements(r)) {
         const k = keyOf(el);
         if (k !== undefined) out.add(k);
       }
@@ -118,7 +119,7 @@ export function pruneUnusedDeadkeys(
           // `dk(3) 'x' > context`) can never fire once nothing arms it.
           if (
             r.ownedByBehaviour !== undefined &&
-            r.context.some((el) => {
+            ruleContextElements(r).some((el) => {
               const k = keyOf(el);
               return k !== undefined && dead.has(k);
             })

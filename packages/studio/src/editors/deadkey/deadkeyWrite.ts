@@ -19,6 +19,7 @@
 //
 // No raw KMN is ever constructed here (§5a: IR pipeline only).
 
+import { ruleContextElements } from "@keyboard-studio/contracts";
 import type {
   KeyboardIR,
   IRRule,
@@ -29,7 +30,10 @@ import {
   listDeadkeys,
   allocateDeadkeyId,
   setDeadkeyName,
-  isPlusSeparator,
+  elementAtOffset,
+  rulePreContext,
+  ruleKeystroke,
+  withRuleParts,
   deadkeyNameKey,
   isNamedDeadkeyElement,
 } from "@keyboard-studio/contracts";
@@ -128,9 +132,12 @@ export function findTriggerRules(ir: KeyboardIR, id: number): IRRule[] {
 
 /** Single context element (after the codec's synthetic `+` separators) that is a vkey or char. */
 function isSingleVkeyOrCharContext(rule: IRRule): boolean {
-  const ctx = rule.context.filter((el) => !isPlusSeparator(el));
+  // No group is in scope; a sole element is the keystroke in a `using keys` group.
+  const group = { usingKeys: true };
+  const only = elementAtOffset(rule, group, 1);
   return (
-    ctx.length === 1 && (ctx[0]?.kind === "vkey" || ctx[0]?.kind === "char")
+    elementAtOffset(rule, group, 2) === undefined &&
+    (only?.kind === "vkey" || only?.kind === "char")
   );
 }
 
@@ -371,7 +378,7 @@ export function withRepointedDeadkeyRefs(
   }
 
   const rewriteDeadkeyElements = (rule: IRRule) => {
-    for (const el of rule.context) {
+    for (const el of ruleContextElements(rule)) {
       if (el.kind === "deadkey" && el.id === fromId) el.id = toId;
     }
     for (const el of rule.output) {
@@ -401,7 +408,7 @@ export function withRepointedDeadkeyRefs(
             : name === `dk_${fromHex}_output`
               ? `dk_${toHex}_output`
               : name;
-        for (const el of rule.context) {
+        for (const el of ruleContextElements(rule)) {
           if ((el.kind === "any" || el.kind === "notany" || el.kind === "index") && "storeRef" in el) {
             el.storeRef = swap(el.storeRef);
           }
@@ -532,7 +539,7 @@ export function namedDeadkeyFragments(
 /** True when a rule mentions the named deadkey (folded identity) in a
  *  typed context or output element. */
 function ruleMentionsNamedDeadkey(rule: IRRule, key: string): boolean {
-  return [...rule.context, ...rule.output].some(
+  return [...ruleContextElements(rule), ...rule.output].some(
     (el) => isNamedDeadkeyElement(el) && deadkeyNameKey(el.name) === key,
   );
 }
@@ -636,16 +643,14 @@ const NAMED_TRIGGER_FRAGMENT_RE =
 /**
  * All typed trigger rules for the named deadkey: output is exactly one
  * name-carrying element for this name, and the context — ignoring the
- * codec's `+` separators — is exactly one vkey or char element. Each hit
- * carries the index of the trigger element in the ORIGINAL context array
- * (so the rewrite preserves separators in place).
+ * codec's `+` separators — is exactly one vkey or char element.
  */
 function findNamedTriggerRules(
   ir: KeyboardIR,
   name: string,
-): { rule: IRRule; triggerIndex: number }[] {
+): { rule: IRRule }[] {
   const key = deadkeyNameKey(name);
-  const found: { rule: IRRule; triggerIndex: number }[] = [];
+  const found: { rule: IRRule }[] = [];
   for (const group of ir.groups) {
     for (const rule of group.rules) {
       if (rule.output.length !== 1) continue;
@@ -657,14 +662,11 @@ function findNamedTriggerRules(
       ) {
         continue;
       }
-      const nonPlus = rule.context
-        .map((el, idx) => ({ el, idx }))
-        .filter(({ el }) => !isPlusSeparator(el));
-      if (nonPlus.length !== 1) continue;
-      const only = nonPlus[0];
+      if (elementAtOffset(rule, group, 2) !== undefined) continue;
+      const only = elementAtOffset(rule, group, 1);
       if (only === undefined) continue;
-      if (only.el.kind !== "vkey" && only.el.kind !== "char") continue;
-      found.push({ rule, triggerIndex: only.idx });
+      if (only.kind !== "vkey" && only.kind !== "char") continue;
+      found.push({ rule });
     }
   }
   return found;
@@ -704,7 +706,7 @@ export function retargetNamedDeadkey(
   // Typed path: replace the trigger context element in place.
   const typed = typedTriggers[0];
   if (typed !== undefined) {
-    const { rule, triggerIndex } = typed;
+    const { rule } = typed;
     const replacement =
       "vkey" in newTrigger
         ? { kind: "vkey" as const, name: newTrigger.vkey, modifiers: [] as string[] }
@@ -713,16 +715,17 @@ export function retargetNamedDeadkey(
       ...ir,
       groups: ir.groups.map((group) => ({
         ...group,
-        rules: group.rules.map((r) =>
-          r.nodeId === rule.nodeId
-            ? {
-                ...r,
-                context: r.context.map((el, idx) =>
-                  idx === triggerIndex ? replacement : el,
-                ),
-              }
-            : r,
-        ),
+        rules: group.rules.map((r) => {
+          if (r.nodeId !== rule.nodeId) return r;
+          // The trigger is the rule's sole counted element: its keystroke, or
+          // (outside `using keys` groups) its sole pre-context element.
+          const only = elementAtOffset(r, group, 1);
+          return ruleKeystroke(r, group) === only
+            ? withRuleParts(r, group, { keystroke: replacement })
+            : withRuleParts(r, group, {
+                preContext: rulePreContext(r, group).map((el) => (el === only ? replacement : el)),
+              });
+        }),
       })),
     };
     return { ok: true, ir: next };

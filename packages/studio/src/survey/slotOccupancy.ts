@@ -50,6 +50,7 @@
 // All glyphs are NFC-normalized on the way in, matching the inventory's
 // normalization convention.
 
+import { ruleContextElements } from "@keyboard-studio/contracts";
 import type {
   KeyboardIR,
   KmnEdit,
@@ -58,6 +59,7 @@ import type {
 import {
   collectFromElements,
   contextHasDirectBackspace,
+  elementAtOffset,
 } from "@keyboard-studio/contracts";
 import { normaliseKmnEdits, parseKeySpec } from "@keyboard-studio/engine";
 import { isAlwaysKeepCategory } from "../lib/irToCarveNodes.ts";
@@ -146,7 +148,7 @@ export function buildSlotOccupancy(
     for (const group of ir.groups) {
       for (const rule of group.rules) {
         if (isDeadkeyOnlyOutput(rule.output)) continue;
-        if (contextHasDirectBackspace(rule.context)) continue;
+        if (contextHasDirectBackspace(ruleContextElements(rule))) continue;
         // Exactly ONE context element, and it must be the vkey (Cycle 4
         // P1-1): a context that pairs the vkey with anything else — a
         // deadkey (deadkey-composition `[deadkey, K_E] → é`), an any() /
@@ -154,8 +156,8 @@ export function buildSlotOccupancy(
         // slot: a plain assignment on that slot does not shadow it, so
         // naming its output as the slot's incumbent would invent a
         // phantom displacement.
-        if (rule.context.length !== 1) continue;
-        const vkeyEl = rule.context[0];
+        if (elementAtOffset(rule, group, 2) !== undefined) continue;
+        const vkeyEl = elementAtOffset(rule, group, 1);
         if (vkeyEl === undefined || vkeyEl.kind !== "vkey") continue;
         // Physical slots only, like the session overlay below: a touch-only
         // T_/U_ key is reached by no keystroke, so counting it would let a

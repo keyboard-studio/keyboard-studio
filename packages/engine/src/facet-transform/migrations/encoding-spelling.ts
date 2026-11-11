@@ -14,6 +14,8 @@
 // IR-OBSERVABLE half of this migration is the modifier fold (`named ↔ split`),
 // which does rewrite rule contexts and carries a per-site precondition.
 
+import { withRuleParts } from "@keyboard-studio/contracts";
+import { ruleContextElements } from "../../shared/rule-shape.js";
 import type {
   ContextElement,
   IRGroup,
@@ -59,8 +61,9 @@ function outputsEqual(a: IRRule, b: IRRule): boolean {
 
 /** The single keystroke vkey element of a rule, if the context is exactly one vkey. */
 function soleVkey(rule: IRRule): Extract<ContextElement, { kind: "vkey" }> | null {
-  if (rule.context.length !== 1) return null;
-  const el = rule.context[0];
+  const ctx = ruleContextElements(rule);
+  if (ctx.length !== 1) return null;
+  const el = ctx[0];
   return el !== undefined && el.kind === "vkey" ? el : null;
 }
 
@@ -142,10 +145,10 @@ function foldGroup(
     const foldedModifiers = vk.modifiers
       .filter((m) => m !== mod)
       .concat(generic);
-    const folded: IRRule = {
-      ...rule,
-      context: [{ ...vk, modifiers: foldedModifiers }],
-    };
+    const folded: IRRule = withRuleParts(rule, group, {
+      preContext: [],
+      keystroke: { ...vk, modifiers: foldedModifiers },
+    });
     keep.push(folded);
     consumed.add(rule.nodeId);
     consumed.add(sibling.nodeId);

@@ -59,6 +59,7 @@ import type { KeyboardIR, OutputElement, TouchKeyIR } from "./keyboard-ir.js";
 import { listDeadkeys } from "./ir/deadkeys.js";
 import { US_BASE_LAYOUT } from "./ir/usBaseLayout.js";
 import { decodeUnicodeKeyId, isSpacerKeyClass } from "./touch-key-ids.js";
+import { ruleLhsKind } from "./rule-shape.js";
 import { bindingsForKeyId } from "./touch-key-rule-join.js";
 import type { TouchKeyRuleBinding, TouchKeyRuleIndex } from "./touch-key-rule-join.js";
 
@@ -481,7 +482,7 @@ export function resolveTouchProduction(
   if (family === "U_") {
     const decoded = decodeUnicodeKeyId(key.id.toUpperCase());
     if (decoded !== undefined) {
-      const hasNomatch = (ir.groups ?? []).some((g) => g.rules.some((r) => r.matchKind === "nomatch"));
+      const hasNomatch = (ir.groups ?? []).some((g) => g.rules.some((r) => ruleLhsKind(r) === "nomatch"));
       const presumptive = hasNomatch || allBindings.length > 0;
       return {
         productions: [

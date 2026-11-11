@@ -24,6 +24,7 @@ export * from "./criteriaLintInput";
 export * from "./iso639_5";
 export * from "./cldrCurrency";
 export * from "./keyboard-ir";
+export * from "./capability/format-capability";
 export * from "./keyboardId";
 // The single authoritative key-budget determination (spec 052 FR-016); axis A7
 // in ./axes is its projection, never an independent measurement.
@@ -85,6 +86,10 @@ export * from "./ir/touchLayerRules";
 export * from "./ir/usBaseLayout";
 export * from "./ir/producedSet";
 export * from "./ir/outputRepertoire";
+export * from "./ir/storeItemText";
+export * from "./ir/resolveStoreItems";
+export * from "./ir/outsStores";
+export { assertNever } from "./assert-never";
 // The reachability-aware sibling view (spec 063). Deliberately a separate
 // function, not an option on buildProducedSet - see both module headers.
 export * from "./ir/reachableProducedSet";

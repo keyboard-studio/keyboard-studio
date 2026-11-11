@@ -52,6 +52,7 @@ import type {
   RawKmnFragment,
 } from "./keyboard-ir.js";
 import type { Pattern } from "./pattern.js";
+import { ruleLhsKind } from "./rule-shape.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -197,6 +198,7 @@ function storeItemKey(item: StoreItem): string {
     // this oracle exists to catch (#2238 ruling D2).
     case "namedDeadkey": return `dkn:${item.name}`;
     case "any":     return "any";
+    case "outs":    return `outs:${item.storeRef}`;
     case "raw":     return `raw:${item.text}`;
     default: {
       const _: never = item;
@@ -281,6 +283,7 @@ function contextElementKey(el: ContextElement): string {
     case "index":      return `index:${el.storeRef}:${el.offset}`;
     case "baselayout": return `baselayout:${el.value}`;
     case "if":         return `if:${el.store}=${el.value}`;
+    case "platform":   return `platform:${el.value}`;
     case "raw":        return `raw:${el.text}`;
     default: {
       const _: never = el;
@@ -300,6 +303,12 @@ function outputElementKey(el: OutputElement): string {
     case "index":   return `index:${el.storeRef}:${el.offset}`;
     case "outs":    return `outs:${el.storeRef}`;
     case "useGroup": return `useGroup:${el.groupName}`;
+    case "layer":   return `layer:${el.value}`;
+    case "set":     return `set:${el.storeRef}=[${el.value.map(outputElementKey).join(",")}]`;
+    case "save":    return `save:${el.storeRef}`;
+    case "reset":   return `reset:${el.storeRef}`;
+    case "call":    return `call:${el.storeRef}`;
+    case "return":  return "return";
     case "raw":     return `raw:${el.text}`;
     default: {
       const _: never = el;
@@ -343,8 +352,12 @@ function compareRule(
   }
 
   // matchKind: structural, not optional-with-default
-  if ((a.matchKind ?? undefined) !== (b.matchKind ?? undefined)) {
-    push(diffs, `${path}.matchKind`, a.matchKind, b.matchKind, "match/nomatch kind differs");
+  const matchKindOf = (r: IRRule): "match" | "nomatch" | undefined => {
+    const lhs = ruleLhsKind(r);
+    return lhs === "input" ? undefined : lhs;
+  };
+  if (matchKindOf(a) !== matchKindOf(b)) {
+    push(diffs, `${path}.matchKind`, matchKindOf(a), matchKindOf(b), "match/nomatch kind differs");
   }
 
   // targetSelector

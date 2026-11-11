@@ -16,6 +16,7 @@ import type {
   TouchKeyIR,
   TouchLayoutIR,
 } from "../keyboard-ir.js";
+import { makeRule } from "../rule-shape.js";
 import { charItems } from "./keyboard-ir.js";
 
 // ---------------------------------------------------------------------------
@@ -99,11 +100,14 @@ export interface VkeyRuleInput extends IRRuleExtras {
  */
 export function vkeyRule(input: VkeyRuleInput): IRRule {
   return withRuleExtras(
-    {
-      nodeId: input.nodeId ?? `rule#auto-${++autoRuleSeq}`,
-      context: [{ kind: "vkey", name: input.vkey ?? "K_A", modifiers: input.modifiers ?? [] }],
-      output: toOutput(input.output),
-    },
+    makeRule(
+      {
+        nodeId: input.nodeId ?? `rule#auto-${++autoRuleSeq}`,
+        keystroke: { kind: "vkey", name: input.vkey ?? "K_A", modifiers: input.modifiers ?? [] },
+        output: toOutput(input.output),
+      },
+      { usingKeys: true },
+    ),
     input,
   );
 }
@@ -123,9 +127,13 @@ export interface CharRuleInput extends IRRuleExtras {
 export function charRule(input: CharRuleInput): IRRule {
   const context: ContextElement[] =
     typeof input.context === "string" ? [{ kind: "char", value: input.context }] : input.context;
+  // The caller supplies the context verbatim (tests spell shapes the parser never
+  // produces, e.g. a context with no `+`), so makeRule's normalizing split cannot
+  // reproduce it.
   return withRuleExtras(
     {
       nodeId: input.nodeId ?? `rule#auto-${++autoRuleSeq}`,
+      // eslint-disable-next-line no-restricted-syntax -- test builder takes an explicit raw context
       context,
       output: toOutput(input.output),
     },

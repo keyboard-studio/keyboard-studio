@@ -399,8 +399,10 @@ describe("deleteDeadkey", () => {
       BASE_KMN +
         clusterKmn("3001", "K_QUOTE", "dk_3001_bases", "dk_3001_output") +
         // A hand-authored rule consuming the deadkey state outside the
-        // canonical cluster: three-element context, not trigger/fan-out/escape.
-        `dk(3001) + [K_A] [K_B] > 'q'\n`,
+        // canonical cluster: a deadkey plus a character before the key, not
+        // trigger/fan-out/escape. (A two-key keystroke such as `+ [K_A] [K_B]`
+        // is now an opaque multi-element-keystroke fragment, spec 116.)
+        `dk(3001) 'x' + [K_A] > 'q'\n`,
     );
     const before = JSON.stringify(ir);
     const result = deleteDeadkey(ir, { id: 0x3001 });

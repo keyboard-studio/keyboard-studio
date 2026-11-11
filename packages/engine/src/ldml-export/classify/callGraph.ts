@@ -6,6 +6,7 @@
 // reserved entry group is a single N group here.
 
 import type { IRGroup, IRRule, KeyboardIR } from "@keyboard-studio/contracts";
+import { ruleLhsKind } from "@keyboard-studio/contracts";
 import { parseUseCall } from "./rawText.js";
 
 /** What a group is, for classification and lowering. */
@@ -60,9 +61,9 @@ function groupCalls(g: IRGroup): string[] {
 function reachesOnEveryPath(caller: IRGroup, target: string): boolean {
   const t = key(target);
   const calls = (r: IRRule): boolean => ruleCalls(r).some((c) => key(c) === t);
-  const matchRules = caller.rules.filter((r) => r.matchKind === "match");
-  const nomatch = caller.rules.filter((r) => r.matchKind === "nomatch");
-  const ordinary = caller.rules.filter((r) => r.matchKind === undefined);
+  const matchRules = caller.rules.filter((r) => ruleLhsKind(r) === "match");
+  const nomatch = caller.rules.filter((r) => ruleLhsKind(r) === "nomatch");
+  const ordinary = caller.rules.filter((r) => ruleLhsKind(r) === "input");
   const afterMatch = matchRules.some(calls);
   if (nomatch.length === 0 || !nomatch.some(calls)) return false;
   return ordinary.every((r) => calls(r) || afterMatch);
