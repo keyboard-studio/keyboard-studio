@@ -4,8 +4,9 @@
 // the key takes part in (each marked editable or read-only), what every picked base keyboard
 // types when the keyboard does not handle the key, and "view in code" for each rule.
 //
-// The edit controls of the next phase attach through `editSlot`, rendered under the plain
-// output; this component does not decide how an edit starts.
+// The edit controls for the selected key render directly under the grid in LayoutPane,
+// above this panel, so the key and its edit controls stay jointly in view; this component
+// does not decide how an edit starts.
 //
 // The value a hand-set key replaced comes from the caller (`replaced`): the starting point's own
 // attribution for the same key and layer, since the working copy's rules do not keep it.
@@ -31,8 +32,6 @@ export interface KeyDetailPanelProps {
   onViewInCode: (nodeId: string) => void;
   /** What the starting point typed on this key before a hand-set value replaced it, when known. */
   replaced?: LayoutOutput | LayoutBecomes | null;
-  /** Where the next phase's edit controls go. */
-  editSlot?: ReactNode;
 }
 
 /**
@@ -74,7 +73,7 @@ function FallbackPolicyEntry({ cell }: { cell: DesktopCellViewModel }) {
   );
 }
 
-export function KeyDetailPanel({ cell, onViewInCode, editSlot, replaced }: KeyDetailPanelProps) {
+export function KeyDetailPanel({ cell, onViewInCode, replaced }: KeyDetailPanelProps) {
   const { t } = useLingui();
   const copy = useLayoutCopy();
 
@@ -275,8 +274,6 @@ export function KeyDetailPanel({ cell, onViewInCode, editSlot, replaced }: KeyDe
       )}
 
       {cell.provisional && <FallbackPolicyEntry key={`${cell.vkey}|${layer}`} cell={cell} />}
-
-      {editSlot}
 
       {cell.baseFallback !== undefined && (
         <div data-testid="key-detail-fallback">

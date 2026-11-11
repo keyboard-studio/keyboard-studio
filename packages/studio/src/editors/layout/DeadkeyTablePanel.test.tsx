@@ -4,11 +4,12 @@
 // editable; the space row proposed (not written) for a new deadkey; chains link to "after"; and a
 // deadkey with no combinations is flagged.
 
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { emitKmn, parseKmn } from "@keyboard-studio/engine";
 import type { KmnEditsValue, LayerCombo } from "@keyboard-studio/contracts";
-import { render } from "../../test/renderWithI18n.tsx";
+import { render, i18n } from "../../test/renderWithI18n.tsx";
+import { messages as frMessages } from "../../locales/fr/messages.json?lingui";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { makeReadyRulesDemoArtifact, useRulesDemoArtifactStore } from "../../stores/rulesDemoArtifactStore.ts";
@@ -63,14 +64,20 @@ const top = () => {
 function panel(props: Partial<React.ComponentProps<typeof DeadkeyTablePanel>> = {}) {
   const onViewInCode = vi.fn();
   const onShowAfter = vi.fn();
+  const onClose = vi.fn();
+  const onSpaceDismissed = vi.fn();
   render(
-    <DeadkeyTablePanel deadkeyId="3000" layers={LAYERS} onViewInCode={onViewInCode} onShowAfter={onShowAfter} {...props} />,
+    <DeadkeyTablePanel deadkeyId="3000" layers={LAYERS} onViewInCode={onViewInCode} onShowAfter={onShowAfter} onClose={onClose} onSpaceDismissed={onSpaceDismissed} {...props} />,
   );
-  return { onViewInCode, onShowAfter };
+  return { onViewInCode, onShowAfter, onClose, onSpaceDismissed };
 }
 
 beforeEach(() => seed());
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  // The fr-locale test below activates fr on the shared i18n instance; put it back.
+  i18n.activate("en");
+});
 
 describe("DeadkeyTablePanel", () => {
   it("shows fan-out rows as base character -> result with the key that types it", () => {
@@ -196,12 +203,31 @@ describe("DeadkeyTablePanel", () => {
   });
 
   it("the author can remove the proposed space row without anything being written", () => {
-    panel({ proposeSpaceRow: true });
+    const { onSpaceDismissed } = panel({ proposeSpaceRow: true });
     const before = text();
     fireEvent.click(screen.getByTestId("deadkey-table-space-remove"));
     expect(screen.queryByTestId("deadkey-table-space-proposal")).toBeNull();
     expect(text()).toBe(before);
     expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
+    expect(onSpaceDismissed).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes through onClose, and renders no close button when the caller passes none", () => {
+    const { onClose } = panel();
+    fireEvent.click(screen.getByTestId("deadkey-table-close"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    cleanup();
+    panel({ onClose: undefined });
+    expect(screen.queryByTestId("deadkey-table-close")).toBeNull();
+  });
+
+  it("shows the French close label under the fr locale", () => {
+    i18n.load("fr", frMessages);
+    act(() => {
+      i18n.activate("fr");
+    });
+    panel();
+    expect(screen.getByTestId("deadkey-table-close").textContent).toBe("Fermer");
   });
 
   it("shows why a change was refused and writes nothing", () => {

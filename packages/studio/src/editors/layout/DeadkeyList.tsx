@@ -4,9 +4,15 @@
 // so it can be placed on the selected key or deleted (deleting goes through the spec 083 lifecycle,
 // and cannot be undone here); a deadkey with no combinations yet is flagged. Reads the working IR
 // and the static attribution of each layer; it starts no timer (decision D3).
+//
+// The rows sit behind a disclosure, collapsed by default: they used to render unprompted at the
+// bottom of the pane, in the initial viewport, for a keyboard that already shows its deadkeys on
+// the grid. A keyboard with no deadkeys says so directly — a disclosure with a count of zero
+// adds a click for nothing.
 
 import { useMemo, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import { listDeadkeys } from "@keyboard-studio/contracts";
 import type { LayerCombo } from "@keyboard-studio/contracts";
 import { attributeLayer } from "@keyboard-studio/engine";
@@ -28,14 +34,23 @@ export interface DeadkeyListProps {
   onOpen: (deadkeyId: string) => void;
   /** A deadkey was deleted: close its table if it was open. */
   onDeleted: (deadkeyId: string) => void;
+  /** Controlled disclosure state; when omitted the list manages its own collapsed state. */
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
-export function DeadkeyList({ layers, openId, selectedCell, onOpen, onDeleted }: DeadkeyListProps) {
+export function DeadkeyList({ layers, openId, selectedCell, onOpen, onDeleted, expanded: expandedProp, onExpandedChange }: DeadkeyListProps) {
   const { t } = useLingui();
   const copy = useLayoutCopy();
   const ir = useWorkingCopyStore((s) => s.ir);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [problem, setProblem] = useState<KmnEditRefusal | null>(null);
+  const [internalExpanded, setInternalExpanded] = useState(false);
+  const expanded = expandedProp ?? internalExpanded;
+  function setExpanded(next: boolean): void {
+    onExpandedChange?.(next);
+    if (expandedProp === undefined) setInternalExpanded(next);
+  }
 
   const entries = useMemo(() => {
     if (ir === null) return [];
@@ -59,9 +74,6 @@ export function DeadkeyList({ layers, openId, selectedCell, onOpen, onDeleted }:
     return out;
   }, [ir, layers]);
 
-  if (ir === null) return null;
-  const heading = t({ id: "editor.layout.deadkey.list.heading", message: "Deadkeys in this keyboard" });
-
   function place(ref: string): void {
     if (selectedCell === null || !selectedCell.editable) return;
     const result = useWorkingCopyStore.getState().commitKmnEdit({
@@ -81,15 +93,45 @@ export function DeadkeyList({ layers, openId, selectedCell, onOpen, onDeleted }:
     if (result.ok) onDeleted(ref);
   }
 
-  return (
-    <section aria-label={heading} data-testid="deadkey-list" style={panelStyle}>
-      <h4 style={{ margin: 0, fontSize: 13, color: TEXT_MAIN }}>{heading}</h4>
-      {entries.length === 0 ? (
+  if (ir === null) return null;
+  const heading = t({ id: "editor.layout.deadkey.list.heading", message: "Deadkeys in this keyboard" });
+
+  if (entries.length === 0) {
+    return (
+      <section aria-label={heading} data-testid="deadkey-list" style={panelStyle}>
+        <h4 style={{ margin: 0, fontSize: 13, color: TEXT_MAIN }}>{heading}</h4>
         <p style={noteStyle} data-testid="deadkey-list-empty">
           {t({ id: "editor.layout.deadkey.list.none", message: "This keyboard has no deadkeys yet. Select a key and choose to make it a deadkey." })}
         </p>
-      ) : (
-        <ul style={listStyle}>
+      </section>
+    );
+  }
+
+  const toggleLabel = expanded
+    ? t({ id: "editor.layout.deadkey.list.hide", message: "Hide deadkeys" })
+    : t({
+        id: "editor.layout.deadkey.list.show",
+        message: plural(entries.length, { one: "Show # deadkey", other: "Show # deadkeys" }),
+      });
+
+  return (
+    <section aria-label={heading} data-testid="deadkey-list" style={panelStyle}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <h4 style={{ margin: 0, fontSize: 13, color: TEXT_MAIN }}>{heading}</h4>
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          aria-expanded={expanded}
+          aria-controls="deadkey-list-entries"
+          data-testid="deadkey-list-toggle"
+          className="ks-focus-ring ks-hit-target ks-press"
+          style={buttonStyle}
+        >
+          {toggleLabel}
+        </button>
+      </div>
+      {expanded && (
+        <ul id="deadkey-list-entries" style={listStyle}>
           {entries.map(({ info, ref, placements, empty }) => {
             const name = info.displayChar ?? ref;
             return (

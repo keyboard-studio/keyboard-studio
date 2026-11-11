@@ -16,7 +16,7 @@ import { test, expect, type Locator, type Page } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
-  chooseTrackCopy,
+  confirmCopyTrack,
   driveAttributionStep,
   acceptProjectName,
   confirmPrefill,
@@ -24,7 +24,7 @@ import {
   driveDeadkeysStep,
   driveMechanismsGallery,
   seedReturningVisitor,
-  navigateToOutput,
+  navigateToPublish,
   triggerDownload,
 } from "./helpers/surveyFlow";
 import { unzipSync } from "fflate";
@@ -41,7 +41,7 @@ async function reachMechanicalGallery(
   await page.goto("/");
   await driveIdentityLite(page, { languageCode });
   await pickStartKeyboard(page, startKeyboardId);
-  await chooseTrackCopy(page);
+  await confirmCopyTrack(page);
   await driveAttributionStep(page, { authorName: "Test Author" });
   await acceptProjectName(page);
   await confirmPrefill(page);
@@ -191,7 +191,7 @@ test.describe("spec 117 Layout tab - US2", () => {
 
     // The downloaded source has both rules. Output opens once the Mechanisms step is finished.
     await driveMechanismsGallery(page, {});
-    await navigateToOutput(page);
+    await navigateToPublish(page);
     const download = await triggerDownload(page);
     const zip = unzipSync(new Uint8Array(fs.readFileSync((await download.path())!)));
     const kmn = Object.entries(zip).find(([name]) => name.endsWith(".kmn"));
@@ -262,7 +262,7 @@ test.describe("spec 117 Layout tab - US3", () => {
     const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
     if (await startButton.isVisible().catch(() => false)) await startButton.click();
     await driveMechanismsGallery(page, {});
-    await navigateToOutput(page);
+    await navigateToPublish(page);
     const download = await triggerDownload(page);
     const zip = unzipSync(new Uint8Array(fs.readFileSync((await download.path())!)));
     const kmn = Object.entries(zip).find(([name]) => name.endsWith(".kmn"));
@@ -351,7 +351,7 @@ test.describe("spec 117 Layout tab - US4", () => {
     const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
     if (await startButton.isVisible().catch(() => false)) await startButton.click();
     await driveMechanismsGallery(page, {});
-    await navigateToOutput(page);
+    await navigateToPublish(page);
     const download = await triggerDownload(page);
     const zip = unzipSync(new Uint8Array(fs.readFileSync((await download.path())!)));
     const kmn = Object.entries(zip).find(([name]) => name.endsWith(".kmn"));
@@ -428,7 +428,7 @@ test.describe("spec 117 Layout tab - US8", () => {
     // The download has exactly the three changes. Output opens once the Mechanisms step is finished.
     await page.getByTestId("editor-view-tab-assign").click();
     await driveMechanismsGallery(page, {});
-    await navigateToOutput(page);
+    await navigateToPublish(page);
     const download = await triggerDownload(page);
     const zip = unzipSync(new Uint8Array(fs.readFileSync((await download.path())!)));
     const kmn = Object.entries(zip).find(([name]) => name.endsWith(".kmn"));
@@ -484,7 +484,7 @@ test.describe("spec 117 Layout tab - US8", () => {
   // Ruling 9: the Assign tab's assignment wins over a code edit on the same key, in either order.
   // The edit is not applied in the download, and the author is told why.
   async function expectDownloadHasAssignmentNotEdit(page: Page): Promise<void> {
-    await navigateToOutput(page);
+    await navigateToPublish(page);
     const download = await triggerDownload(page);
     const zip = unzipSync(new Uint8Array(fs.readFileSync((await download.path())!)));
     const kmn = Object.entries(zip).find(([name]) => name.endsWith(".kmn"));
@@ -556,7 +556,7 @@ test.describe("spec 117 Layout tab - US8", () => {
     await page.getByRole("button", { name: "Go to U+0065 e" }).click();
     await driveMechanismsGallery(page, { placements: { e: { key: "K_Q" } } });
     await expect(page.locator('a[href="#output"]')).toBeEnabled({ timeout: 60_000 });
-    await navigateToOutput(page);
+    await navigateToPublish(page);
     const download = await triggerDownload(page);
     const zip = unzipSync(new Uint8Array(fs.readFileSync((await download.path())!)));
     const kmn = Object.entries(zip).find(([name]) => name.endsWith(".kmn"));

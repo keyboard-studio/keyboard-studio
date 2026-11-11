@@ -333,6 +333,125 @@ describe("LayoutPane", () => {
   });
 });
 
+describe("LayoutPane deadkey table close and edit-panel placement", () => {
+  const DK_KMN = `store(&VERSION) '10.0'
+store(&NAME) 'T'
+store(dk_3000_bases) 'e'
+store(dk_3000_output) U+00E9
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > 'x'
++ [K_B] > 'y'
++ [K_D] > dk(3000)
+dk(3000) + any(dk_3000_bases) > index(dk_3000_output, 2)
+`;
+
+  async function loadDeadkeys(): Promise<void> {
+    load(DK_KMN);
+    render(<LayoutPane onViewInCode={vi.fn()} />);
+    publish();
+    await settle();
+  }
+
+  const openButtonFor = (id: string): HTMLElement =>
+    within(
+      screen.getAllByTestId("deadkey-list-item").find((e) => e.getAttribute("data-deadkey") === id)!,
+    ).getByTestId("deadkey-list-open");
+
+  it("renders the edit panel directly under the grid, above the detail panel", async () => {
+    load(KMN);
+    render(<LayoutPane onViewInCode={vi.fn()} />);
+    publish();
+    await settle();
+    fireEvent.click(cell("K_A"));
+    const edit = screen.getByTestId("key-edit-panel");
+    const detail = screen.getByTestId("key-detail-panel");
+    expect(edit.compareDocumentPosition(detail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("a deadkey table closes and returns focus to its list row's Open button", async () => {
+    await loadDeadkeys();
+    fireEvent.click(screen.getByTestId("deadkey-list-toggle"));
+    fireEvent.click(openButtonFor("3000"));
+    expect(screen.getByTestId("deadkey-table-panel")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("deadkey-table-close"));
+    expect(screen.queryByTestId("deadkey-table-panel")).toBeNull();
+    expect(screen.getByTestId("deadkey-list-toggle").getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement).toBe(openButtonFor("3000"));
+  });
+
+  it("the deadkey list is collapsed on arrival: no rows and no table until the author asks", async () => {
+    await loadDeadkeys();
+    expect(screen.getByTestId("deadkey-list-toggle").getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByTestId("deadkey-list-item")).toBeNull();
+    expect(screen.queryByTestId("deadkey-table-panel")).toBeNull();
+  });
+
+  it("closing a new deadkey's table without deciding re-proposes the space row on reopen; declining it does not", async () => {
+    await loadDeadkeys();
+    fireEvent.click(cell("K_B"));
+    fireEvent.click(screen.getByTestId("key-edit-deadkey"));
+    fireEvent.change(screen.getByTestId("key-edit-deadkey-display"), { target: { value: "´" } });
+    fireEvent.click(screen.getByTestId("key-edit-confirm"));
+    expect(screen.getByTestId("deadkey-table-panel")).toBeTruthy();
+    expect(screen.getByTestId("deadkey-table-space-proposal")).toBeTruthy();
+    const newId = useWorkingCopyStore
+      .getState()
+      .deadkeyOverlay.ops.find((o) => o.kind === "define")?.id;
+    expect(newId).not.toBeUndefined();
+    const ref = newId!.toString(16).padStart(4, "0");
+
+    // Close without deciding, reopen: the proposal is back.
+    fireEvent.click(screen.getByTestId("deadkey-table-close"));
+    expect(screen.queryByTestId("deadkey-table-panel")).toBeNull();
+    fireEvent.click(openButtonFor(ref));
+    expect(screen.getByTestId("deadkey-table-space-proposal")).toBeTruthy();
+
+    // Decline it explicitly, close, reopen: no proposal this time.
+    fireEvent.click(screen.getByTestId("deadkey-table-space-remove"));
+    fireEvent.click(screen.getByTestId("deadkey-table-close"));
+    fireEvent.click(openButtonFor(ref));
+    expect(screen.queryByTestId("deadkey-table-space-proposal")).toBeNull();
+  });
+
+  it("an open deadkey table stays open when another key is selected — Close is the way out", async () => {
+    await loadDeadkeys();
+    fireEvent.click(screen.getByTestId("deadkey-list-toggle"));
+    fireEvent.click(openButtonFor("3000"));
+    expect(screen.getByTestId("deadkey-table-panel")).toBeTruthy();
+    fireEvent.click(cell("K_A"));
+    expect(screen.getByTestId("deadkey-table-panel")).toBeTruthy();
+  });
+
+  it("re-observes the edit panel for the scroll safety net after an after-view round trip", async () => {
+    // jsdom has no ResizeObserver and no layout, so the observer is stubbed and the
+    // observe calls themselves are the assertion: without the after-view in the dep
+    // array the observer keeps watching the detached node and never re-observes.
+    const observed: Element[] = [];
+    class MockResizeObserver {
+      constructor(_cb: ResizeObserverCallback) {}
+      observe = (el: Element): void => {
+        observed.push(el);
+      };
+      unobserve = (): void => {};
+      disconnect = (): void => {};
+    }
+    vi.stubGlobal("ResizeObserver", MockResizeObserver);
+    await loadDeadkeys();
+    fireEvent.click(cell("K_A"));
+    expect(observed).toHaveLength(1);
+    expect(observed[0]?.querySelector('[data-testid="key-edit-panel"]')).not.toBeNull();
+    // Open the after-view: the edit panel unmounts. Return: it remounts.
+    fireEvent.change(screen.getByTestId("layout-after-select"), { target: { value: "3000" } });
+    await settle();
+    expect(screen.getByTestId("after-context-close")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("after-context-close"));
+    await settle();
+    expect(observed).toHaveLength(2);
+    expect(observed[1]).toBe(screen.getByTestId("key-edit-panel").parentElement);
+  });
+});
+
 describe("LayoutPane undo (spec 117 US2)", () => {
   it("offers undo only when the top undo entry is a Layout edit, and undoes it", async () => {
     load(KMN);

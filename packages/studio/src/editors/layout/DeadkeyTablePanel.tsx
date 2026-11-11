@@ -29,9 +29,13 @@ export interface DeadkeyTablePanelProps {
   onShowAfter: (deadkeyId: string) => void;
   /** The deadkey was just made: propose its space row. */
   proposeSpaceRow?: boolean;
+  /** Close the table. When omitted the panel renders with no close button. */
+  onClose?: () => void;
+  /** The author explicitly declined the proposed space row ("Do not add it"). */
+  onSpaceDismissed?: () => void;
 }
 
-export function DeadkeyTablePanel({ deadkeyId, layers, onViewInCode, onShowAfter, proposeSpaceRow = false }: DeadkeyTablePanelProps) {
+export function DeadkeyTablePanel({ deadkeyId, layers, onViewInCode, onShowAfter, proposeSpaceRow = false, onClose, onSpaceDismissed }: DeadkeyTablePanelProps) {
   const { t } = useLingui();
   const copy = useLayoutCopy();
   const ids = { base: useId(), result: useId(), key: useId(), layer: useId(), keyResult: useId() };
@@ -146,7 +150,20 @@ export function DeadkeyTablePanel({ deadkeyId, layers, onViewInCode, onShowAfter
 
   return (
     <section aria-label={heading} data-testid="deadkey-table-panel" style={panelStyle}>
-      <h4 style={{ margin: 0, fontSize: 13, color: TEXT_MAIN }}>{heading}</h4>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <h4 style={{ margin: 0, fontSize: 13, color: TEXT_MAIN }}>{heading}</h4>
+        {onClose !== undefined && (
+          <button
+            type="button"
+            onClick={onClose}
+            data-testid="deadkey-table-close"
+            className="ks-focus-ring ks-hit-target ks-press"
+            style={buttonStyle}
+          >
+            {t({ id: "editor.layout.deadkey.table.close", message: "Close" })}
+          </button>
+        )}
+      </div>
 
       {table.empty && !showSpace && (
         <p role="status" style={noteStyle} data-testid="deadkey-table-empty">
@@ -192,7 +209,10 @@ export function DeadkeyTablePanel({ deadkeyId, layers, onViewInCode, onShowAfter
             </button>
             <button
               type="button"
-              onClick={() => setSpaceDismissed(true)}
+              onClick={() => {
+                setSpaceDismissed(true);
+                onSpaceDismissed?.();
+              }}
               data-testid="deadkey-table-space-remove"
               className="ks-focus-ring ks-hit-target ks-press"
               style={buttonStyle}

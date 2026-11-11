@@ -1,7 +1,9 @@
 // LayoutPane — the Layout tab: layer selector, desktop key grid, key detail (spec 117 US1,
 // FR-010..FR-018). Read-only in this phase: it shows what every key really types and where that
 // comes from, and links read-only behaviour to the Code tab. The edit controls of the next phase
-// attach to the detail panel's `editSlot`.
+// render directly under the grid, above the detail panel, so the selected key and its edit
+// controls are jointly in view without scrolling down (at 150% zoom the detail panel's own
+// height used to push them a viewport apart).
 //
 // Everything shown is derived: attribution of the layer over the compiled artifact
 // (`useLayoutAttribution`, which starts no timer and calls no compile — decision D3), the base
@@ -9,7 +11,7 @@
 // owns is the selected layer, the selected key, the layers the author added this session, and
 // whether the Add layer dialog is open.
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { attributeLayer, listContexts } from "@keyboard-studio/engine";
 import { listDeadkeys } from "@keyboard-studio/contracts";
@@ -71,7 +73,14 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
   // The "after typed text" view (literal contexts); mutually exclusive with `afterDeadkey`.
   const [afterLiteral, setAfterLiteral] = useState(false);
   const [newDeadkey, setNewDeadkey] = useState<string | null>(null);
+  // The deadkey list is collapsed by default; closing a table expands it so the "Open its
+  // table" button that focus returns to is in the DOM.
+  const [deadkeyListExpanded, setDeadkeyListExpanded] = useState(false);
   const addButtonRef = useRef<HTMLButtonElement | null>(null);
+  const paneRef = useRef<HTMLDivElement | null>(null);
+  const editWrapRef = useRef<HTMLDivElement | null>(null);
+  // The deadkey whose list row focus returns to when its table is closed.
+  const closeFocusRef = useRef<string | null>(null);
 
   const layers = useMemo(() => listAvailableLayers(startIr, ir, addedLayers), [startIr, ir, addedLayers]);
   const layer: LayerCombo = layers.find((l) => layerKey(l) === layerId) ?? [];
@@ -162,6 +171,83 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layers, ir, i18n.locale]);
 
+  // Close a deadkey table and return focus to that deadkey's "Open its table" button. The
+  // list is expanded first so the button is in the DOM; the effect below focuses it once the
+  // table has unmounted. Closing does NOT clear `newDeadkey`: if the author closed without
+  // deciding on the proposed space row, reopening the table proposes it again. Only an
+  // explicit "Do not add it" clears it (see onSpaceDismissed below).
+  function handleCloseDeadkey(): void {
+    if (openDeadkey === null) return;
+    closeFocusRef.current = openDeadkey;
+    setDeadkeyListExpanded(true);
+    setOpenDeadkey(null);
+  }
+
+  useEffect(() => {
+    if (openDeadkey !== null) return;
+    const id = closeFocusRef.current;
+    if (id === null) return;
+    closeFocusRef.current = null;
+    // Match the row by attribute value, not by interpolating the id into a selector: a
+    // named deadkey's name can hold characters that break a selector (and `CSS.escape`
+    // is not available in this jsdom). If the row is gone (the deadkey was deleted
+    // meanwhile) fall back to the list toggle.
+    const list = paneRef.current?.querySelector('[data-testid="deadkey-list"]');
+    const row = Array.from(list?.querySelectorAll("[data-deadkey]") ?? []).find(
+      (el) => el.getAttribute("data-deadkey") === id,
+    );
+    const target = row?.querySelector('[data-testid="deadkey-list-open"]');
+    if (target instanceof HTMLElement) target.focus();
+    else paneRef.current?.querySelector<HTMLElement>('[data-testid="deadkey-list-toggle"]')?.focus();
+  }, [openDeadkey, deadkeyListExpanded]);
+
+  // Keep the selected key and its edit controls jointly in view. On selection (click or arrow
+  // key) scroll the pane the minimum amount that fits the edit panel, capped so the selected
+  // cell stays in view; when everything already fits, or there is no edit panel, do nothing —
+  // so arrow-key navigation and manual scrolling are never yanked. At 150% zoom the edit
+  // panel sits directly under the grid, so the two fit together with at most a small nudge;
+  // this is the safety net for a taller edit panel (deadkey options, displacement, case
+  // partner). The same check also runs when the edit panel resizes (its content grows while
+  // typing, or the viewport zooms after the key was selected): a resize alone does not change
+  // the selection, so the selection effect below would never fire.
+  function ensureEditVisible(): void {
+    if (selectedVkey === null || afterDeadkey !== null || afterLiteral) return;
+    const pane = paneRef.current;
+    const edit = editWrapRef.current;
+    if (pane === null || edit === null || pane.clientHeight === 0) return;
+    const cellEl = pane.querySelector(`[data-testid="layout-cell-${selectedVkey}"]`);
+    if (!(cellEl instanceof HTMLElement)) return;
+    const paneRect = pane.getBoundingClientRect();
+    const overflow = edit.getBoundingClientRect().bottom - paneRect.bottom;
+    if (overflow <= 0) return;
+    const maxScroll = cellEl.getBoundingClientRect().top - paneRect.top - 8;
+    if (maxScroll <= 0) return;
+    pane.scrollTop += Math.min(overflow, maxScroll);
+  }
+
+  useLayoutEffect(() => {
+    ensureEditVisible();
+    // `selectedVkey` / `layerId` / the after-view are the triggers; the refs are stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVkey, layerId, afterDeadkey, afterLiteral]);
+
+  useEffect(() => {
+    const edit = editWrapRef.current;
+    if (edit === null) return;
+    window.addEventListener("resize", ensureEditVisible);
+    if (typeof ResizeObserver === "undefined") return () => window.removeEventListener("resize", ensureEditVisible);
+    const observer = new ResizeObserver(() => ensureEditVisible());
+    observer.observe(edit);
+    return () => {
+      window.removeEventListener("resize", ensureEditVisible);
+      observer.disconnect();
+    };
+    // Re-observe when the edit panel remounts: a new key/layer, or returning from the
+    // after-view (the panel unmounts while AfterContextView renders, so the observer
+    // would otherwise keep watching the detached node).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVkey, layerId, afterDeadkey, afterLiteral]);
+
   if (ir === null) {
     return (
       <div data-testid="layout-pane" style={{ padding: 24, color: TEXT_DIM, fontFamily: FONT }}>
@@ -214,6 +300,7 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
 
   return (
     <div
+      ref={paneRef}
       data-testid="layout-pane"
       style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12, fontFamily: FONT, color: TEXT_MAIN, overflow: "auto" }}
     >
@@ -401,24 +488,21 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
             })}
           />
 
-          <KeyDetailPanel
-            cell={selected}
-            onViewInCode={onViewInCode}
-            replaced={replaced}
-            editSlot={
-              selected !== null && selected.editable ? (
-                <KeyEditPanel
-                  key={`${selected.vkey}|${layerId}`}
-                  cell={selected}
-                  onViewInCode={onViewInCode}
-                  onDeadkeyDefined={(id) => {
-                    setNewDeadkey(id);
-                    setOpenDeadkey(id);
-                  }}
-                />
-              ) : undefined
-            }
-          />
+          {selected !== null && selected.editable && (
+            <div ref={editWrapRef}>
+              <KeyEditPanel
+                key={`${selected.vkey}|${layerId}`}
+                cell={selected}
+                onViewInCode={onViewInCode}
+                onDeadkeyDefined={(id) => {
+                  setNewDeadkey(id);
+                  setOpenDeadkey(id);
+                }}
+              />
+            </div>
+          )}
+
+          <KeyDetailPanel cell={selected} onViewInCode={onViewInCode} replaced={replaced} />
         </>
       )}
 
@@ -433,6 +517,8 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
             setAfterDeadkey(id);
           }}
           proposeSpaceRow={newDeadkey === openDeadkey}
+          onClose={handleCloseDeadkey}
+          onSpaceDismissed={() => setNewDeadkey(null)}
         />
       )}
 
@@ -445,6 +531,8 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
           if (openDeadkey === id) setOpenDeadkey(null);
           if (afterDeadkey === id) setAfterDeadkey(null);
         }}
+        expanded={deadkeyListExpanded}
+        onExpandedChange={setDeadkeyListExpanded}
       />
 
       <AddLayerDialog
