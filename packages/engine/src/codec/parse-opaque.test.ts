@@ -369,4 +369,23 @@ group(main) using keys
       { kind: "char", value: ";" },
     ]);
   });
+
+  it("a vkey bracket whose key is a quoted ']' stays one item and round-trips", () => {
+    // bu_phonetic: store(keyBridgeB) [CTRL ALT SHIFT "]"]. The bracket scan
+    // used to stop at the quoted ']', splitting the item in two and emitting
+    // `[CTRL ALT SHIFT "] "]`, which kmc rejects.
+    const kmn = `store(&NAME) 'Quoted Bracket Key'
+store(keyBridgeB) [CTRL ALT SHIFT "]"]
+begin Unicode > use(main)
+group(main) using keys
++ [SHIFT "]"] > U+032A
+`;
+    const { ir } = parse(kmn, "quoted-bracket-key");
+    expect(ir.stores.find((s) => s.name === "keyBridgeB")?.items).toEqual([
+      { kind: "raw", text: '[CTRL ALT SHIFT "]"]' },
+    ]);
+    const out = emit(ir);
+    expect(out).toContain('store(keyBridgeB) [CTRL ALT SHIFT "]"]');
+    expect(out).toContain('+ [SHIFT "]"] > U+032A');
+  });
 });
