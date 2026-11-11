@@ -1392,10 +1392,10 @@ export function projectWorkingCopyVfs(
   // Step 3.1: Target platforms — always `store(&TARGETS) 'any'` (product owner
   // ruling, 2026-11-07). Every produced keyboard ships desktop and touch, the
   // two outputs that adapt per OS, so none picks individual platforms; and the
-  // preview, the Layout tab, and the outputs all need the web build a
-  // 'windows'-only keyboard never gets. Unconditional, unlike identity: it is
-  // not an author choice. Same seam, so preview and outputs cannot disagree.
-  if (vfs.get(`source/${keyboardId}.kmn`) !== undefined) {
+  // preview, the Layout tab, and copied outputs all need the web build a
+  // 'windows'-only keyboard never gets. Open preserves the existing source
+  // unchanged unless the author edits it.
+  if (openMode === undefined && vfs.get(`source/${keyboardId}.kmn`) !== undefined) {
     applyTargetsAnyMutation(vfs, keyboardId);
   }
 

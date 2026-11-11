@@ -13,6 +13,7 @@ const KMN = [
   "c a hand-written comment",
   "store(&NAME) 'Tiny'",
   "store(&VERSION) '10.0'",
+  'store(&Targets) "any"',
   "begin Unicode > use(main)",
   "group(main) using keys",
   "+ [K_A] > 'a'",
@@ -46,21 +47,17 @@ describe("projectWorkingCopyVfs: Open mode", () => {
     const { result, text } = run({});
     expect(result.reformatRequired).toBeUndefined();
     expect(text).toContain("c a hand-written comment\r\n");
+    expect(text).toContain('store(&Targets) "any"\r\n');
     expect(text).not.toContain("[K_A]");
     expect(text).toContain("+ [K_B] > 'b'\r\n");
     expect(text).not.toMatch(/[^\r]\n/);
   });
 
-  it("preserves an uneditable file except for the required target store", () => {
+  it("preserves an uneditable file without normalizing its target store", () => {
     const { result, text } = run({ stripSourceLine: true });
     expect(result.reformatRequired).toEqual([`source/${ID}.kmn`]);
     expect(result.warnings.some((w) => w.startsWith("[open]") && w.includes(`source/${ID}.kmn`))).toBe(true);
-    expect(text).toBe(
-      KMN.replace(
-        "store(&VERSION) '10.0'\r\n",
-        "store(&VERSION) '10.0'\r\nstore(&TARGETS) 'any'\r\n",
-      ),
-    );
+    expect(text).toBe(KMN);
   });
 
   it("re-emits the file once the author agrees", () => {
