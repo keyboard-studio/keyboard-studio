@@ -152,12 +152,16 @@ describe("base-browser tier scope — release/ only", () => {
   });
 
   // StartKeyboard.path is documented "Always under release/" (contracts/startKeyboard.ts).
-  // This makes that documented invariant executable.
+  // This makes that documented invariant executable. CLDR entries (#2599) are
+  // exempt by origin: they are a second pinned source under the permissive
+  // Unicode License (not corpus tiers), and the loader never resolves them
+  // from `path` — the tier guard still applies to every corpus entry.
   it("every catalogue entry resolves under release/", async () => {
     const browser = createStartBrowser({ fetch: fixtureFetch() });
     const list = await browser.listAll();
     expect(list.length).toBeGreaterThan(0);
     for (const k of list) {
+      if (k.origin === "cldr") continue;
       expect(k.path.startsWith("release/"), `base "${k.id}" path: ${k.path}`).toBe(true);
     }
   });
@@ -169,6 +173,7 @@ describe("base-browser tier scope — release/ only", () => {
     const hits = await browser.search("japanese");
     expect(hits.map((k) => k.id)).not.toContain("japanese");
     for (const k of hits) {
+      if (k.origin === "cldr") continue;
       expect(k.path.startsWith("release/"), `search hit "${k.id}" path: ${k.path}`).toBe(true);
     }
   });

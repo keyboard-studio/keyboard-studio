@@ -59,6 +59,43 @@ export type { KmnHeaderStore } from "./compiler/parseKmnHeaderStores.js";
 export { parseKpjFlags } from "./compiler/parseKpjFlags.js";
 export type { CompilerOptions } from "./compiler/parseKpjFlags.js";
 
+// Issue #2599 — CLDR 43.1 legacy keyboard import (desktop + Android touch).
+export {
+  CLDR_INDEX,
+  CLDR_REPO,
+  CLDR_TAG,
+  cldrAttributionPath,
+  cldrFileUrl,
+  cldrSourceCommit,
+  cldrStartKeyboards,
+  deadkeyNameFor,
+  expandModifiers,
+  formForLocale,
+  groupCldrIndex,
+  importCldrDesktopKeyboard,
+  importCldrKeyboard,
+  importCldrTouchLayout,
+  isoToVkey,
+  makeDesktopTouchResolver,
+  parseCldrLegacyKeyboard,
+} from "./cldr-import/index.js";
+export type {
+  CldrDesktopImportReport,
+  CldrDesktopImportResult,
+  CldrIndexEntry,
+  CldrLegacyKeyboard,
+  CldrLegacyKeyMap,
+  CldrLegacyMap,
+  CldrLegacyTransform,
+  CldrPickerGroup,
+  CldrSkippedItem,
+  CldrTouchImportReport,
+  CldrTouchImportResult,
+  CldrTouchKeyResolver,
+  ImportCldrKeyboardOptions,
+  ImportCldrKeyboardResult,
+} from "./cldr-import/index.js";
+
 // Issue #39 — release-tree source loader (proxy + VFS hydration).
 export { fetchKeyboardSourceToVfs, rewriteKpsBuildEntries } from "./loader/fetchKeyboardSourceToVfs.js";
 export type {

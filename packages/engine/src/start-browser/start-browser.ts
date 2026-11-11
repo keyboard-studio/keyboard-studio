@@ -21,6 +21,7 @@ import { classifyStartDocumentation } from "./classifyStartDocumentation.js";
 import { kpsRefToPosix, parseKps, parseKpsFiles } from "./kps-parser.js";
 import { offlineKbdus } from "./offline-bundle.js";
 import { dedupeKpsPathsById, matchKeyboardScopePath } from "./corpus-scope.js";
+import { cldrStartKeyboards } from "../cldr-import/index.js";
 
 const OWNER = "keyboard-studio";
 const REPO = "keyboards";
@@ -270,6 +271,16 @@ export function createStartBrowser(
     // Guarantee the offline US-English fallback is always present
     if (!keyboards.some((kb) => kb.id === offlineKbdus.id)) {
       keyboards.push(offlineKbdus);
+    }
+
+    // CLDR 43.1 starts (issue #2599): merged after the corpus, and the corpus
+    // wins on any id collision — a Keyman-native keyboard is the better
+    // starting point than a CLDR import for the same locale (ruling §1).
+    // CLDR ids are namespaced `cldr_<locale>[_<variant>]`, so in practice
+    // this only bites if a corpus keyboard ever takes a `cldr_*` id.
+    const corpusIds = new Set(keyboards.map((kb) => kb.id));
+    for (const cldrKb of cldrStartKeyboards()) {
+      if (!corpusIds.has(cldrKb.id)) keyboards.push(cldrKb);
     }
 
     keyboards.sort((a, b) => a.id.localeCompare(b.id));
