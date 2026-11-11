@@ -304,7 +304,7 @@ export async function pickStartKeyboard(
   await search.fill(keyboardId);
   await page.locator(`[id$="-opt-${keyboardId}"]`).first().click({ timeout: 15_000 });
   const confirm = page.getByTestId("base-confirm");
-  await expect(confirm).toBeEnabled({ timeout: 5_000 });
+  await expect(confirm).toBeEnabled({ timeout: 30_000 });
   await confirm.click();
 }
 

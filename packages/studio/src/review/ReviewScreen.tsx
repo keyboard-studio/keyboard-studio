@@ -4,6 +4,14 @@
 // and writes none — the whole screen is structurally read-only (the spec 057
 // US2 precedent: isolation by absence, not by flag).
 //
+// It also renders standalone WITHOUT the NavBar (StudioShell returns it
+// before StudioShellContent), so the NavBar's LocaleSwitcher never appears
+// here — and the boot locale comes from navigator.language detection, so a
+// French-browser visitor landed on a fully French page with no way back.
+// This screen therefore carries its own LocaleSwitcher, in a slim row above
+// the banner (page background, so the switcher's own theme tokens apply
+// unchanged).
+//
 // Shareable report links carry ?source=&path=&sha=(&pr=); on load the screen
 // resolves the target from the index (repo sources) or the params (PRs) and
 // jumps straight to the run.
@@ -19,6 +27,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { CriteriaResult } from "../criteria/criteriaTypes.ts";
 import { ACCENT, BG_CARD, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
+import { LocaleSwitcher } from "../components/LocaleSwitcher.tsx";
 import { ReviewPicker } from "./ReviewPicker.tsx";
 import { ReviewReport } from "./ReviewReport.tsx";
 import {
@@ -272,6 +281,15 @@ export function ReviewScreen() {
       }}
     >
       <div style={{ maxWidth: 960, margin: "0 auto" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginBottom: 12,
+          }}
+        >
+          <LocaleSwitcher />
+        </div>
         <div
           style={{
             background: "var(--sil-blue-dark)",

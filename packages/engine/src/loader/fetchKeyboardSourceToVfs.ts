@@ -22,6 +22,15 @@ import { kpsRefToPosix, parseKpsFiles, parseKpsFontRefs } from "../start-browser
 import { extractWelcomeImageRefs } from "../shared/helpDocsRender.js";
 import { parseKvks } from "../codec/parse-kvks.js";
 import { pathUtils } from "../compiler/pathUtils.js";
+import { emit } from "../codec/emit.js";
+import { emitTouchLayout } from "../codec/parse-touch.js";
+import {
+  CLDR_REPO,
+  CLDR_TAG,
+  cldrAttributionPath,
+  importCldrKeyboard,
+  parseCldrLegacyKeyboard,
+} from "../cldr-import/index.js";
 
 /** Structural fetch type — avoids pulling in the DOM lib for an isomorphic package. */
 export type FetchFn = (
@@ -256,6 +265,169 @@ async function getBytes(
 }
 
 /**
+ * CLDR branch of {@link fetchKeyboardSourceToVfs} (issue #2599): fetch the
+ * pinned 43.1 XML files for a `origin: "cldr"` start, import them to an IR,
+ * and write the emitted `.kmn` + `.keyman-touch-layout` into the VFS at the
+ * same paths the corpus flow writes, so the studio's parse → scaffold →
+ * compile flow runs unchanged downstream.
+ *
+ * Throws when a required CLDR file is missing or unparseable. Import
+ * lossage (unmapped positions, skipped modifier alternatives, non-deadkey
+ * transforms) is reported in `warnings`, never thrown — the import report
+ * is the record, and a partial keyboard is still a usable starting point.
+ */
+async function fetchCldrKeyboardSourceToVfs(
+  startKeyboard: StartKeyboard,
+  vfs: VirtualFS,
+  opts: { proxyBase: string; fetchImpl: FetchFn },
+): Promise<FetchKeyboardSourceResult> {
+  const source = startKeyboard.cldr;
+  if (source === undefined) {
+    throw new Error(
+      `fetchKeyboardSourceToVfs: CLDR start '${startKeyboard.id}' has no cldr source`,
+    );
+  }
+  const cldrUrl = (platform: string, file: string): string =>
+    `${opts.proxyBase}/${CLDR_REPO}/${CLDR_TAG}/keyboards/${platform}/${file}`;
+
+  const desktopPlatform = source.desktopPlatform ?? "windows";
+  // Android-only locales (ruling §4): no desktop file — the Android phone
+  // file doubles as the desktop half (its `opt` keyMaps stay touch-only).
+  const desktopFile = source.desktopFile ?? source.androidFile;
+  const desktopIsAndroid = source.desktopFile === undefined;
+  if (desktopFile === undefined) {
+    throw new Error(
+      `fetchKeyboardSourceToVfs: CLDR start '${startKeyboard.id}' has neither a desktop nor an Android file`,
+    );
+  }
+  const fetches: Array<{ key: string; url: string }> = [
+    {
+      key: "desktop",
+      url: cldrUrl(desktopIsAndroid ? "android" : desktopPlatform, desktopFile),
+    },
+  ];
+  if (source.androidFile !== undefined && source.androidFile !== desktopFile) {
+    fetches.push({
+      key: "android",
+      url: cldrUrl("android", source.androidFile),
+    });
+  }
+  if (source.tabletFile !== undefined) {
+    fetches.push({
+      key: "tablet",
+      url: cldrUrl("android", source.tabletFile),
+    });
+  }
+  const texts = new Map<string, string>();
+  for (const f of fetches) {
+    const r = await getText(f.url, opts.fetchImpl);
+    if (!r.ok || r.text === undefined) {
+      const detail = r.networkError
+        ? `network error: ${r.networkError}`
+        : `HTTP ${r.status}`;
+      throw new Error(
+        `fetchKeyboardSourceToVfs: required CLDR file not found at ${f.url} (${detail})`,
+      );
+    }
+    texts.set(f.key, r.text);
+  }
+
+  const desktop = parseCldrLegacyKeyboard(texts.get("desktop") as string);
+  const androidText = texts.get("android");
+  const tabletText = texts.get("tablet");
+  // Android-only locales (ruling §4): the phone file is both halves — the
+  // desktop import skips its `opt` keyMaps, the touch import uses them.
+  const android = androidText !== undefined
+    ? parseCldrLegacyKeyboard(androidText)
+    : desktopIsAndroid
+      ? desktop
+      : undefined;
+  const { ir, desktopReport, touchReport, tabletReport } = importCldrKeyboard({
+    desktop,
+    ...(android !== undefined ? { android } : {}),
+    ...(tabletText !== undefined
+      ? { androidTablet: parseCldrLegacyKeyboard(tabletText) }
+      : {}),
+    keyboardId: startKeyboard.id,
+    displayName: startKeyboard.displayName,
+    ...(startKeyboard.languages !== undefined
+      ? { bcp47: startKeyboard.languages }
+      : {}),
+    ...(desktopIsAndroid ? { desktopFileKind: "android" as const } : {}),
+    sourceFiles: {
+      desktop: `keyboards/${desktopIsAndroid ? "android" : desktopPlatform}/${desktopFile}`,
+      ...(source.androidFile !== undefined
+        ? { android: `keyboards/android/${source.androidFile}` }
+        : {}),
+      ...(source.tabletFile !== undefined
+        ? { androidTablet: `keyboards/android/${source.tabletFile}` }
+        : {}),
+    },
+  });
+
+  const filesLoaded: string[] = [];
+  const kmnVfsPath = `source/${startKeyboard.id}.kmn`;
+  vfs.set(kmnVfsPath, emit(ir));
+  filesLoaded.push(kmnVfsPath);
+  if (ir.touchLayout !== undefined) {
+    const tlVfsPath = `source/${startKeyboard.id}.keyman-touch-layout`;
+    vfs.set(tlVfsPath, emitTouchLayout(ir.touchLayout));
+    filesLoaded.push(tlVfsPath);
+  }
+
+  const warnings: string[] = [];
+  const summarize = (label: string, skippedCount: number, extra: string[]): void => {
+    const parts = [`${label}: ${skippedCount} skipped`];
+    if (extra.length > 0) parts.push(extra.join("; "));
+    if (skippedCount > 0 || extra.length > 0) {
+      warnings.push(
+        `CLDR import (${startKeyboard.id}) — ${parts.join(", ")}; ` +
+          `source: ${cldrAttributionPath(desktopIsAndroid ? "android" : desktopPlatform, desktopFile)}`,
+      );
+    }
+  };
+  summarize(
+    "desktop",
+    desktopReport.skipped.length,
+    [
+      ...(desktopReport.unmappedPositions.length > 0
+        ? [`unmapped positions: ${desktopReport.unmappedPositions.join(", ")}`]
+        : []),
+      ...(desktopReport.skippedModifiers.length > 0
+        ? [`skipped modifier alternatives: ${desktopReport.skippedModifiers.join(", ")}`]
+        : []),
+    ],
+  );
+  if (touchReport !== undefined) {
+    summarize(
+      "phone touch",
+      touchReport.skipped.length,
+      touchReport.skippedKeyMaps.length > 0
+        ? [`skipped keyMaps: ${touchReport.skippedKeyMaps.join(", ")}`]
+        : [],
+    );
+  }
+  if (tabletReport !== undefined) {
+    summarize(
+      "tablet touch",
+      tabletReport.skipped.length,
+      tabletReport.skippedKeyMaps.length > 0
+        ? [`skipped keyMaps: ${tabletReport.skippedKeyMaps.join(", ")}`]
+        : [],
+    );
+  }
+
+  return {
+    options: DEFAULT_OPTIONS,
+    filesLoaded,
+    warnings,
+    fonts: [],
+    stylesheets: [],
+    startWelcomeConvention: "absent",
+  };
+}
+
+/**
  * Populate the VFS with the source files for the chosen base keyboard.
  *
  * Throws on a missing required file (the `.kmn` itself, or a required
@@ -273,6 +445,18 @@ export async function fetchKeyboardSourceToVfs(
   const baseUrl = `${proxyBase}/${startKeyboard.path}`;
   const filesLoaded: string[] = [];
   const warnings: string[] = [];
+
+  // CLDR starts (issue #2599): fetch the pinned 43.1 XML files, import them
+  // to an IR, and write the emitted .kmn + .keyman-touch-layout into the
+  // VFS — the same paths the corpus flow writes, so the studio's parse →
+  // scaffold → compile flow runs unchanged downstream. CLDR carries no
+  // .kps/.kpj/fonts, so those result fields stay empty/default.
+  if (startKeyboard.origin === "cldr") {
+    return fetchCldrKeyboardSourceToVfs(startKeyboard, vfs, {
+      proxyBase,
+      fetchImpl,
+    });
+  }
 
   // Step 1: required .kmn.
   const kmnUrl = `${baseUrl}/source/${startKeyboard.id}.kmn`;
