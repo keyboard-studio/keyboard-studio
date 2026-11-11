@@ -287,7 +287,12 @@ export async function pickStartKeyboard(
     await card.click();
     const cardConfirm = page.getByTestId("base-confirm");
     if (await cardConfirm.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await expect(cardConfirm).toBeEnabled({ timeout: 5_000 });
+      // "Preparing preview…" parses the base artifact before the confirm
+      // enables — on a cold or loaded machine that takes longer than a
+      // 5s guess (sil_cameroon_qwerty wedged past it while a corpus run
+      // owned the VM). Playwright's own default action timeout is 30s;
+      // match it rather than failing a healthy walk on a slow parse.
+      await expect(cardConfirm).toBeEnabled({ timeout: 30_000 });
       await cardConfirm.click();
     }
     return;
@@ -299,7 +304,7 @@ export async function pickStartKeyboard(
   await search.fill(keyboardId);
   await page.locator(`[id$="-opt-${keyboardId}"]`).first().click({ timeout: 15_000 });
   const confirm = page.getByTestId("base-confirm");
-  await expect(confirm).toBeEnabled({ timeout: 5_000 });
+  await expect(confirm).toBeEnabled({ timeout: 30_000 });
   await confirm.click();
 }
 
@@ -1105,7 +1110,7 @@ export async function driveTouchGallery(page: Page): Promise<void> {
  *      pf_history_entry) — the minimal path every existing walk wants,
  *      rather than opening the optional documentation battery
  *   6. Advances through remaining optional questions in a bounded loop
- *   7. Detects arrival at #output (phase boundary)
+ *   7. Detects arrival at the done panel (phase boundary)
  *
  * @param page Page instance
  * @param welcomeText Welcome paragraph text (e.g. "Welcome to the keyboard.")
@@ -1201,13 +1206,18 @@ export async function driveHelpPhase(
   await moreDetailNo.check();
   await surveyAdvance(page).click();
 
-  await advanceThroughTailToOutput(page);
+  await advanceThroughTailToDone(page);
 }
 
-/** Advance through optional Phase F tail questions, then css/html editor steps, until #output. */
-export async function advanceThroughTailToOutput(page: Page): Promise<void> {
+/** Advance through optional Phase F tail questions, then the html/icon/trial/publish tail, until the done panel. */
+export async function advanceThroughTailToDone(page: Page): Promise<void> {
   for (let guard = 0; guard < 20; guard++) {
-    if (/#output$/.test(page.url())) {
+    if (
+      await page
+        .getByRole("heading", { name: "Survey complete" })
+        .isVisible()
+        .catch(() => false)
+    ) {
       return;
     }
     const next = surveyAdvance(page);
@@ -1219,17 +1229,20 @@ export async function advanceThroughTailToOutput(page: Page): Promise<void> {
     const editorContinue = page
       .getByTestId("html-continue")
       .or(page.getByTestId("css-continue"))
+      .or(page.getByTestId("icon-continue"))
+      .or(page.getByTestId("trial-continue"))
+      .or(page.getByTestId("publish-finish"))
       .or(page.getByRole("button", { name: "Continue" }));
     if (await editorContinue.isVisible().catch(() => false)) {
       await editorContinue.click();
       continue;
     }
     throw new Error(
-      `advanceThroughTailToOutput: stuck before #output (url: ${page.url()}) — ` +
+      `advanceThroughTailToDone: stuck before the done panel (url: ${page.url()}) — ` +
         "no survey-advance or editor Continue visible",
     );
   }
-  throw new Error("advanceThroughTailToOutput: did not reach #output within the step budget");
+  throw new Error("advanceThroughTailToDone: did not reach the done panel within the step budget");
 }
 
 /** Optional custom CSS step (after touch): continue with empty CSS (no .css file). */
@@ -1290,11 +1303,43 @@ export async function switchTab(page: Page, route: TabRoute): Promise<void> {
 }
 
 /**
- * Navigate to the Output tab via the nav link and wait for the screen to load.
+ * Go to the Publish step, where the release lives (spec 113).
+ *
+ * The `#output` tab is a redirect into the tail now: a finished walk lands
+ * on Publish directly; mid-walk it lands on Trial, so Continue once. The
+ * coverage gate must already be open, or Trial's Continue is disabled and
+ * this waits out the timeout naming the stall.
  */
-export async function navigateToOutput(page: Page): Promise<void> {
+export async function navigateToPublish(page: Page): Promise<void> {
   await page.click('a[href="#output"]');
-  await page.waitForSelector('[data-testid="output-screen-root"]', { timeout: 10_000 });
+  const tail = page.locator('[data-testid="publish-step-root"], [data-testid="trial-step-root"]');
+  await tail.first().waitFor({ state: "visible", timeout: 10_000 });
+  const trialContinue = page.getByTestId("trial-continue");
+  if (await trialContinue.isVisible().catch(() => false)) {
+    await expect(trialContinue).toBeEnabled({ timeout: 15_000 });
+    await trialContinue.click();
+    await page.waitForSelector('[data-testid="publish-step-root"]', { timeout: 10_000 });
+  }
+}
+
+/**
+ * Go to the Trial step, where test builds live (spec 113).
+ *
+ * The `#output` tab is a redirect into the tail now: mid-walk it lands on
+ * Trial. The coverage gate must already be open (the galleries walked), or
+ * Trial mounts with Continue disabled — the builds themselves still work.
+ * Callers that need a FINISHED walk must use navigateToPublish instead: once
+ * the walk is done, `#output` redirects to Publish and Trial is behind.
+ */
+export async function navigateToTrial(page: Page): Promise<void> {
+  await page.click('a[href="#output"]');
+  await page.waitForSelector('[data-testid="trial-step-root"]', { timeout: 30_000 });
+}
+
+/** From the done panel, open the Publish step (spec 113: the walk ends at done; the release lives on Publish). */
+export async function goToPublishFromDone(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Review the Publish step" }).click();
+  await page.waitForSelector('[data-testid="publish-step-root"]', { timeout: 30_000 });
 }
 
 /**

@@ -25,8 +25,11 @@
 // (`entryPoints.newContext` / `postKeystroke`), which parse() derives from the
 // presence of the reserved groups. Deleting `group(NewContext)` must clear the
 // flag, or this IR disagrees with a re-parse of the carveViaSplice text.
+// Likewise the header fields parse() derives from system stores (name /
+// copyright / version / targets): deleting the backing store clears the
+// field — see reconcileHeaderSystemStores.
 
-import type { IRGroup, IRHeader, KeyboardIR } from "@keyboard-studio/contracts";
+import type { IRGroup, IRHeader, IRStore, KeyboardIR } from "@keyboard-studio/contracts";
 import { resolveCarveCascade } from "./carveCascade.js";
 
 /**
@@ -94,11 +97,17 @@ export function carveFilterIr(
       return { ...g, rules: filteredRules };
     });
 
+  // Filter deleted stores.
+  const stores = startIr.stores.filter((s) => !cascade.deletedStoreIds.has(s.nodeId));
+
   return {
     ...startIr,
-    header: reconcileEntryPoints(startIr.header, groups),
-    // Filter deleted stores.
-    stores: startIr.stores.filter((s) => !cascade.deletedStoreIds.has(s.nodeId)),
+    header: reconcileHeaderSystemStores(
+      reconcileEntryPoints(startIr.header, groups),
+      startIr.stores,
+      stores,
+    ),
+    stores,
     groups,
     // Raw fragments: filter out any deleted fragment nodes (including those
     // cascaded from their owning group); survivors are preserved so emit()'s
@@ -134,4 +143,57 @@ function reconcileEntryPoints(header: IRHeader, groups: readonly IRGroup[]): IRH
   };
   const { entryPoints: _dropped, ...headerRest } = header;
   return Object.keys(next).length > 0 ? { ...headerRest, entryPoints: next } : headerRest;
+}
+
+/**
+ * Reconcile the header fields parse() derives from system stores (name /
+ * copyright / version / targets): deleting the backing store clears the
+ * field. A re-parse of the spliced text re-derives these from the surviving
+ * stores, so keeping the stale value would make the filtered IR disagree
+ * with it (e.g. deleting store(&VERSION) must clear header.version).
+ * Only fields whose source store was actually deleted are touched —
+ * hand-built IRs may carry header values with no backing store, and those
+ * pass through verbatim. Values are recomputed from the surviving stores'
+ * items (plain quoted-string stores, the only shape these headers take,
+ * round-trip exactly). Returns the original header object when nothing
+ * changes.
+ */
+function reconcileHeaderSystemStores(
+  header: IRHeader,
+  startStores: readonly IRStore[],
+  stores: readonly IRStore[],
+): IRHeader {
+  const deletedNames = new Set(
+    startStores
+      .filter((s) => s.isSystem && !stores.some((t) => t.nodeId === s.nodeId))
+      .map((s) => s.name.toUpperCase()),
+  );
+  if (deletedNames.size === 0) return header;
+  const textOf = (name: string): string | undefined => {
+    const store = stores.find((s) => s.isSystem && s.name.toUpperCase() === name);
+    if (store === undefined) return undefined;
+    return store.items
+      .map((it) => (it.kind === "char" ? it.value : it.kind === "raw" ? (it.text ?? "") : ""))
+      .join("");
+  };
+  const next: Partial<IRHeader> = {};
+  if (deletedNames.has("NAME")) next.name = textOf("NAME") ?? "";
+  if (deletedNames.has("COPYRIGHT")) next.copyright = textOf("COPYRIGHT") ?? "";
+  if (deletedNames.has("KEYBOARDVERSION") || deletedNames.has("VERSION")) {
+    next.version = textOf("KEYBOARDVERSION") ?? textOf("VERSION") ?? "";
+  }
+  if (deletedNames.has("TARGETS")) {
+    const raw = textOf("TARGETS");
+    next.targets = raw ? raw.split(/\s+/).filter(Boolean) : [];
+  }
+  if (
+    (next.name === undefined || next.name === header.name) &&
+    (next.copyright === undefined || next.copyright === header.copyright) &&
+    (next.version === undefined || next.version === header.version) &&
+    (next.targets === undefined ||
+      JSON.stringify(next.targets) === JSON.stringify(header.targets))
+  ) {
+    return header;
+  }
+  return { ...header, ...next };
 }

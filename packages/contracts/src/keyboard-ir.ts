@@ -399,6 +399,17 @@ export interface IRStore {
    */
   sourceLine?: number;
   /**
+   * Additional 1-based source lines this store consumes beyond `sourceLine`,
+   * set by the parser when a #2633 target-selector merge drops a twin line
+   * whose content this store now carries (e.g. the dropped `$keymanweb:
+   * store(x)` twin of a surviving desktop-body store, or a dropped header
+   * statement whose value this store already declares). The text-splice
+   * carve path deletes these lines together with the store: without them
+   * the dropped line would survive a deletion and re-parse the twin back
+   * into existence. Absent when the store consumes only `sourceLine`.
+   */
+  consumedSourceLines?: number[];
+  /**
    * A trailing `c <comment>` on the store declaration line, captured so it
    * round-trips. Non-semantic (ignored by the semantic round-trip comparison),
    * but preserved on emit. Mirrors IRRule.trailingComment.
@@ -476,6 +487,17 @@ export interface IRRule {
    */
   sourceLine?: number;
   /**
+   * Additional 1-based source lines this rule consumes beyond `sourceLine`,
+   * set by the parser when a #2633 target-selector merge drops a twin line
+   * whose content this rule now carries (e.g. the dropped `$keymanweb:
+   * nomatch > nul` twin of a surviving `nomatch > beep`). The text-splice
+   * carve path deletes these lines together with the rule: without them
+   * the dropped line would survive a deletion and re-parse as an orphan
+   * rule in the preceding group. Absent when the rule consumes only
+   * `sourceLine`.
+   */
+  consumedSourceLines?: number[];
+  /**
    * Marker for rules added by the rules survey step (spec 082: pack install,
    * guard synthesis, Narrow exceptions). Set by the studio/engine when the
    * rule is minted into the working IR; never by the codec parser. The VFS
@@ -549,6 +571,16 @@ export interface RawKmnFragment {
    * Absent for fragments with no traceable source line.
    */
   sourceLine?: number;
+  /**
+   * Additional 1-based source lines this fragment consumes beyond
+   * `sourceLine` — currently only a dropped header statement whose value
+   * this fragment already declares (see `consumedSourceLines` on
+   * {@link IRStore}). The text-splice carve path deletes these lines
+   * together with the fragment, so a re-parse cannot re-synthesise the
+   * value from the surviving header. Absent when the fragment consumes
+   * only `sourceLine`.
+   */
+  consumedSourceLines?: number[];
   /**
    * nodeId of the IRGroup that contains this fragment, or undefined for global
    * fragments (e.g. pre-begin unknown constructs). Used by the position-faithful
@@ -727,6 +759,31 @@ export enum ImportStatus {
   RoundTripDivergence = "round-trip-divergence",
 }
 
+/**
+ * One Keyman 19-deprecated .kmn form the codec rewrote while parsing
+ * (#2633). Keyman 19 deprecated these forms (upstream keymanapp/keyman
+ * commit 45755d3894, shipped in 19.0.320-beta) and Keyman 20 removes them,
+ * so the working copy must carry the modern equivalent. The parser still
+ * ACCEPTS every form (a corpus keyboard using one must remain a valid
+ * starting point); the rewrite is what the emitted .kmn carries. Each entry
+ * is one visible rewrite: the decision record / as-built notes surface
+ * renders these so the author can see exactly what changed.
+ */
+export type DeprecatedRewriteKind =
+  | "header-statement"
+  | "legacy-value-format"
+  | "target-selector"
+  | "version-raise";
+export interface DeprecatedRewrite {
+  kind: DeprecatedRewriteKind;
+  /** 1-based source line of the original (deprecated) form. */
+  sourceLine: number;
+  /** Original source text of the deprecated form (trimmed). */
+  sourceText: string;
+  /** What it became in the modern IR / emitted .kmn. */
+  rewrittenText: string;
+}
+
 /** Full report produced by the codec + Layer A' checks (I1-I5) after parsing a source keyboard. */
 export interface ImportReport {
   keyboardId: string;
@@ -738,6 +795,13 @@ export interface ImportReport {
   recognizedRatio: number;
   /** Populated when status is RoundTripDivergence (check I2 failure). */
   roundTripDiff?: RoundTripDiff;
+  /**
+   * Deprecated .kmn forms the codec rewrote while parsing (#2633), in
+   * source order. Absent when the parse produced no rewrites (or when the
+   * report predates #2633). The as-built notes render these so the author
+   * can see exactly what changed.
+   */
+  deprecatedRewrites?: DeprecatedRewrite[];
   /**
    * Per-node removal capability classifications produced by
    * `classifyRemovalCapabilities` at import time.

@@ -19,7 +19,8 @@
 //      { next, navigate?, setCharactersSubStage? }
 //   4. session.advance(next)
 //   5. if setCharactersSubStage: session.setCharactersSubStage("prefill")
-//   6. if navigate === "output": navigateTo("output")
+//   6. if navigate !== undefined: navigateTo(navigate) — "criteria" on the
+//      Open walk (spec 111); Copy's publish → done carries none (spec 113).
 //
 // STEP-SPECIFIC EFFECTS (research R7):
 //   Steps whose pre-Stage-5 handlers wrote to the session or working-copy store
@@ -120,13 +121,30 @@ interface DeepLinkArrival {
 }
 
 /**
- * Back to Output after a revision (spec 094). The walk goes back to where it
- * stood before the jump: completing the revised step advanced it, and a
- * revision is not a reason to move the Studio tab's place.
+ * Back to the tail after a revision (spec 094, generalized by spec 113).
+ * The walk goes back to where it stood before the jump: completing the
+ * revised step advanced it, and a revision is not a reason to move the
+ * Studio tab's place.
  */
-function returnToOutput(arrival: DeepLinkArrival): void {
+function returnToTail(arrival: DeepLinkArrival): void {
   if (arrival.returnPosition !== undefined) restoreTraversalPosition(arrival.returnPosition);
   jumpToLocation(arrival.returnTo);
+}
+
+/**
+ * Whether a deep link's return target is the Trial/Publish tail (spec 113,
+ * #2540) — the revise-and-return home since the Output screen retired.
+ * The legacy `{ route: "output" }` still counts: nothing produces it
+ * anymore, but an in-flight pending jump could still carry it, and the
+ * `#output` redirect lands on the Trial step either way.
+ */
+function returnsToTail(returnTo: Location | undefined): boolean {
+  if (returnTo === undefined) return false;
+  if (returnTo.route === "output") return true;
+  return (
+    returnTo.route === "survey" &&
+    (returnTo.step === "trial" || returnTo.step === "publish")
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -305,12 +323,15 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
   // idiom: setting/clearing a flag twice under StrictMode's mount/cleanup/
   // mount is harmless, unlike calling a destructive consumer twice would be.
   //
-  // This only needs to run once: a decision-trail deep link always arrives
-  // from a DIFFERENT route (`#trail`), so the hash round trip that lands on
-  // `#survey` always mounts a fresh SurveyView/StepHost — there is no
-  // continuously-mounted-StepHost case where a second jump could land on an
-  // already-open survey without an intervening mount.
-  const [deepLinkArrival] = useState<DeepLinkArrival | null>(() => {
+  // This only needs to run once per mount for a decision-trail deep link,
+  // which always arrives from a DIFFERENT route (`#trail`), so the hash round
+  // trip that lands on `#survey` always mounts a fresh SurveyView/StepHost.
+  // A TAIL deep link is different since spec 113 moved the revise home from
+  // the `#output` route to the Trial step: Trial lives on `#survey` like
+  // every other step, so a Trial→section jump changes no hash and mounts
+  // nothing new, and this initializer never re-runs. The step-change effect
+  // below catches that case; this initializer still covers the mount case.
+  const [deepLinkArrival, setDeepLinkArrival] = useState<DeepLinkArrival | null>(() => {
     const pending = peekPendingJump();
     return pending?.returnTo !== undefined
       ? {
@@ -330,8 +351,8 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
   // "Discard changes and go back" rolls the one working copy back rather than
   // keeping a second one. Taken in the same lazy initializer idiom as
   // `deepLinkArrival` above; a StrictMode double call just snapshots twice.
-  const [revisionSnapshot] = useState<RevisionSnapshot | null>(() =>
-    deepLinkArrival?.returnTo.route === "output" ? captureRevisionSnapshot() : null,
+  const [revisionSnapshot, setRevisionSnapshot] = useState<RevisionSnapshot | null>(() =>
+    returnsToTail(deepLinkArrival?.returnTo) ? captureRevisionSnapshot() : null,
   );
 
   // FR-034: the choice is explicit, not a prompt on every revision — the
@@ -340,20 +361,45 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
   // point instead.
   const [continueFromHere, setContinueFromHere] = useState(false);
 
+  // spec 113: the step-change catch for same-route tail arrivals. A
+  // Trial→section jump stays on `#survey`, so no mount happens and the
+  // initializer above never re-runs — without this, revising from Trial
+  // would land on the section as an ordinary step with no "Back to testing"
+  // and no snapshot. When the active step changes under a pending jump,
+  // capture it (and its snapshot) the same way the mount path does, and
+  // reset "Continue from here" — a new arrival is a new revision. Declared
+  // after the clearing effect, so on mount it peeks after the clear and
+  // no-ops; on a step change it is the only effect that re-runs. StrictMode's
+  // setup/cleanup/setup is safe: the first setup captures and clears, the
+  // second peeks nothing.
+  useEffect(() => {
+    const pending = peekPendingJump();
+    if (pending?.returnTo === undefined) return;
+    const arrival: DeepLinkArrival = {
+      targetStepId: activeStepId,
+      returnTo: pending.returnTo,
+      ...(pending.returnPosition !== undefined ? { returnPosition: pending.returnPosition } : {}),
+    };
+    setDeepLinkArrival(arrival);
+    if (returnsToTail(arrival.returnTo)) setRevisionSnapshot(captureRevisionSnapshot());
+    setContinueFromHere(false);
+    clearPendingJump();
+  }, [activeStepId]);
+
   // Gated to the step the jump actually targeted — see the DeepLinkArrival
   // comment above the interface for why this isn't just "a jump happened
   // this mount".
   const isDeepLinkTarget =
     deepLinkArrival !== null && activeStepId === deepLinkArrival.targetStepId;
 
-  // spec 094: the arrival came from Output's section list, a blocker's Open
-  // button or a tester report — not from the decision trail.
-  const fromOutput = isDeepLinkTarget && deepLinkArrival?.returnTo.route === "output";
+  // spec 094: the arrival came from the Trial/Publish tail's section list, a
+  // blocker's Open button or a tester report — not from the decision trail.
+  const fromTail = isDeepLinkTarget && returnsToTail(deepLinkArrival?.returnTo);
   // #2050: the revision session stays open until the author confirms,
   // discards, or chooses "Continue from here instead" — Backing off the
   // targeted step no longer ends it, so Discard stays reachable.
   const revisionSessionOpen =
-    deepLinkArrival?.returnTo.route === "output" && !continueFromHere;
+    returnsToTail(deepLinkArrival?.returnTo) && !continueFromHere;
   const activeLayout = manifest.find((s) => s.id === activeStepId && s.kind === "editor-step")?.layout;
 
   const discardRevision = useCallback(() => {
@@ -361,7 +407,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
     // Restores the working copy, answers and decision record as they stood on
     // arrival, so nothing from this visit is recorded (Story 1 scenario 3).
     restoreRevisionSnapshot(revisionSnapshot);
-    returnToOutput(deepLinkArrival);
+    returnToTail(deepLinkArrival);
   }, [revisionSnapshot, deepLinkArrival]);
 
   // A full-page editor owns its footer nav slots, so its revision actions ride
@@ -389,11 +435,24 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
           <Trans id="step.done.heading">Survey complete</Trans>
         </h2>
         <p style={TERMINAL_TEXT_STYLE}>
-          <Trans id="step.done.detail">
-            All authoring steps have been completed. Head to Output to download or
-            submit your keyboard.
+          {/* spec 113: the walk ends at Publish now — the done panel points
+              back there, not at the retired Output screen. New id per the
+              FR-020 rule: the copy changed, so the old `step.done.detail`
+              ("Head to Output…") must not be re-worded. */}
+          <Trans id="step.done.detail.publish">
+            All authoring steps have been completed. Your keyboard is ready
+            on the Publish step — download it or submit it from there.
           </Trans>
         </p>
+        <button
+          type="button"
+          onClick={() => {
+            jumpToLocation({ route: "survey", step: "publish" });
+          }}
+          style={START_OVER_BTN_STYLE}
+        >
+          <Trans id="step.done.reviewPublish">Review the Publish step</Trans>
+        </button>
         <button type="button" onClick={onStartOver} style={START_OVER_BTN_STYLE}>
           <Trans id="step.startOver">Start over</Trans>
         </button>
@@ -487,7 +546,7 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
   // affordances ride the footer (StepNavCluster, outside the full-screen
   // chrome div), so nothing is interposed and the contract above still holds.
   // A decision-trail arrival on a full-layout step is unchanged.
-  const revisableViaDeepLink = isDeepLinkTarget && (resolvedStep.layout !== "full" || fromOutput);
+  const revisableViaDeepLink = isDeepLinkTarget && (resolvedStep.layout !== "full" || fromTail);
 
   // ---------------------------------------------------------------------------
   // Centralized onComplete — the generic completion path (contract §2).
@@ -535,15 +594,15 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
     // NOTHING about the record or about staleness — only where the author
     // lands next, which is the one thing FR-034 asks this component to add.
     if (revisableViaDeepLink && deepLinkArrival !== null && !continueFromHere) {
-      if (deepLinkArrival.returnTo.route === "output") {
-        returnToOutput(deepLinkArrival);
+      if (returnsToTail(deepLinkArrival.returnTo)) {
+        returnToTail(deepLinkArrival);
       } else {
         jumpToLocation(deepLinkArrival.returnTo);
       }
       return;
     }
 
-    // 6. Navigate to output when help completes.
+    // 6. Navigate when the advance says so (Open: "criteria" on done).
     //
     // Spec 057 FR-005/FR-008 (D-3): this hop leaves the wizard, and the way
     // back in is the Studio tab. That return used to drop the author on the
@@ -629,10 +688,21 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
     revisableViaDeepLink && !continueFromHere && resolvedStep.layout !== "full" ? (
       <div role="note" data-testid="step-deep-link-return-banner" style={DEEP_LINK_BANNER_STYLE}>
         <p style={DEEP_LINK_BANNER_TEXT_STYLE}>
-          {fromOutput ? (
-            <Trans id="step.revision.notice">
-              You opened this from Output. Confirming will take you back to testing.
-            </Trans>
+          {fromTail ? (
+            // spec 113: the return step is Trial (testing) or Publish — the
+            // legacy `{ route: "output" }` reads as Trial, where the
+            // `#output` redirect lands. New ids per the FR-020 rule: the
+            // copy changed, so the old `step.revision.notice` ("from
+            // Output…") must not be re-worded.
+            deepLinkArrival?.returnTo.step === "publish" ? (
+              <Trans id="step.revision.notice.publish">
+                You opened this from Publish. Confirming will take you back to Publish.
+              </Trans>
+            ) : (
+              <Trans id="step.revision.notice.trial">
+                You opened this from Trial. Confirming will take you back to testing.
+              </Trans>
+            )
           ) : (
             <Trans id="step.deepLinkReturn.notice">
               You jumped here from Decisions to revise this answer. Confirming
@@ -640,14 +710,14 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
             </Trans>
           )}
         </p>
-        {fromOutput && (
+        {fromTail && (
           <p style={DEEP_LINK_BANNER_TEXT_STYLE}>
             <Trans id="step.revision.leavingKeepsChanges">
               If you leave this step, your changes are kept.
             </Trans>
           </p>
         )}
-        {fromOutput && (
+        {fromTail && (
           <button
             type="button"
             data-testid="step-revision-discard"
@@ -671,9 +741,15 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
     ) : offTargetRevision ? (
       <div role="note" data-testid="step-deep-link-return-banner" style={DEEP_LINK_BANNER_STYLE}>
         <p style={DEEP_LINK_BANNER_TEXT_STYLE}>
-          <Trans id="step.revision.leftTargetNotice">
-            You left the step you opened from Output — your changes were kept.
-          </Trans>
+          {deepLinkArrival?.returnTo.step === "publish" ? (
+            <Trans id="step.revision.leftTargetNotice.publish">
+              You left the step you opened from Publish — your changes were kept.
+            </Trans>
+          ) : (
+            <Trans id="step.revision.leftTargetNotice.trial">
+              You left the step you opened from Trial — your changes were kept.
+            </Trans>
+          )}
         </p>
         <button
           type="button"

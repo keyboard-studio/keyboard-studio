@@ -14,7 +14,7 @@
 // the caller (StudioShell) computes them from the shared, MARK-AWARE
 // `useAccountedForGate()` hook (../hooks/useAccountedForGate.ts), which
 // itself composes `useInventoryCoverageGate()` (the same base gate
-// StepHost / PhaseFGate / OutputScreen / StudioShell's own output-nav-blocked
+// StepHost / PhaseFGate / PublishStep / StudioShell's own output-nav-blocked
 // signal use) with the author's per-surface "mark for later review" sets
 // (mechanism-gallery-progression). A character the author has consciously
 // marked for later review no longer counts here, even though it still counts
@@ -54,7 +54,7 @@ export interface UnfinishedGalleryIndicatorProps {
    * `surveySessionStore.backToUnfinishedGallery(target)` (a BACK primitive —
    * see that action's docstring for why it must not be the forward-push
    * `advance`) followed by `navigateTo("survey")`, mirroring
-   * OutputScreen.tsx's `handleGoToGallery` / PhaseFGate.tsx's `handleGoBack`.
+   * OutputGateBanners' `handleGoToGallery` / PhaseFGate.tsx's `handleGoBack`.
    */
   readonly onNavigate: (target: "mechanisms" | "touch") => void;
 }

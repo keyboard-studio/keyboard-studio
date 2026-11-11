@@ -89,6 +89,16 @@ vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () => ({
   TouchGallery: () => <div data-testid="stub-TouchGallery" />,
 }));
 
+// Trial/Publish steps (spec 113): the manifest's declared components, stubbed
+// so SC-005 checks the chrome without the artifact pipeline.
+vi.mock("../../src/editors/assignLoop/TrialStep.tsx", () => ({
+  TrialStep: () => <div data-testid="stub-TrialStep" />,
+}));
+
+vi.mock("../../src/editors/assignLoop/PublishStep.tsx", () => ({
+  PublishStep: () => <div data-testid="stub-PublishStep" />,
+}));
+
 vi.mock("../../src/survey/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
   TouchSeedSourceRenderer: () => <div data-testid="stub-TouchSeedSourcePanel" />,
 }));
@@ -274,6 +284,8 @@ const STEP_TO_EXPECTED_STUB: Record<string, string> = {
   touch: "stub-TouchGallery",
   help: "stub-FlowStepHost-phase_f_helpdocs",
   package: "stub-FlowStepHost-phase_f_helpdocs",
+  trial: "stub-TrialStep",
+  publish: "stub-PublishStep",
 };
 
 // Full-layout step ids (declared in manifest as layout:"full").
@@ -287,6 +299,10 @@ const FULL_LAYOUT_IDS = new Set<string>([
   "fallback_policy",
   "touch",
   "touch_seed_source",
+  // spec 113: Trial and Publish are full-screen steps like the other
+  // assign-loop galleries.
+  "trial",
+  "publish",
 ]);
 
 describe("SC-005: declared component matches mounted component for all manifest editor steps", () => {

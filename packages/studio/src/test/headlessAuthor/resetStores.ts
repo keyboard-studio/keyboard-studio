@@ -10,6 +10,7 @@ import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 import { useDecisionLogStore } from "../../decisions/decisionLogStore.ts";
 import { resetRebuildTrail } from "../../decisions/rebuildWorkingCopy.ts";
+import { useTestingStore } from "../../stores/testingStore.ts";
 
 export function resetAuthorStores(): void {
   useWorkingCopyStore.getState().reset();
@@ -17,5 +18,9 @@ export function resetAuthorStores(): void {
   useSurveySessionStore.getState().reset();
   useSurveyAnswerStore.getState().reset();
   useDecisionLogStore.getState().reset();
+  // Spec 113: the Trial step driver records a test build in the testing
+  // store, so a walk touches it — reset it with the rest, or a second run
+  // of the same case would record build 2 and diverge from run 1.
+  useTestingStore.getState().reset();
   resetRebuildTrail();
 }

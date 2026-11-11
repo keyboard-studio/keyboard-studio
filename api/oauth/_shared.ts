@@ -29,10 +29,14 @@ import { GoogleExchangeBodySchema } from "../../utilities/oauth-backend/src/goog
 
 export { exchangeCore, refreshCore, ExchangeBodySchema, RefreshBodySchema };
 export { googleExchangeCore, GoogleExchangeBodySchema };
+import {
+  sessionSigningKeyFromEnv,
+  withSessionToken,
+} from "../../utilities/oauth-backend/src/submitter-auth.js";
 export type { HandlerConfig, HandlerResult, GoogleHandlerConfig };
 
 // Adapt the global Web fetch to the utility's minimal OAuthFetchFn contract.
-const webFetch: OAuthFetchFn = async (url, init) => {
+export const webFetch: OAuthFetchFn = async (url, init) => {
   const res = await fetch(url, {
     ...(init?.method !== undefined ? { method: init.method } : {}),
     ...(init?.headers !== undefined ? { headers: init.headers } : {}),
@@ -215,6 +219,6 @@ export async function runGoogleHandler(
 
   const result: GoogleHandlerResult = await googleExchangeCore(parsed.data, config);
   return result.ok
-    ? jsonResponse(200, result.data)
+    ? jsonResponse(200, withSessionToken(result.data, sessionSigningKeyFromEnv()))
     : jsonResponse(result.status, { error: result.error });
 }

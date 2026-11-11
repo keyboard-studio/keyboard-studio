@@ -277,9 +277,32 @@ interface LookupMiss {
   op: string;
 }
 
-/** A miss carries no bytes; kmc-package treats any falsy return as "not found". */
+/**
+ * A miss carries no bytes; kmc-package treats any falsy return as "not found".
+ *
+ * Binary content is handed back as a Node `Buffer`, not the caller's
+ * Uint8Array: a VirtualFS built in another realm (jsdom in the studio's
+ * tests, an iframe in the app) hands us foreign Uint8Arrays, and kmc-package's
+ * JSZip rejects them — "Can't read the data of 'readme.htm'. Is it in a
+ * supported JavaScript type?" — even though they carry the same bytes.
+ * `Buffer.from(view)` allocates in the Node realm, which is the realm JSZip
+ * runs in; a plain `new Uint8Array(view)` would not help, because this module
+ * itself executes in the caller's realm under vitest (the workspace symlink
+ * keeps the engine out of node_modules' externalization), so the copy would
+ * still be foreign. In the browser `Buffer` is the `buffer`-package polyfill
+ * `ensureBufferGlobal` installs, in the same realm as the browser's JSZip.
+ * Strings already encode here, so only the binary branch needs it.
+ * (spec 113: the headless-author corpus walk builds its test build through
+ * this path under jsdom.)
+ */
 function encode(content: Uint8Array | string): Uint8Array {
-  return typeof content === "string" ? new TextEncoder().encode(content) : content;
+  const BufferCtor = (globalThis as { Buffer?: { from(data: Uint8Array): Uint8Array; from(data: string, encoding: string): Uint8Array } }).Buffer;
+  if (BufferCtor !== undefined) {
+    // Both branches: the string branch's TextEncoder would have the same
+    // foreign-realm problem when this module executes in the caller's realm.
+    return typeof content === "string" ? BufferCtor.from(content, "utf8") : BufferCtor.from(content);
+  }
+  return typeof content === "string" ? new TextEncoder().encode(content) : new Uint8Array(content);
 }
 
 /** @internal Exported for unit test. */

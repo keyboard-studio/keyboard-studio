@@ -48,6 +48,17 @@ function Harness() {
   const [platform, setPlatform] = useState<string | null>("phone");
   const [layer, setLayer] = useState("default");
   const [selected, setSelected] = useState<string | null>(null);
+  // Multi-selection mirrors TouchGallery: every single-key write collapses
+  // the set to that one key; only explicit Ctrl/Shift gestures build it.
+  const [selectedAddresses, setSelectedAddresses] = useState<string[]>([]);
+  const selectKey = (address: string | null): void => {
+    setSelected(address);
+    setSelectedAddresses(address === null ? [] : [address]);
+  };
+  const selectKeys = (addresses: readonly string[], anchor: string | null): void => {
+    setSelectedAddresses([...addresses]);
+    setSelected(anchor);
+  };
   // Tray state mirrors TouchGallery (the bar lives in its locked header).
   const [trayLetter, setTrayLetter] = useState<string | null>(null);
   const [, setTrayReturns] = useState<string[]>([]);
@@ -59,7 +70,9 @@ function Harness() {
       activeLayerId={layer}
       onSelectLayer={setLayer}
       selectedKeyAddress={selected}
-      onSelectKey={setSelected}
+      onSelectKey={selectKey}
+      selectedKeyAddresses={selectedAddresses}
+      onSelectKeys={selectKeys}
       trayLetter={trayLetter}
       onSelectTrayLetter={setTrayLetter}
       onTrayReturnsChange={setTrayReturns}
@@ -112,6 +125,8 @@ function directRender(onSelectLayer: (id: string) => void, onSelectPlatform: (id
       onSelectLayer={onSelectLayer}
       selectedKeyAddress={null}
       onSelectKey={() => {}}
+      selectedKeyAddresses={[]}
+      onSelectKeys={() => {}}
       commitOp={() => true}
     />,
   );
@@ -375,5 +390,177 @@ describe("TouchBuilderPane", () => {
     expect(committedOps()).toEqual([
       { address: "phone:default:K_A", kind: "set", fields: { width: 110 } },
     ]);
+  });
+
+  // #2596 item 2 — multi-select keys and apply one change to all of them
+  // (keymanapp/keyman#3611).
+  it("Ctrl+click adds a second key and shows the multi-key inspector", () => {
+    const { q, keyEl } = setup();
+    fireEvent.click(keyEl("phone:default:K_A"));
+    fireEvent.click(keyEl("phone:default:K_B"), { ctrlKey: true });
+    expect(q.getByTestId("touch-builder-multi-summary").textContent).toContain(
+      "2 keys selected",
+    );
+    // The single-key inspector (text, id, wedge, subkeys) is gone.
+    expect(q.queryByTestId("touch-builder-field-text")).toBeNull();
+    expect(q.queryByTestId("touch-builder-field-id")).toBeNull();
+    expect(q.queryByTestId("touch-builder-add-right")).toBeNull();
+    expect(q.queryByTestId("touch-builder-right-edge")).toBeNull();
+    // Both keys read selected.
+    expect(keyEl("phone:default:K_A").getAttribute("aria-pressed")).toBe("true");
+    expect(keyEl("phone:default:K_B").getAttribute("aria-pressed")).toBe("true");
+    expect(keyEl("phone:default:K_C").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("Shift+click selects the row-major range from the anchor", () => {
+    const { q, keyEl } = setup();
+    fireEvent.click(keyEl("phone:default:K_A"));
+    fireEvent.click(keyEl("phone:default:K_C"), { shiftKey: true });
+    expect(q.getByTestId("touch-builder-multi-summary").textContent).toContain(
+      "3 keys selected",
+    );
+    // Backwards range too.
+    fireEvent.click(keyEl("phone:default:K_C"));
+    fireEvent.click(keyEl("phone:default:K_A"), { shiftKey: true });
+    expect(q.getByTestId("touch-builder-multi-summary").textContent).toContain(
+      "3 keys selected",
+    );
+  });
+
+  it("Ctrl+click on an already-selected key removes it", () => {
+    const { q, keyEl } = setup();
+    fireEvent.click(keyEl("phone:default:K_A"));
+    fireEvent.click(keyEl("phone:default:K_B"), { ctrlKey: true });
+    fireEvent.click(keyEl("phone:default:K_B"), { ctrlKey: true });
+    // Back to a single selection: the single-key inspector returns.
+    expect(q.queryByTestId("touch-builder-multi-summary")).toBeNull();
+    expect(q.getByTestId("touch-builder-field-text")).toBeDefined();
+  });
+
+  it("Ctrl+Enter toggles a key from the keyboard (spec 056)", () => {
+    const { q, keyEl } = setup();
+    fireEvent.click(keyEl("phone:default:K_A"));
+    fireEvent.keyDown(keyEl("phone:default:K_B"), { key: "Enter", ctrlKey: true });
+    expect(q.getByTestId("touch-builder-multi-summary").textContent).toContain(
+      "2 keys selected",
+    );
+    fireEvent.keyDown(keyEl("phone:default:K_B"), { key: "Enter", ctrlKey: true });
+    expect(q.queryByTestId("touch-builder-multi-summary")).toBeNull();
+  });
+
+  it("Escape clears the whole multi-selection", () => {
+    const { q, keyEl } = setup();
+    fireEvent.click(keyEl("phone:default:K_A"));
+    fireEvent.click(keyEl("phone:default:K_B"), { ctrlKey: true });
+    fireEvent.keyDown(keyEl("phone:default:K_B"), { key: "Escape" });
+    expect(q.queryByTestId("touch-builder-multi-summary")).toBeNull();
+    expect(q.queryByTestId("touch-builder-field-text")).toBeNull();
+    expect(keyEl("phone:default:K_A").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("Clear selection button clears the multi-selection", () => {
+    const { q, keyEl } = setup();
+    fireEvent.click(keyEl("phone:default:K_A"));
+    fireEvent.click(keyEl("phone:default:K_B"), { ctrlKey: true });
+    fireEvent.click(q.getByTestId("touch-builder-clear-selection"));
+    expect(q.queryByTestId("touch-builder-multi-summary")).toBeNull();
+  });
+
+  it("bulk width commits one set per selected key, snapping to the grid", () => {
+    const { q, keyEl } = setup();
+    fireEvent.click(keyEl("phone:default:K_A"));
+    fireEvent.click(keyEl("phone:default:K_C"), { shiftKey: true });
+    const widthInput = q.getByTestId("touch-builder-multi-field-width") as HTMLInputElement;
+    // All three agree on the default width 100: shown, not Mixed.
+    expect(widthInput.value).toBe("100");
+    fireEvent.change(widthInput, { target: { value: "126" } });
+    fireEvent.blur(widthInput);
+    expect(committedOps()).toEqual([
+      { address: "phone:default:K_A", kind: "set", fields: { width: 130 } },
+      { address: "phone:default:K_B", kind: "set", fields: { width: 130 } },
+      { address: "phone:default:K_C", kind: "set", fields: { width: 130 } },
+    ]);
+    // The replayed layout carries the bulk width on all three keys.
+    expect(keyEl("phone:default:K_A").style.width).toBe(
+      keyEl("phone:default:K_B").style.width,
+    );
+  });
+
+  it("bulk width skips keys already at the target value", () => {
+    const { q, selectKey, keyEl } = setup();
+    // K_B to 150 first (single-key path).
+    selectKey("phone:default:K_B");
+    const single = q.getByTestId("touch-builder-field-width") as HTMLInputElement;
+    fireEvent.change(single, { target: { value: "150" } });
+    fireEvent.blur(single);
+    expect(committedOps()).toHaveLength(1);
+    // Select all three; widths now disagree → Mixed placeholder.
+    fireEvent.click(keyEl("phone:default:K_A"));
+    fireEvent.click(keyEl("phone:default:K_B"), { ctrlKey: true });
+    fireEvent.click(keyEl("phone:default:K_C"), { ctrlKey: true });
+    const widthInput = q.getByTestId("touch-builder-multi-field-width") as HTMLInputElement;
+    expect(widthInput.value).toBe("");
+    expect(widthInput.placeholder).toBe("Mixed values");
+    fireEvent.change(widthInput, { target: { value: "150" } });
+    fireEvent.blur(widthInput);
+    // K_B already 150: no op for it.
+    expect(committedOps().slice(1)).toEqual([
+      { address: "phone:default:K_A", kind: "set", fields: { width: 150 } },
+      { address: "phone:default:K_C", kind: "set", fields: { width: 150 } },
+    ]);
+  });
+
+  it("bulk key type commits one set per key; Blank commits one suppress per key", () => {
+    const { q, keyEl } = setup();
+    fireEvent.click(keyEl("phone:default:K_A"));
+    fireEvent.click(keyEl("phone:default:K_B"), { ctrlKey: true });
+    fireEvent.change(q.getByTestId("touch-builder-multi-field-sp"), {
+      target: { value: "2" },
+    });
+    expect(committedOps()).toEqual([
+      { address: "phone:default:K_A", kind: "set", fields: { sp: 2 } },
+      { address: "phone:default:K_B", kind: "set", fields: { sp: 2 } },
+    ]);
+    fireEvent.change(q.getByTestId("touch-builder-multi-field-sp"), {
+      target: { value: "9" },
+    });
+    expect(committedOps().slice(2)).toEqual([
+      { address: "phone:default:K_A", kind: "suppress", spClass: 9, sentinelId: "T_BLANK" },
+      { address: "phone:default:K_B", kind: "suppress", spClass: 9, sentinelId: "T_BLANK" },
+    ]);
+  });
+
+  it("bulk next layer skips keys already on the target layer", () => {
+    const { q, keyEl } = setup();
+    // K_B already has nextlayer shift in the fixture; K_A does not.
+    fireEvent.click(keyEl("phone:default:K_A"));
+    fireEvent.click(keyEl("phone:default:K_B"), { ctrlKey: true });
+    fireEvent.change(q.getByTestId("touch-builder-multi-field-nextlayer"), {
+      target: { value: "shift" },
+    });
+    expect(committedOps()).toEqual([
+      { address: "phone:default:K_A", kind: "set", fields: { nextlayer: "shift" } },
+    ]);
+  });
+
+  it("switching layer drops the multi-selection from view", () => {
+    const { q, keyEl } = setup();
+    fireEvent.click(keyEl("phone:default:K_A"));
+    fireEvent.click(keyEl("phone:default:K_B"), { ctrlKey: true });
+    fireEvent.click(q.getByTestId("touch-builder-layer-shift"));
+    expect(q.queryByTestId("touch-builder-multi-summary")).toBeNull();
+    expect(q.queryByTestId("touch-builder-field-text")).toBeNull();
+    expect(keyEl("phone:shift:K_A").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("plain click collapses a multi-selection to one key", () => {
+    const { q, keyEl } = setup();
+    fireEvent.click(keyEl("phone:default:K_A"));
+    fireEvent.click(keyEl("phone:default:K_B"), { ctrlKey: true });
+    fireEvent.click(keyEl("phone:default:K_C"));
+    expect(q.queryByTestId("touch-builder-multi-summary")).toBeNull();
+    expect(q.getByTestId("touch-builder-field-text")).toBeDefined();
+    expect(keyEl("phone:default:K_A").getAttribute("aria-pressed")).toBe("false");
+    expect(keyEl("phone:default:K_C").getAttribute("aria-pressed")).toBe("true");
   });
 });

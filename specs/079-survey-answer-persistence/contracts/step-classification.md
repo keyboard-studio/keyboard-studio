@@ -34,6 +34,8 @@ Part I). The "After 079" column is the target this feature must reach.
 | help | non-compliant (D-5) | F-5 | `answer-store` | compliant |
 | html | believed compliant (working copy); the HTML editor step records the authored welcome.htm on Continue | F-10 | `working-copy` | compliant |
 | icon | believed compliant (working copy); the icon editor step records the designed icon (.ico + .png) on Continue, unchanged means template icon | F-10 | `working-copy` | compliant |
+| trial | new step (spec 113, #2540: try the keyboard and get it to testers — numbered test builds, tester reports, revise-and-return; moved out of the Output screen); believed compliant (working copy) | spec 113 | `working-copy` | compliant |
+| publish | new step (spec 113, #2540: release checks, final downloads (.kmp / source .zip / LDML) and the managed GitHub PR; moved out of the Output screen); believed compliant (working copy) | spec 113 | `working-copy` | compliant |
 | package | no author answers; output step | — | `{ exempt: "Output screen: records no decision; its only state is the chosen download, re-derived on entry." }` | justified-exempt |
 
 Every "verify by revisit test" row is now closed: each names the FR-051 test that passed. A row is closed only when its FR-051 test passes. If the test finds a gap,

@@ -20,7 +20,7 @@ import type {
   RawKmnFragment,
   IRComment,
 } from "@keyboard-studio/contracts";
-import { charStore, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
+import { charItems, charStore, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 
 function makeStore(nodeId: string, name: string): IRStore {
   return charStore({ nodeId, name, chars: "1" });
@@ -127,6 +127,59 @@ describe("carveFilterIr", () => {
     expect(out.header.entryPoints).toEqual({ main: "main", postKeystroke: true });
     // No reserved group deleted -> the header object passes through as-is.
     expect(carveFilterIr(ir, new Set(["r0"])).header).toBe(ir.header);
+  });
+
+  it("clears a header field derived from a deleted system store", () => {
+    const versionStore: IRStore = {
+      nodeId: "sv",
+      name: "VERSION",
+      items: charItems("10.0"),
+      isSystem: true,
+    };
+    const nameStore: IRStore = {
+      nodeId: "sn",
+      name: "NAME",
+      items: charItems("Test"),
+      isSystem: true,
+    };
+    const ir = makeTestIR({
+      stores: [versionStore, nameStore],
+      header: { version: "10.0", name: "Test" },
+    });
+    // Mirrors parse(): the header fields are derived from the surviving
+    // system stores, so a re-parse of the spliced text (no &VERSION store,
+    // no header statement) reads version "".
+    const out = carveFilterIr(ir, new Set(["sv"]));
+    expect(out.header.version).toBe("");
+    expect(out.header.name).toBe("Test");
+    expect(out.header).not.toBe(ir.header);
+  });
+
+  it("KEYBOARDVERSION wins over VERSION; deleting it falls back to VERSION", () => {
+    const keyboardVersion: IRStore = {
+      nodeId: "skv",
+      name: "KEYBOARDVERSION",
+      items: charItems("1.3"),
+      isSystem: true,
+    };
+    const versionStore: IRStore = {
+      nodeId: "sv",
+      name: "VERSION",
+      items: charItems("10.0"),
+      isSystem: true,
+    };
+    const ir = makeTestIR({
+      stores: [keyboardVersion, versionStore],
+      header: { version: "1.3" },
+    });
+    expect(carveFilterIr(ir, new Set(["sv"])).header.version).toBe("1.3");
+    expect(carveFilterIr(ir, new Set(["skv"])).header.version).toBe("10.0");
+    expect(carveFilterIr(ir, new Set(["skv", "sv"])).header.version).toBe("");
+  });
+
+  it("deleting a user store leaves the header object untouched", () => {
+    const ir = makeIR({ stores: [makeStore("s0", "a")] });
+    expect(carveFilterIr(ir, new Set(["s0"])).header).toBe(ir.header);
   });
 
   it("never mutates baseIr", () => {

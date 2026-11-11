@@ -18,6 +18,9 @@ import type {
 // ---------------------------------------------------------------------------
 
 /** Minimal valid POST body accepted by ManagedPRBodySchema. */
+/** A signed-in GitHub submitter, so the handler proceeds past the sign-in gate. */
+const signedIn = () => Promise.resolve({ provider: "github" as const, login: "octo" });
+
 function validBody() {
   return {
     attribution: { displayName: "Alice", email: "alice@example.com" },
@@ -96,7 +99,7 @@ function successResponses() {
 describe("runManagedPRHandler — method guard", () => {
   it("returns 405 with Allow: POST for non-POST requests", async () => {
     const req = new Request("https://app.example/submit/managed-pr", { method: "GET" });
-    const res = await runManagedPRHandler(req, stubConfig([]));
+    const res = await runManagedPRHandler(req, stubConfig([]), undefined, signedIn);
     expect(res.status).toBe(405);
     expect(res.headers.get("Allow")).toBe("POST");
     expect(await res.json()).toEqual({ error: "method_not_allowed" });
@@ -104,7 +107,7 @@ describe("runManagedPRHandler — method guard", () => {
 
   it("returns 405 for DELETE", async () => {
     const req = new Request("https://app.example/submit/managed-pr", { method: "DELETE" });
-    const res = await runManagedPRHandler(req, stubConfig([]));
+    const res = await runManagedPRHandler(req, stubConfig([]), undefined, signedIn);
     expect(res.status).toBe(405);
   });
 });
@@ -176,27 +179,27 @@ describe("runManagedPRHandler — body validation", () => {
       body: "{ not json",
       headers: { "content-type": "application/json" },
     });
-    const res = await runManagedPRHandler(req, stubConfig([]));
+    const res = await runManagedPRHandler(req, stubConfig([]), undefined, signedIn);
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "invalid_request" });
   });
 
   it("returns 400 invalid_request when required fields are missing", async () => {
-    const res = await runManagedPRHandler(postReq({ nope: 1 }), stubConfig([]));
+    const res = await runManagedPRHandler(postReq({ nope: 1 }), stubConfig([]), undefined, signedIn);
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "invalid_request" });
   });
 
   it("returns 400 invalid_request when keyboardId has invalid characters", async () => {
     const body = { ...validBody(), keyboardId: "INVALID!" };
-    const res = await runManagedPRHandler(postReq(body), stubConfig([]));
+    const res = await runManagedPRHandler(postReq(body), stubConfig([]), undefined, signedIn);
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "invalid_request" });
   });
 
   it("returns 400 invalid_request when sourceFiles is empty", async () => {
     const body = { ...validBody(), sourceFiles: [] };
-    const res = await runManagedPRHandler(postReq(body), stubConfig([]));
+    const res = await runManagedPRHandler(postReq(body), stubConfig([]), undefined, signedIn);
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "invalid_request" });
   });
@@ -209,7 +212,7 @@ describe("runManagedPRHandler — body validation", () => {
 describe("runManagedPRHandler — success", () => {
   it("returns 200 with prUrl and commitSha on a happy-path request", async () => {
     const config = stubConfig(successResponses());
-    const res = await runManagedPRHandler(postReq(validBody()), config);
+    const res = await runManagedPRHandler(postReq(validBody()), config, undefined, signedIn);
     expect(res.status).toBe(200);
     const json = (await res.json()) as { prUrl: string; commitSha: string };
     expect(json.prUrl).toBe("https://github.com/keymanapp/keyboards/pull/99");
@@ -229,7 +232,7 @@ describe("runManagedPRHandler — error mapping", () => {
       // Master ref triggers 429 (first pipeline call)
       { ok: false, status: 429, statusText: "Too Many Requests", headers: retryAfterHeaders, body: {} },
     ];
-    const res = await runManagedPRHandler(postReq(validBody()), stubConfig(responses));
+    const res = await runManagedPRHandler(postReq(validBody()), stubConfig(responses), undefined, signedIn);
     expect(res.status).toBe(429);
     expect(res.headers.get("Retry-After")).toBe("30");
     const json = (await res.json()) as { error: string };
@@ -241,7 +244,7 @@ describe("runManagedPRHandler — error mapping", () => {
     const responses = successResponses();
     // index 4 = create branch ref (5th of the 6 same-repo pipeline calls)
     responses[4] = { ok: false, status: 422, statusText: "Unprocessable Entity", body: {} };
-    const res = await runManagedPRHandler(postReq(validBody()), stubConfig(responses));
+    const res = await runManagedPRHandler(postReq(validBody()), stubConfig(responses), undefined, signedIn);
     expect(res.status).toBe(409);
     const json = (await res.json()) as { error: string; branchName: string };
     expect(json.error).toBe("branch_exists");
@@ -253,7 +256,7 @@ describe("runManagedPRHandler — error mapping", () => {
     const responses = [
       { ok: false, status: 403, statusText: "Forbidden", body: {} },
     ];
-    const res = await runManagedPRHandler(postReq(validBody()), stubConfig(responses));
+    const res = await runManagedPRHandler(postReq(validBody()), stubConfig(responses), undefined, signedIn);
     expect(res.status).toBe(502);
     expect((await res.json() as { error: string }).error).toBe("submission_unavailable");
   });
@@ -264,7 +267,7 @@ describe("runManagedPRHandler — error mapping", () => {
       orgLogin: "test-org",
       fetch: async () => ({ ok: true, status: 200, statusText: "OK", headers: { get: () => null }, json: () => Promise.resolve({}), text: () => Promise.resolve("") }),
     };
-    const res = await runManagedPRHandler(postReq(validBody()), brokenConfig);
+    const res = await runManagedPRHandler(postReq(validBody()), brokenConfig, undefined, signedIn);
     expect(res.status).toBe(502);
     expect((await res.json() as { error: string }).error).toBe("submission_unavailable");
   });
@@ -290,7 +293,7 @@ describe("managed-pr — tree-path confinement (audit: unvalidated-tree-path-pri
     it(`rejects 400 for path ${JSON.stringify(path)}`, async () => {
       const body = validBody();
       body.sourceFiles = [{ path, content: "x" }];
-      const res = await runManagedPRHandler(postReq(body), stubConfig([]));
+      const res = await runManagedPRHandler(postReq(body), stubConfig([]), undefined, signedIn);
       expect(res.status).toBe(400);
       expect((await res.json() as { error: string }).error).toBe("invalid_request");
     });
@@ -299,7 +302,7 @@ describe("managed-pr — tree-path confinement (audit: unvalidated-tree-path-pri
   it("rejects 400 for a path outside the keyboard directory", async () => {
     const body = validBody();
     body.sourceFiles = [{ path: "release/o/other_kbd/other.kmn", content: "x" }];
-    const res = await runManagedPRHandler(postReq(body), stubConfig([]));
+    const res = await runManagedPRHandler(postReq(body), stubConfig([]), undefined, signedIn);
     expect(res.status).toBe(400);
   });
 
@@ -309,7 +312,7 @@ describe("managed-pr — tree-path confinement (audit: unvalidated-tree-path-pri
       { path: "release/t/test_kbd/source/test_kbd.kmn", content: "store(&VERSION) '1.0'" },
       { path: "release/t/test_kbd/test_kbd.kps", content: "<Keyboard/>" },
     ];
-    const res = await runManagedPRHandler(postReq(body), stubConfig(successResponses()));
+    const res = await runManagedPRHandler(postReq(body), stubConfig(successResponses()), undefined, signedIn);
     expect(res.status).toBe(200);
   });
 });
@@ -318,14 +321,14 @@ describe("managed-pr — commit trailer injection (audit: commit-trailer-injecti
   it("rejects 400 for a newline in displayName", async () => {
     const body = validBody();
     body.attribution.displayName = "Alice\nCo-authored-by: Mallory <m@evil.example>";
-    const res = await runManagedPRHandler(postReq(body), stubConfig([]));
+    const res = await runManagedPRHandler(postReq(body), stubConfig([]), undefined, signedIn);
     expect(res.status).toBe(400);
   });
 
   it("rejects 400 for a newline in prTitle", async () => {
     const body = validBody();
     body.prTitle = "Add keyboard\nSigned-off-by: Mallory <m@evil.example>";
-    const res = await runManagedPRHandler(postReq(body), stubConfig([]));
+    const res = await runManagedPRHandler(postReq(body), stubConfig([]), undefined, signedIn);
     expect(res.status).toBe(400);
   });
 });
@@ -347,7 +350,40 @@ describe("managed-pr — anonymous throttle (audit: anonymous-unbounded-installa
       postReq(validBody()),
       stubConfig(successResponses()),
       () => Promise.resolve({ allowed: true }),
+      signedIn,
     );
     expect(res.status).toBe(200);
+  });
+});
+
+describe("managed-pr — sign-in required", () => {
+  it("returns 401 sign_in_required when no submitter is signed in", async () => {
+    const res = await runManagedPRHandler(
+      postReq(validBody()),
+      stubConfig([]),
+      () => Promise.resolve({ allowed: true }),
+      () => Promise.resolve(null),
+    );
+    expect(res.status).toBe(401);
+    expect((await res.json() as { error: string }).error).toBe("sign_in_required");
+  });
+
+  it("names the signed-in submitter in the PR body", async () => {
+    const calls: { url: string; body?: string }[] = [];
+    const config = stubConfig(successResponses());
+    const inner = config.fetch;
+    config.fetch = (url, init) => {
+      calls.push({ url, ...(init.body !== undefined ? { body: init.body } : {}) });
+      return inner(url, init);
+    };
+    const res = await runManagedPRHandler(
+      postReq(validBody()),
+      config,
+      () => Promise.resolve({ allowed: true }),
+      () => Promise.resolve({ provider: "google", email: "author@example.org", name: "A" }),
+    );
+    expect(res.status).toBe(200);
+    const pr = calls.find((c) => c.url.endsWith("/pulls") && c.body !== undefined && c.body.includes("draft"));
+    expect(pr?.body).toContain("Signed in with Google as author@example.org");
   });
 });

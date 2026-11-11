@@ -188,8 +188,16 @@ describe("nextMainLineStepAfter", () => {
     expect(nextMainLineStepAfter("html")).toBe("icon");
   });
 
-  it("icon → done (package is reserved terminal)", () => {
-    expect(nextMainLineStepAfter("icon")).toBe("done");
+  it("icon → trial", () => {
+    expect(nextMainLineStepAfter("icon")).toBe("trial");
+  });
+
+  it("trial → publish", () => {
+    expect(nextMainLineStepAfter("trial")).toBe("publish");
+  });
+
+  it("publish → done (package is reserved terminal)", () => {
+    expect(nextMainLineStepAfter("publish")).toBe("done");
   });
 });
 
@@ -202,22 +210,25 @@ describe("nextMainLineStepAfter", () => {
 // ---------------------------------------------------------------------------
 
 describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
-  it("SR-1/SR-2 copy track: identity -> … -> mechanisms -> fallback_policy -> osk -> touch_seed_source -> touch -> help -> html -> icon -> done", () => {
+  it("SR-1/SR-2 copy track: identity -> … -> mechanisms -> fallback_policy -> osk -> touch_seed_source -> touch -> help -> html -> icon -> trial -> publish -> done", () => {
     const { sequence, navigateAtEnd } = walkSpine(copyCtx);
     expect(sequence).toEqual([
       // No "track": the question is removed; the start screen records the
       // track (or it defaults to copy at instantiation).
       "identity", "layout", "choose_base", "attribution", "project_name", "characters",
-      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "fallback_policy", "osk", "touch_seed_source", "touch", "css", "help", "html", "icon", "done",
+      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "fallback_policy", "osk", "touch_seed_source", "touch", "css", "help", "html", "icon", "trial", "publish", "done",
     ]);
-    // "... -> done -> output": icon -> done carries navigate:"output".
-    expect(navigateAtEnd).toBe("output");
+    // Spec 113 (#2540): publish -> done carries NO navigate — the author
+    // rests on the `done` terminal panel, whose copy points back at
+    // Publish. (The old `icon -> done + navigate:"output"` hop is gone
+    // with the Output screen.)
+    expect(navigateAtEnd).toBeUndefined();
   });
 
   it("SR-2 adapt track (Open, spec 111): project_name is skipped, the language list joins, and the identity-first screens and galleries leave the walk", () => {
     const { sequence, navigateAtEnd } = walkSpine(adaptCtx);
     expect(sequence).toEqual([
-      "identity", "attribution", "open_languages", "open_missing_letters", "mechanisms", "fallback_policy", "osk", "touch", "css", "icon", "done",
+      "identity", "attribution", "open_languages", "open_missing_letters", "mechanisms", "fallback_policy", "osk", "touch", "css", "icon", "trial", "publish", "done",
     ]);
     expect(sequence).not.toContain("project_name");
     // Open ends at Review (the criteria view), whose Continue opens Output.
@@ -283,7 +294,7 @@ describe("spec 034 SR-5 — validateManifestShape structural guard", () => {
       "identity", "layout", "choose_base", "attribution",
       // Spec 111: Open's gated pages sit on the spine; Copy's gates skip them.
       "open_languages", "open_missing_letters", "open_upgrades", "characters",
-      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "fallback_policy", "osk", "touch", "css", "help", "html", "icon", "package",
+      "marks", "punctuation", "invisibles", "convenience", "carve", "deadkeys", "rules", "mechanisms", "fallback_policy", "osk", "touch", "css", "help", "html", "icon", "trial", "publish", "package",
     ]);
   });
 });
@@ -469,7 +480,8 @@ describe("advance: spine hops", () => {
 });
 
 // ---------------------------------------------------------------------------
-// advance — help → html; html → icon; icon → done + navigate:"output"
+// advance — help → html; html → icon; icon → trial; trial → publish;
+// publish → done (no navigate, spec 113)
 // ---------------------------------------------------------------------------
 
 describe("advance: help (gate open)", () => {
@@ -493,10 +505,26 @@ describe("advance: html", () => {
 });
 
 describe("advance: icon", () => {
-  it("icon → done with navigate:'output'", () => {
+  it("icon → trial (no navigate)", () => {
     const outcome = advance("icon", undefined, copyCtx);
+    expect(outcome.next).toBe("trial");
+    expect(outcome.navigate).toBeUndefined();
+  });
+});
+
+describe("advance: trial", () => {
+  it("trial → publish (no navigate)", () => {
+    const outcome = advance("trial", undefined, copyCtx);
+    expect(outcome.next).toBe("publish");
+    expect(outcome.navigate).toBeUndefined();
+  });
+});
+
+describe("advance: publish", () => {
+  it("publish → done with NO navigate (spec 113: the author rests on the done panel)", () => {
+    const outcome = advance("publish", undefined, copyCtx);
     expect(outcome.next).toBe("done");
-    expect(outcome.navigate).toBe("output");
+    expect(outcome.navigate).toBeUndefined();
   });
 });
 

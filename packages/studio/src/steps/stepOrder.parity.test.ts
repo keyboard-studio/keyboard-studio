@@ -47,6 +47,16 @@
 // (icon requires welcome-htm, so it follows the html screen).
 
 //
+// AMENDMENT (spec 113, #2540, same rule — a deliberate decision, not a
+// regeneration): the Output screen splits into Trial and Publish steps
+// after the icon step. BASELINE_ORDER gains "trial" after "icon" and
+// "publish" after "trial"; BASELINE_MEMBERSHIP gains trial: ["trial"] and
+// publish: ["publish"]; the Flow Map edges re-route: icon -> trial ->
+// publish -> package (trial requires icon, publish requires trial, so
+// both follow their predecessor by chain). The tie-break pairs gain the
+// (earlier-screen, trial) and (earlier-screen, publish) pairs no requires
+// chain orders — see BASELINE_TIE_BREAK_PAIRS.
+//
 // AMENDMENT (spec 111, same rule -- a deliberate decision, not a
 // regeneration): Open adds an "open_languages" side trail (the editable
 // language list, shown on the adapt track only). BASELINE_ORDER gains it
@@ -108,6 +118,8 @@ const BASELINE_ORDER = [
   "help",
   "html",
   "icon",
+  "trial",
+  "publish",
   "package",
 ] as const;
 
@@ -151,7 +163,9 @@ const BASELINE_EDGES: ReadonlyArray<readonly [string, string, string]> = [
   ["css", "help", "spine"],
   ["help", "html", "spine"],
   ["html", "icon", "spine"],
-  ["icon", "package", "spine"],
+  ["icon", "trial", "spine"],
+  ["trial", "publish", "spine"],
+  ["publish", "package", "spine"],
 ];
 
 /** Membership on `main` at 18e63aa4: the decisions each step's screen held. */
@@ -184,6 +198,8 @@ const BASELINE_MEMBERSHIP: Readonly<Record<string, readonly string[]>> = {
   help: ["help-welcome-paragraph", "help-body-parity", "help-usage-tip-1", "help-history-entry", "help-history-bullets", "help-more-detail", "help-doc-language", "help-doc-language-other", "help-doc-language-second", "help-doc-language-second-other", "help-font-guidance", "help-usage-tip-2", "help-scope-variety", "help-provenance-basis", "help-design-rationale", "help-canonical-order", "help-script-glossary", "help-example-words", "help-troubleshooting", "help-related-keyboards", "help-known-limitations", "help-further-reading", "help-project-url", "help-credits", "help-contact-info", "help-docs"],
   html: ["welcome-htm"],
   icon: ["icon"],
+  trial: ["trial"],
+  publish: ["publish"],
   package: [],
 };
 

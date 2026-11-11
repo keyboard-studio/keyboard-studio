@@ -167,12 +167,12 @@ export function emitRule(rule: IRRule, groupUsingKeys: boolean): string {
   if (rule.trailingComment !== undefined) {
     line = `${line} c ${rule.trailingComment}`;
   }
-  // Target-selector prefix (`$keyman:`, `$keymanweb:`, `$keymanonly:`) — the
-  // source-line prefix that scopes a rule to a specific compile target. Must
-  // come first on the line per kmcmplib::GetLinePrefixType.
-  if (rule.targetSelector !== undefined) {
-    line = `$${rule.targetSelector}: ${line}`;
-  }
+  // Target-selector prefixes (`$keyman:`, `$keymanweb:`, `$keymanonly:`)
+  // are Keyman 19-deprecated and removed in Keyman 20 — emit NEVER writes
+  // them, even for a stale or hand-built IR that still carries a
+  // `targetSelector` (#2633 backstop: parse rewrites prefixed lines into
+  // platform() guards / merged stores, so a well-formed IR has no
+  // targetSelector left; this drop is the last line of defence).
   return line;
 }
 
@@ -389,16 +389,25 @@ export function emitStore(store: IRStore): string {
   const nameToken = store.isSystem ? `&${store.name}` : store.name;
   // &CasedKeys holds virtual keys, not a string — it keeps the token form.
   const metadata = store.isSystem && store.name.toUpperCase() !== "CASEDKEYS";
-  const items = emitStoreItems(store.items, metadata);
+  let items = emitStoreItems(store.items, metadata);
+  // An empty body with a trailing comment would re-parse as content: the
+  // bare `store(x)  c foo` line has no value token for stripTrailingComment
+  // to anchor on (the `c` sits at the start of the value, where the
+  // left-whitespace test fails), so `c foo` is misread as store items —
+  // and, since #2633 decodes bare numbers as octal, a numeric comment word
+  // becomes a bogus codepoint (eo_plus `store(S1) '' c 1` re-parsed `1` as
+  // U+0001). Spell the empty body as `''` — the source spelling — so the
+  // comment stays a comment. A comment-less empty store keeps the pinned
+  // bare `store(x) ` form (see emit.test.ts "emptied store").
+  if (items === "" && store.trailingComment !== undefined) items = "''";
   let line = `store(${nameToken}) ${items}`;
   // Trailing `c <comment>` — same convention as emitRule.
   if (store.trailingComment !== undefined) {
     line = `${line} c ${store.trailingComment}`;
   }
-  // Target-selector prefix — same convention as emitRule.
-  return store.targetSelector !== undefined
-    ? `$${store.targetSelector}: ${line}`
-    : line;
+  // Target-selector prefixes are never emitted (#2633 backstop — see
+  // emitRule): a stale IR carrying one has it dropped silently.
+  return line;
 }
 
 // ---------------------------------------------------------------------------

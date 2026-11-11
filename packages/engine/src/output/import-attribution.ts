@@ -1,8 +1,28 @@
 // see spec.md §12 line 1157 — PR body must include source path, round-trip
 // status, and opaque-feature inventory when the session imported a release/ keyboard.
 
-import type { ImportReport } from "@keyboard-studio/contracts";
+import type {
+  DeprecatedRewrite,
+  DeprecatedRewriteKind,
+  ImportReport,
+} from "@keyboard-studio/contracts";
 import { ImportStatus } from "@keyboard-studio/contracts";
+
+/** Human-readable heading per rewrite kind, for the as-built notes. */
+const DEPRECATED_REWRITE_HEADINGS: Record<DeprecatedRewriteKind, string> = {
+  "header-statement": "Header statements",
+  "legacy-value-format": "Legacy value formats",
+  "target-selector": "Target selectors ($keyman*:)",
+  "version-raise": "Version raise",
+};
+
+/**
+ * Format one rewrite entry as a single as-built-notes line:
+ * `line 12: NAME "Foo" → store(&NAME) 'Foo'`.
+ */
+function formatDeprecatedRewrite(rewrite: DeprecatedRewrite): string {
+  return `line ${rewrite.sourceLine}: ${rewrite.sourceText} → ${rewrite.rewrittenText}`;
+}
 
 export interface ImportAttributionInput {
   /** Relative path of the imported keyboard in the source tree, e.g. "release/c/cm_qwerty". */
@@ -101,6 +121,33 @@ export function buildImportAttributionBlock(
 
   if (deletedOpaque !== undefined && deletedOpaque.length > 0) {
     lines.push(`Deleted opaque features: ${deletedOpaque.join(", ")} (removed during carve gallery step)`);
+  }
+
+  // --- deprecated-syntax rewrites (#2633) ---
+  // Each rewrite the codec performed on a Keyman 19-deprecated form, grouped
+  // by kind, so the user can see exactly what changed on import. Absent
+  // entirely when the source had no deprecated forms.
+  const rewrites = report.deprecatedRewrites ?? [];
+  if (rewrites.length > 0) {
+    lines.push("", "### Deprecated syntax rewrites");
+    lines.push(
+      "The source used Keyman 19-deprecated syntax (removed in Keyman 20); " +
+        "the working copy was rewritten to the modern equivalent:",
+    );
+    const kinds: DeprecatedRewriteKind[] = [
+      "header-statement",
+      "legacy-value-format",
+      "target-selector",
+      "version-raise",
+    ];
+    for (const kind of kinds) {
+      const entries = rewrites.filter((r) => r.kind === kind);
+      if (entries.length === 0) continue;
+      lines.push(`- ${DEPRECATED_REWRITE_HEADINGS[kind]} (${entries.length}):`);
+      for (const entry of entries) {
+        lines.push(`  - ${formatDeprecatedRewrite(entry)}`);
+      }
+    }
   }
 
   return lines.join("\n");

@@ -1,4 +1,4 @@
-// Unit tests for steps/phases.ts — the display-only A-F phase mapping over
+// Unit tests for steps/phases.ts — the display-only A-H phase mapping over
 // the real manifest step ids, plus its structural drift guard.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
@@ -45,6 +45,14 @@ describe("phaseOfStep", () => {
 
   it("returns the F/'Finalize' phase for 'icon' (icon editor, after Documentation)", () => {
     expect(phaseOfStep("icon")?.letter).toBe("F");
+  });
+
+  it("returns the G/'Trial' phase for 'trial' (spec 113, #2540)", () => {
+    expect(phaseOfStep("trial")?.letter).toBe("G");
+  });
+
+  it("returns the H/'Publish' phase for 'publish' (spec 113, #2540)", () => {
+    expect(phaseOfStep("publish")?.letter).toBe("H");
   });
 
   // One parametrised case per real manifest step id (excluding UNPHASED_STEP_IDS)
@@ -167,12 +175,12 @@ describe("invariant — flattened PHASES order is a subsequence of manifest orde
 });
 
 // ---------------------------------------------------------------------------
-// Invariant 4 — letters are exactly A-F, in order, no gaps
+// Invariant 4 — letters are exactly A-H, in order, no gaps
 // ---------------------------------------------------------------------------
 
-describe("invariant — PHASES letters are exactly A-F, in order", () => {
-  it("letters equal ['A','B','C','D','E','F']", () => {
-    expect(PHASES.map((p) => p.letter)).toEqual(["A", "B", "C", "D", "E", "F"]);
+describe("invariant — PHASES letters are exactly A-H, in order", () => {
+  it("letters equal ['A','B','C','D','E','F','G','H']", () => {
+    expect(PHASES.map((p) => p.letter)).toEqual(["A", "B", "C", "D", "E", "F", "G", "H"]);
   });
 });
 

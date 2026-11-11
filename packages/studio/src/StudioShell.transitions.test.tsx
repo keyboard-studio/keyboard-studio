@@ -27,7 +27,7 @@ vi.mock("./components/UnsupportedScriptStub.tsx", () => import("./test/studioShe
 vi.mock("./components/OSKFrame.tsx", () => import("./test/studioShellMocks/OSKFrame.tsx"));
 vi.mock("./components/OskModeToggle.tsx", () => import("./test/studioShellMocks/OskModeToggle.tsx"));
 vi.mock("./components/CompareScreen.tsx", () => import("./test/studioShellMocks/CompareScreen.tsx"));
-vi.mock("./components/OutputScreen.tsx", () => import("./test/studioShellMocks/OutputScreen.tsx"));
+vi.mock("./components/OutputRedirect.tsx", () => import("./test/studioShellMocks/OutputRedirect.tsx"));
 vi.mock("./components/WelcomeScreen.tsx", () => import("./test/studioShellMocks/WelcomeScreen.tsx"));
 vi.mock("./dashboard/DashboardView.tsx", () => import("./test/studioShellMocks/DashboardView.tsx"));
 // Controllable: static idle by default; the "resume draft banner" F1/P1

@@ -46,6 +46,10 @@ import {
   suggestKeyIdFromText,
   synthesizeDropKeyId,
   buildCharmapDropOps,
+  buildBulkKeyEditOps,
+  commonFieldValue,
+  rangeKeySelection,
+  toggleKeySelection,
   FLICK_DIRECTIONS,
 } from "./touchBuilderModel.ts";
 
@@ -653,5 +657,141 @@ describe("suggestKeyIdFromText", () => {
   it("suggests nothing for empty text or whitespace", () => {
     expect(suggestKeyIdFromText("")).toBeNull();
     expect(suggestKeyIdFromText(" ")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #2596 item 2 — multi-select (keymanapp/keyman#3611)
+// ---------------------------------------------------------------------------
+
+describe("toggleKeySelection", () => {
+  it("appends an absent address and removes a present one", () => {
+    expect(toggleKeySelection([], "phone:default:K_A")).toEqual(["phone:default:K_A"]);
+    expect(
+      toggleKeySelection(["phone:default:K_A", "phone:default:K_B"], "phone:default:K_B"),
+    ).toEqual(["phone:default:K_A"]);
+    expect(
+      toggleKeySelection(["phone:default:K_A"], "phone:default:K_B"),
+    ).toEqual(["phone:default:K_A", "phone:default:K_B"]);
+  });
+  it("keeps row-major order on append (never re-sorts)", () => {
+    expect(
+      toggleKeySelection(["phone:default:K_B"], "phone:default:K_A"),
+    ).toEqual(["phone:default:K_B", "phone:default:K_A"]);
+  });
+});
+
+describe("rangeKeySelection", () => {
+  const flat = ["phone:default:K_A", "phone:default:K_B", "phone:default:K_C", "phone:default:K_D"];
+  it("selects the inclusive row-major slice, either direction", () => {
+    expect(rangeKeySelection(flat, "phone:default:K_A", "phone:default:K_C")).toEqual([
+      "phone:default:K_A",
+      "phone:default:K_B",
+      "phone:default:K_C",
+    ]);
+    expect(rangeKeySelection(flat, "phone:default:K_C", "phone:default:K_A")).toEqual([
+      "phone:default:K_A",
+      "phone:default:K_B",
+      "phone:default:K_C",
+    ]);
+  });
+  it("selects just the target for a null or off-layer anchor", () => {
+    expect(rangeKeySelection(flat, null, "phone:default:K_B")).toEqual(["phone:default:K_B"]);
+    expect(rangeKeySelection(flat, "phone:shift:K_A", "phone:default:K_B")).toEqual([
+      "phone:default:K_B",
+    ]);
+    expect(rangeKeySelection(flat, "phone:default:K_A", "phone:default:K_X")).toEqual([
+      "phone:default:K_X",
+    ]);
+  });
+});
+
+describe("commonFieldValue", () => {
+  it("returns the common value when all agree", () => {
+    expect(commonFieldValue([100, 100, 100])).toEqual({ mixed: false, value: 100 });
+    expect(commonFieldValue(["shift"])).toEqual({ mixed: false, value: "shift" });
+  });
+  it("reports mixed when any value differs", () => {
+    expect(commonFieldValue([100, 150])).toEqual({ mixed: true, value: undefined });
+    expect(commonFieldValue([0, 0, 1])).toEqual({ mixed: true, value: undefined });
+  });
+  it("is not mixed for an empty selection", () => {
+    expect(commonFieldValue([])).toEqual({ mixed: false, value: undefined });
+  });
+});
+
+describe("buildBulkKeyEditOps", () => {
+  const entries = [
+    { address: "phone:default:K_A", key: { id: "K_A", text: "a", width: 100, sp: 0 } },
+    { address: "phone:default:K_B", key: { id: "K_B", text: "b", width: 150, sp: 0 } },
+    { address: "phone:default:K_C", key: { id: "K_C", text: "c", sp: 1 } },
+  ] as const;
+  it("emits one set per key carrying only its differing fields", () => {
+    expect(buildBulkKeyEditOps([...entries], { width: 120 })).toEqual([
+      { address: "phone:default:K_A", kind: "set", fields: { width: 120 } },
+      { address: "phone:default:K_B", kind: "set", fields: { width: 120 } },
+      { address: "phone:default:K_C", kind: "set", fields: { width: 120 } },
+    ]);
+  });
+  it("skips keys already at the target value", () => {
+    // K_A stores 100, K_C stores nothing (= default 100): both already at
+    // the target, so only K_B (150) gets an op.
+    expect(buildBulkKeyEditOps([...entries], { width: 100 })).toEqual([
+      { address: "phone:default:K_B", kind: "set", fields: { width: 100 } },
+    ]);
+    expect(buildBulkKeyEditOps([...entries], { sp: 0 })).toEqual([
+      { address: "phone:default:K_C", kind: "set", fields: { sp: 0 } },
+    ]);
+  });
+  it("snaps bulk widths to the item-4 grid", () => {
+    expect(buildBulkKeyEditOps([entries[0]!], { width: 126 })).toEqual([
+      { address: "phone:default:K_A", kind: "set", fields: { width: 130 } },
+    ]);
+  });
+  it("merges several fields into one set per key", () => {
+    expect(buildBulkKeyEditOps([entries[0]!], { width: 120, pad: 5, nextlayer: "shift" })).toEqual([
+      {
+        address: "phone:default:K_A",
+        kind: "set",
+        fields: { width: 120, pad: 5, nextlayer: "shift" },
+      },
+    ]);
+  });
+  it("maps sp 9/10 to a suppress op per key, never a set half", () => {
+    expect(buildBulkKeyEditOps([...entries], { sp: 9 })).toEqual([
+      { address: "phone:default:K_A", kind: "suppress", spClass: 9, sentinelId: "T_BLANK" },
+      { address: "phone:default:K_B", kind: "suppress", spClass: 9, sentinelId: "T_BLANK" },
+      { address: "phone:default:K_C", kind: "suppress", spClass: 9, sentinelId: "T_BLANK" },
+    ]);
+    expect(buildBulkKeyEditOps([entries[0]!], { sp: 10 })).toEqual([
+      { address: "phone:default:K_A", kind: "suppress", spClass: 10, sentinelId: "T_SPACER" },
+    ]);
+  });
+  it("emits nothing when every key is already at every target", () => {
+    expect(buildBulkKeyEditOps([entries[0]!], { width: 100, sp: 0 })).toEqual([]);
+  });
+  it("replays through the real applier: bulk width lands on all three keys", () => {
+    const layout = parseTouchLayoutString(`{
+      "phone": { "layer": [{ "id": "default", "row": [
+        { "id": 1, "key": [
+          { "id": "K_A", "text": "a", "width": 100 },
+          { "id": "K_B", "text": "b", "width": 150 },
+          { "id": "K_C", "text": "c" }
+        ]}
+      ]}] }
+    }`);
+    const ops = buildBulkKeyEditOps(
+      [
+        { address: "phone:default:K_A", key: { id: "K_A", text: "a", width: 100 } },
+        { address: "phone:default:K_B", key: { id: "K_B", text: "b", width: 150 } },
+        { address: "phone:default:K_C", key: { id: "K_C", text: "c" } },
+      ],
+      { width: 120 },
+    );
+    const next = replayKeyEditOverlay(layout, {
+      ops: ops as KeyEditOperation[],
+    }).layout;
+    const row = next.platforms[0]!.layers[0]!.rows[0]!.keys;
+    expect(row.map((k) => k.width)).toEqual([120, 120, 120]);
   });
 });

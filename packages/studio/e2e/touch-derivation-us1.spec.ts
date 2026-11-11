@@ -69,6 +69,7 @@ import {
   driveMechanismsGallery,
   driveTouchGallery,
   driveHelpPhase,
+  goToPublishFromDone,
   seedReturningVisitor,
   switchTab,
   zipSourceEntry,
@@ -284,11 +285,12 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
       "Type ɛ, ɔ, and ŋ directly from the base layout.",
     );
 
-    await page.waitForURL(/#output$/, { timeout: 30_000 });
+    await expect(page.getByRole("heading", { name: "Survey complete" })).toBeVisible({ timeout: 30_000 });
+    await goToPublishFromDone(page);
 
-    // Accessibility gate (spec 056 FR-003): scan the output screen.
-    // 1.4.3 -- the Output screen's documented pre-existing contrast debt.
-    await expectNoSeriousAxeViolations(page, "output screen (US1 bambara walk)", {
+    // Accessibility gate (spec 056 FR-003): scan the publish step.
+    // 1.4.3 -- the Publish step's documented pre-existing contrast debt.
+    await expectNoSeriousAxeViolations(page, "publish step (US1 bambara walk)", {
       exclude: OUTPUT_SCREEN_DEBT,
     });
 

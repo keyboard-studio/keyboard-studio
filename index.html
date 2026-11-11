@@ -420,14 +420,14 @@ footer p+p{margin-top:12px}
   <div class="stack prose">
     <span class="eyebrow">Two kinds of work</span>
     <h2 id="h-tracks">A new keyboard, or a new version of an existing one</h2>
-    <p>The author's first real decision is what they are making. Both run the same steps on the same working copy. They differ in the keyboard ID, what the pull request contains, and what the history says.</p>
+    <p>The start screen asks what the author is making: <b>Create</b> a new keyboard, or <b>Open</b> an existing one. Both work on one working copy and share the later steps. Create starts from the author's language and suggests a keyboard to copy. Open starts from the keyboard itself, keeps what it already has, and shows only the steps it needs.</p>
   </div>
   <div class="tracks">
     <article class="track">
-      <span class="eyebrow">Track 1</span>
+      <span class="eyebrow">Create</span>
       <h3>Make a new keyboard</h3>
       <dl>
-        <dt>Starts from</dt><dd>An existing keyboard, used as a starting point. For example, a country keyboard cut down to one language</dd>
+        <dt>Starts from</dt><dd>An existing keyboard to copy, suggested from the language, script and related languages. For example, a country keyboard cut down to one language</dd>
         <dt>Keyboard ID</dt><dd>New, and checked against <code>release/</code>, <code>experimental/</code> and <code>legacy/</code></dd>
         <dt>Result</dt><dd>A new keyboard folder</dd>
         <dt>In Developer</dt><dd>Like copying a project</dd>
@@ -435,105 +435,121 @@ footer p+p{margin-top:12px}
       </dl>
     </article>
     <article class="track two-t">
-      <span class="eyebrow">Track 2</span>
-      <h3>Make a new version</h3>
+      <span class="eyebrow">Open</span>
+      <h3>Update an existing keyboard</h3>
       <dl>
-        <dt>Starts from</dt><dd>The current released version of the same keyboard</dd>
-        <dt>Keyboard ID</dt><dd>Unchanged</dd>
-        <dt>Result</dt><dd>A version bump in the existing folder</dd>
+        <dt>Starts from</dt><dd>The keyboard itself, from <code>keymanapp/keyboards</code> or the <code>keyboard-studio/keyboards</code> fork</dd>
+        <dt>Keyboard ID</dt><dd>Unchanged. Its languages, documentation, comments and formatting are kept</dd>
+        <dt>Result</dt><dd>A version bump in the existing folder. Only what the author changes is rewritten</dd>
         <dt>In Developer</dt><dd>Like editing the project and bumping its version</dd>
-        <dt>History</dt><dd>Cumulative <code>HISTORY.md</code>, a strictly greater version, and the original <code>welcome.htm</code> prose kept. Checks confirm nothing was lost on the way in</dd>
+        <dt>History</dt><dd>An "Updated" entry above the existing history. The pull request names the source repository and commit</dd>
+        <dt>Checks</dt><dd>Problems already there when the keyboard was opened never block. A check that newly fails needs a fix or a written reason</dd>
       </dl>
     </article>
   </div>
   <div class="wfwrap">
-    <svg class="wf" viewBox="0 0 760 1210" role="img" aria-labelledby="wf-t wf-d">
-      <title id="wf-t">Authoring workflow for both tracks</title>
-      <desc id="wf-d">The author gives the language and script, then chooses one starting keyboard: a suggested match, their own choice, or US QWERTY. They then choose a track. Track 1 names a new keyboard; Track 2 keeps the existing identity. Both tracks share prefill, characters, the desktop gallery, a locked desktop layout, a derived touch layout, and docs. They split again at submission: Track 1 submits a new keyboard, Track 2 a new version. Checks and the compiler run on every edit from prefill to docs, and every answer arrives as a proposal with its source.</desc>
+    <svg class="wf" viewBox="0 0 760 1306" role="img" aria-labelledby="wf-t wf-d">
+      <title id="wf-t">Authoring workflow for Create and Open</title>
+      <desc id="wf-d">The start screen offers two paths. Create asks for the language and script, the keyboard layout, a keyboard to copy, the author and a new project name, then walks the character survey and the remove-keys, deadkeys and rules steps. Open finds the keyboard, records which checks already fail, then asks about languages and letters, offers upgrades only when the keyboard needs them, and leaves the other editors in a Tools menu. Both paths then share the mechanisms gallery, fallback policy and on-screen keyboard labels, the touch layout, docs, CSS and icon, and trial and publish. They split again at submission: Create submits a new keyboard, Open a new version. Checks and the compiler run on every edit, and every answer arrives as a proposal with its source.</desc>
       <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" class="ahp"/></marker></defs>
-      <path class="r2" d="M714 104 H724 V974 H714"/>
-      <text class="r2t" transform="translate(744 539) rotate(90)">EVERY ANSWER ARRIVES PROPOSED, WITH ITS SOURCE</text>
-      <path class="r1" d="M46 490 H36 V974 H46"/>
-      <text class="r1t" transform="translate(22 732) rotate(-90)">CHECKS + COMPILER ON EVERY EDIT</text>
-      <rect class="n" x="210" y="20" width="340" height="58" rx="10"/>
-      <text class="t" x="380" y="44">Language and script</text>
-      <text class="s" x="380" y="64">autonym, English name, ISO 639 code, target script</text>
-      <path class="ln" d="M380 78 V102" marker-end="url(#ah)"/>
-      <rect class="n" x="210" y="104" width="340" height="58" rx="10"/>
-      <text class="t" x="380" y="128">Choose one starting keyboard</text>
-      <text class="s" x="380" y="148">never a blank file</text>
-      <path class="ln" d="M380 162 C380 178 160 176 160 192" marker-end="url(#ah)"/>
-      <path class="ln" d="M380 162 V192" marker-end="url(#ah)"/>
-      <path class="ln" d="M380 162 C380 178 600 176 600 192" marker-end="url(#ah)"/>
-      <rect class="n" x="60" y="194" width="200" height="58" rx="10"/>
-      <text class="t" x="160" y="218">Suggested match</text>
-      <text class="s" x="160" y="238">from related keyboards</text>
-      <rect class="n" x="280" y="194" width="200" height="58" rx="10"/>
-      <text class="t" x="380" y="218">Author's choice</text>
-      <text class="s" x="380" y="238">any release/ keyboard or .kmn</text>
-      <rect class="n" x="500" y="194" width="200" height="58" rx="10"/>
-      <text class="t" x="600" y="218">US QWERTY</text>
-      <text class="s" x="600" y="238">when nothing is closer</text>
-      <path class="ln" d="M160 252 C160 272 380 268 380 286" marker-end="url(#ah)"/>
-      <path class="ln" d="M380 252 V286" marker-end="url(#ah)"/>
-      <path class="ln" d="M600 252 C600 272 380 268 380 286" marker-end="url(#ah)"/>
-      <rect class="n" x="270" y="288" width="220" height="46" rx="23"/>
-      <text class="t" x="380" y="316">Which track?</text>
-      <path class="ln l1" d="M380 334 C380 352 220 352 220 370" marker-end="url(#ah)"/>
-      <path class="ln l2" d="M380 334 C380 352 540 352 540 370" marker-end="url(#ah)"/>
-      <rect class="n n1" x="80" y="372" width="280" height="78" rx="10"/>
-      <text class="e" x="220" y="392">TRACK 1 · NEW KEYBOARD</text>
-      <text class="t" x="220" y="414">Name the new keyboard</text>
-      <text class="s" x="220" y="434">new display name, ID derived from it</text>
-      <rect class="n n2" x="400" y="372" width="280" height="78" rx="10"/>
-      <text class="e e2" x="540" y="392">TRACK 2 · NEW VERSION</text>
-      <text class="t" x="540" y="414">Keep the keyboard's identity</text>
-      <text class="s" x="540" y="434">same ID, from the current release</text>
-      <path class="ln l1" d="M220 450 C220 470 380 468 380 488" marker-end="url(#ah)"/>
-      <path class="ln l2" d="M540 450 C540 470 380 468 380 488" marker-end="url(#ah)"/>
-      <rect class="n" x="210" y="490" width="340" height="58" rx="10"/>
-      <text class="t" x="380" y="514">Prefill from the starting keyboard</text>
-      <text class="s" x="380" y="534">script group, BCP47 tag, characters to confirm</text>
-      <path class="ln" d="M380 548 V576" marker-end="url(#ah)"/>
-      <rect class="n" x="210" y="578" width="340" height="58" rx="10"/>
-      <text class="t" x="380" y="602">Character inventory</text>
-      <text class="s" x="380" y="622">only what the starting keyboard lacks</text>
-      <path class="ln" d="M380 636 V664" marker-end="url(#ah)"/>
-      <rect class="n" x="210" y="666" width="340" height="58" rx="10"/>
-      <text class="t" x="380" y="690">Desktop behaviour gallery</text>
-      <text class="s" x="380" y="710">dead keys, modifiers, rotas, as live demos</text>
-      <path class="ln" d="M380 724 V752" marker-end="url(#ah)"/>
-      <rect class="lock" x="240" y="754" width="280" height="44" rx="8"/>
-      <text class="t" x="380" y="781">Desktop layout locked</text>
-      <path class="ln" d="M380 798 V826" marker-end="url(#ah)"/>
-      <rect class="n" x="210" y="828" width="340" height="58" rx="10"/>
-      <text class="t" x="380" y="852">Touch layout</text>
-      <text class="s" x="380" y="872">derived from the locked desktop layout</text>
-      <path class="ln" d="M380 886 V914" marker-end="url(#ah)"/>
-      <rect class="n" x="210" y="916" width="340" height="58" rx="10"/>
-      <text class="t" x="380" y="940">Docs and package details</text>
-      <text class="s" x="380" y="960">help page, author, copyright, language tags</text>
-      <path class="ln l1" d="M380 974 C380 992 220 992 220 1010" marker-end="url(#ah)"/>
-      <path class="ln l2" d="M380 974 C380 992 540 992 540 1010" marker-end="url(#ah)"/>
-      <rect class="n n1" x="80" y="1012" width="280" height="96" rx="10"/>
-      <text class="e" x="220" y="1032">TRACK 1</text>
-      <text class="t" x="220" y="1054">Submit new keyboard</text>
-      <text class="s" x="220" y="1074">new folder under release/</text>
-      <text class="s" x="220" y="1092">HISTORY: "Created from source vX.Y"</text>
-      <rect class="n n2" x="400" y="1012" width="280" height="96" rx="10"/>
-      <text class="e e2" x="540" y="1032">TRACK 2</text>
-      <text class="t" x="540" y="1054">Submit new version</text>
-      <text class="s" x="540" y="1074">version bump in the same folder</text>
-      <text class="s" x="540" y="1092">cumulative HISTORY, fidelity checks</text>
-      <path class="ln l1" d="M220 1108 C220 1126 380 1124 380 1144" marker-end="url(#ah)"/>
-      <path class="ln l2" d="M540 1108 C540 1126 380 1124 380 1144" marker-end="url(#ah)"/>
-      <rect class="n" x="160" y="1146" width="440" height="46" rx="23"/>
-      <text class="t" x="380" y="1174">.kmp download, source .zip, or draft pull request</text>
+      <path class="r2" d="M714 104 H724 V1070 H714"/>
+      <text class="r2t" transform="translate(744 587) rotate(90)">EVERY ANSWER ARRIVES PROPOSED, WITH ITS SOURCE</text>
+      <path class="r1" d="M46 212 H36 V1070 H46"/>
+      <text class="r1t" transform="translate(22 641) rotate(-90)">CHECKS + COMPILER ON EVERY EDIT</text>
+      <rect class="n" x="210" y="20" width="340" height="46" rx="23"/>
+      <text class="t" x="380" y="48">Start screen: Create or Open?</text>
+      <path class="ln l1" d="M380 66 C380 84 210 84 210 102" marker-end="url(#ah)"/>
+      <path class="ln l2" d="M380 66 C380 84 550 84 550 102" marker-end="url(#ah)"/>
+      <rect class="n n1" x="60" y="104" width="300" height="78" rx="10"/>
+      <text class="e" x="210" y="124">CREATE · NEW KEYBOARD</text>
+      <text class="t" x="210" y="146">Language and script</text>
+      <text class="s" x="210" y="166">autonym, ISO 639 code, target script</text>
+      <rect class="n n2" x="400" y="104" width="300" height="78" rx="10"/>
+      <text class="e e2" x="550" y="124">OPEN · NEW VERSION</text>
+      <text class="t" x="550" y="146">Find the keyboard</text>
+      <text class="s" x="550" y="166">pick the repository if the copies differ</text>
+      <path class="ln l1" d="M210 182 V210" marker-end="url(#ah)"/>
+      <path class="ln l2" d="M550 182 V210" marker-end="url(#ah)"/>
+      <rect class="n n1" x="60" y="212" width="300" height="58" rx="10"/>
+      <text class="t" x="210" y="236">Keyboard layout</text>
+      <text class="s" x="210" y="256">Windows layout and Caps handling</text>
+      <rect class="n n2" x="400" y="212" width="300" height="58" rx="10"/>
+      <text class="t" x="550" y="236">Baseline check</text>
+      <text class="s" x="550" y="256">what already fails is marked pre-existing</text>
+      <path class="ln l1" d="M210 270 V298" marker-end="url(#ah)"/>
+      <path class="ln l2" d="M550 270 V298" marker-end="url(#ah)"/>
+      <rect class="n n1" x="60" y="300" width="300" height="58" rx="10"/>
+      <text class="t" x="210" y="324">Choose a keyboard to copy</text>
+      <text class="s" x="210" y="344">ranked by language, script, relatedness</text>
+      <rect class="n n2" x="400" y="300" width="300" height="58" rx="10"/>
+      <text class="t" x="550" y="324">Languages</text>
+      <text class="s" x="550" y="344">read from the .kps; add, remove, reorder</text>
+      <path class="ln l1" d="M210 358 V386" marker-end="url(#ah)"/>
+      <path class="ln l2" d="M550 358 V386" marker-end="url(#ah)"/>
+      <rect class="n n1" x="60" y="388" width="300" height="58" rx="10"/>
+      <text class="t" x="210" y="412">Author and project name</text>
+      <text class="s" x="210" y="432">a new name; the keyboard ID comes from it</text>
+      <rect class="n n2" x="400" y="388" width="300" height="58" rx="10"/>
+      <text class="t" x="550" y="412">Letters</text>
+      <text class="s" x="550" y="432">what each language needs; add characters</text>
+      <path class="ln l1" d="M210 446 V474" marker-end="url(#ah)"/>
+      <path class="ln l2" d="M550 446 V474" marker-end="url(#ah)"/>
+      <rect class="n n1" x="60" y="476" width="300" height="58" rx="10"/>
+      <text class="t" x="210" y="500">Characters</text>
+      <text class="s" x="210" y="520">survey, marks, punctuation, invisibles</text>
+      <rect class="n n2" x="400" y="476" width="300" height="58" rx="10"/>
+      <text class="t" x="550" y="500">Upgrades, only if needed</text>
+      <text class="s" x="550" y="520">cased keys, touch Caps, Ctrl, symbols</text>
+      <path class="ln l1" d="M210 534 V562" marker-end="url(#ah)"/>
+      <path class="ln l2" d="M550 534 V562" marker-end="url(#ah)"/>
+      <rect class="n n1" x="60" y="564" width="300" height="58" rx="10"/>
+      <text class="t" x="210" y="588">Remove keys, deadkeys, rules</text>
+      <text class="s" x="210" y="608">walked in order</text>
+      <rect class="n n2" x="400" y="564" width="300" height="58" rx="10"/>
+      <text class="t" x="550" y="588">Tools menu</text>
+      <text class="s" x="550" y="608">remove, marks, deadkeys, rules on demand</text>
+      <path class="ln l1" d="M210 622 C210 641 380 640 380 658" marker-end="url(#ah)"/>
+      <path class="ln l2" d="M550 622 C550 641 380 640 380 658" marker-end="url(#ah)"/>
+      <rect class="n" x="210" y="660" width="340" height="58" rx="10"/>
+      <text class="t" x="380" y="684">Mechanisms gallery</text>
+      <text class="s" x="380" y="704">put characters on keys (not basic_ on Open)</text>
+      <path class="ln" d="M380 718 V746" marker-end="url(#ah)"/>
+      <rect class="n" x="210" y="748" width="340" height="58" rx="10"/>
+      <text class="t" x="380" y="772">Fallback policy and key labels</text>
+      <text class="s" x="380" y="792">unhandled keys; on-screen keyboard labels</text>
+      <path class="ln" d="M380 806 V834" marker-end="url(#ah)"/>
+      <rect class="n" x="210" y="836" width="340" height="58" rx="10"/>
+      <text class="t" x="380" y="860">Touch layout</text>
+      <text class="s" x="380" y="880">Create seeds one; Open edits its own</text>
+      <path class="ln" d="M380 894 V922" marker-end="url(#ah)"/>
+      <rect class="n" x="210" y="924" width="340" height="58" rx="10"/>
+      <text class="t" x="380" y="948">Docs, CSS and icon</text>
+      <text class="s" x="380" y="968">Open asks about docs only if they fail</text>
+      <path class="ln" d="M380 982 V1010" marker-end="url(#ah)"/>
+      <rect class="n" x="210" y="1012" width="340" height="58" rx="10"/>
+      <text class="t" x="380" y="1036">Trial, then Publish</text>
+      <text class="s" x="380" y="1056">test builds, then the release checks</text>
+      <path class="ln l1" d="M380 1070 C380 1088 210 1088 210 1106" marker-end="url(#ah)"/>
+      <path class="ln l2" d="M380 1070 C380 1088 550 1088 550 1106" marker-end="url(#ah)"/>
+      <rect class="n n1" x="60" y="1108" width="300" height="96" rx="10"/>
+      <text class="e" x="210" y="1128">CREATE</text>
+      <text class="t" x="210" y="1150">Submit a new keyboard</text>
+      <text class="s" x="210" y="1170">new folder under release/</text>
+      <text class="s" x="210" y="1188">HISTORY: "Created from source vX.Y"</text>
+      <rect class="n n2" x="400" y="1108" width="300" height="96" rx="10"/>
+      <text class="e e2" x="550" y="1128">OPEN</text>
+      <text class="t" x="550" y="1150">Submit a new version</text>
+      <text class="s" x="550" y="1170">version bump in the same folder</text>
+      <text class="s" x="550" y="1188">HISTORY: "Updated"; PR names the source</text>
+      <path class="ln l1" d="M210 1204 C210 1222 380 1220 380 1240" marker-end="url(#ah)"/>
+      <path class="ln l2" d="M550 1204 C550 1222 380 1220 380 1240" marker-end="url(#ah)"/>
+      <rect class="n" x="160" y="1242" width="440" height="46" rx="23"/>
+      <text class="t" x="380" y="1270">.kmp download, source .zip, or draft pull request</text>
     </svg>
   </div>
   <div class="wfkey">
-    <span><i style="background:var(--accent-soft);border-color:var(--accent)"></i>Track 1 only</span>
-    <span><i style="background:var(--t2-soft);border-color:var(--t2)"></i>Track 2 only</span>
+    <span><i style="background:var(--accent-soft);border-color:var(--accent)"></i>Create only</span>
+    <span><i style="background:var(--t2-soft);border-color:var(--t2)"></i>Open only</span>
     <span><i style="background:var(--surface);border-color:var(--line)"></i>Shared by both</span>
   </div>
 </section>
@@ -656,7 +672,7 @@ footer p+p{margin-top:12px}
     <li><a href="docs/criteria.md">docs/criteria.md</a>: the Keyman keyboard review criteria</li>
     <li><a href="packages/contracts/data/criteria.json">packages/contracts/data/criteria.json</a>: every criterion and how it is handled</li>
     <li><a href="docs/lint.md">docs/lint.md</a>: the 14 kmcmplib checks, with source references</li>
-    <li><a href="docs/design-notes/keyboard-vocabulary-glossary.md">docs/design-notes/keyboard-vocabulary-glossary.md</a>: the two tracks</li>
+    <li><a href="docs/design-notes/keyboard-vocabulary-glossary.md">docs/design-notes/keyboard-vocabulary-glossary.md</a>: the keyboard vocabulary used here</li>
   </ul>
   <div class="legal">
     <p class="copyright">Copyright &copy; <span id="copyright-year">2026</span>&nbsp;<a href="https://www.sil.org/">SIL Global</a></p>

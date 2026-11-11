@@ -24,6 +24,8 @@ vi.mock("./survey/languageList/LanguageListHost.tsx", () => import("./test/studi
 vi.mock("./survey/openWalk/MissingLettersHost.tsx", () => import("./test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ MissingLettersHost: m.MissingLettersHost })));
 vi.mock("./survey/openWalk/UpgradesHost.tsx", () => import("./test/studioShellMocks/OpenWalkHosts.tsx").then((m) => ({ UpgradesHost: m.UpgradesHost })));
 vi.mock("./editors/assignLoop/IconEditor.tsx", () => import("./test/studioShellMocks/IconEditor.tsx"));
+vi.mock("./editors/assignLoop/TrialStep.tsx", () => import("./test/studioShellMocks/TrialStep.tsx"));
+vi.mock("./editors/assignLoop/PublishStep.tsx", () => import("./test/studioShellMocks/PublishStep.tsx"));
 vi.mock("./survey/touchSeedSource/TouchSeedSourceHost.tsx", () =>
   import("./test/studioShellMocks/TouchSeedSourceHost.tsx"),
 );
@@ -31,7 +33,7 @@ vi.mock("./components/UnsupportedScriptStub.tsx", () => import("./test/studioShe
 vi.mock("./components/OSKFrame.tsx", () => import("./test/studioShellMocks/OSKFrame.tsx"));
 vi.mock("./components/OskModeToggle.tsx", () => import("./test/studioShellMocks/OskModeToggle.tsx"));
 vi.mock("./components/CompareScreen.tsx", () => import("./test/studioShellMocks/CompareScreen.tsx"));
-vi.mock("./components/OutputScreen.tsx", () => import("./test/studioShellMocks/OutputScreen.tsx"));
+vi.mock("./components/OutputRedirect.tsx", () => import("./test/studioShellMocks/OutputRedirect.tsx"));
 vi.mock("./components/WelcomeScreen.tsx", () => import("./test/studioShellMocks/WelcomeScreen.tsx"));
 vi.mock("./dashboard/DashboardView.tsx", () => import("./test/studioShellMocks/DashboardView.tsx"));
 // Controllable: static idle by default; the "resume draft banner" F1/P1
@@ -59,11 +61,13 @@ import { advanceToAttribution, advanceToAttributionAdapt, advanceToTouchSeedSour
 installShellHooks({ warmLazySteps: true });
 
 // ---------------------------------------------------------------------------
-// StudioShell / SurveyView — done stage calls navigateTo('output')
+// StudioShell / SurveyView — the Trial/Publish tail ends at done with no
+// Output navigation (spec 113: icon -> trial -> publish -> done; the old
+// `icon -> done + navigateTo('output')` hop is gone with the Output screen).
 // ---------------------------------------------------------------------------
 
-describe("SurveyView — PhaseF done navigates to #output", () => {
-  it("calls navigateTo('output') when PhaseF onComplete fires", async () => {
+describe("SurveyView — the Trial/Publish tail ends at done, never navigating to #output", () => {
+  it("walks icon → trial → publish → done without calling navigateTo('output')", async () => {
     window.location.hash = "#survey";
 
     await act(async () => {
@@ -85,13 +89,24 @@ describe("SurveyView — PhaseF done navigates to #output", () => {
     });
     expect(screen.getByTestId("stage-icon")).toBeTruthy();
 
-    // Complete the icon step → done → navigateTo('output').
+    // Complete the icon step → trial (no navigate).
     await act(async () => {
       fireEvent.click(screen.getByTestId("icon-continue"));
     });
+    expect(screen.getByTestId("stage-trial")).toBeTruthy();
+    expect(navigateTo).not.toHaveBeenCalledWith("output");
 
-    // navigateTo should have been called with 'output'.
-    expect(navigateTo).toHaveBeenCalledWith("output");
+    // Complete the trial step → publish.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("trial-continue"));
+    });
+    expect(screen.getByTestId("stage-publish")).toBeTruthy();
+
+    // Finish the publish step → done, still with no Output navigation.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("publish-finish"));
+    });
+    expect(navigateTo).not.toHaveBeenCalledWith("output");
   });
 });
 

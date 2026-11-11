@@ -5,7 +5,7 @@
 // including its original line ending. Spans come from `sourceLine` plus
 // `joinContinuations`, as carveViaSplice resolves them.
 
-import type { KeyboardIR, IRGroup } from "@keyboard-studio/contracts";
+import type { KeyboardIR, IRGroup, IRRule } from "@keyboard-studio/contracts";
 import { joinContinuations, type LogicalLine } from "../codec/continuation.js";
 import { emitRule, emitStore } from "../codec/emit.js";
 
@@ -25,17 +25,148 @@ export type SpliceKmnResult =
 interface NodeInfo {
   kind: "group" | "rule" | "store" | "raw";
   sourceLine: number | undefined;
+  /**
+   * Extra source lines the node consumes beyond `sourceLine` (a #2633
+   * merge-dropped twin's line, or a dropped header statement's line).
+   * Deleting/replacing the node must remove these lines too — they have
+   * no node of their own, so nothing else ever deletes them.
+   */
+  consumedSourceLines?: readonly number[] | undefined;
 }
 
 function indexNodes(ir: KeyboardIR): Map<string, NodeInfo> {
   const m = new Map<string, NodeInfo>();
   for (const g of ir.groups) {
     m.set(g.nodeId, { kind: "group", sourceLine: g.sourceLine });
-    for (const r of g.rules) m.set(r.nodeId, { kind: "rule", sourceLine: r.sourceLine });
+    for (const r of g.rules) {
+      m.set(r.nodeId, {
+        kind: "rule",
+        sourceLine: r.sourceLine,
+        consumedSourceLines: r.consumedSourceLines,
+      });
+    }
   }
-  for (const s of ir.stores) m.set(s.nodeId, { kind: "store", sourceLine: s.sourceLine });
-  for (const f of ir.raw) m.set(f.nodeId, { kind: "raw", sourceLine: f.sourceLine });
+  for (const s of ir.stores) {
+    m.set(s.nodeId, {
+      kind: "store",
+      sourceLine: s.sourceLine,
+      consumedSourceLines: s.consumedSourceLines,
+    });
+  }
+  for (const f of ir.raw) {
+    m.set(f.nodeId, {
+      kind: "raw",
+      sourceLine: f.sourceLine,
+      consumedSourceLines: f.consumedSourceLines,
+    });
+  }
   return m;
+}
+
+/**
+ * Normalise delete/replace edits that land on a physical line shared by
+ * several rules (#2633 target-selector expansion: one `$keymanweb:` line
+ * becomes three platform-guarded copies sharing its sourceLine). The
+ * line-granular apply loop below cannot express "delete one copy": left
+ * alone, deleting one copy would delete the whole line (silently dropping
+ * the surviving copies), and deleting all copies would error as
+ * "overlapping edits". Each shared line's edits collapse into a single
+ * edit — a delete when every rule on the line is deleted, otherwise a
+ * replace with the surviving rules re-emitted in IR order (a deleted
+ * first copy's trailing comment rides onto the last surviving line).
+ * Lines with a single rule pass through untouched, so the common 1-line /
+ * 1-node case is byte-identical to before.
+ */
+function normaliseSharedLineEdits(
+  startIr: KeyboardIR,
+  edits: readonly KmnEdit[],
+  spanOf: (sourceLine: number | undefined) => Span | undefined,
+): KmnEdit[] {
+  const nodes = indexNodes(startIr);
+  // Rules by source line — only lines with >1 rule need normalisation.
+  const rulesByLine = new Map<number, { group: IRGroup; rule: IRRule }[]>();
+  for (const g of startIr.groups) {
+    for (const r of g.rules) {
+      if (r.sourceLine === undefined) continue;
+      const list = rulesByLine.get(r.sourceLine) ?? [];
+      list.push({ group: g, rule: r });
+      rulesByLine.set(r.sourceLine, list);
+    }
+  }
+
+  // Group non-insert edits by the start of their resolved span.
+  type NonInsertEdit = Exclude<KmnEdit, { kind: "insert" }>;
+  const bySpanStart = new Map<number, NonInsertEdit[]>();
+  const out: KmnEdit[] = [];
+  for (const edit of edits) {
+    if (edit.kind === "insert") {
+      out.push(edit);
+      continue;
+    }
+    const info = nodes.get(edit.nodeId);
+    const span = info === undefined ? undefined : spanOf(info.sourceLine);
+    if (span === undefined) {
+      out.push(edit);
+      continue;
+    }
+    const list = bySpanStart.get(span.start) ?? [];
+    list.push(edit);
+    bySpanStart.set(span.start, list);
+  }
+
+  // A line shared by several rules needs normalisation even for a SINGLE
+  // edit on it: deleting one copy must re-emit the surviving copies onto
+  // the line, not delete it. Lines with one rule pass through untouched.
+  for (const lineEdits of bySpanStart.values()) {
+    const first = lineEdits[0]!;
+    const firstInfo = nodes.get(first.nodeId);
+    const lineRules = rulesByLine.get(firstInfo?.sourceLine ?? -1) ?? [];
+    if (lineRules.length < 2) {
+      out.push(...lineEdits);
+      continue;
+    }
+    // Several rules on one physical line: only the shared-rule-line shape
+    // is normalised; anything else falls through to the overlap error.
+    const ruleIds = new Set(lineRules.map(({ rule }) => rule.nodeId));
+    const allRuleEdits = lineEdits.every(
+      (e) => (e.kind === "delete" || e.kind === "replace") && ruleIds.has(e.nodeId),
+    );
+    if (!allRuleEdits) {
+      out.push(...lineEdits);
+      continue;
+    }
+    const byId = new Map(lineEdits.map((e) => [e.nodeId, e]));
+    const survivors: { rule: IRRule; text: string }[] = [];
+    let droppedComment: string | undefined;
+    for (const { group, rule } of lineRules) {
+      const edit = byId.get(rule.nodeId);
+      if (edit === undefined) {
+        survivors.push({ rule, text: emitRule(rule, group.usingKeys) });
+      } else if (edit.kind === "replace") {
+        survivors.push({ rule, text: edit.text });
+      } else if (droppedComment === undefined) {
+        droppedComment = rule.trailingComment;
+      }
+    }
+    if (survivors.length === 0) {
+      // Every rule on the line is deleted: one delete, not N overlapping ones.
+      out.push({ kind: "delete", nodeId: lineRules[0]!.rule.nodeId });
+      continue;
+    }
+    // A deleted first copy owned the line's trailing comment (parse gives
+    // it to copy 0 only); carry it onto the last surviving line so the
+    // comment is not lost with the deleted copy.
+    const last = survivors[survivors.length - 1]!;
+    if (droppedComment !== undefined && last.rule.trailingComment === undefined) {
+      last.text = `${last.text} c ${droppedComment}`;
+    }
+    out.push({
+      kind: "replace",
+      nodeId: lineRules[0]!.rule.nodeId,
+      text: survivors.map((s) => s.text).join("\n"),
+    });
+  }
+  return out;
 }
 
 /** Diff two IRs that share node ids (startIr -> working ir) into edits. */
@@ -136,7 +267,11 @@ export function spliceKmn(
   const replaceNoEol = new Set<number>();
   const insertAfter = new Map<number, string[]>(); // line index -> texts
 
-  for (const edit of edits) {
+  // Collapse edits that share one physical line (several rules from one
+  // `$keymanweb:` line) into a single edit per line before applying.
+  const normalisedEdits = normaliseSharedLineEdits(startIr, edits, spanOf);
+
+  for (const edit of normalisedEdits) {
     if (edit.kind === "insert") {
       let after: number | undefined;
       if (edit.anchor.after === "last-store") {
@@ -182,6 +317,16 @@ export function spliceKmn(
     for (let i = span.start; i <= span.end; i++) {
       if (removed.has(i)) return { ok: false, reason: `overlapping edits on "${edit.nodeId}"`, nodeId: edit.nodeId };
       removed.add(i);
+    }
+    // A merge-dropped twin's line (consumedSourceLines) has no node of its
+    // own: editing this node must remove it too, or a re-parse resurrects
+    // the twin. Idempotent — the line is unowned, so no other edit claims it.
+    if (info.consumedSourceLines !== undefined) {
+      for (const line of info.consumedSourceLines) {
+        const cspan = spanOf(line);
+        if (cspan === undefined) continue;
+        for (let i = cspan.start; i <= cspan.end; i++) removed.add(i);
+      }
     }
     if (edit.kind === "replace") {
       replaceAt.set(span.start, edit.text);

@@ -54,6 +54,8 @@ type ActiveStepId =
   | "help"
   | "html"
   | "icon"
+  | "trial"
+  | "publish"
   | "done"
   | "unsupported";
 
@@ -368,7 +370,19 @@ function advanceStep(
       return { next: nextMainLineStepAfter("html") }; // icon
 
     case "icon":
-      return { next: "done", navigate: "output" };
+      return { next: nextMainLineStepAfter("icon") }; // trial
+
+    case "trial":
+      return { next: nextMainLineStepAfter("trial") }; // publish
+
+    case "publish":
+      // Spec 113 (#2540): completing Publish ends the walk. No navigate —
+      // the author rests on the `done` terminal panel, whose copy points
+      // back at the Publish step. (The old `icon → done + navigate:"output"`
+      // hop is gone with the Output screen: `#output` is now a redirect
+      // into the tail, and navigating there from `done` would land the
+      // author back on Publish in a loop.)
+      return { next: "done" };
 
     // Terminals — if somehow called, stay put (host does not call advance for terminals).
     case "done":

@@ -31,6 +31,11 @@ const silIpaPath =
     ? resolve(corpusRoot, "release", "sil", "sil_ipa", "source", "sil_ipa.kmn")
     : "";
 const hasSilIpa = silIpaPath !== "" && existsSync(silIpaPath);
+const bjCreeEastPath =
+  corpusRoot !== undefined
+    ? resolve(corpusRoot, "release", "bj", "bj_cree_east", "source", "bj_cree_east.kmn")
+    : "";
+const hasBjCreeEast = bjCreeEastPath !== "" && existsSync(bjCreeEastPath);
 
 describe("corpus integration", () => {
   it.skipIf(!hasSilIpa)(
@@ -43,6 +48,20 @@ describe("corpus integration", () => {
         expect(outcome.summary.recognizedPrimary).toBe("S-03");
         expect(outcome.summary.treePrimary).toBe("S-03");
         expect(outcome.summary.triggeredRule).toBe("3a");
+      }
+    },
+  );
+
+  it.skipIf(!hasBjCreeEast)(
+    "bj_cree_east keeps its §7.5 agreement (rule 12, S-03) — its postfix index shape is syllabic sequencing, not A3 evidence (#2278)",
+    () => {
+      const text = readFileSync(bjCreeEastPath, "utf8");
+      const outcome = evaluateKeyboard("bj_cree_east", text, "release/bj/bj_cree_east/bj_cree_east.kmn");
+      expect(outcome.kind).toBe("agreement");
+      if (outcome.kind === "agreement") {
+        expect(outcome.summary.recognizedPrimary).toBe("S-03");
+        expect(outcome.summary.treePrimary).toBe("S-03");
+        expect(outcome.summary.triggeredRule).toBe(12);
       }
     },
   );

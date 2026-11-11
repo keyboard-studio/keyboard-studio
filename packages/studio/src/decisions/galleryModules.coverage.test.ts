@@ -70,6 +70,11 @@ const BASELINE_STEP_REQUIRES: Readonly<Record<string, readonly string[]>> = {
   // #2485: the icon step follows the html step and needs its welcome-htm
   // decision recorded first (mirrors the icon gallery module's requires).
   icon: ["welcome-htm"],
+  // spec 113 (#2540): the Trial step follows the icon step and needs its
+  // icon decision recorded first; Publish follows Trial the same way
+  // (each mirrors its gallery module's requires).
+  trial: ["icon"],
+  publish: ["trial"],
 };
 
 /**
@@ -84,8 +89,8 @@ const INTRA_STEP_REQUIRES: Readonly<Partial<Record<DecisionId, readonly string[]
 const SETTLES = derivedSettles();
 
 describe("gallery module coverage (FR-002)", () => {
-  it("the derived settles set is exactly the twenty-three gallery decisions (spec 111 adds language-list, missing-letters-review and upgrades-review, spec 112 caps-handling, issue #2539 fallback-policy and #2485 icon)", () => {
-    expect(SETTLES.size).toBe(23);
+  it("the derived settles set is exactly the twenty-five gallery decisions (spec 111 adds language-list, missing-letters-review and upgrades-review, spec 112 caps-handling, issue #2539 fallback-policy, #2485 icon, and spec 113 trial + publish)", () => {
+    expect(SETTLES.size).toBe(25);
     expect([...SETTLES.keys()].sort()).toEqual([
       "base-keyboard",
       "caps-handling",
@@ -103,11 +108,13 @@ describe("gallery module coverage (FR-002)", () => {
       "missing-letters-review",
       "osk-layout",
       "physical-layout",
+      "publish",
       "punctuation-inventory",
       "retained-convenience-chars",
       "rule-set",
       "touch-layout",
       "touch-seed-source",
+      "trial",
       "upgrades-review",
       "welcome-htm",
       "windows-layout",

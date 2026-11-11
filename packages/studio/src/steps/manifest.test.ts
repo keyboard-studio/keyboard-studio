@@ -348,8 +348,12 @@ describe("Off-spine step inventory", () => {
 // two live OSKs co-mount).
 //
 // Exactly {carve, deadkeys, rules, mechanisms, fallback_policy, osk, touch,
-// touch_seed_source, css, html, icon} must declare layout:"full". All other
+// touch_seed_source, css, html, icon, trial, publish} must declare layout:"full". All other
 // steps must have layout:"pane" or omit the field (implicit "pane").
+//
+// trial and publish joined this set in spec 113 (#2540): the Trial and
+// Publish steps host the Output screen's panels, which need the full width
+// the Output pane used to have.
 // ---------------------------------------------------------------------------
 
 const FULL_LAYOUT_IDS = [
@@ -364,10 +368,12 @@ const FULL_LAYOUT_IDS = [
   "css",
   "html",
   "icon",
+  "trial",
+  "publish",
 ] as const;
 
 describe("layout declarations (spec 024 Stage 0)", () => {
-  it("exactly eleven steps declare layout:'full'", () => {
+  it("exactly thirteen steps declare layout:'full'", () => {
     const fullSteps = manifest.filter((s) => s.layout === "full");
     const fullIds = fullSteps.map((s) => s.id).sort();
     expect(fullIds).toEqual([...FULL_LAYOUT_IDS].sort());
@@ -401,6 +407,16 @@ describe("layout declarations (spec 024 Stage 0)", () => {
   it("touch_seed_source declares layout:'full' (P0 fix: suppresses the outer persistent OSK pane so the panel's own inline OSK is the only preview)", () => {
     const seedSource = manifest.find((s) => s.id === "touch_seed_source");
     expect(seedSource?.layout).toBe("full");
+  });
+
+  it("trial declares layout:'full' (spec 113: hosts the Output screen's test-build panels)", () => {
+    const trial = manifest.find((s) => s.id === "trial");
+    expect(trial?.layout).toBe("full");
+  });
+
+  it("publish declares layout:'full' (spec 113: hosts the Output screen's download + submit panels)", () => {
+    const publish = manifest.find((s) => s.id === "publish");
+    expect(publish?.layout).toBe("full");
   });
 
   it("all other steps have layout:'pane' or omit layout (implicit pane)", () => {

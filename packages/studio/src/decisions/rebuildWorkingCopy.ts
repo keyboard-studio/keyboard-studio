@@ -361,7 +361,7 @@ export function rebuildWorkingCopyFromStores(
 /**
  * The live entry for a starting-point change (spec 093 T017, owner
  * ruling (b) — RETAIN + RECALCULATE): called by StudioShell's doCommit
- * (and the OutputScreen picker's instantiate path) AFTER the new base
+ * (and the PublishStep change-base flow's instantiate path) AFTER the new base
  * has been instantiated and the live extraction pass has seeded the new
  * bundle's records. The retained decision set is recalculated against
  * the new starting point — extracted/default records re-derive from the

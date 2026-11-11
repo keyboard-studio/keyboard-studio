@@ -69,6 +69,8 @@ import {
   invertChanges,
   parseKpsLanguages,
   parseKmn,
+  isKeyboardSource,
+  NOT_A_KEYBOARD_SOURCE_MESSAGE,
 } from "@keyboard-studio/engine";
 import type { KmnEditEffect } from "@keyboard-studio/engine";
 import type { IRChange } from "@keyboard-studio/contracts";
@@ -2678,11 +2680,18 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     }
     let nextIr: KeyboardIR | null = null;
     if (path.endsWith(".kmn")) {
+      let parsedIr: KeyboardIR;
       try {
-        nextIr = deriveFacets(parseKmn(text, startKeyboard.id).ir);
+        parsedIr = parseKmn(text, startKeyboard.id).ir;
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err) };
       }
+      // parse() keeps unreadable text as opaque fragments, so text that is not
+      // a keyboard at all comes back as an empty IR instead of throwing.
+      if (!isKeyboardSource(parsedIr)) {
+        return { ok: false, error: NOT_A_KEYBOARD_SOURCE_MESSAGE };
+      }
+      nextIr = deriveFacets(parsedIr);
     }
     // A fresh VFS object so subscribers see the change; the file text is the
     // author's own, verbatim.

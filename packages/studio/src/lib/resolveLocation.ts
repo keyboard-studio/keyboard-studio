@@ -12,7 +12,6 @@
 
 import type { DecisionSet } from "../decisions/decisionTypes.ts";
 import { resolveLegacyStepId } from "../decisions/legacyStepIds.ts";
-import type { Step } from "../steps/types.ts";
 import type { ActiveStepId, TraversalSnapshot } from "../stores/surveySessionStore.ts";
 import type { Location } from "./location.ts";
 
@@ -55,7 +54,16 @@ export type LocationResolution =
 export type QuestionRegistryView = Readonly<Record<string, unknown>>;
 
 export interface ResolveContext {
-  readonly manifest: readonly Step[];
+  /**
+   * Which steps exist in this build, as ids only. The resolver needs
+   * membership, nothing else — and taking the full `Step[]` would drag the
+   * step pool (steps/manifest.ts) into lib/, which the Trial/Publish hosts
+   * import through the Output-screen family, closing a module cycle
+   * (spec 113, depcruise `no-circular`). Production supplies the ids from
+   * steps/derivedViews.ts's `manifestStepIds`; fixtures pass Step objects,
+   * which satisfy this view.
+   */
+  readonly manifest: readonly { readonly id: string }[];
   readonly questionRegistry: QuestionRegistryView;
   readonly traversal: TraversalSnapshot;
   /**
@@ -68,7 +76,7 @@ export interface ResolveContext {
    */
   readonly decisions: DecisionSet;
   /**
-   * Spec 091 T015: the derived screen gates (steps/manifest.ts
+   * Spec 091 T015: the derived screen gates (steps/derivedViews.ts
    * `screenGates`), keyed by screen id. `walkedByTrack` reads the gate
    * from here — steps no longer carry `gatedBy` (T014). Optional so pure
    * fixtures can omit it (absent = ungated); production always supplies

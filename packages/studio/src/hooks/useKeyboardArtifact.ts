@@ -12,7 +12,7 @@ import { openBaselineInventory } from "../criteria/openBaselineInventory.ts";
 import { deriveOpenHelpGaps } from "../lib/openHelpGaps.ts";
 import type { StartKeyboard, VirtualFS, KeyboardIR, LintFinding, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, PackageFontSet, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
-import type { RoundTripDeps, StartDocCssText } from "@keyboard-studio/engine";
+import type { ParseResult, RoundTripDeps, StartDocCssText } from "@keyboard-studio/engine";
 import { loadDemoSimulate } from "../components/rules/demoSimulation.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
@@ -59,7 +59,7 @@ interface EngineModule {
   }>;
   init: () => Promise<void>;
   isReady?: () => boolean;
-  parseKmn?: (text: string, keyboardId: string) => { ir: KeyboardIR; opaqueFeatures: Array<{ feature: string; count: number }> };
+  parseKmn?: (text: string, keyboardId: string) => ParseResult;
   /** Emit a parsed IR back to .kmn text (the codec's emit, barrel name). */
   emitKmn?: (ir: KeyboardIR) => string;
   /**
@@ -68,7 +68,7 @@ interface EngineModule {
    * the parsed IR + its emitted text. Both return LintFinding[] (I1–I6).
    */
   runImportFidelityParseChecks?: (
-    parseResult: { ir: KeyboardIR; opaqueFeatures: Array<{ feature: string; count: number }> },
+    parseResult: ParseResult,
     source: string,
   ) => LintFinding[];
   /**
