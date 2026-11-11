@@ -701,11 +701,12 @@ jobs:
         run: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke decision-store-reload touch-key-identity --grep "boot-smoke|decision-store-reload|spec 104 walk 1:"
 
       # Full set (nightly schedule, push to main, workflow_dispatch):
-      # boot-smoke + copy-edit + spec 088 live gate + spec 104 walks.
-      - name: Playwright (full set - boot-smoke + copy-edit + spec 088 live gate + spec 104 touch-key identity walks)
+      # boot-smoke + copy-edit + spec 088 live gate + spec 104 walks +
+      # preview-longpress-popup (top-row longpress paints above the OSK).
+      - name: Playwright (full set - boot-smoke + copy-edit + spec 088 live gate + spec 104 touch-key identity walks + preview-longpress-popup)
         id: pw_full
         if: ${{ github.event_name != 'pull_request' }}
-        run: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload touch-key-identity
+        run: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload touch-key-identity preview-longpress-popup
 
       # `continue-on-error` makes this job report success even when the
       # tests failed, so surface the real verdict as a job output for
@@ -782,7 +783,7 @@ jobs:
       - name: Open or update the tracking issue
         run: |
           title="Nightly e2e desktop failure ($TARGET_REF)"
-          body="The full desktop Playwright set failed on $TARGET_REF (event: $GITHUB_EVENT_NAME). Run: $RUN_URL. The PR lane only runs a quick slice; copy-edit and the other long walks run on the schedule only (docs/tooling.md, PR CI budget). Reproduce locally: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload touch-key-identity"
+          body="The full desktop Playwright set failed on $TARGET_REF (event: $GITHUB_EVENT_NAME). Run: $RUN_URL. The PR lane only runs a quick slice; copy-edit and the other long walks run on the schedule only (docs/tooling.md, PR CI budget). Reproduce locally: pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload touch-key-identity preview-longpress-popup"
           existing="$(gh issue list --state open --search "\"$title\" in:title" --json number,title --jq "[.[] | select(.title == \"$title\")][0].number // empty")"
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --body "Failed again: $RUN_URL"

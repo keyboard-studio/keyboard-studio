@@ -287,7 +287,12 @@ export async function pickStartKeyboard(
     await card.click();
     const cardConfirm = page.getByTestId("base-confirm");
     if (await cardConfirm.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await expect(cardConfirm).toBeEnabled({ timeout: 5_000 });
+      // "Preparing preview…" parses the base artifact before the confirm
+      // enables — on a cold or loaded machine that takes longer than a
+      // 5s guess (sil_cameroon_qwerty wedged past it while a corpus run
+      // owned the VM). Playwright's own default action timeout is 30s;
+      // match it rather than failing a healthy walk on a slow parse.
+      await expect(cardConfirm).toBeEnabled({ timeout: 30_000 });
       await cardConfirm.click();
     }
     return;
@@ -299,7 +304,7 @@ export async function pickStartKeyboard(
   await search.fill(keyboardId);
   await page.locator(`[id$="-opt-${keyboardId}"]`).first().click({ timeout: 15_000 });
   const confirm = page.getByTestId("base-confirm");
-  await expect(confirm).toBeEnabled({ timeout: 5_000 });
+  await expect(confirm).toBeEnabled({ timeout: 30_000 });
   await confirm.click();
 }
 

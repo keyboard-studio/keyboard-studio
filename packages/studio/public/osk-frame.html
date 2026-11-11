@@ -99,7 +99,17 @@
         background: #1c2230;
         display: flex;
         justify-content: center;
-        overflow: hidden;
+        /* visible, not hidden: KMW positions the longpress popup
+           (#kmw-popup-keys) and the keytip ABOVE the OSK box's top edge —
+           the top row sits flush with the box top because the Preview
+           configures no predictive-text model, so there is no autosuggest
+           banner holding that space open. overflow:hidden clipped the
+           whole popup (it paints entirely above the box). Visible lets
+           it paint over the textarea/status area inside this iframe, as
+           on a real phone. Both axes must stay visible: hidden on one
+           axis computes the other to auto, which clips again. The iframe
+           element itself still bounds painting to the preview pane. */
+        overflow: visible;
         /* Never squeezed by the body's flex column: a shrunk host clipped the
            keyboard's bottom rows, and its measured height fed CONTENT_HEIGHT. */
         flex-shrink: 0;
