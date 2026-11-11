@@ -460,7 +460,9 @@ describe("C. replay equivalence", () => {
     // kmn-edits is the LAST decision in the derived order (registered after every other module
     // and requiring the rule writers), so no completion's rebuild resumes from a cached
     // checkpoint past it -- a checkpoint built before the edit would silently drop it.
-    const modules = Object.values(questionRegistry) as QuestionModule[];
+    // The live rebuild's module list (see manualFold): the registry plus the authoring-track
+    // provider, without which the sort throws on characterInventory's authoring-track edge.
+    const modules = [...Object.values(questionRegistry), authoringTrackProviderModule];
     const order = decisionOrderFor(modules);
     expect(order[order.length - 1]).toBe("kmn-edits");
     const lastCompletion = order[order.length - 2]!;
