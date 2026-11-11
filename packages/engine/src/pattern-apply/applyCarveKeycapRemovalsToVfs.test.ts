@@ -433,6 +433,68 @@ describe("applyCarveKeycapRemovalsToVfs — NFC comparison", () => {
   });
 });
 
+describe("applyCarveKeycapRemovalsToVfs — .kvks dotted-circle carrier keycaps", () => {
+  it("blanks carved combining marks shown on a dotted-circle carrier, and keeps a bare dotted circle", () => {
+    // Bafut on sil_cameroon_qwerty: the RightAlt layer shows the five
+    // non-Bafut marks as dotted-circle carriers while the carved set holds
+    // the bare marks — an exact-text match never sees them, so they
+    // survived on the desktop OSK as ghost keys (rules gone, keycaps still
+    // shown). The bare "◌" (K_R) is a real inventory character on that
+    // keyboard and must survive, as must a Bafut mark carrier (U+0300)
+    // and a Bafut letter (ə).
+    const MACRON = "\u0304";
+    const TILDE_BELOW = "\u0330";
+    const GRAVE_MACRON = "\u1DC5";
+    const MACRON_GRAVE = "\u1DC6";
+    const CEDILLA = "\u0327";
+    const GRAVE = "\u0300";
+    const carrier = (mark: string): string => `◌${mark}`;
+    const kvks = `<visualkeyboard><encoding name="unicode">
+<layer shift="RA">
+<key vkey="K_HYPHEN">${carrier(MACRON)}</key>
+<key vkey="K_J">${carrier(TILDE_BELOW)}</key>
+<key vkey="K_K">${carrier(GRAVE_MACRON)}</key>
+<key vkey="K_L">${carrier(MACRON_GRAVE)}</key>
+<key vkey="K_C">${carrier(CEDILLA)}</key>
+<key vkey="K_R">◌</key>
+<key vkey="K_X">${carrier(GRAVE)}</key>
+<key vkey="K_E">ə</key>
+</layer>
+</encoding></visualkeyboard>`;
+    const vfs = makeVfs([{ path: "source/test.kvks", content: kvks }]);
+    const ir = makeIR([
+      irGroup({
+        nodeId: "group#0",
+        rules: [
+          makeCharRule("rule#macron", MACRON, "K_HYPHEN"),
+          makeCharRule("rule#tildeBelow", TILDE_BELOW, "K_J"),
+          makeCharRule("rule#graveMacron", GRAVE_MACRON, "K_K"),
+          makeCharRule("rule#macronGrave", MACRON_GRAVE, "K_L"),
+          makeCharRule("rule#cedilla", CEDILLA, "K_C"),
+        ],
+      }),
+    ]);
+
+    applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
+      wholeNodeIds: [
+        "rule#macron",
+        "rule#tildeBelow",
+        "rule#graveMacron",
+        "rule#macronGrave",
+        "rule#cedilla",
+      ],
+    }));
+
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    for (const vkey of ["K_HYPHEN", "K_J", "K_K", "K_L", "K_C"]) {
+      expect(xml).toContain(`<key vkey="${vkey}"></key>`);
+    }
+    expect(xml).toContain('<key vkey="K_R">◌</key>');
+    expect(xml).toContain(`<key vkey="K_X">${carrier(GRAVE)}</key>`);
+    expect(xml).toContain('<key vkey="K_E">ə</key>');
+  });
+});
+
 describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
   it("derives a char from a carved slot of an output store (coordinated cross-pair drop, #931)", () => {
     // outX is cross-paired with inX (index(out,1) resolves to the SAME
