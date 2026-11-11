@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { addTouchSymbolsLayerRaw } from "./addTouchSymbolsLayer.js";
 import { SYMBOLS_LAYER } from "./symbolsLayerData.js";
+import { buildTouchKeyRuleIndex, findDeadTouchKeys } from "@keyboard-studio/contracts";
+import { parse as parseKmn, parseTouchLayout } from "../codec/index.js";
 
 const fx = (p: string) =>
   readFileSync(new URL(`../caps/__fixtures__/${p}`, import.meta.url), "utf8");
@@ -120,6 +122,17 @@ describe("addTouchSymbolsLayerRaw", () => {
     const out = JSON.parse(addTouchSymbolsLayerRaw(JSON.stringify(first)).json) as Raw;
     expect(keys(layer(out, "shift")).filter((k) => k.id === "K_SYMBOLS")).toHaveLength(1);
     expect(keys(layer(out, "default")).filter((k) => k.id === "K_SYMBOLS")).toHaveLength(1);
+  });
+
+  it("every key the template adds types something with the keyboard's own rules (no dead T_ keys)", () => {
+    // The upgrade edits only the touch layout, so a template key must type on
+    // its own: a T_ key with no .kmn rule types nothing.
+    const raw = JSON.parse(fx(UPSTREAM)) as Raw;
+    raw["tablet"]!.layer.push({ ...(JSON.parse(JSON.stringify(layer(raw, "shift"))) as RawLayer), id: "caps" });
+    const layout = parseTouchLayout(addTouchSymbolsLayerRaw(JSON.stringify(raw)).json);
+    const ir = { ...parseKmn(fx("upstream_basic_kbdus/basic_kbdus.kmn"), "basic_kbdus").ir, touchLayout: layout };
+    const dead = findDeadTouchKeys({ ir, layout, ruleIndex: buildTouchKeyRuleIndex(ir) });
+    expect(dead.map((f) => f.fields.keyId)).toEqual([]);
   });
 
   it.skipIf(!existsSync(FORK))("the fork's basic_kbdus already has what the fixer adds", () => {

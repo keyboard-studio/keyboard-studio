@@ -3,6 +3,13 @@
 // currency signs whose `*abc*` key returns to `default`. Embedded as data so
 // the touch upgrade can add it to a layout that has none (spec 111 T059c).
 // Plain JSON-compatible data: `addTouchSymbolsLayerRaw` deep-copies it per use.
+//
+// Every character key is a `U_xxxx` key, which types its own code point with
+// no rule. The upgrade edits only the touch layout, so a `T_` key here would
+// type nothing (symbols.json's `T_` digits and punctuation relied on rules the
+// .kmn never got). Multi-code-point `U_xxxx_yyyy` ids need Keyman 15.0
+// (KM07002), so symbols.json's Cameroon-specific `T_FCFA` key is left out
+// rather than reworked for keyboards on older `&VERSION`s.
 
 export const SYMBOLS_LAYER: { id: string; row: Array<{ id: number | string; key: Array<Record<string, unknown>> }> } = {
   "id": "symbol",
@@ -11,43 +18,43 @@ export const SYMBOLS_LAYER: { id: string; row: Array<{ id: number | string; key:
       "id": 1,
       "key": [
         {
-          "id": "T_0031",
+          "id": "U_0031",
           "text": "1"
         },
         {
-          "id": "T_0032",
+          "id": "U_0032",
           "text": "2"
         },
         {
-          "id": "T_0033",
+          "id": "U_0033",
           "text": "3"
         },
         {
-          "id": "T_0034",
+          "id": "U_0034",
           "text": "4"
         },
         {
-          "id": "T_0035",
+          "id": "U_0035",
           "text": "5"
         },
         {
-          "id": "T_0036",
+          "id": "U_0036",
           "text": "6"
         },
         {
-          "id": "T_0037",
+          "id": "U_0037",
           "text": "7"
         },
         {
-          "id": "T_0038",
+          "id": "U_0038",
           "text": "8"
         },
         {
-          "id": "T_0039",
+          "id": "U_0039",
           "text": "9"
         },
         {
-          "id": "T_0030",
+          "id": "U_0030",
           "text": "0"
         },
         {
@@ -175,17 +182,17 @@ export const SYMBOLS_LAYER: { id: string; row: Array<{ id: number | string; key:
           ]
         },
         {
-          "id": "T_003A",
+          "id": "U_003A",
           "text": ":",
           "layer": "default"
         },
         {
-          "id": "T_003B",
+          "id": "U_003B",
           "text": ";",
           "layer": "default"
         },
         {
-          "id": "T_0021",
+          "id": "U_0021",
           "text": "!",
           "nextlayer": "default",
           "layer": "default",
@@ -198,7 +205,7 @@ export const SYMBOLS_LAYER: { id: string; row: Array<{ id: number | string; key:
           ]
         },
         {
-          "id": "T_003F",
+          "id": "U_003F",
           "text": "?",
           "nextlayer": "default",
           "layer": "default",
@@ -280,7 +287,7 @@ export const SYMBOLS_LAYER: { id: string; row: Array<{ id: number | string; key:
           "nextlayer": "default"
         },
         {
-          "id": "T_002C",
+          "id": "U_002C",
           "text": ",",
           "layer": "default"
         },
@@ -299,12 +306,6 @@ export const SYMBOLS_LAYER: { id: string; row: Array<{ id: number | string; key:
         {
           "id": "U_00A5",
           "text": "¥"
-        },
-        {
-          "id": "T_FCFA",
-          "text": "FCFA",
-          "width": 205,
-          "fontsize": ".6em"
         }
       ]
     },
@@ -331,7 +332,7 @@ export const SYMBOLS_LAYER: { id: string; row: Array<{ id: number | string; key:
           "layer": "default"
         },
         {
-          "id": "T_002E",
+          "id": "U_002E",
           "text": ".",
           "width": 150,
           "layer": "default"
