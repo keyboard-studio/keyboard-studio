@@ -72,7 +72,7 @@ export const CODE_EDIT_SET: readonly CodeEditEntry[] = [
   { id: "enga", edits: [changeRule, addRule, deleteRule, addStore, editHeader] },
   {
     id: "sil_euro_latin",
-    edits: [editHeader, opaque(/outs\(whitespace\) dk\(1\)/, () => "outs(whitespace) dk(2)")],
+    edits: [editHeader, opaque(/outs\(whitespace\) dk\(0001\)/, () => "outs(whitespace) dk(0002)")],
   },
   {
     id: "korean_phonetic",
