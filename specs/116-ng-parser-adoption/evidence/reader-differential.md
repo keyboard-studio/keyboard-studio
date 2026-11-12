@@ -196,10 +196,15 @@ of the two tables below.
 | `option-store-directive` | 313 | 0 |
 | `outs-expansion` | 2170 | 1813 |
 | `removed-statement` | 2 | 2 |
-| `unknown-pre-begin` | 9 | 9 |
+| `unknown-pre-begin` | 9 | 0 |
 
 - `call-return` and `option-store-directive` fall to zero: no rule in the corpus is opaque only
   because of `set`, `save`, `reset`, `call` or `return`.
+- `unknown-pre-begin` falls to zero with the #2633 deprecated-forms restore (#2662): the 9 lines
+  are old-style header statements (6x `HOTKEY "..."` in gff keyboards, 3x `VERSION 9.0`/`10.0`
+  in sil keyboards) that header synthesis now converts to system stores instead of opaque
+  fragments. Recorded 2026-11-12; the reader-regression test reads this After column, so the
+  report and the reader move in the same commit, as that test requires.
 - `outs-expansion` drops by 357: the store declarations whose body held `outs()`. The 1813 that
   remain are `outs()` in a rule's output or context, which this spec does not type (FR-020 names
   store items only); they are not a regression.
