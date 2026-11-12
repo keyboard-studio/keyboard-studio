@@ -133,7 +133,7 @@ describe("patched lexer equals the upstream lexer (seeded random input)", () => 
       if (failures.length >= 5) break;
     }
     expect(failures).toEqual([]);
-  });
+  }, 30_000); // 3000 inputs x 6+ lexer parses each: ~6.1s locally, 8.5s on CI — over vitest's 5s default (main CI run 43140522180 timed out at 5000ms with no assertion failure).
 
   it("emits an identical token stream for every single character of the Latin-1 range", () => {
     const failures: string[] = [];
