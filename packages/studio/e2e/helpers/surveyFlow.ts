@@ -1094,10 +1094,11 @@ export async function driveTouchGallery(page: Page): Promise<void> {
 }
 
 /**
- * Help (Phase F) step — fill required fields and advance.
+ * Phase F prefix — walk the core Phase F questions up to the
+ * more-detail gate, and stop there. Shared by driveHelpPhase (which
+ * continues through the tail to the done panel) and walks that stop at
+ * the Documentation step (docs-code-height).
  *
- * Phase F has several questions (welcome paragraph, usage tips, credits, contact).
- * This helper:
  *   1. Fills the welcome paragraph
  *   2. Advances past pf_font_guidance (Phase F revision, #2182) — a core-flow
  *      question spliced between the welcome paragraph and the first usage
@@ -1109,14 +1110,12 @@ export async function driveTouchGallery(page: Page): Promise<void> {
  *      revision's required Yes/No gate, which unconditionally follows
  *      pf_history_entry) — the minimal path every existing walk wants,
  *      rather than opening the optional documentation battery
- *   6. Advances through remaining optional questions in a bounded loop
- *   7. Detects arrival at the done panel (phase boundary)
  *
  * @param page Page instance
  * @param welcomeText Welcome paragraph text (e.g. "Welcome to the keyboard.")
  * @param usageTipText First usage tip (e.g. "Type a consonant, then a vowel.")
  */
-export async function driveHelpPhase(
+export async function drivePhaseFToGate(
   page: Page,
   welcomeText: string = "Welcome to the keyboard.",
   usageTipText: string = "Press a key to start.",
@@ -1181,7 +1180,7 @@ export async function driveHelpPhase(
     .catch(() => false);
   if (!usageTipShown) {
     throw new Error(
-      "driveHelpPhase: #pf_usage_tip_1 never appeared within 30s after the " +
+      "drivePhaseFToGate: #pf_usage_tip_1 never appeared within 30s after the " +
         `welcome paragraph (url: ${page.url()}) — the walk is parked on an ` +
         "unhandled Phase F question; the retained error-context snapshot " +
         "shows which one.",
@@ -1205,7 +1204,26 @@ export async function driveHelpPhase(
   await moreDetailNo.waitFor({ state: "visible", timeout: 15_000 });
   await moreDetailNo.check();
   await surveyAdvance(page).click();
+}
 
+/**
+ * Help (Phase F) step — fill required fields and advance to the done panel.
+ *
+ * Runs drivePhaseFToGate (steps 1-5 above), then:
+ *   6. Advances through remaining optional questions in a bounded loop
+ *   7. Detects arrival at the done panel (phase boundary)
+ * (advanceThroughTailToDone).
+ *
+ * @param page Page instance
+ * @param welcomeText Welcome paragraph text (e.g. "Welcome to the keyboard.")
+ * @param usageTipText First usage tip (e.g. "Type a consonant, then a vowel.")
+ */
+export async function driveHelpPhase(
+  page: Page,
+  welcomeText: string = "Welcome to the keyboard.",
+  usageTipText: string = "Press a key to start.",
+): Promise<void> {
+  await drivePhaseFToGate(page, welcomeText, usageTipText);
   await advanceThroughTailToDone(page);
 }
 

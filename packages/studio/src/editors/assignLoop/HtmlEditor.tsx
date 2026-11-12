@@ -766,6 +766,14 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
               flexDirection: "column",
               gap: 16,
               minHeight: 0,
+              // The tree row uses alignItems:"flex-start" so the file
+              // tree stays compact (its own alignSelf:"flex-start");
+              // without this the right column is content-height and
+              // every flex:1 below it has no free space to grow into,
+              // so the code pane bottoms out at its min-heights
+              // (measured 2026-11-11: row 809px, column 345px, Monaco
+              // wrapper exactly 200px). Stretch to the row instead.
+              alignSelf: "stretch",
             }}
           >
             {bodyContent}
