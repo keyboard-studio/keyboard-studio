@@ -223,14 +223,15 @@ describe("extractDeadkeyCandidates — skip-loudly reasons", () => {
   });
 
   it("platform-gated ($keymanweb:) rules are skipped and counted", () => {
-    // #2633 + spec 116: a $keymanweb: rule parses into ONE rule carrying
-    // targetSelector "keymanweb" (the legacy reader's THREE platform-guarded
-    // copies are gone with the ng-parser reader), and that copy is skipped.
+    // #2633: a $keymanweb: rule parses into THREE platform-guarded copies
+    // (web / phone native / tablet native), and each copy is skipped.
+    // (Spec 116 had adapted this to ONE targetSelector-carrying rule while
+    // the rewrite was dropped; the rewrite is restored, so is the count.)
     const { candidates, skipCounts } = extract(
       ['group(main) using keys', '$keymanweb: dk(200) + "n" > U+014B'].join("\n"),
     );
     expect(candidates).toEqual([]);
-    expect(skipCounts.get(DEADKEY_SKIP_REASONS.PLATFORM_GATED)).toBe(1);
+    expect(skipCounts.get(DEADKEY_SKIP_REASONS.PLATFORM_GATED)).toBe(3);
   });
 
   it("platform-gated ($keymanonly:) rules are skipped and counted", () => {
