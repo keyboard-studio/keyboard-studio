@@ -210,7 +210,7 @@ was kept rather than re-captured.
 ## 2026-11-13 — README.md composition sentence (PR #2657)
 
 **Re-capture: 2026-11-13 (America/Chicago), from PR #2657
-(`km/docs-composition-from-answer`) merged with main `2ebd5b21`.** Taken
+(`km/docs-composition-from-answer`) merged with main `51b0d2e0`.** Taken
 locally on Windows 11 (Node 22, Playwright `desktop` project). The walk
 differed from main's baseline in exactly one byte-compared entry,
 `README.md`, and in one line of it: the composition sentence now reads
