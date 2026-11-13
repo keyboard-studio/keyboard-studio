@@ -270,7 +270,7 @@ The walk on Open:
 - **FR-046**: On Open, leaving a code view that holds text the author has not applied (switching tab or file, or pressing Continue) MUST NOT drop that text silently. The studio asks whether to apply or discard it.
 - **FR-047**: On Open, the documentation and style editors MUST edit the files themselves. No separate edited copy may replace a file at output. A page the author has edited still gets suggested fixes when the keyboard changes (FR-023, FR-028).
 - **FR-048**: Only these changes are made at output and not before: the version bump and the HISTORY entry (FR-013), and a test build's own version and label.
-- **FR-049**: An Open draft MUST save the current files and the record of decisions. On restore, the models are read from the saved text. A draft saved before this amendment has its waiting changes placed into the files once on restore, under FR-009, and is a live-file session from then on.
+- **FR-049** *(amended 2026-11-13)*: An Open draft MUST save the current files and the record of decisions. On restore, the models are read from the saved text. Drafts saved before this amendment are not migrated (OWNER RULING 2026-11-13: no backward compatibility is needed). Such a draft opens with its saved files; changes it held only as decisions are not written into the files.
 - **FR-050**: The Letters step's list of letters to add is a session list, not a file change. A letter leaves the list when the keyboard produces it (FR-018).
 
 FR-035..FR-040 (raw Ctrl reporting and its fix, no new Ctrl content or layers, `LCTRL`/`RCTRL` advisory, the proposed `CTRL ALT` to `RALT` upgrade, and the warning on removing a letter a listed language needs) moved to [spec 114](../114-ctrl-and-letter-removal/spec.md), with their tasks (formerly T070-T077). The numbers are not reused here.
@@ -403,9 +403,9 @@ The Layout tab is reachable on Open. Its edits are recorded in a decision and re
 
 ### Open questions
 
-1. **Key labels on the on-screen keyboard.** Today a Mechanisms change updates the on-screen keyboard file's key labels automatically at output. With live files, is that part of the same applied change, or a consistency suggestion the author accepts (FR-023, FR-024)? Recommended: part of the same change, shown in its preview, because the on-screen keyboard pictures the same keys. The same question applies to carrying a desktop layer change into the touch layout.
-2. **Drafts saved before this amendment.** FR-049 places their waiting changes once on restore. The alternative is to list them for the author to keep or revert, as the old-Adapt drafts are (Edge Cases).
-3. **Depth of undo.** Whether undo on Open is one step per applied change for the whole session, or only back to the snapshot taken on arriving at a step.
+1. *Answered 2026-11-13: part of the same applied change.* **Key labels on the on-screen keyboard.** Today a Mechanisms change updates the on-screen keyboard file's key labels automatically at output. With live files, is that part of the same applied change, or a consistency suggestion the author accepts (FR-023, FR-024)? Recommended: part of the same change, shown in its preview, because the on-screen keyboard pictures the same keys. The same question applies to carrying a desktop layer change into the touch layout.
+2. **Drafts saved before this amendment.** *Answered 2026-11-13: no migration; backward compatibility is not needed (FR-049).*
+3. *Answered 2026-11-13: one step per applied change for the whole session, held in memory only (not carried over a reload).* **Depth of undo.** Whether undo on Open is one step per applied change for the whole session, or only back to the snapshot taken on arriving at a step.
 
 ### Notes for planning
 
