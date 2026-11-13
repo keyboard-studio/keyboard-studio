@@ -1067,7 +1067,12 @@ export function projectWorkingCopyVfs(
   // applyDeadkeyOpsToVfs — never a silent no-op, never a corrupt .kmn.
   if (deadkeyOps.length > 0) {
     try {
-      const deadkeyResult = applyDeadkeyOpsToVfs(vfs, keyboardId, deadkeyOps);
+      const deadkeyResult = applyDeadkeyOpsToVfs(
+        vfs,
+        keyboardId,
+        deadkeyOps,
+        openMode !== undefined ? writeKmn : undefined,
+      );
       warnings.push(...deadkeyResult.warnings);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1144,7 +1149,7 @@ export function projectWorkingCopyVfs(
   }
 
   // Step 2.2: Layout-tab edits (spec 117, research R12). Replays the `kmn-edits` log over the
-  // projected .kmn: parse, replayKmnEdits, emit. After the deadkey ops (1.8) and the assignments
+  // projected .kmn: parse, replayKmnEdits, write (a full emit in Copy, a splice on Open). After the deadkey ops (1.8) and the assignments
   // (2), so a key-first edit wins over an earlier character-first one on the same key; before
   // layer propagation (2.5), mark guards (2.6) and context tolerance (2.7), so those see the
   // edited keyboard (a tolerance batch anchored on a rule an edit removed is skipped there, with
@@ -1155,8 +1160,11 @@ export function projectWorkingCopyVfs(
     const kmnTextForLayout = readVfsText(vfs, kmnPathForLayout);
     if (kmnTextForLayout !== undefined) {
       try {
-        const replayed = replayKmnEdits(parseKmn(kmnTextForLayout, keyboardId).ir, kmnEdits.entries);
-        vfs.set(kmnPathForLayout, emitKmn(replayed.ir), false);
+        // Parse the text about to be spliced into, so node ids and line spans agree with it.
+        // On Open (spec 111 FR-008) writeKmn splices only the changed rules.
+        const parsedForLayout = parseKmn(kmnTextForLayout, keyboardId).ir;
+        const replayed = replayKmnEdits(parsedForLayout, kmnEdits.entries);
+        writeKmn(kmnPathForLayout, kmnTextForLayout, parsedForLayout, replayed.ir);
         warnings.push(
           ...replayed.misses.map((m) => `[project-working-copy] layout edit ${m.seq} skipped: ${m.reason}`),
         );
