@@ -314,7 +314,7 @@ FR-035..FR-040 (raw Ctrl reporting and its fix, no new Ctrl content or layers, `
 These are named here so `/speckit-plan`'s Constitution Check can't miss them:
 
 - **Article II (IR is the spine; mutations never on raw text)**: Open makes the file text the source and the IR its parse. Tool changes are still computed on the IR, then placed into the text as precise edits, extending the existing carve splice. Author code edits are text. This needs an amendment that recognises text-sourced working copies, with the carve splice as precedent.
-- **Article III (working copy recalculated from decisions)**: on Open, file text and applied changes are the state. Decisions cover only real choices (source repository, accepted and declined suggestions). Text, including review notes, is never stored as a decision. This needs an amendment, plus a rule for how decision replay coexists with text edits (e.g. a text edit is a checkpoint that replay never crosses). *(2026-11-13: the live-files amendment removes replay on Open altogether, FR-042. It changes Article III again and needs owner approval; proposed wording is in [Amendment 2026-11-13](#amendment-2026-11-13-live-files).)*
+- **Article III (working copy recalculated from decisions)**: on Open, file text and applied changes are the state. Decisions cover only real choices (source repository, accepted and declined suggestions). Text, including review notes, is never stored as a decision. This needs an amendment, plus a rule for how decision replay coexists with text edits (e.g. a text edit is a checkpoint that replay never crosses). *(2026-11-13: the live-files amendment removes replay on Open altogether, FR-042. It changes Article III again; the owner approved the wording on 2026-11-13, given in [Amendment 2026-11-13](#amendment-2026-11-13-live-files).)*
 - **Article IX**: removing the identity-first steps from Open is done with screen gates and step declarations (FR-005).
 - **Article X**: carried values on Open are the keyboard's own content, not proposals from another keyboard, so they take effect without confirmation. Every change the studio proposes is a suggestion requiring acceptance (FR-024).
 - **Article VII**: byte-identical round trip stays out of scope as a general guarantee. FR-010 promises only that content the author didn't touch is carried unchanged.
@@ -385,7 +385,7 @@ Article III was amended for this feature on 2026-11-03 to say that decisions rep
 
 The table row becomes: "What renders / emits: the KeyboardIR working copy; **on Open, the current file text**".
 
-This needs owner approval. Per Governance it lands in the same PR as the change that prompts it, with a version bump. Article II is unchanged: tool changes are still computed on the model and placed as a splice, and a full re-emit still needs consent.
+OWNER RULING 2026-11-13: the product owner approved this wording. Per Governance it lands in the same PR as the change that prompts it (phase 15, T083 and T085), with a version bump. Article II is unchanged: tool changes are still computed on the model and placed as a splice, and a full re-emit still needs consent.
 
 ### Out of scope here
 
