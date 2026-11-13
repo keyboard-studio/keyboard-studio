@@ -206,3 +206,23 @@ unchanged. A local capture on that merge tree matched this zip in every
 entry except the CRLF-only `source/test.kvks` / `test.kpj` (Windows
 `autocrlf`) and `.studio/decision-record.json` timestamps, so this zip
 was kept rather than re-captured.
+
+## 2026-11-13 — README.md composition sentence (PR #2657)
+
+**Re-capture: 2026-11-13 (America/Chicago), from PR #2657
+(`km/docs-composition-from-answer`) merged with main `2ebd5b21`.** Taken
+locally on Windows 11 (Node 22, Playwright `desktop` project). The walk
+differed from main's baseline in exactly one byte-compared entry,
+`README.md`, and in one line of it: the composition sentence now reads
+"Accented letters are produced as a letter followed by a combining
+mark." because the docs read the recorded output-form answer
+(`base-plus-mark`) instead of inferring it from the NFC-folded produced
+set. Only that entry was replaced in the zip; the rest is main's
+baseline, kept rather than re-captured because a Windows capture differs
+in the CRLF-only `source/test.kvks` / `test.kpj` (`autocrlf`) and in
+`.studio/decision-record.json` timestamps.
+
+This supersedes the baseline committed in `3e7b3e60`, whose `README.md`
+also carried a "Marks are typed after the letter they belong to." tip.
+The walk never records a `mark-input-order` answer, so it does not emit
+that line, and verify failed on it.
