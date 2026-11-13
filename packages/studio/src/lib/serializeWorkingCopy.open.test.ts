@@ -17,6 +17,10 @@ import { fetchKeyboardSourceToVfs, parseKmn, parseKps, parseKpsLanguages } from 
 import type { FetchFn } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
+import { useOpenRemovalStore } from "../stores/openRemovalStore.ts";
+import { useWorkingCopyTransform } from "../hooks/useWorkingCopyTransform.ts";
+import { renderHook } from "@testing-library/react";
+import { applyOpenChange } from "./openApply.ts";
 import { projectWorkingCopyForOutput } from "./serializeWorkingCopy.ts";
 import { readVfsText } from "./vfsText.ts";
 import { OPEN_SAMPLE_KEYBOARD_IDS, sampleKeyboardRelativePath } from "../test/openSampleKeyboards.ts";
@@ -245,4 +249,109 @@ describe.skipIf(!CORPUS_PRESENT)("Open: one rule deleted changes only that rule 
       expect(got.split("\n").length).toBeLessThanOrEqual(kmnText.split("\n").length + 1);
     }, 60_000);
   }
+});
+
+describe.skipIf(!CORPUS_PRESENT)("Open: an applied removal over the corpus sample set", () => {
+  const skipped: string[] = [];
+  const withoutVersion = (t: string): string =>
+    t.split(/(?<=\n)/).filter((l) => !/&KEYBOARDVERSION|&VERSION/i.test(l)).join("");
+
+  for (const id of OPEN_SAMPLE_KEYBOARD_IDS) {
+    it(`${id}: only lines holding the character change; every route agrees; restore is byte-identical`, async () => {
+      if (!existsSync(folderOf(id))) return;
+      const { kmnText } = await openKeyboard(id);
+      const wc = useWorkingCopyStore.getState();
+      wc.setFallbackPolicy("pass-through");
+      wc.setAttribution({ authorName: "Corpus", copyrightHolder: "Corpus" });
+      useOpenRemovalStore.getState().clear();
+      const lines = linesOf(kmnText);
+      // One removable character: a single-key rule typing one character that
+      // appears on its own physical line, in plain or U+ spelling.
+      let pick: { nodeId: string; ch: string } | undefined;
+      for (const g of useWorkingCopyStore.getState().startIr!.groups) {
+        if (g.readonly) continue;
+        for (const r of g.rules) {
+          if (r.sourceLine === undefined || r.output.length !== 1) continue;
+          const o = r.output[0]!;
+          if (o.kind !== "char" || [...o.value].length !== 1) continue;
+          if (r.context.length !== 1 || r.context[0]!.kind !== "vkey") continue;
+          const line = lines[r.sourceLine - 1] ?? "";
+          const hex = o.value.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0");
+          if (!line.includes(o.value) && !line.toUpperCase().includes(`U+${hex}`)) continue;
+          pick = { nodeId: r.nodeId, ch: o.value.normalize("NFC") };
+          break;
+        }
+        if (pick !== undefined) break;
+      }
+      if (pick === undefined) {
+        skipped.push(id);
+        console.warn(`[WARN] ${id}: no removable single-key character; skipped`);
+        return;
+      }
+      const ch = pick.ch;
+      const hex = ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0");
+      const holdsChar = (l: string): boolean => l.includes(ch) || l.toUpperCase().includes(`U+${hex}`);
+
+      // Read before the removal: which stores hold the character now.
+      const holders = new Set(
+        useWorkingCopyStore.getState().startIr!.stores
+          .filter((st) => st.items.some((it) => it.kind === "char" && it.value.includes(ch)))
+          .map((st) => st.name),
+      );
+      const result = applyOpenChange({ kind: "remove", itemIds: [pick.nodeId], chars: [ch] });
+      expect(result.status, JSON.stringify(result)).toBe("applied");
+      const s = useWorkingCopyStore.getState();
+      const codeView = readVfsText(s.startVfs!, `source/${id}.kmn`)!;
+
+      const { removed, added } = diffLines(lines, linesOf(codeView));
+      // A changed store line must be a store that held the character, or one
+      // position-paired with such a store (`any(A)` ... `index(B,n)` in one
+      // rule): the carve drops the matching item from both.
+      // Pairing is by position, so it is transitive: a store paired with a
+      // store paired with a holder shares the holder's index.
+      const pairs: [string, string][] = [];
+      for (const l of lines) {
+        const a = /\bany\(([^)\s]+)\)/i.exec(l)?.[1];
+        const b = /\bindex\(([^,)\s]+)/i.exec(l)?.[1];
+        if (a !== undefined && b !== undefined) pairs.push([a, b]);
+      }
+      const allowedStores = new Set(holders);
+      for (let grew = true; grew; ) {
+        grew = false;
+        for (const [a, b] of pairs) {
+          if (allowedStores.has(a) !== allowedStores.has(b)) {
+            allowedStores.add(a);
+            allowedStores.add(b);
+            grew = true;
+          }
+        }
+      }
+      for (const l of removed.filter((x) => !/&KEYBOARDVERSION/i.test(x))) {
+        const store = /^\s*store\s*\(([^)\s]+)\)/i.exec(l)?.[1];
+        const ok = store !== undefined ? allowedStores.has(store) : holdsChar(l);
+        expect(ok, `${id}: ch=${ch} (U+${hex}) an unrelated line changed: ${l.trim()}`).toBe(true);
+      }
+      expect(added.filter((l) => !/&KEYBOARDVERSION/i.test(l)).length).toBeLessThanOrEqual(removed.length);
+
+      // Preview transform and download hold the same text as the working copy's file.
+      const { result: hook, unmount } = renderHook(() => useWorkingCopyTransform({ previewedStartId: id }));
+      const previewVfs = createVirtualFS(s.startVfs!.entries());
+      hook.current!(previewVfs, id);
+      const preview = readVfsText(previewVfs, `source/${id}.kmn`)!;
+      unmount();
+      const projected = await projectWorkingCopyForOutput();
+      const download = readVfsText(projected!.vfs, `source/${id}.kmn`)!;
+      expect(withoutVersion(preview)).toBe(withoutVersion(codeView));
+      expect(withoutVersion(download)).toBe(withoutVersion(codeView));
+
+      const entries = [...useOpenRemovalStore.getState().entries];
+      expect(applyOpenChange({ kind: "reinsert", entries }).status).toBe("applied");
+      expect(readVfsText(useWorkingCopyStore.getState().startVfs!, `source/${id}.kmn`)).toBe(kmnText);
+    }, 120_000);
+  }
+
+  it("reports the keyboards skipped for lack of a candidate", () => {
+    if (skipped.length > 0) console.warn(`[WARN] open corpus removal skipped: ${skipped.join(", ")}`);
+    expect(skipped.length).toBeLessThan(OPEN_SAMPLE_KEYBOARD_IDS.length);
+  });
 });

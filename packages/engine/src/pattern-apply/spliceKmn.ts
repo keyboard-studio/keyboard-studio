@@ -8,10 +8,16 @@
 import type { KeyboardIR, IRGroup, IRRule } from "@keyboard-studio/contracts";
 import { joinContinuations, type LogicalLine } from "../codec/continuation.js";
 import { emitRule, emitStore } from "../codec/emit.js";
+import { parse } from "../codec/parse.js";
 
 export type InsertAnchor =
   | { after: "last-store" }
-  | { after: "group-end"; groupNodeId: string };
+  | { after: "group-end"; groupNodeId: string }
+  // Rules match first to last, so a new rule goes right after the nearest
+  // earlier rule both versions share, or right after the group header when
+  // no earlier rule is shared.
+  | { after: "rule"; nodeId: string }
+  | { after: "group-start"; groupNodeId: string };
 
 export type KmnEdit =
   | { kind: "delete"; nodeId: string }
@@ -32,6 +38,8 @@ interface NodeInfo {
    * no node of their own, so nothing else ever deletes them.
    */
   consumedSourceLines?: readonly number[] | undefined;
+  /** The node's own trailing `c <comment>` text, when it has one. */
+  trailingComment?: string | undefined;
 }
 
 function indexNodes(ir: KeyboardIR): Map<string, NodeInfo> {
@@ -43,6 +51,7 @@ function indexNodes(ir: KeyboardIR): Map<string, NodeInfo> {
         kind: "rule",
         sourceLine: r.sourceLine,
         consumedSourceLines: r.consumedSourceLines,
+        trailingComment: r.trailingComment,
       });
     }
   }
@@ -51,6 +60,7 @@ function indexNodes(ir: KeyboardIR): Map<string, NodeInfo> {
       kind: "store",
       sourceLine: s.sourceLine,
       consumedSourceLines: s.consumedSourceLines,
+      trailingComment: s.trailingComment,
     });
   }
   for (const f of ir.raw) {
@@ -182,13 +192,21 @@ export function diffIrToKmnEdits(startIr: KeyboardIR, ir: KeyboardIR): KmnEdit[]
   const workIds = new Set<string>();
   for (const g of ir.groups) {
     workIds.add(g.nodeId);
+    let lastShared: string | undefined;
     for (const r of g.rules) {
       workIds.add(r.nodeId);
       const text = emitRule(r, g.usingKeys);
       const before = startRuleText.get(r.nodeId);
       if (before === undefined) {
-        edits.push({ kind: "insert", anchor: { after: "group-end", groupNodeId: g.nodeId }, text });
-      } else if (before !== text) {
+        const anchor: InsertAnchor =
+          lastShared !== undefined
+            ? { after: "rule", nodeId: lastShared }
+            : { after: "group-start", groupNodeId: g.nodeId };
+        edits.push({ kind: "insert", anchor, text });
+        continue;
+      }
+      lastShared = r.nodeId;
+      if (before !== text) {
         edits.push({ kind: "replace", nodeId: r.nodeId, text });
       }
     }
@@ -237,6 +255,172 @@ interface Span {
   end: number;
 }
 
+// ---------------------------------------------------------------------------
+// Keeping the author's spelling in a replaced line (Open mode)
+//
+// A replace edit carries text freshly emitted from the IR, which re-spells the
+// whole line. When the new line only drops things from the old one, the lines
+// the author wrote are kept as they were: a store loses just the dropped
+// items (the rest keep their `U+XXXX` / quoted / `dk()` spelling and line
+// layout), and the gap before a trailing comment is kept as written. Anything
+// not recognised, or any result that does not re-read as the intended line,
+// falls back to the emitted text, so this can only ever keep more of the file.
+// ---------------------------------------------------------------------------
+
+interface StoreTok {
+  start: number;
+  end: number;
+  quote: "'" | '"' | "";
+  items: string[];
+}
+
+interface StoreBody {
+  head: string;
+  toks: StoreTok[];
+  /** From the trailing comment's `c` to the end; "" when there is none. */
+  tail: string;
+  /** Where the gap after the last token ends (start of `tail`, or end of text). */
+  gapEnd: number;
+  bodyStart: number;
+  text: string;
+}
+
+function tokenizeStore(text: string): StoreBody | undefined {
+  const h = /^(store\s*\([A-Za-z0-9_&]+\))/i.exec(text);
+  if (h === null) return undefined;
+  const bodyStart = h[1]!.length;
+  const toks: StoreTok[] = [];
+  let pos = bodyStart;
+  let tail = "";
+  let gapEnd = text.length;
+  const gapRe = /(?:[ \t]+|\\[ \t]*\r?\n)/y;
+  for (;;) {
+    gapRe.lastIndex = pos;
+    let m = gapRe.exec(text);
+    let sawGap = false;
+    while (m !== null) {
+      sawGap = true;
+      pos = gapRe.lastIndex;
+      m = gapRe.exec(text);
+    }
+    if (pos >= text.length) break;
+    const rest = text.slice(pos);
+    if (sawGap && /^c(?:[ \t]|$)/i.test(rest)) {
+      tail = rest;
+      gapEnd = pos;
+      break;
+    }
+    let tm: RegExpExecArray | null;
+    if ((tm = /^(['"])([^'"\r\n]*)\1(?=[ \t\\]|$)/.exec(rest)) !== null || (tm = /^(['"])([^\r\n]*?)\1(?=[ \t\\]|$)/.exec(rest)) !== null) {
+      const q = tm[1] as "'" | '"';
+      if (tm[2]!.includes(q)) return undefined;
+      toks.push({ start: pos, end: pos + tm[0].length, quote: q, items: [...tm[2]!].map((c) => `c:${c.codePointAt(0)}`) });
+      pos += tm[0].length;
+    } else if ((tm = /^U\+([0-9A-Fa-f]{4,6})(?=[ \t\\]|$)/.exec(rest)) !== null) {
+      toks.push({ start: pos, end: pos + tm[0].length, quote: "", items: [`c:${parseInt(tm[1]!, 16)}`] });
+      pos += tm[0].length;
+    } else if ((tm = /^(?:dk|deadkey)\(\s*([^)\s]+)\s*\)(?=[ \t\\]|$)/i.exec(rest)) !== null) {
+      toks.push({ start: pos, end: pos + tm[0].length, quote: "", items: [`dk:${tm[1]!.toLowerCase()}`] });
+      pos += tm[0].length;
+    } else {
+      return undefined;
+    }
+  }
+  return { head: h[1]!, toks, tail, gapEnd, bodyStart, text };
+}
+
+/** How the codec reads a store line: name, items and comment, as one comparable string. */
+function realStoreOf(line: string): string | undefined {
+  try {
+    const ir = parse(`${line}\nbegin Unicode > use(main)\ngroup(main) using keys\n`, "guard").ir;
+    const st = ir.stores[0];
+    if (st === undefined) return undefined;
+    return JSON.stringify({ n: st.name, s: st.isSystem, i: st.items, c: st.trailingComment });
+  } catch {
+    return undefined;
+  }
+}
+
+const tailText = (t: string): string => t.replace(/^c[ \t]*/i, "");
+
+/** The old store line with only the dropped items removed, or undefined when that is not possible. */
+function dropStoreItems(orig: string, next: string): string | undefined {
+  const o = tokenizeStore(orig);
+  const n = tokenizeStore(next);
+  if (o === undefined || n === undefined) return undefined;
+  if (o.head.toLowerCase() !== n.head.toLowerCase()) return undefined;
+  if (tailText(o.tail) !== tailText(n.tail)) return undefined;
+  const want = n.toks.flatMap((t) => t.items);
+  let j = 0;
+  const kept: boolean[][] = [];
+  for (const t of o.toks) {
+    kept.push(
+      t.items.map((it) => {
+        if (j < want.length && want[j] === it) {
+          j += 1;
+          return true;
+        }
+        return false;
+      }),
+    );
+  }
+  if (j !== want.length || want.length === 0) return undefined;
+  let out = o.head;
+  let prevEnd = o.bodyStart;
+  for (let i = 0; i < o.toks.length; i++) {
+    const t = o.toks[i]!;
+    const flags = kept[i]!;
+    const keptAny = flags.some(Boolean);
+    const gap = orig.slice(prevEnd, t.start);
+    prevEnd = t.end;
+    if (!keptAny) continue;
+    let tokText = orig.slice(t.start, t.end);
+    if (!flags.every(Boolean)) {
+      const chars = [...tokText.slice(1, -1)].filter((_, k) => flags[k]);
+      tokText = `${t.quote}${chars.join("")}${t.quote}`;
+    }
+    out += gap + tokText;
+  }
+  out += orig.slice(prevEnd, o.gapEnd) + o.tail;
+  // A gap that belonged to a dropped token is gone with it; what is left must
+  // still read as exactly the intended store.
+  const check = tokenizeStore(out);
+  if (check === undefined) return undefined;
+  const got = check.toks.flatMap((t) => t.items);
+  if (got.length !== want.length || got.some((it, k) => it !== want[k])) return undefined;
+  if (tailText(check.tail) !== tailText(n.tail)) return undefined;
+  // The tokeniser must not vouch for its own reading: the real parser has to
+  // read the edited line as the same store as the freshly emitted one.
+  const real = realStoreOf(out);
+  const intended = realStoreOf(next);
+  if (real === undefined || intended === undefined || real !== intended) return undefined;
+  return out;
+}
+
+/** Keep the original gap before a trailing `c <comment>` when the new line carries the same comment. */
+function keepCommentGap(orig: string, next: string, comment: string | undefined): string {
+  if (comment === undefined) return next;
+  const suffix = `c ${comment}`;
+  const lastLine = orig.slice(orig.lastIndexOf("\n") + 1);
+  if (!lastLine.endsWith(suffix)) return next;
+  const gap = /[ \t]+$/.exec(lastLine.slice(0, -suffix.length));
+  if (gap === null) return next;
+  const nextSuffix = ` ${suffix}`;
+  if (!next.endsWith(nextSuffix)) return next;
+  return next.slice(0, -nextSuffix.length) + gap[0] + suffix;
+}
+
+function refineReplacement(info: NodeInfo, orig: string, next: string): string {
+  if (info.kind === "store" && !next.includes("\n")) {
+    const dropped = dropStoreItems(orig, next);
+    if (dropped !== undefined) return dropped;
+  }
+  if (info.kind === "rule" || info.kind === "store") {
+    return keepCommentGap(orig, next, info.trailingComment);
+  }
+  return next;
+}
+
 /** Apply edits to the starting text. ok:false names the first ineligible edit. */
 export function spliceKmn(
   startText: string,
@@ -280,6 +464,23 @@ export function spliceKmn(
           if (sp !== undefined && (after === undefined || sp.end > after)) after = sp.end;
         }
         if (after === undefined) return { ok: false, reason: "no store with a source span to insert after" };
+      } else if (edit.anchor.after === "rule") {
+        const anchorId = edit.anchor.nodeId;
+        const info = nodes.get(anchorId);
+        const sp = info === undefined ? undefined : spanOf(info.sourceLine);
+        if (info === undefined || info.kind !== "rule" || sp === undefined) {
+          return { ok: false, reason: `insert anchor rule "${anchorId}" has no resolvable source span`, nodeId: anchorId };
+        }
+        after = sp.end;
+      } else if (edit.anchor.after === "group-start") {
+        const groupNodeId = edit.anchor.groupNodeId;
+        const g: IRGroup | undefined = startIr.groups.find((x) => x.nodeId === groupNodeId);
+        if (g === undefined) {
+          return { ok: false, reason: `insert anchor group "${groupNodeId}" is not in the starting keyboard`, nodeId: groupNodeId };
+        }
+        const hs = spanOf(g.sourceLine);
+        if (hs === undefined) return { ok: false, reason: `group "${groupNodeId}" has no resolvable source span`, nodeId: groupNodeId };
+        after = hs.end;
       } else {
         const groupNodeId = edit.anchor.groupNodeId;
         const g: IRGroup | undefined = startIr.groups.find((x) => x.nodeId === groupNodeId);
@@ -329,7 +530,8 @@ export function spliceKmn(
       }
     }
     if (edit.kind === "replace") {
-      replaceAt.set(span.start, edit.text);
+      const origText = lines.slice(span.start, span.end + 1).join("").replace(/\r?\n$/, "");
+      replaceAt.set(span.start, refineReplacement(info, origText, edit.text));
       if (!/\n$/.test(lines[span.end] ?? "")) replaceNoEol.add(span.start);
     }
   }

@@ -58,6 +58,9 @@ import {
   parseKmn,
   isKeyboardSource,
   NOT_A_KEYBOARD_SOURCE_MESSAGE,
+  recognizePatterns,
+  classifyRemovalCapabilities,
+  parseTouchLayout,
 } from "@keyboard-studio/engine";
 import type {
   ContextToleranceOverlay,
@@ -67,6 +70,9 @@ import type {
   StartDocCssText,
 } from "@keyboard-studio/engine";
 import { readVfsText } from "../lib/vfsText.ts";
+import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
+import { isOpenedWithDescriptor } from "../lib/openMode.ts";
+import { clearOpenSession } from "./openUndoStore.ts";
 import type { PreviewProjection } from "../lib/previewProjection.ts";
 import type { BaseLayoutId as LdmlBaseLayoutChoice } from "../lib/referenceBaseLayouts.ts";
 import type { DeadkeyOperation, DeadkeyOverlay } from "../lib/deadkeyOps.ts";
@@ -1370,6 +1376,20 @@ export interface WorkingCopyState {
   replaceStartingPointFromText: (path: string, text: string) => ReplaceStartingPointResult;
 
   /**
+   * Open mode (spec 111, "live files"): write several starting-point files in
+   * ONE update (`null` deletes a file). A changed `.kmn` is re-parsed (and
+   * pattern-recognized, like instantiation) into `startIr` AND `ir`, and
+   * `removalCapabilities` is recomputed from it; `touchLayoutJson` follows a
+   * changed touch layout. Node ids are positional, so every overlay or session
+   * set keyed by one is cleared (see the body for what is cleared and what is
+   * deliberately kept). A `.kmn` that is not a keyboard changes nothing and
+   * returns `{ ok: false }`. Only `lib/openApply.ts` calls this.
+   */
+  replaceStartingPointFiles: (
+    files: Readonly<Record<string, string | null>>,
+  ) => ReplaceStartingPointResult;
+
+  /**
    * Apply an identity patch (language name, BCP47 tag, display name) over
    * the base keyboard identity. Replaces any prior patch (last-wins).
    */
@@ -1826,6 +1846,7 @@ export type WorkingCopyData = Omit<
   // actions are excluded from the data snapshot
   | "setIR"
   | "replaceStartingPointFromText"
+  | "replaceStartingPointFiles"
   | "setWorkingIR"
   | "clearIR"
   | "deleteNode"
@@ -2209,21 +2230,38 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // must also reset keyEditOverlay to an empty log alongside wiping
   // undoStack — otherwise a committed key edit would be left applied with no
   // remaining way to undo it.
+  //
+  // Open (spec 111 live files) narrows that: a key edit or deadkey op there is
+  // an edit the author made, not a carve to discard, and "keep every rule"
+  // must not erase it. So on Open the two overlays and their 'k'/'kb' undo
+  // entries survive (the invariant above still holds: an op and its undo
+  // entry stay together).
   keepAll: () =>
-    set((s) => ({
-      carveSuggestion:
-        s.carveSuggestion === null
-          ? null
-          : { ...s.carveSuggestion, derived: [], touched: true },
-      deletedNodeIds: new Set(),
-      deletedItemIds: new Set(),
-      deletedTouchKeyIds: new Set(),
-      carveChars: new Set(),
-      undoStack: [],
-      keyEditOverlay: { ops: [] },
-      carveTouchKeepInert: [],
-      deadkeyOverlay: { ops: [] },
-    })),
+    set((s) => {
+      const open = isOpenedWithDescriptor(
+        s.instantiationMode,
+        s.startVfs,
+        s.startKeyboard?.id ?? "",
+      );
+      return {
+        carveSuggestion:
+          s.carveSuggestion === null
+            ? null
+            : { ...s.carveSuggestion, derived: [], touched: true },
+        deletedNodeIds: new Set(),
+        deletedItemIds: new Set(),
+        deletedTouchKeyIds: new Set(),
+        carveChars: new Set(),
+        carveTouchKeepInert: [],
+        ...(open
+          ? { undoStack: s.undoStack.filter((e) => e.k === "k" || e.k === "kb") }
+          : {
+              undoStack: [],
+              keyEditOverlay: { ops: [] },
+              deadkeyOverlay: { ops: [] },
+            }),
+      };
+    }),
 
   restoreAll: () => get().keepAll(),
 
@@ -2394,6 +2432,96 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // identical so the author's text is not re-serialized.
       ...(path.endsWith(".keyman-touch-layout") ? { touchLayoutJson: text } : {}),
     });
+    return { ok: true };
+  },
+
+  replaceStartingPointFiles: (files) => {
+    const { startVfs, startKeyboard, startIr: priorStartIr } = get();
+    if (startVfs === null || startKeyboard === null) {
+      return { ok: false, error: "No keyboard is open." };
+    }
+    const kmnPath = `source/${startKeyboard.id}.kmn`;
+    const kmnText = files[kmnPath];
+    let nextIr: KeyboardIR | null = null;
+    let nextCapabilities: Map<string, RemovalCapability> | null = null;
+    if (typeof kmnText === "string") {
+      let parsedIr: KeyboardIR;
+      try {
+        parsedIr = parseKmn(kmnText, startKeyboard.id).ir;
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+      if (!isKeyboardSource(parsedIr)) {
+        return { ok: false, error: NOT_A_KEYBOARD_SOURCE_MESSAGE };
+      }
+      // The same preparation instantiation gives the IR it seeds: recognition
+      // first (the classifier reads `ownedByPattern`), then the touch layout
+      // the starting point carries, then capabilities, then facets.
+      let recognized = recognizePatterns(parsedIr).ir;
+      const touchPath = findTouchLayoutPath(startVfs);
+      const touchChange = touchPath === undefined ? undefined : files[touchPath];
+      if (touchChange === undefined) {
+        if (priorStartIr?.touchLayout !== undefined) {
+          recognized = { ...recognized, touchLayout: priorStartIr.touchLayout };
+        }
+      } else if (touchChange !== null) {
+        try {
+          recognized = { ...recognized, touchLayout: parseTouchLayout(touchChange) };
+        } catch {
+          // An unreadable layout leaves ir.touchLayout undefined, as at instantiation.
+        }
+      }
+      nextCapabilities = classifyRemovalCapabilities(recognized);
+      nextIr = deriveFacets(recognized);
+    }
+    // A fresh VFS object so subscribers see the change; file text is verbatim.
+    const nextVfs = createVirtualFS(startVfs.entries());
+    let nextTouchJson: string | undefined;
+    for (const [path, text] of Object.entries(files)) {
+      if (text === null) nextVfs.delete(path);
+      else nextVfs.set(path, text, false);
+      if (path.endsWith(".keyman-touch-layout") && text !== null) nextTouchJson = text;
+    }
+    // Node ids are positional: a re-parse shifts them, so anything keyed by a
+    // node id is stale the moment `startIr` changes.
+    //   Cleared: deletedNodeIds, deletedItemIds (item/slot ids), carveChars
+    //   (replays a carve over the new text), undoStack's id-bearing entries
+    //   (n / i / t / batch), carveSuggestion.derived, the guard-intent
+    //   `keptGuardRuleIds` and `narrowUndoStack` (rule ids), and
+    //   `contextToleranceOverlay` (batches anchor on rule ids; its generated
+    //   rules were replayed over the old ids and would land beside the wrong
+    //   rules).
+    //   Kept: key-edit and deadkey overlays (addressed by touch key / deadkey
+    //   name, not node id), deletedTouchKeyIds and carveTouchKeepInert
+    //   (touch addresses and characters), disabledFamilyIds and the guard
+    //   intent family/question/group sets (keyed by name or question text),
+    //   carveSuggestion.kept (characters).
+    // Two stores cannot change in one update, so the order is what keeps them
+    // consistent: the guard ids are emptied FIRST. A subscriber that runs
+    // between the two writes sees the old `startIr` with no kept guards (safe:
+    // an empty set names no rule); the reverse order would show the new
+    // `startIr` against rule ids that now point at different rules.
+    if (nextIr !== null) {
+      useGuardIntentStore.setState({ keptGuardRuleIds: new Set(), narrowUndoStack: [] });
+    }
+    set((s) => ({
+      startVfs: nextVfs,
+      ...(nextIr !== null && nextCapabilities !== null
+        ? {
+            startIr: nextIr,
+            ir: nextIr,
+            removalCapabilities: nextCapabilities,
+            deletedNodeIds: new Set<string>(),
+            deletedItemIds: new Set<string>(),
+            carveChars: new Set<string>(),
+            undoStack: s.undoStack.filter((e) => e.k === "k" || e.k === "kb"),
+            carveSuggestion:
+              s.carveSuggestion === null ? null : { ...s.carveSuggestion, derived: [] },
+            contextToleranceOverlay: null,
+          }
+        : {}),
+      ...(nextTouchJson !== undefined ? { touchLayoutJson: nextTouchJson } : {}),
+    }));
     return { ok: true };
   },
 
@@ -2597,6 +2725,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   reset: () => {
     // Clear the module-level re-opened roots so clearStale after reset is correct.
     _reopenedRoots = new Set();
+    // Applied-change history belongs to the working copy being thrown away.
+    clearOpenSession();
     set({
       ...INITIAL_STATE,
       // Re-initialize mutable objects so mutations do not bleed across resets.
@@ -2633,6 +2763,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     if (shouldNoop) {
       return;
     }
+    // A genuinely new working copy: the previous one's applied-change history
+    // (undo steps, removal list) must not carry over.
+    clearOpenSession();
 
     // Bake the base keyboard's facets (spec 048 FR-001) — casing, for now —
     // onto the working-copy IR before it is seeded onto both `startIr` and
@@ -2702,6 +2835,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     if (shouldNoop) {
       return;
     }
+    // A genuinely new working copy: the previous one's applied-change history
+    // (undo steps, removal list) must not carry over.
+    clearOpenSession();
 
     // Bake the loaded keyboard's facets (spec 048 FR-001) onto the working-copy
     // IR — the identical derivation instantiateFromStart applies, so both

@@ -86,3 +86,15 @@ describe("raw-Ctrl pair (spec 114)", () => {
     expect(await offerUpgrades([], input)).toEqual([]);
   });
 });
+
+describe("upgrades never insert a rule (so the mid-group insert anchors do not reach them)", () => {
+  it("the &CasedKeys upgrade's IR diff has no rule insert; every insert anchors on the last store", async () => {
+    const { parseKmn, diffIrToKmnEdits } = await import("@keyboard-studio/engine");
+    const startIr = parseKmn(kmnText, "basic_kbdus").ir;
+    const upgraded = caps.upgradeToCasedKeys(startIr, { bcp47: "en" });
+    const inserts = diffIrToKmnEdits(startIr, upgraded.ir).filter((e) => e.kind === "insert");
+    for (const e of inserts) {
+      expect(e.kind === "insert" && e.anchor.after).toBe("last-store");
+    }
+  });
+});

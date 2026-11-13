@@ -139,6 +139,7 @@ import { resolveImpact, resolveImpactAsync } from "./decisions/impact.ts";
 import { buildPathOverlay } from "./dashboard/pathOverlay.ts";
 import { projectWorkingCopyForOutput } from "./lib/serializeWorkingCopy.ts";
 import { StepHost } from "./components/StepHost.tsx";
+import { OpenApplyHost } from "./components/OpenApplyHost.tsx";
 import { ResumeDraftBanner } from "./components/ResumeDraftBanner.tsx";
 import {
   loadServerDraftMeta,
@@ -2086,6 +2087,7 @@ function StudioShellContent() {
     message: "Finish every inventory character before you can access Output",
   });
   return (
+    <OpenApplyHost>
     <div
       style={{
         display: "flex",
@@ -2163,5 +2165,6 @@ function StudioShellContent() {
           place to keep that rule, and the two would drift. */}
       <StudioFooter activeRoute={route} />
     </div>
+    </OpenApplyHost>
   );
 }

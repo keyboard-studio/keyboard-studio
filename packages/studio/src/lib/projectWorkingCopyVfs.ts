@@ -430,6 +430,16 @@ export interface ProjectWorkingCopyVfsInput {
      * without the author having agreed to it.
      */
     preview?: boolean;
+    /**
+     * Apply-time projection (spec 111 "live files"): the caller is writing ONE
+     * change into the files as the author applies it (`lib/openApply.ts`), not
+     * building the output. Skips the output-only steps — documentation
+     * overlays (0b-ii), the OSK stylesheet (0b, 4b), identity and version
+     * (3), the descriptor (3.6) and the id rename (4) — so the `.kmn` splice
+     * in `writeKmn` stays the single place a change reaches the file text,
+     * and nothing the output stamps on is written into the author's files.
+     */
+    applyOnly?: boolean;
   };
 }
 
@@ -509,6 +519,18 @@ export interface ProjectWorkingCopyVfsResult {
    * Absent when there are none (and always on Copy).
    */
   reformatRequired?: string[];
+  /**
+   * `openMode.applyOnly` only: the IR each changed `.kmn` was meant to become,
+   * by path (the last `nextIr` handed to the splice point). The caller checks
+   * the text it got against this.
+   */
+  intendedKmnIr?: Record<string, KeyboardIR>;
+  /**
+   * `openMode.applyOnly` only: the carve step's IR for the `.kmn` (it shares
+   * node ids with `startIr`), before any later step wrote the file. Absent when
+   * the carve step did not write it.
+   */
+  carvedKmnIr?: Record<string, KeyboardIR>;
 }
 
 // ---------------------------------------------------------------------------
@@ -578,7 +600,10 @@ export function projectWorkingCopyVfs(
 
   const warnings: string[] = [];
   const openMode = input.openMode;
+  const applyOnly = openMode?.applyOnly === true;
   const reformatRequired: string[] = [];
+  const intendedKmnIr: Record<string, KeyboardIR> = {};
+  const carvedKmnIr: Record<string, KeyboardIR> = {};
 
   // Writes a changed `.kmn`: a splice into the current text on Open (FR-008),
   // a full emit otherwise. `currentText`/`currentIr` are the file as the VFS
@@ -589,6 +614,7 @@ export function projectWorkingCopyVfs(
     currentIr: KeyboardIR,
     nextIr: KeyboardIR,
   ): void => {
+    if (applyOnly) intendedKmnIr[path] = nextIr;
     if (openMode === undefined) {
       vfs.set(path, emitKmn(nextIr), false);
       return;
@@ -620,7 +646,8 @@ export function projectWorkingCopyVfs(
   //   - the id-rename pass (step 4) renames the file when the author chose a new id.
   // Previously serializeWorkingCopy injected this inline before calling this helper;
   // centralizing it here is the fix that makes the OSK preview equivalent to the ZIP.
-  if (touchLayoutJson !== null && touchLayoutJson !== undefined) {
+  // applyOnly: the file's own text is already the layout; there is nothing to inject.
+  if (!applyOnly && touchLayoutJson !== null && touchLayoutJson !== undefined) {
     const touchPath = `source/${keyboardId}.keyman-touch-layout`;
     // Open (spec 111 FR-010): a layout the author did not change is the file's
     // own text, not a re-serialization of it.
@@ -639,12 +666,16 @@ export function projectWorkingCopyVfs(
   // 2.6/2.7/2.8, step 4 itself) drops this text-level line, so step 4b
   // re-applies the CSS after the rename. Keep this call: steps 2–3.6 and the
   // preview's intermediate reads see the line from here on.
-  warnings.push(...applyCustomCssToVfs(vfs, keyboardId, customCss, startKeyboardId));
+  // applyOnly skips it: the stylesheet is a document the author's tools own.
+  if (!applyOnly) {
+    warnings.push(...applyCustomCssToVfs(vfs, keyboardId, customCss, startKeyboardId));
+  }
 
   // Step 0b-ii: Documentation overrides — the author's edited doc files
   // replace the generated/carried text in the projected VFS, so the OSK
   // preview and the zip read the same text. Untouched members change nothing.
-  if (authoredDocs !== undefined) applyAuthoredDocsToVfs(vfs, keyboardId, authoredDocs, welcomePath);
+  // applyOnly skips it: authored documents are output overlays, never source edits.
+  if (authoredDocs !== undefined && !applyOnly) applyAuthoredDocsToVfs(vfs, keyboardId, authoredDocs, welcomePath);
 
   // Step 1: Carve projection — re-emit IR with deleted nodes filtered out.
   //
@@ -843,7 +874,10 @@ export function projectWorkingCopyVfs(
       // the changed nodes into the file as it stands, never a whole re-emit.
       const carveKmnPath = `source/${keyboardId}.kmn`;
       const carveKmnText = readVfsText(vfs, carveKmnPath);
-      if (carveKmnText !== undefined) writeKmn(carveKmnPath, carveKmnText, startIr, mergedSeamIr);
+      if (carveKmnText !== undefined) {
+        writeKmn(carveKmnPath, carveKmnText, startIr, mergedSeamIr);
+        if (applyOnly) carvedKmnIr[carveKmnPath] = mergedSeamIr;
+      }
       carveResult = { warnings: [] };
     } else {
       carveResult = applyCarveToVfs(vfs, keyboardId, mergedSeamIr, EMPTY_DELETION_SET, {
@@ -1341,7 +1375,9 @@ export function projectWorkingCopyVfs(
   // This is the single seam BOTH output paths (zip + pull request via
   // `serializeWorkingCopy`) and the OSK preview (`useWorkingCopyTransform`) pass
   // through, so they cannot disagree about whether the name changed.
-  if (identity !== null) {
+  // applyOnly skips steps 3, 3.6 and 4 (identity, descriptor, id rename): they
+  // stamp the release identity onto the output, not the author's live files.
+  if (!applyOnly && identity !== null) {
     const baseName = baseDisplayName ?? startIr.header.name;
     const identityArg: { name?: string; copyright?: string; version?: string } =
       {};
@@ -1414,7 +1450,7 @@ export function projectWorkingCopyVfs(
   // Runs for BOTH tracks and on BOTH the preview and output paths, which is what
   // makes FR-004/SC-005 true: the OSK preview, the zip, and the pull request all
   // see one descriptor because they all come through here.
-  if (identity !== null) {
+  if (!applyOnly && identity !== null) {
     const kmnTextForKps = readVfsText(vfs, `source/${keyboardId}.kmn`) ?? "";
     const kpsIdentity: PackageDescriptorIdentity = {
       // Passed through as-is, INCLUDING a blank: the writer owns the fallback
@@ -1466,7 +1502,7 @@ export function projectWorkingCopyVfs(
   // id via the result so callers that compile/re-read from the VFS after this
   // function returns know to use `targetKeyboardId`, not `keyboardId`.
   let effectiveKeyboardId: string | undefined;
-  if (targetKeyboardId !== undefined && targetKeyboardId !== keyboardId) {
+  if (!applyOnly && targetKeyboardId !== undefined && targetKeyboardId !== keyboardId) {
     effectiveKeyboardId = targetKeyboardId;
     const kmnPath = `source/${keyboardId}.kmn`;
     const kmnText = readVfsText(vfs, kmnPath);
@@ -1510,19 +1546,23 @@ export function projectWorkingCopyVfs(
   // changes nothing, so the no-carve path stays byte-identical. The
   // effective (post-rename) id names the renamed stylesheet; the stored
   // text is relinked from the start id, exactly as step 0b does.
-  warnings.push(
-    ...applyCustomCssToVfs(
-      vfs,
-      effectiveKeyboardId ?? keyboardId,
-      customCss,
-      startKeyboardId ?? keyboardId,
-    ),
-  );
+  // applyOnly skips it with step 0b: no stylesheet step ran, so nothing to repair.
+  if (!applyOnly) {
+    warnings.push(
+      ...applyCustomCssToVfs(
+        vfs,
+        effectiveKeyboardId ?? keyboardId,
+        customCss,
+        startKeyboardId ?? keyboardId,
+      ),
+    );
+  }
 
   return {
     warnings,
     ...(effectiveKeyboardId !== undefined ? { effectiveKeyboardId } : {}),
     ...(reformatRequired.length > 0 ? { reformatRequired } : {}),
+    ...(applyOnly ? { intendedKmnIr, carvedKmnIr } : {}),
   };
 }
 

@@ -504,6 +504,8 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   instantiateFromExisting: { kind: "action", class: "STARTING-POINT" },
   // Open mode (spec 111 FR-009): swaps a starting-point file and startIr together.
   replaceStartingPointFromText: { kind: "action", class: "STARTING-POINT" },
+  // Open mode (spec 111 live files): writes the applied change's files and re-parses.
+  replaceStartingPointFiles: { kind: "action", class: "STARTING-POINT" },
   setIdentity: { kind: "action", class: "OVERLAY-CHANNEL" },
   setAttribution: { kind: "action", class: "OVERLAY-CHANNEL" },
   setLicenseUnparseable: { kind: "action", class: "STARTING-POINT" },

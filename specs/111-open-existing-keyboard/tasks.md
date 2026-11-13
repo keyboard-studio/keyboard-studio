@@ -250,7 +250,7 @@ T070-T077 (FR-035..FR-040) moved to [spec 114](../114-ctrl-and-letter-removal/sp
 
 **Goal**: on Open, the remove tool, Mechanisms assignments and added rules write the source file when applied, and decisions are no longer replayed. The Article III amendment lands with this phase (owner approval needed).
 
-- [ ] T081 One Open-only apply function: compute the change on the model, splice it into the current text, replace the file and re-read the model; ask for reformat consent here (FR-009 amended).
+- [x] T081 One Open-only apply function: compute the change on the model, splice it into the current text, replace the file and re-read the model; ask for reformat consent here (FR-009 amended).
 - [ ] T082 Route the remove tool, Mechanisms assignments and rule additions through it on Open; applied changes then read as existing content.
 - [ ] T082a Route Layout-tab edits (spec 117) through the apply function on Open, keeping their decision as the record; Copy keeps the replay. Depends on the Layout tab having merged.
 - [ ] T082b The preview drops a file the working copy no longer holds (phase 14's overlay only adds and replaces); needed before any tool can remove a file.
@@ -259,10 +259,16 @@ T070-T077 (FR-035..FR-040) moved to [spec 114](../114-ctrl-and-letter-removal/sp
 - [ ] T084 Measure across the corpus sample how often a tool change cannot be spliced; report before converting more tools.
 - [ ] T085 Apply the Article III wording from the spec amendment to `.specify/memory/constitution.md`, with the version bump (owner-approved only).
 - [ ] T086 Tests: SC-010 and SC-011 for the source file.
+- [ ] T086a (slice S2) Retire on Open the disabled-families overlay (`disabledFamilyIds`): disabling a family writes the file when applied, then the overlay and its replay are dropped for Open.
+- [ ] T086b (slice S2) Retire on Open the marks-guards overlay: guard rules are written into the file when applied; no guard state is replayed at output.
+- [ ] T086c (slice S3) Retire on Open the context-tolerance overlay store: the fix is spliced when applied, so `contextToleranceOverlay` is never held on Open (S1 carries a held one into the file on the next apply as a stopgap).
+- [ ] T086d (slice S3) Retire on Open the deadkey-ops overlay and the key-edit-ops overlay: each op is written to the file when applied; `keepAll` no longer needs the Open exception that keeps them (FR-041).
+- [ ] T086e (slice S1 follow-up) Wire the generic `files` change (`OpenChange` kind `files`) and `undoLastOpenApply` to their first editors; S4 builds the undo UI over the session undo list.
 
 ## Phase 16: Touch (FR-044)
 
 - [ ] T087 Settle which touch host is live on Open, then make key-grid, builder and character edits patch the touch file's text when applied; Continue no longer rebuilds the layout on Open.
+- [ ] T087a Retire on Open the touch overlays that S1 leaves in place: `deletedTouchKeyIds` and `carveTouchKeepInert` (touch-key deletions and keep-inert characters) are written into the touch layout file when applied.
 - [ ] T088 Tests: SC-013.
 
 ## Phase 17: Remaining files (FR-041, FR-047)
@@ -280,5 +286,5 @@ T070-T077 (FR-035..FR-040) moved to [spec 114](../114-ctrl-and-letter-removal/sp
 
 ## Phase 19: Cleanup
 
-- [ ] T096 Remove the Open branches of the output projection that no longer do anything, leaving the version bump and HISTORY entry (FR-048).
+- [ ] T096 Remove the Open branches of the output projection that no longer do anything, leaving the version bump and HISTORY entry (FR-048). Includes: remove the output-time reformat consent on Open from the download, test-build and PR paths (consent is asked when the change is applied, so output never asks).
 - [ ] T097 Extend the Open end-to-end walk to assert SC-010 on every step.

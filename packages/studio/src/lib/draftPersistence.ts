@@ -30,6 +30,7 @@ import {
 } from "./persistWorkingCopy.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useGuardIntentStore } from "../stores/guardIntentStore.ts";
+import { clearOpenSession } from "../stores/openUndoStore.ts";
 import { useTestingStore, mergeTestingRecords } from "../stores/testingStore.ts";
 import type { WorkingCopyData } from "../stores/workingCopyStore.ts";
 import {
@@ -1603,6 +1604,7 @@ function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): App
     // the survey-session store is not.
     const workingCopyState = prepareWorkingCopySnapshot(envelope.workingCopy);
     useWorkingCopyStore.setState(workingCopyState);
+    clearOpenSession();
     applyTraversalSnapshot(envelope.traversal);
 
     // The legacy phaseBDraft slice (P0 fix; removed from the written
@@ -1756,6 +1758,7 @@ export function captureRevisionSnapshot(): RevisionSnapshot {
 export function restoreRevisionSnapshot(snapshot: RevisionSnapshot): void {
   const workingCopyState = prepareWorkingCopySnapshot(snapshot.workingCopy);
   useWorkingCopyStore.setState(workingCopyState);
+  clearOpenSession();
   useGuardIntentStore.setState({
     keptGuardRuleIds: new Set(snapshot.workingCopy.keptGuardRuleIds ?? []),
     dismissedMissingGroups: new Set(snapshot.workingCopy.dismissedMissingGroups ?? []),

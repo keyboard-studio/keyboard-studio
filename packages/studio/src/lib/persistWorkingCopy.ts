@@ -63,6 +63,7 @@ import type { DeadkeyOverlay } from "./deadkeyOps.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { WorkingCopyData, TouchEditorMode } from "../stores/workingCopyStore.ts";
 import { useGuardIntentStore } from "../stores/guardIntentStore.ts";
+import { clearOpenSession } from "../stores/openUndoStore.ts";
 import { pinnedProxyBase, pinnedSourceFor } from "./openSourceChoice.ts";
 import { migrateFallbackPolicy } from "../survey/carve/fallbackPolicyMigration.ts";
 
@@ -746,6 +747,8 @@ export function rehydrateWorkingCopyFromSession(): boolean {
     // into the ONE working-copy store (Article III — restore never
     // constructs a second working copy).
     useWorkingCopyStore.setState(prepareWorkingCopySnapshot(snapshot));
+    // A restored project has none of the previous session's applied changes.
+    clearOpenSession();
     // spec 082 FR-020/FR-022: guard-intent dispositions live in their own
     // store; restore them alongside. Tolerate pre-082 snapshots (absent →
     // empty, never re-ask nothing).
