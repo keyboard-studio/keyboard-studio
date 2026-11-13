@@ -49,6 +49,7 @@ import type {
   OutputElement,
   PlacementCandidate,
 } from "@keyboard-studio/contracts";
+import { ruleContextElements, ruleLhsKind } from "../shared/rule-shape.js";
 import { US_UNSHIFTED, isSingleCodepoint } from "./filters.js";
 import { isRewritePlatformGuard } from "../codec/target-guards.js";
 
@@ -104,8 +105,8 @@ function bump(counts: DeadkeySkipCounts, reason: string): void {
  * `dk(003b) any(...)`). Both must extract identically, so it is filtered out
  * before any shape or position check.
  */
-function stripPlusMarker(context: ContextElement[]): ContextElement[] {
-  return context.filter((el) => !(el.kind === "raw" && el.text === "+"));
+function stripPlusMarker(rule: IRRule): ContextElement[] {
+  return ruleContextElements(rule);
 }
 
 /** A store whose items are ALL `char` — returns its characters in order, or
@@ -164,7 +165,7 @@ export function extractDeadkeyCandidatesFromRule(
   // rewrite form, where the guard is the rule context's first element
   // (a sourced guard such as platform('touch') is not one of the rewrite
   // spellings and keeps its existing treatment).
-  const firstCtx = rule.context[0];
+  const firstCtx = ruleContextElements(rule)[0];
   if (
     rule.targetSelector !== undefined ||
     (firstCtx?.kind === "raw" && isRewritePlatformGuard(firstCtx.text))
@@ -173,7 +174,7 @@ export function extractDeadkeyCandidatesFromRule(
     return [];
   }
 
-  const ctx = stripPlusMarker(rule.context);
+  const ctx = stripPlusMarker(rule);
   const deadkeyCount = ctx.filter((el) => el.kind === "deadkey").length;
   if (deadkeyCount === 0) return []; // not a deadkey rule — nothing to extract or skip.
   if (deadkeyCount > 1) {
@@ -312,7 +313,7 @@ export function extractDeadkeyCandidates(
   const out: RawCandidate[] = [];
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      if (rule.matchKind !== undefined) continue;
+      if (ruleLhsKind(rule) !== "input") continue;
       out.push(...extractDeadkeyCandidatesFromRule(ir, rule, skipCounts));
     }
   }

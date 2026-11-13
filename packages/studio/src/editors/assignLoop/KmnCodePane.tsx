@@ -3,14 +3,38 @@
 // A Monaco editor over the `.kmn` source with syntax highlighting,
 // following the TouchCodePane pattern ("view swap, not a fork"):
 //
-// - Text source: `emitKmn(ir)` where `ir` is the working-copy KeyboardIR —
-//   canonical formatting, always coherent with the Assign tab.
+// - Text source: the PROJECTED `.kmn` — the same text the preview compiles
+//   and the download ships. The pane clones `startVfs`, applies the shared
+//   working-copy transform (`useWorkingCopyTransform` → `projectWorkingCopyVfs`,
+//   the single projection the OSK preview and `serializeWorkingCopy` both use),
+//   and reads the `.kmn` back out of the projected VFS. Carve deletions,
+//   mechanism assignments, identity, mark guards, caps handling, deadkey ops,
+//   context-tolerance fixes and rules-step additions are all reflected, so the
+//   pane is always coherent with the Assign tab and the preview — the
+//   `emitKvks(effectiveKvks)` precedent OskCodePane already follows.
+//   When no `startVfs` is available (not yet instantiated), the pane falls
+//   back to the carve floor: `emitKmn(applyCarveMutate(startIr, …))`.
 //   `ir === null` renders the empty state.
 // - Lint: debounced per keystroke through kmnCodeLint.ts (parseKmn;
 //   syntax errors become positioned Monaco markers).
 // - Apply: parse the edited KMN via `parseKmn`, write the resulting IR
 //   back through `setWorkingIR` (overlay-preserving: the carve-deletion
 //   overlay and undo stack survive a code-view Apply).
+//   Apply operates on the working-IR base: the projection builds from
+//   `startIr` + overlays, so an edit to a projection-generated rule
+//   (an assignment, a mark guard, a caps rule) is regenerated away on the
+//   next projection, and an edit to a base rule lands in the working IR
+//   (visible in the gallery) but does not reach the preview/download —
+//   the pre-existing Apply limitation, now visible in the pane instead of
+//   hidden behind a stale emit. Because the projection does not move on a
+//   `setWorkingIR`, Apply resyncs the draft bookkeeping directly
+//   (`lastAppliedRef = applied text`) so the dirty badge clears and the
+//   editor keeps the applied text; a later canonical change then snaps
+//   this clean editor to the projection, per the dirty-draft rule.
+//   Apply never writes projected text back
+//   into `ir` as a starting point and never touches `startIr`, so a later
+//   carve restore still resurrects the rule in preview, download, gallery,
+//   and code view.
 //   Monaco-local undo covers typing.
 
 import "./touchBuilder/monacoSetup.ts";
@@ -19,9 +43,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
-import { emitKmn, parseKmn } from "@keyboard-studio/engine";
+import { createVirtualFS, type Pattern } from "@keyboard-studio/contracts";
+import { devLog } from "@keyboard-studio/contracts/dev-log";
+import { emitKmn, parseKmn, OUTPUT_FORM_SEAM_PATTERN_IDS } from "@keyboard-studio/engine";
 import { findRawCtrlRules } from "@keymanapp/keyboard-lint";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
+import { applyCarveMutate } from "../../steps/editorMutate.ts";
+import { physicalAssignmentsOf } from "../../lib/physicalAssignments.ts";
+import { findKmnPath } from "../../lib/findKmnPath.ts";
+import { getPatternByIdSync } from "../../lib/services.ts";
 import { isOpenMode } from "../../lib/openMode.ts";
 import { readVfsText } from "../../lib/vfsText.ts";
 import {
@@ -78,7 +109,70 @@ export function KmnCodePane() {
       : (ir?.header.name ?? "keyboard");
 
   // The canonical text for the current IR (Open: the file's text, verbatim).
-  const canonical = ir === null ? null : (openText ?? emitKmn(ir));
+  //
+  // Projected `.kmn` (primary): the same projection the preview and the
+  // download run, applied to a clone of `startVfs` so the base is never
+  // mutated. The pattern map is resolved synchronously from the recorded
+  // assignments (plus the output-form seam ids, mirroring
+  // `serializeWorkingCopy` step 3) so mechanism assignments are reflected
+  // too — `useWorkingCopyTransform` without a pattern map would skip them.
+  // `previewedStartId` is the store's own base id: this call site only ever
+  // renders the committed base, so the F4 gate never suppresses the overlay.
+  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
+  const patternMap = useMemo(() => {
+    const ids = new Set(
+      physicalAssignmentsOf(phaseResults).flatMap((a) =>
+        a.mechanisms.map((m) => m.patternId),
+      ),
+    );
+    for (const id of OUTPUT_FORM_SEAM_PATTERN_IDS) ids.add(id);
+    const map = new Map<string, Pattern>();
+    for (const id of ids) {
+      const pattern = getPatternByIdSync(id);
+      if (pattern !== undefined) map.set(id, pattern);
+    }
+    return map;
+  }, [phaseResults]);
+  const vfsTransform = useWorkingCopyTransform({
+    patternMap: patternMap.size > 0 ? patternMap : null,
+    previewedStartId: startKeyboard?.id ?? null,
+  });
+  const startIr = useWorkingCopyStore((s) => s.startIr);
+  const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
+  const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const carveChars = useWorkingCopyStore((s) => s.carveChars);
+  const projectedKmn = useMemo(() => {
+    if (vfsTransform === null || startVfs === null || startKeyboard === null)
+      return null;
+    try {
+      // Shallow-entry clone: the projection replaces whole entries via
+      // vfs.set() rather than mutating entry buffers in place (the same
+      // clone contract `serializeWorkingCopy` relies on).
+      const clone = createVirtualFS(startVfs.entries());
+      vfsTransform(clone, startKeyboard.id);
+      const kmnPath = findKmnPath(clone);
+      if (kmnPath === undefined) return null;
+      return readVfsText(clone, kmnPath) ?? null;
+    } catch (err) {
+      devLog.warn(
+        "[KmnCodePane] projected .kmn unavailable; showing carve-filtered emit",
+        err,
+      );
+      return null;
+    }
+  }, [vfsTransform, startVfs, startKeyboard]);
+  // Carve floor (no `startVfs` yet): the carve-applied working IR through
+  // the mutate seam — the same derivation the projection's step 1 runs.
+  const carveFallback = useMemo(() => {
+    if (ir === null || startIr === null) return null;
+    return emitKmn(
+      applyCarveMutate(startIr, deletedNodeIds, deletedItemIds, carveChars),
+    );
+  }, [ir, startIr, deletedNodeIds, deletedItemIds, carveChars]);
+  const canonical =
+    ir === null
+      ? null
+      : (openText ?? projectedKmn ?? carveFallback ?? emitKmn(ir));
 
   // Raw-Ctrl baseline (issue #2359): the rules already in the working copy
   // never block Apply — only rules the edited text ADDS do. Content-keyed,
@@ -96,8 +190,13 @@ export function KmnCodePane() {
   const textRef = useRef<string | null>(null);
   // The canonical text the current draft was last synced to / applied from.
   const lastAppliedRef = useRef<string | null>(null);
-  // Set around Apply: the store update changes the IR, the new canonical
-  // text then snaps the editor (and clears dirty) via the effect below.
+  // Set around Apply in open mode only: the starting-point replacement
+  // changes the file text, so the new canonical snaps the editor (and
+  // clears dirty) via the effect below. The non-open path does NOT use
+  // this flag: its canonical derives from `startIr` + overlays, not from
+  // `ir`, so `setWorkingIR` never moves it and the effect would never
+  // re-run to consume the flag — instead `handleApply` resyncs
+  // `lastAppliedRef` directly (see there).
   const justAppliedRef = useRef(false);
 
   const [markers, setMarkers] = useState<readonly KmnCodeMarker[]>([]);
@@ -248,7 +347,30 @@ export function KmnCodePane() {
     // Overlay-preserving write: the carve-deletion overlay and undo stack
     // survive a code-view Apply (unlike setIR's wholesale reset).
     setWorkingIR(after.ir);
-    justAppliedRef.current = true;
+    // Resync the draft bookkeeping directly. The projected / carve-fallback
+    // canonical derives from `startIr` + overlays, not from `ir`, so this
+    // write does not change `canonical` and the [canonical]-keyed snap
+    // effect above never re-runs — without this, the "Unapplied changes"
+    // badge would stay stuck after a successful Apply (a regression vs
+    // the old `emitKmn(ir)` canonical, which the write did move). The
+    // applied text is now clean, and the editor keeps showing it.
+    // No `justAppliedRef` here: a dangling flag would snap — and wipe — a
+    // later dirty draft on the next canonical change, breaking the
+    // dirty-draft protection. On the emit path (no startVfs/startIr) the
+    // new IR does move the canonical, and the effect's clean-sync branch
+    // (text === lastApplied) snaps the editor to the re-emitted text,
+    // which is the old behaviour.
+    // TRADE-OFF (accepted, option (a)): the applied text is "clean" while
+    // the pane's canonical still does not contain a base-rule edit, so a
+    // later canonical change (e.g. a recorded assignment) snaps this clean
+    // editor to the projection text and the edit vanishes from view. That
+    // is the existing dirty-draft rule applied consistently — only dirty
+    // drafts are protected from snapping; an applied edit is clean — and
+    // the edit itself is not lost: it is committed in the working IR and
+    // visible in the gallery. The alternative (keep the draft but clear
+    // the badge) would conflate "applied" with "matches canonical" and
+    // leave the pane drifting from the preview with no signal.
+    lastAppliedRef.current = current;
     setApplyError(null);
   };
 

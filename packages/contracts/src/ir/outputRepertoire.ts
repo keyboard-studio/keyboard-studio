@@ -23,10 +23,20 @@ import type {
   StoreItem,
   TouchKeyIR,
 } from "../keyboard-ir.js";
+import { assertNever } from "../assert-never.js";
 import type { OutputRepertoire } from "../toleranceReport.js";
-import { isPlusSeparator } from "../rule-shape.js";
+import {
+  ruleConditions,
+  ruleExtraKeystrokeElements,
+  ruleHasNulContext,
+  ruleKeystroke,
+  ruleLhsKind,
+  rulePreContext,
+} from "../rule-shape.js";
 import { decodeUnicodeKeyId } from "../touch-coverage.js";
 import { US_BASE_LAYOUT } from "./usBaseLayout.js";
+import { storeHasOuts } from "./outsStores.js";
+import { resolveStoreItems } from "./resolveStoreItems.js";
 
 export interface BuildOutputRepertoireOptions {
   /** Polled during the closure; when it returns true the closure stops early. */
@@ -110,9 +120,20 @@ function storeNameOfFragment(sourceText: string): string | undefined {
   return /^\s*store\s*\(\s*([^)\s]+)\s*\)/i.exec(sourceText)?.[1];
 }
 
+/**
+ * Store name -> items, by position. A store holding `outs()` references maps to
+ * its expansion, which is what its pre-spec-116 opaque fragment carried as
+ * `storeSketch`. As in that sketch, a reference that cannot expand contributes
+ * nothing.
+ */
 function buildStoreMap(ir: KeyboardIR): Map<string, StoreItem[]> {
   const m = new Map<string, StoreItem[]>();
-  for (const s of ir.stores as IRStore[]) m.set(s.name.toLowerCase(), s.items);
+  for (const s of ir.stores as IRStore[]) {
+    const items = storeHasOuts(s)
+      ? resolveStoreItems(ir, s.name).filter((it) => !(it.kind === "raw" && it.text.startsWith("outs(")))
+      : s.items;
+    m.set(s.name.toLowerCase(), items);
+  }
   for (const f of ir.raw) {
     if (f.storeSketch === undefined) continue;
     const name = storeNameOfFragment(f.sourceText);
@@ -132,14 +153,22 @@ interface CtxEl {
   isKey: boolean;
 }
 
+/**
+ * The rule's context elements in offset order (`[nul?, ...conditions,
+ * ...preContext, keystroke?, ...extras]`, no separator), each flagged as
+ * keystroke or text. Only the keystroke part (the element after the separator,
+ * or the last element when there is none, and only in a `using keys` group)
+ * counts as the key.
+ */
 function splitContext(rule: IRRule, usingKeys: boolean): CtxEl[] {
-  const sep = rule.context.findIndex(isPlusSeparator);
+  const group = { usingKeys };
   const out: CtxEl[] = [];
-  rule.context.forEach((el, i) => {
-    if (i === sep) return;
-    const isKey = sep >= 0 ? i > sep : usingKeys;
-    out.push({ el, isKey });
-  });
+  if (ruleHasNulContext(rule)) out.push({ el: { kind: "raw", text: "nul" }, isKey: false });
+  for (const el of ruleConditions(rule)) out.push({ el, isKey: false });
+  for (const el of rulePreContext(rule, group)) out.push({ el, isKey: false });
+  const keystroke = ruleKeystroke(rule, group);
+  if (keystroke !== undefined) out.push({ el: keystroke, isKey: true });
+  for (const el of ruleExtraKeystrokeElements(rule, group)) out.push({ el, isKey: true });
   return out;
 }
 
@@ -243,8 +272,21 @@ function expandRule(
           }
           break;
         }
+        case "deadkey":
+        case "namedDeadkey":
+        case "beep":
+        case "nul":
+        case "useGroup":
+        case "layer":
+        case "set":
+        case "save":
+        case "reset":
+        case "call":
+        case "return":
+        case "raw":
+          break; // no text
         default:
-          break; // deadkey, beep, nul, useGroup, raw: no text
+          assertNever(o, "output element");
       }
     }
 
@@ -304,7 +346,7 @@ function boundKeys(ir: KeyboardIR, stores: Map<string, StoreItem[]>): Set<string
   for (const g of ir.groups) {
     if (!g.usingKeys) continue;
     for (const r of g.rules) {
-      if (r.matchKind !== undefined) continue;
+      if (ruleLhsKind(r) !== "input") continue;
       const ctx = splitContext(r, true);
       const keyEls = ctx.filter((c) => c.isKey);
       // Any preceding context (text, deadkey, baselayout, option) is a condition:
@@ -347,7 +389,7 @@ export function buildOutputRepertoire(
 
   for (const g of ir.groups) {
     for (const r of g.rules) {
-      if (r.matchKind !== undefined) continue;
+      if (ruleLhsKind(r) !== "input") continue;
       pushInstances(expandRule(splitContext(r, g.usingKeys), r.output, stores, unresolvedRaw, truncation));
     }
   }

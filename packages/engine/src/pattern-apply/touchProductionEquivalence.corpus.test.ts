@@ -437,7 +437,14 @@ describe.skipIf(!available)("spec 104 T021 — corpus resolver⇔consumer equiva
 
         expect(failures, failures.join("\n")).toEqual([]);
       },
-      300_000,
+      // hakka's delta enumeration takes ~293s on a good main-CI run and
+      // 305s on a loaded one (runs 43140522180 / 43166453716) — the 300s
+      // limit straddles it, so it passes or times out on run-to-run
+      // variance alone. Next slowest keyboard is ~158s, so 600s gives ~2x
+      // headroom over the slowest case without changing what the test
+      // checks. (Same marginal-timeout pattern as the lexer random-input
+      // test fixed in #2663.)
+      600_000,
     );
   }
 });

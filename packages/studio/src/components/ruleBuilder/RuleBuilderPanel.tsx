@@ -26,6 +26,8 @@ import {
   FAMILY_NAME_PARAMETER_KEY,
   PACK_VERSION,
   validateRulePack,
+  ruleContextElements,
+  ruleLhsKind,
   type BehaviourKind,
   type DemoPair,
   type IRRule,
@@ -39,6 +41,7 @@ import {
   type RuleKind,
 } from "@keyboard-studio/engine/kmAssist";
 import { exportPack } from "@keyboard-studio/engine/rulePacks";
+import { isPlusSeparator } from "@keyboard-studio/engine";
 import {
   ACCENT,
   BG_CARD,
@@ -130,6 +133,9 @@ function fmtContextElement(el: ContextElement): string {
     case "if":
       // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
       return `if(${el.store} = '${el.value}')`;
+    case "platform":
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
+      return `platform('${el.value}')`;
     case "raw":
       return el.text;
   }
@@ -156,6 +162,23 @@ function fmtOutputElement(el: OutputElement): string {
       return `outs(${el.storeRef})`;
     case "useGroup":
       return `use(${el.groupName})`;
+    case "layer":
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
+      return `layer('${el.value}')`;
+    case "set":
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
+      return `set(${el.storeRef} = ${el.value.map(fmtOutputElement).join(" ")})`;
+    case "save":
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
+      return `save(${el.storeRef})`;
+    case "reset":
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
+      return `reset(${el.storeRef})`;
+    case "call":
+      // eslint-disable-next-line lingui/no-unlocalized-strings -- KMN rule-syntax fragment, symbolic notation, not prose
+      return `call(${el.storeRef})`;
+    case "return":
+      return "return";
     case "raw":
       return el.text;
   }
@@ -170,15 +193,18 @@ function fmtOutputElement(el: OutputElement): string {
  * switch to the engine export once it lands.
  */
 export function formatRuleSummary(rule: IRRule): string {
-  const parts = rule.context.map(fmtContextElement);
-  const firstVkey = rule.context.findIndex(el => el.kind === "vkey");
-  const hasPlus = rule.context.some(el => el.kind === "raw" && el.text.trim() === "+");
+  // eslint-disable-next-line no-restricted-syntax -- the summary reproduces the LHS verbatim, including where the codec's `+` separator sits, which the separator-free accessors drop
+  const context = rule.context;
+  const parts = context.map(fmtContextElement);
+  const firstVkey = context.findIndex(el => el.kind === "vkey");
+  const hasPlus = context.some(isPlusSeparator);
   if (firstVkey >= 0 && !hasPlus) {
     parts.splice(firstVkey, 0, "+");
   }
   const lhs = parts.join(" ");
   const rhs = rule.output.map(fmtOutputElement).join(" ");
-  const prefix = rule.matchKind !== undefined ? `${rule.matchKind} ` : "";
+  const lhsKind = ruleLhsKind(rule);
+  const prefix = lhsKind !== "input" ? `${lhsKind} ` : "";
   return `${prefix}${lhs} > ${rhs}`;
 }
 
@@ -188,7 +214,7 @@ export function formatRuleSummary(rule: IRRule): string {
 
 /** A rule is touch-layer when its trigger is a touch key (`T_0300`-style). */
 function isTouchRule(rule: IRRule): boolean {
-  return rule.context.some(el => el.kind === "vkey" && el.name.startsWith("T_"));
+  return ruleContextElements(rule).some(el => el.kind === "vkey" && el.name.startsWith("T_"));
 }
 
 type FamilySelection = "all" | "some" | "none";

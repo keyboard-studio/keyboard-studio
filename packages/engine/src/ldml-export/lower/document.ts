@@ -5,6 +5,7 @@
 // triggers, the transform groups in call order, the variables, and the document header.
 
 import type { LDMLKeyboard } from "@keymanapp/developer-utils";
+import { ruleLhsKind } from "@keyboard-studio/contracts";
 import { minimalTagOf } from "../../langtags/index.js";
 import type { ClassifyDetail } from "../classify/classify.js";
 import { findStore, isGuardElement, type RulePlan } from "../classify/ruleElements.js";
@@ -187,7 +188,7 @@ export function lowerDocument(
     if (g.usingKeys) continue;
     const rows: Entry[] = [];
     for (const p of plans) {
-      if (p.group !== g || !p.lower || p.keystroke !== null || p.rule.matchKind !== undefined) continue;
+      if (p.group !== g || !p.lower || p.keystroke !== null || ruleLhsKind(p.rule) !== "input") continue;
       for (const t of renderRule(env, p, null, null)) {
         rows.push({ t, triggerKey: "", ctxLen: contextLength(p), line: p.rule.sourceLine ?? 0 });
       }

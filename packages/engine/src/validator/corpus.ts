@@ -18,6 +18,7 @@
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { KeyboardIR, KeyChord } from "@keyboard-studio/contracts";
+import { ruleContextElements } from "../shared/rule-shape.js";
 
 // ---------------------------------------------------------------------------
 // D7 modifier sets
@@ -71,7 +72,7 @@ function extractVkeysFromIR(ir: KeyboardIR): string[] {
   const seen = new Set<string>();
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      for (const el of rule.context) {
+      for (const el of ruleContextElements(rule)) {
         if (el.kind === "vkey") {
           seen.add(el.name);
         }

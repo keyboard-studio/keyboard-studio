@@ -106,10 +106,10 @@
 // Untouched stores keep the same object reference; groups/comments/raw are passed
 // through by reference.
 
-import type { KeyboardIR, IRStore, ContextElement, OutputElement } from "@keyboard-studio/contracts";
+import type { KeyboardIR, IRRule, IRStore, ContextElement, OutputElement } from "@keyboard-studio/contracts";
 import { isNamedDeadkeyElement } from "@keyboard-studio/contracts";
 import { parseSlotId } from "./slotId.js";
-import { isPlusSeparator } from "../shared/rule-shape.js";
+import { elementAtOffset, ruleContextElements, ruleKeystroke } from "../shared/rule-shape.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -374,9 +374,11 @@ const NON_TYPING_TRIGGER_VKEYS = new Set(["K_BKSP", "K_DEL"]);
  * deadkey selector, whose rule has no `+` at all and so is never flagged
  * here) — see {@link StoreSlotEditMode} `matchTableOnly`.
  */
-function isEditOnlyTriggerRule(context: ContextElement[]): boolean {
-  const plusIdx = context.findIndex(isPlusSeparator);
-  const triggerEl = plusIdx === -1 ? (context.length === 1 ? context[0] : undefined) : context[plusIdx + 1];
+function isEditOnlyTriggerRule(
+  rule: { context: ContextElement[] },
+  group: { usingKeys: boolean },
+): boolean {
+  const triggerEl = ruleKeystroke(rule, group);
   return triggerEl !== undefined && triggerEl.kind === "vkey" && NON_TYPING_TRIGGER_VKEYS.has(triggerEl.name.toUpperCase());
 }
 
@@ -408,8 +410,11 @@ function isBareContextGuardOutput(output: OutputElement[]): boolean {
  * any() ONLY inside such rules, and never itself an index()/outs() output
  * target, is never actually produced anywhere in the IR.
  */
-function ruleAddsNoNewContent(rule: { context: ContextElement[]; output: OutputElement[] }): boolean {
-  return isEditOnlyTriggerRule(rule.context) || isBareContextGuardOutput(rule.output);
+function ruleAddsNoNewContent(
+  rule: { context: ContextElement[]; output: OutputElement[] },
+  group: { usingKeys: boolean },
+): boolean {
+  return isEditOnlyTriggerRule(rule, group) || isBareContextGuardOutput(rule.output);
 }
 
 /**
@@ -469,15 +474,15 @@ export function analyzeStores(ir: KeyboardIR): StoreAnalysis {
       // coordinated pair-drop (or blocked: unresolved-index-pairing)
       // posture; adoption is a separate consumer ruling.
       if (
-        rule.context.some(isNamedDeadkeyElement) ||
+        ruleContextElements(rule).some(isNamedDeadkeyElement) ||
         rule.output.some(isNamedDeadkeyElement)
       ) {
         continue;
       }
 
-      const noNewContent = ruleAddsNoNewContent(rule);
+      const noNewContent = ruleAddsNoNewContent(rule, group);
 
-      for (const el of rule.context) {
+      for (const el of ruleContextElements(rule)) {
         if (el.kind === "any") {
           const usage = ensureUsage(el.storeRef);
           usage.asAnySource = true;
@@ -488,10 +493,6 @@ export function analyzeStores(ir: KeyboardIR): StoreAnalysis {
           ensureUsage(el.storeRef).asContextIndex = true;
         }
       }
-
-      // The n-th context item, per the pairing algorithm, excludes the
-      // codec's synthetic `+` keystroke-boundary token.
-      const effectiveContext = rule.context.filter((el) => !isPlusSeparator(el));
 
       for (const el of rule.output) {
         if (el.kind === "outs") {
@@ -507,7 +508,7 @@ export function analyzeStores(ir: KeyboardIR): StoreAnalysis {
         // Spec 051 T004: mark as output target
         ensureUsage(el.storeRef).asIndexOutputTarget = true;
         ensureNode(el.storeRef);
-        const target = effectiveContext[el.offset - 1];
+        const target = elementAtOffset(rule, group, el.offset);
         if (target !== undefined && target.kind === "any") {
           union(el.storeRef, target.storeRef);
         } else {
@@ -984,9 +985,9 @@ export function applyStoreSlotRemovals(
   const removedStores: string[] = [];
   if (emptiedStoreNames.size > 0) {
     const doomed = new Set(emptiedStoreNames);
-    const refsOf = (rule: { context: ContextElement[]; output: OutputElement[] }): string[] => {
+    const refsOf = (rule: IRRule): string[] => {
       const names: string[] = [];
-      for (const el of [...rule.context, ...rule.output]) {
+      for (const el of [...ruleContextElements(rule), ...rule.output]) {
         if ("storeRef" in el) names.push(el.storeRef);
       }
       return names;

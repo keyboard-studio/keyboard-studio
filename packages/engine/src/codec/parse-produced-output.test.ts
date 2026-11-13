@@ -53,12 +53,16 @@ describe("parse — producedOutput sketch on rule-opaque fragments", () => {
     expect(buildProducedSet(ir).has("Z")).toBe(false);
   });
 
+  // Spec 116: an SMP literal alone no longer opaques a rule (it is typed), so
+  // the rule is made opaque by an outs() expansion after it (which stays opaque
+  // in a rule's output).
   it("SMP literal RHS decodes to a single astral char element", () => {
-    const { ir } = parseKmn(`+ [K_D] > U+1F600`);
+    const { ir } = parseKmn(`+ [K_D] > U+1F600 outs(x)`);
     expect(ir.raw).toHaveLength(1);
-    expect(ir.raw[0]!.reason).toBe(OPAQUE_REASONS.SMP_LITERAL);
+    expect(ir.raw[0]!.reason).toBe(OPAQUE_REASONS.OUTS_EXPANSION);
     expect(ir.raw[0]!.producedOutput).toEqual([
       { kind: "char", value: "\u{1F600}" },
+      { kind: "outs", storeRef: "x" },
     ]);
   });
 
@@ -85,11 +89,24 @@ describe("parse — producedOutput sketch on rule-opaque fragments", () => {
     ]);
   });
 
-  it("set() RHS carries no producible content: no producedOutput, quoted value stays inside the token", () => {
+  it("set() RHS is a typed element (spec 116): no fragment, and it produces no character", () => {
     const { ir } = parseKmn(`+ [K_B] > set(opt='x')`);
+    expect(ir.raw).toHaveLength(0);
+    const rule = ir.groups.flatMap((g) => g.rules)[0]!;
+    expect(rule.output).toEqual([{ kind: "set", storeRef: "opt", value: [{ kind: "char", value: "x" }] }]);
+    expect(buildProducedSet(ir).has("x")).toBe(false);
+  });
+
+  it("a fragment's lenient sketch still holds set()/layer() as raw placeholders, as before the typed members", () => {
+    const { ir } = parseKmn(`+ [K_B] > 'a' set(opt='x') layer('shift') outs(z)`);
     expect(ir.raw).toHaveLength(1);
-    expect(ir.raw[0]!.reason).toBe(OPAQUE_REASONS.OPTION_STORE_DIRECTIVE);
-    expect(ir.raw[0]!.producedOutput).toBeUndefined();
+    expect(ir.raw[0]!.reason).toBe(OPAQUE_REASONS.OUTS_EXPANSION);
+    expect(ir.raw[0]!.producedOutput).toEqual([
+      { kind: "char", value: "a" },
+      { kind: "raw", text: "set(opt='x')" },
+      { kind: "raw", text: "layer('shift')" },
+      { kind: "outs", storeRef: "z" },
+    ]);
   });
 
   it("nul RHS carries no producible content: typed nul output, produced set unchanged", () => {
@@ -129,7 +146,8 @@ U+1402`,
   it("store-opaque fragments get no producedOutput (rule fragments only)", () => {
     const { ir } = parseKmn(
       `+ [K_A] > U+0061`,
-      `store(smp) U+10D24
+      // A bracketed menu literal stays opaque (an SMP store is typed since spec 116).
+      `store(menu) '[1ae 2a]'
 `,
     );
     expect(ir.raw).toHaveLength(1);

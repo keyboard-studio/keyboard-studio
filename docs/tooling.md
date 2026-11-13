@@ -244,6 +244,28 @@ on every PR against one known corpus. It also sets `KEYBOARDS_REPO` to that path
 postbuild and dev server. When the fork moves, bump the pin deliberately and re-run the
 corpus-gated tests locally against the new commit first.
 
+The `.kmn` reader (spec 116) has its own corpus suites, run through the engine's
+`vitest.corpus.config.ts`
+(`pnpm --filter @keyboard-studio/engine exec vitest run --config vitest.corpus.config.ts <path>`):
+
+- `src/codec/reader-regression.corpus.test.ts` holds the reader to the IR, node-id, opaque-reason
+  and comment counts recorded in `specs/116-ng-parser-adoption/evidence/reader-differential.md`.
+- `src/codec/reader-timing.corpus.test.ts` is the read-time budget: total within 2x the recorded
+  baseline (`evidence/baseline.md`), slowest file within 300 ms.
+- `src/codec/ng/lexer-equivalence.corpus.test.ts` checks the locally patched lexer emits exactly
+  the unpatched upstream token stream; `parser-equivalence.corpus.test.ts` checks the local
+  FIRST-set prediction patch changes no parse result.
+- `src/shared/rule-shape-equivalence.corpus.test.ts` checks the rule-shape accessors against the
+  rule splitters they replaced; it fails only on a disagreement research R5a does not explain.
+
+### Vendored Keyman parser
+
+`packages/engine/src/codec/ng/` is a snapshot of Keyman's next-generation `.kmn` parser front end.
+To re-sync it: `node scripts/vendor-ng-parser.mjs <keyman-checkout> <commit>`. The script reads
+each file with `git show <commit>:<path>`, never the working tree. It does not re-apply local
+patches: re-apply those by hand from `codec/ng/PROVENANCE.md`, update the commit recorded there,
+then run the reader corpus suites above.
+
 ### Headless author
 
 The scripted author ([spec 107](../specs/107-headless-scripted-author/quickstart.md)) walks the
@@ -352,7 +374,7 @@ run on the schedule, not on pull requests.
 | Where | `e2e desktop` runs | Approx. time |
 |---|---|---|
 | Pull request | `boot-smoke`, `decision-store-reload`, and spec 104 walk 1 (`touch-key-identity`, narrowed by `--grep "boot-smoke|decision-store-reload|spec 104 walk 1:"`; one command, so one results summary) | about 3 min |
-| Nightly schedule (07:17 UTC), push to `main`, `workflow_dispatch`, the nightly dev soak | `boot-smoke`, `copy-edit`, `decision-store-reload`, `touch-key-identity` (all walks), `preview-longpress-popup` | about 19 min |
+| Nightly schedule (07:17 UTC), push to `main`, `workflow_dispatch`, the nightly dev soak | `boot-smoke`, `copy-edit`, `decision-store-reload`, `touch-key-identity` (all walks), `preview-longpress-popup`, `preview-touch-height`, `docs-code-height` | about 19 min |
 
 - **Playwright container image.** The three e2e jobs (`e2e-desktop`, `e2e-mobile`,
   `e2e-golden`) run in `mcr.microsoft.com/playwright:v1.61.1-noble` with
@@ -376,7 +398,7 @@ run on the schedule, not on pull requests.
 - **Failures on the schedule.** The `e2e nightly failure report` job opens (or comments on) one
   open issue titled `Nightly e2e desktop failure (<ref>)` when the full set fails on a non-PR run.
 - **Run the nightly set by hand.** Locally:
-  `pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload touch-key-identity preview-longpress-popup`.
+  `pnpm --filter @keyboard-studio/studio test:e2e --project=desktop boot-smoke copy-edit decision-store-reload touch-key-identity preview-longpress-popup preview-touch-height docs-code-height`.
   On GitHub: Actions, CI, "Run workflow" (`workflow_dispatch`) on the branch.
 - **Adding a walk.** Estimate its time first. Under about 1 minute it may join the PR filter list
   in the `e2e-desktop` job; longer goes in the full-set step only.
@@ -426,6 +448,15 @@ Live and passing:
   top-row longpress popup paints above the OSK box in the Touch gallery
   preview (Matthew's 2026-11-11 report: `#osk-host-frame` overflow:hidden
   clipped it). Full-set only (nightly / push to main), ~2 min walk.
+- [preview-touch-height.spec.ts](../packages/studio/e2e/preview-touch-height.spec.ts) —
+  Touch gallery Mobile KB keys stay roughly square at desktop width (Matthew's 2026-11-11
+  report: the phone profile's pinned 290px height squashed the keys at a ~1000px pane).
+  Full-set only (nightly / push to main), ~3 min walk at 1920x1080.
+- [docs-code-height.spec.ts](../packages/studio/e2e/docs-code-height.spec.ts) —
+  Documentation step Code mode Monaco fills the page height at desktop width
+  (Matthew's 2026-11-11 report: the code view is only a few lines tall, a short
+  strip that does not fill the page). Full-set only (nightly / push to main),
+  ~6 min walk at 1920x1080.
 - [tab-roundtrip.spec.ts](../packages/studio/e2e/tab-roundtrip.spec.ts) and
   [compare-isolation.spec.ts](../packages/studio/e2e/compare-isolation.spec.ts) — spec 057's two
   gating specs, written and recorded RED against the pre-fix tree before the fix landed

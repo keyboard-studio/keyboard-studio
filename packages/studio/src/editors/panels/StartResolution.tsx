@@ -6,7 +6,7 @@
 // The chosen base then back-fills the prefill confirmations. refs #369.
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -26,6 +26,12 @@ import { getLoadedLangtags, loadLangtags } from "../../lib/langtagsDefaults.ts";
 import { StartKeyboardPicker } from "../../components/StartKeyboardPicker.tsx";
 import { Badge, Button } from "../../ui/index.ts";
 import type { BadgeTone } from "../../ui/Badge.tsx";
+import {
+  leadParagraph,
+  phaseHeading,
+  surveyCard,
+  surveyPageColumn,
+} from "../../survey/surveyStyles.ts";
 import { useStartDocProfile } from "../../hooks/useStartDocProfile.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
@@ -68,6 +74,26 @@ const REASON_TONE: Record<ResolvedReason, BadgeTone> = {
   "language-cross-script": "warn",
   "us-qwerty-fallback": "subtle",
 };
+
+// Same composition as the survey steps (#2567): left-aligned column,
+// display title above the accent-topped card — not the old 1.1rem accent
+// heading this step used to render with no card at all. Every return path
+// (loading / error / empty / loaded) goes through this shell so the title
+// never disappears while the catalog loads. Module-level, not nested in the
+// component: a nested component type remounts its children on every render,
+// which would drop the picker's input focus while typing.
+function Shell({ children }: { children: ReactNode }): React.JSX.Element {
+  return (
+    <div style={surveyPageColumn}>
+      <h2 id="base-resolution-heading" style={phaseHeading}>
+        <Trans id="editor.baseResolution.heading">Choose a starting keyboard</Trans>
+      </h2>
+      <section aria-labelledby="base-resolution-heading" style={surveyCard}>
+        {children}
+      </section>
+    </div>
+  );
+}
 
 export interface StartResolutionProps {
   /** The chosen (language, script) target from identity-lite. */
@@ -198,20 +224,6 @@ export function StartResolution({
     [suggestions],
   );
 
-  const heading: React.CSSProperties = {
-    margin: "0 0 8px 0",
-    fontSize: "1.1rem",
-    color: "var(--app-accent)",
-    fontWeight: 600,
-    fontFamily: "var(--app-font)",
-  };
-  const subtle: React.CSSProperties = {
-    margin: "0 0 20px 0",
-    fontSize: 13,
-    color: "var(--app-text-muted)",
-    fontFamily: "var(--app-font)",
-  };
-
   // Back / Confirm live in the footer (spec 081). Publish unconditionally,
   // before the loading / error / empty early returns below. Back is offered in
   // every state — the loading, error and empty screens have nothing to confirm,
@@ -256,19 +268,33 @@ export function StartResolution({
         }),
   });
 
-  if (loading) return <div role="status" style={{ color: "var(--app-text-muted)", fontFamily: "var(--app-font)" }}><Trans id="starting.picker.loading">Loading starting keyboards...</Trans></div>;
-  if (error !== null) return <div style={{ color: "var(--app-danger)", fontFamily: "var(--app-font)" }}>{error}</div>;
+  if (loading)
+    return (
+      <Shell>
+        <div role="status" style={{ color: "var(--app-text-muted)", fontFamily: "var(--app-font)" }}>
+          <Trans id="starting.picker.loading">Loading starting keyboards...</Trans>
+        </div>
+      </Shell>
+    );
+  if (error !== null)
+    return (
+      <Shell>
+        <div style={{ color: "var(--app-danger)", fontFamily: "var(--app-font)" }}>{error}</div>
+      </Shell>
+    );
   if (bases.length === 0)
     return (
-      <div role="status" style={{ color: "var(--app-text-muted)", fontSize: 13, fontFamily: "var(--app-font)" }}>
-        <Trans id="starting.picker.emptyCatalog">No starting keyboards found. Check your connection and try again.</Trans>
-      </div>
+      <Shell>
+        <div role="status" style={{ color: "var(--app-text-muted)", fontSize: 13, fontFamily: "var(--app-font)" }}>
+          <Trans id="starting.picker.emptyCatalog">No starting keyboards found. Check your connection and try again.</Trans>
+        </div>
+      </Shell>
     );
 
   return (
+    <Shell>
     <div data-testid="base-picker" style={{ color: "var(--app-text)", fontFamily: "var(--app-font)" }}>
-      <h2 style={heading}><Trans id="editor.baseResolution.heading">Choose a starting keyboard</Trans></h2>
-      <p style={subtle}>
+      <p style={leadParagraph}>
         <Trans id="editor.baseResolution.intro">
           Based on your language and chosen script, here are the closest starting
           points. Search above or pick a suggestion below.
@@ -324,7 +350,7 @@ export function StartResolution({
       </div>
 
       <div style={{ borderTop: "1px solid var(--app-border)", paddingTop: 16 }}>
-        <p style={{ ...subtle, marginBottom: 8 }}><Trans id="editor.baseResolution.suggestedForYou">Suggested for you:</Trans></p>
+        <p style={{ ...leadParagraph, marginBottom: 8 }}><Trans id="editor.baseResolution.suggestedForYou">Suggested for you:</Trans></p>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {suggestions.map(({ base, reason, relative }) => {
             const isSelected = base.id === previewedBase?.id;
@@ -395,5 +421,6 @@ export function StartResolution({
         </div>
       </div>
     </div>
+    </Shell>
   );
 }

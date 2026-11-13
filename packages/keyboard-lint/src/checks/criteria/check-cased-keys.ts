@@ -12,6 +12,7 @@
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import {
+  storeItemText,
   buildProducedSet,
   casedKeySet,
   declaredCasedKeys,
@@ -31,9 +32,7 @@ function systemStoreValue(ir: KeyboardIR, name: string): string | undefined {
   );
   if (store === undefined) return undefined;
   return store.items
-    .map((item) =>
-      item.kind === "char" ? item.value : item.kind === "raw" ? item.text : "",
-    )
+    .map((item) => storeItemText(item))
     .join("")
     .trim();
 }
