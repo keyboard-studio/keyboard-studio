@@ -5,6 +5,7 @@
 // hint, and the standard special keys are a hint too. The delivery fact (row 5.15) is added once by
 // the classifier, not here.
 
+import { ruleLhsKind } from "@keyboard-studio/contracts";
 import type { KeyboardIR, TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/contracts";
 import { ruleParts, type Part } from "../lower/triggers.js";
 import type { ItemSink } from "./items.js";
@@ -76,7 +77,7 @@ export function buildTouchRuleIndex(plans: readonly RulePlan[], ir: KeyboardIR):
   const out = new Map<string, TouchRule[]>();
   for (const plan of plans) {
     const ks = plan.keystroke;
-    if (plan.facts.role !== "main" || !plan.group.usingKeys || plan.rule.matchKind !== undefined) continue;
+    if (plan.facts.role !== "main" || !plan.group.usingKeys || ruleLhsKind(plan.rule) !== "input") continue;
     if (ks === null || (ks.kind !== "vkey" && ks.kind !== "rawKey")) continue;
     const id = ks.vkey.toUpperCase();
     if (!id.startsWith("T_")) continue;

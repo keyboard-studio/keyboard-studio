@@ -14,6 +14,7 @@
 // render, and the table is already in the initial bundle through the engine
 // (see survey/characterMap/unicodeTable.ts).
 
+import { ruleContextElements } from "@keyboard-studio/contracts";
 import {
   DOC_FORMS,
   DOC_MECHANISM_ORDER,
@@ -203,7 +204,6 @@ function renderGuideSummary(rows: readonly GuideRow[]): string {
 // Mechanisms (research R7)
 // ---------------------------------------------------------------------------
 
-const isPlus = (el: ContextElement): boolean => el.kind === "raw" && el.text === "+";
 
 function allRules(ir: KeyboardIR): IRRule[] {
   return ir.groups.flatMap((g) => g.rules);
@@ -226,7 +226,7 @@ function charOutput(rule: IRRule): string | undefined {
 function hasRepeatToCycle(rules: readonly IRRule[]): boolean {
   const directOutputs = new Map<string, Set<string>>();
   for (const rule of rules) {
-    const ctx = rule.context.filter((el) => !isPlus(el));
+    const ctx = ruleContextElements(rule);
     const out = charOutput(rule);
     const key = ctx.length === 1 ? keyIdentity(ctx[0]) : undefined;
     if (key === undefined || out === undefined) continue;
@@ -235,7 +235,7 @@ function hasRepeatToCycle(rules: readonly IRRule[]): boolean {
     directOutputs.set(key, set);
   }
   return rules.some((rule) => {
-    const ctx = rule.context.filter((el) => !isPlus(el));
+    const ctx = ruleContextElements(rule);
     if (ctx.length !== 2 || ctx[0]?.kind !== "char") return false;
     const key = keyIdentity(ctx[1]);
     return key !== undefined && (directOutputs.get(key)?.has(ctx[0].value) ?? false);
@@ -262,7 +262,7 @@ function detectMechanisms(
 ): Set<DocMechanismId> {
   const rules = allRules(ir);
   const found = new Set<DocMechanismId>();
-  if (rules.some((r) => r.context.some((el) => el.kind === "deadkey"))) found.add("deadkeys");
+  if (rules.some((r) => ruleContextElements(r).some((el) => el.kind === "deadkey"))) found.add("deadkeys");
   if (rules.some((r) => ruleModifier(r) === "ralt")) found.add("rightAlt");
   if (hasRepeatToCycle(rules)) found.add("repeatToCycle");
   if (markInputOrder === "postfix") found.add("combiningOrder");

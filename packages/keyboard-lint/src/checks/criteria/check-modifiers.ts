@@ -39,6 +39,7 @@ import type {
   LintFinding,
   TouchLayoutIR,
 } from "@keyboard-studio/contracts";
+import { ruleKeystrokeLoose } from "@keyboard-studio/contracts";
 import {
   checkFailed,
   checkPassed,
@@ -141,12 +142,11 @@ function kmnUsage(ir: KeyboardIR): SourceUsage {
   const usage: SourceUsage = { byFamily: new Map() };
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      for (const el of rule.context) {
-        if (el.kind !== "vkey") continue;
-        for (const mod of el.modifiers) {
-          const atom = KMN_MODIFIER_MAP[mod.toUpperCase()];
-          if (atom !== undefined) record(usage, atom, mod.toUpperCase());
-        }
+      const el = ruleKeystrokeLoose(rule);
+      if (el?.kind !== "vkey") continue;
+      for (const mod of el.modifiers) {
+        const atom = KMN_MODIFIER_MAP[mod.toUpperCase()];
+        if (atom !== undefined) record(usage, atom, mod.toUpperCase());
       }
     }
   }

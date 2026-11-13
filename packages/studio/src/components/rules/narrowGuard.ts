@@ -17,6 +17,13 @@
 // is replaced: context "blockedChar + '+' + vkey" → output
 // "blockedChar + markChar".
 
+import {
+  makeRule,
+  ruleConditions,
+  ruleHasNulContext,
+  ruleKeystroke,
+  rulePreContext,
+} from "@keyboard-studio/contracts";
 import type {
   ContextElement,
   IRRule,
@@ -38,15 +45,37 @@ export function buildNarrowException(
   guard: OverBroadGuard,
   guardRule: IRRule,
 ): IRRule | null {
-  const anyIndex = guardRule.context.findIndex((el) => el.kind === "any");
-  if (anyIndex === -1) return null;
-  const context: ContextElement[] = guardRule.context.map((el, i) =>
-    i === anyIndex ? { kind: "raw", text: guard.blockedChar } : { ...el },
-  );
+  // Guard rules are `using keys` rules (`any(store) + key > context`).
+  const group = { usingKeys: true };
+  // Replace the first `any()` (head, then pre-context, then keystroke: source order).
+  let replaced = false;
+  const swapFirstAny = (el: ContextElement): ContextElement => {
+    if (!replaced && el.kind === "any") {
+      replaced = true;
+      return { kind: "raw", text: guard.blockedChar };
+    }
+    return { ...el };
+  };
+  const conditions = ruleConditions(guardRule).map(swapFirstAny);
+  const preContext = rulePreContext(guardRule, group).map(swapFirstAny);
+  const guardKeystroke = ruleKeystroke(guardRule, group);
+  const keystroke = guardKeystroke === undefined ? undefined : swapFirstAny(guardKeystroke);
+  if (!replaced) return null;
   const output: OutputElement[] = [
     { kind: "raw", text: guard.blockedChar + guard.markChar },
   ];
-  return { nodeId: crypto.randomUUID(), context, output, rulesStepAdded: true };
+  return makeRule(
+    {
+      nodeId: crypto.randomUUID(),
+      nulContext: ruleHasNulContext(guardRule),
+      conditions,
+      preContext,
+      ...(keystroke !== undefined ? { keystroke } : {}),
+      output,
+      rulesStepAdded: true,
+    },
+    group,
+  );
 }
 
 /** Locate the guard rule's group and index in the working IR. */

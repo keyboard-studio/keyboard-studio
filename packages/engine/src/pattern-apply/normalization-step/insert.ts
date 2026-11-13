@@ -2,6 +2,7 @@ import type { IRComment, IRGroup, IRRule, KeyboardIR, NormalizationStep } from "
 import { emitRule } from "../../codec/emit.js";
 import { sameGroupName } from "../../codec/groupName.js";
 import { NORMALIZATION_GROUP, NORMALIZATION_STORE_PREFIX } from "./constants.js";
+import { ruleContextElements, ruleLhsKind } from "../../shared/rule-shape.js";
 
 /**
  * The keyboard's entry group name: `entryPoints.main`, else the first
@@ -33,7 +34,7 @@ function groupNamedByUse(output: readonly IRRule["output"][number][]): string | 
 function storeRefsOf(rules: readonly IRRule[]): Set<string> {
   const refs = new Set<string>();
   for (const r of rules) {
-    for (const el of [...r.context, ...r.output]) {
+    for (const el of [...ruleContextElements(r), ...r.output]) {
       if ("storeRef" in el) refs.add(el.storeRef.toLowerCase());
     }
   }
@@ -72,7 +73,7 @@ export function generatedStepGroupOf(ir: KeyboardIR): IRGroup | undefined {
   const group = ir.groups.find((g) => g.name === NORMALIZATION_GROUP);
   if (group === undefined || group.usingKeys) return undefined;
   if (group.nodeId.startsWith(NORMALIZATION_STORE_PREFIX)) return group;
-  const nomatch = group.rules.find((r) => r.matchKind === "nomatch");
+  const nomatch = group.rules.find((r) => ruleLhsKind(r) === "nomatch");
   const target = nomatch === undefined ? undefined : groupNamedByUse(nomatch.output);
   if (target === undefined || target === NORMALIZATION_GROUP) return undefined;
   return ir.groups.some((g) => sameGroupName(g.name, target)) ? group : undefined;
@@ -114,7 +115,7 @@ function ownedStoreNames(ir: KeyboardIR, group: IRGroup): Set<string> {
 export function removeNormalizationStep(ir: KeyboardIR, originalEntry?: string): KeyboardIR {
   const group = generatedStepGroupOf(ir);
   if (group === undefined) return ir;
-  const nomatch = group.rules.find((r) => r.matchKind === "nomatch");
+  const nomatch = group.rules.find((r) => ruleLhsKind(r) === "nomatch");
   const groups = ir.groups.filter((g) => g !== group);
   const implicit = groups.find((g) => !g.readonly)?.name ?? "main";
   const target = (nomatch === undefined ? undefined : groupNamedByUse(nomatch.output)) ?? lastUseTarget(group) ?? originalEntry;
@@ -150,8 +151,9 @@ export function removeNormalizationStep(ir: KeyboardIR, originalEntry?: string):
 
 /** Short per-shape comment for one generated rule. */
 function ruleShapeComment(r: IRRule): string {
-  const first = r.context[0];
-  if (r.context.every((e) => e.kind === "char")) return "literal alternate -> form the keyboard produces";
+  const context = ruleContextElements(r);
+  const first = context[0];
+  if (context.every((e) => e.kind === "char")) return "literal alternate -> form the keyboard produces";
   if (first?.kind === "any") return "store-indexed rewrite: any(heads) [+ tail] -> matching produced form";
   return "literal head + any(tails) -> store-indexed produced form";
 }
@@ -195,7 +197,7 @@ export function applyNormalizationStep(ir: KeyboardIR, step: NormalizationStep):
   // The closing match/nomatch rules take no comment: the parser does not anchor
   // a comment ahead of them to the rule, so it would not survive a round trip.
   step.rules.forEach((r, i) => {
-    if (r.matchKind !== undefined) return;
+    if (ruleLhsKind(r) !== "input") return;
     comments.push({
       nodeId: `${NORMALIZATION_STORE_PREFIX}comment_rule_${i}`,
       text: ruleShapeComment(r),

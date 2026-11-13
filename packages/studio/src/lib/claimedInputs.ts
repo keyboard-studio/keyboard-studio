@@ -33,6 +33,7 @@
 //     warning must not take the starting rule down with it.
 
 import type { KeyboardIR, MechanismAssignment, Pattern } from "@keyboard-studio/contracts";
+import { elementAtOffset } from "@keyboard-studio/contracts";
 import { parseKeySpec } from "@keyboard-studio/engine";
 import { mechanismClaimedSlots } from "../survey/slotOccupancy.ts";
 
@@ -120,8 +121,9 @@ export function claimedInputRuleIds(
   if (claims.length === 0) return ids;
 
   for (const rule of main.rules) {
-    if (rule.context.length !== 1) continue;
-    const el = rule.context[0];
+    // Exactly one context element, and it must be the vkey.
+    if (elementAtOffset(rule, main, 2) !== undefined) continue;
+    const el = elementAtOffset(rule, main, 1);
     if (el === undefined || el.kind !== "vkey") continue;
     const k = keystrokeOf(el.name, el.modifiers);
     if (k === null) continue;

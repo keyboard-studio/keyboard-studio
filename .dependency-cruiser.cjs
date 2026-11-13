@@ -18,10 +18,23 @@ module.exports = {
       comment:
         'No runtime circular dependencies — they defeat the layered design. ' +
         'Type-only cycles are allowed: TypeScript erases them (e.g. the ' +
-        'Pattern <-> KeyboardIR type cross-reference in contracts).',
+        'Pattern <-> KeyboardIR type cross-reference in contracts). The vendored ' +
+        'Keyman parser (codec/ng) has upstream rule-class cycles between its ' +
+        'analyzer files; they are resolved lazily at construction time. The built ' +
+        'copy under dist/ carries the same cycles.',
       severity: 'error',
-      from: {},
+      from: { pathNot: '^packages/engine/(src|dist)/codec/ng/' },
       to: { circular: true, dependencyTypesNot: ['type-only'] },
+    },
+    {
+      name: 'codec-ng-internal',
+      comment:
+        'The vendored Keyman parser front end (codec/ng) is an internal detail ' +
+        'of the codec: only the top-level codec modules may import it, and the ' +
+        'codec barrel exports nothing from it (Constitution Art II).',
+      severity: 'error',
+      from: { pathNot: '^packages/engine/src/codec/(ng/|[^/]+\.ts$)' },
+      to: { path: '^packages/engine/src/codec/ng/' },
     },
     {
       name: 'lint-not-to-engine',

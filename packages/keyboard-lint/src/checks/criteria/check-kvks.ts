@@ -12,6 +12,7 @@
 // separately (contextMissing) so the two never share a verdict.
 
 import type { KeyboardIR, KvksIR } from "@keyboard-studio/contracts";
+import { ruleKeystrokeLoose } from "@keyboard-studio/contracts";
 import {
   checkFailed,
   checkPassed,
@@ -24,13 +25,12 @@ import {
 export function irUsesRalt(ir: KeyboardIR): boolean {
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      for (const el of rule.context) {
-        if (
-          el.kind === "vkey" &&
-          el.modifiers.some((m) => m.toUpperCase() === "RALT")
-        ) {
-          return true;
-        }
+      const el = ruleKeystrokeLoose(rule);
+      if (
+        el?.kind === "vkey" &&
+        el.modifiers.some((m) => m.toUpperCase() === "RALT")
+      ) {
+        return true;
       }
     }
   }

@@ -1,6 +1,7 @@
 // capsLogic — the pure rules behind the caps-handling decision (spec 112):
 // the casing gate and which modes are offered. React-free.
 
+import { ruleContextElements } from "@keyboard-studio/contracts";
 import { caseCounterpart, isCapsModifier } from "@keyboard-studio/contracts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import type { CapsHandlingValue } from "../../decisions/decisionTypes.ts";
@@ -14,7 +15,7 @@ export function isCasedAlphabet(chars: readonly string[], bcp47?: string): boole
 export function hasCapsRules(ir: KeyboardIR): boolean {
   return ir.groups.some((g) =>
     g.rules.some((r) =>
-      r.context.some(
+      ruleContextElements(r).some(
         (el) => el.kind === "vkey" && el.modifiers.some(isCapsModifier),
       ),
     ),

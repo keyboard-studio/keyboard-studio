@@ -17,6 +17,7 @@
  */
 
 import type { KeyboardIR, KvksIR, IRRule } from "@keyboard-studio/contracts";
+import { ruleKeystrokeLoose } from "../shared/rule-shape.js";
 import { NodeIdMinter } from "../shared/node-ids.js";
 
 /** IR modifier → .kvks shift-code fragment. */
@@ -100,8 +101,10 @@ export function generateKvksFromIR(ir: KeyboardIR, kbdname: string): KvksIR {
   // Walk all groups' rules.
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      // Find the vkey in context (typically last).
-      const vkeyEl = [...rule.context].reverse().find((el) => el.kind === "vkey");
+      // The vkey is the rule's keystroke.
+      // Loose: a vkey only ever appears in a `using keys` group, and the
+      // generator never inspected the group flag.
+      const vkeyEl = ruleKeystrokeLoose(rule);
       if (!vkeyEl || vkeyEl.kind !== "vkey") continue;
 
       const shiftCode = vkeyEl.modifiers

@@ -1,6 +1,6 @@
 // Write / remove the `&CasedKeys` system store (spec 112, data-model).
 
-import { casedKeysStoreText, type KeyboardIR, type IRStore } from "@keyboard-studio/contracts";
+import { casedKeysStoreText, storeItemText, type KeyboardIR, type IRStore } from "@keyboard-studio/contracts";
 
 const MIN_VERSION = "14.0";
 
@@ -13,7 +13,7 @@ function declaredVersion(ir: KeyboardIR): string | null {
   const store = findStore(ir, "VERSION");
   if (store === undefined) return null;
   return store.items
-    .map((i) => (i.kind === "char" ? i.value : i.kind === "raw" ? i.text : "?"))
+    .map((i) => storeItemText(i, "?"))
     .join("");
 }
 

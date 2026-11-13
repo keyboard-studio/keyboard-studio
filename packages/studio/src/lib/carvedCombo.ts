@@ -6,7 +6,9 @@
 // holds no fallback decision — that is the keyboard-wide fallback policy,
 // decided elsewhere (see specs/076-rule-behaviours/fallback-surface-design.md).
 
+import { ruleContextElements } from "@keyboard-studio/contracts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { ruleKeystrokeLoose } from "@keyboard-studio/contracts";
 import { parseSlotId } from "@keyboard-studio/engine";
 import {
   DEADKEY,
@@ -38,15 +40,13 @@ export function humanizeChord(key: string, modifiers: readonly string[]): string
   return mods === "" ? humanizeVkey(key) : `${mods} + ${humanizeVkey(key)}`;
 }
 
-/** The trigger key of a rule: the LAST vkey in its context (the key pressed). */
+/** The trigger key of a rule: its keystroke element, when that is a vkey (the key pressed). */
 function triggerKeyOf(rule: {
   context: { kind: string; name?: string; modifiers?: string[] }[];
 }): { key: string; modifiers: string[] } | undefined {
-  for (let i = rule.context.length - 1; i >= 0; i--) {
-    const el = rule.context[i]!;
-    if (el.kind === "vkey" && el.name !== undefined) {
-      return { key: el.name, modifiers: el.modifiers ?? [] };
-    }
+  const el = ruleKeystrokeLoose(rule);
+  if (el !== undefined && el.kind === "vkey" && el.name !== undefined) {
+    return { key: el.name, modifiers: el.modifiers ?? [] };
   }
   return undefined;
 }
@@ -77,7 +77,7 @@ function findPairedRuleKey(
 ): { key: string; modifiers: string[] } | undefined {
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      const consumes = rule.context.some(
+      const consumes = ruleContextElements(rule).some(
         (el) =>
           (el.kind === "any" || el.kind === "index") &&
           (el.storeRef === storeName || el.storeRef === storeNodeId),

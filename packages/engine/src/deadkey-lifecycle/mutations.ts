@@ -37,8 +37,10 @@ import {
   getDeadkeyName,
   isPlusSeparator,
   listDeadkeys,
+  makeRule,
   scanDeadkeyRefs,
   setDeadkeyName,
+  withRuleParts,
 } from "@keyboard-studio/contracts";
 import type {
   DeadkeyInfo,
@@ -48,6 +50,7 @@ import type {
   KeyboardIR,
 } from "@keyboard-studio/contracts";
 import { entryGroupOf, insertBlockBeforeTerminalRules } from "../pattern-apply/ir-insert.js";
+import { ruleContextElements } from "../shared/rule-shape.js";
 import {
   describeRule,
   findContextRules,
@@ -218,11 +221,15 @@ export function defineDeadkey(
   };
   next.stores.push(baseStore, outputStore);
 
-  const triggerRule: IRRule = {
-    nodeId: `dk-${hex}-trigger`,
-    context: [{ kind: "vkey", name: triggerKey, modifiers: [] }],
-    output: [{ kind: "deadkey", id }],
-  };
+  const group = ensureEntryGroup(next);
+  const triggerRule: IRRule = makeRule(
+    {
+      nodeId: `dk-${hex}-trigger`,
+      keystroke: { kind: "vkey", name: triggerKey, modifiers: [] },
+      output: [{ kind: "deadkey", id }],
+    },
+    group,
+  );
   // Authorship marker — always written, even unnamed (origin "studio").
   // Throws on a malformed authorName: loud here, not corrupt in the .kmn.
   setDeadkeyName(triggerRule, authorName);
@@ -230,26 +237,25 @@ export function defineDeadkey(
   // Cluster order matches the deadkey-single-tap fragment: fan-out, escape,
   // trigger. The emitter renders the inline `+` separators; the leading `+`
   // on the trigger rule is derived by the emitter (no separator element).
-  const fanoutRule: IRRule = {
-    nodeId: `dk-${hex}-fanout`,
-    context: [
-      { kind: "deadkey", id },
-      { kind: "raw", text: "+" },
-      { kind: "any", storeRef: baseStoreName },
-    ],
-    output: [{ kind: "index", storeRef: outputStoreName, offset: 2 }],
-  };
-  const escapeRule: IRRule = {
-    nodeId: `dk-${hex}-escape`,
-    context: [
-      { kind: "deadkey", id },
-      { kind: "raw", text: "+" },
-      { kind: "vkey", name: triggerKey, modifiers: [] },
-    ],
-    output: [{ kind: "char", value: accentChar }],
-  };
+  const fanoutRule: IRRule = makeRule(
+    {
+      nodeId: `dk-${hex}-fanout`,
+      preContext: [{ kind: "deadkey", id }],
+      keystroke: { kind: "any", storeRef: baseStoreName },
+      output: [{ kind: "index", storeRef: outputStoreName, offset: 2 }],
+    },
+    group,
+  );
+  const escapeRule: IRRule = makeRule(
+    {
+      nodeId: `dk-${hex}-escape`,
+      preContext: [{ kind: "deadkey", id }],
+      keystroke: { kind: "vkey", name: triggerKey, modifiers: [] },
+      output: [{ kind: "char", value: accentChar }],
+    },
+    group,
+  );
 
-  const group = ensureEntryGroup(next);
   group.rules = insertBlockBeforeTerminalRules(group.rules, [
     fanoutRule,
     escapeRule,
@@ -402,7 +408,7 @@ export function renameDeadkey(
   // 2. Every rule context and every store item referencing the old id.
   for (const group of next.groups) {
     for (const rule of group.rules) {
-      for (const el of rule.context) {
+      for (const el of ruleContextElements(rule)) {
         if (el.kind === "deadkey" && el.id === from) el.id = to;
       }
     }
@@ -600,15 +606,19 @@ export function retargetDeadkey(
   }
 
   const next = structuredClone(ir);
-  for (const { rule } of findTriggerRules(next, id)) {
-    const idx = rule.context.findIndex((el) => !isPlusSeparator(el));
+  for (const { group, rule } of findTriggerRules(next, id)) {
+    const idx = ruleContextElements(rule).findIndex((el) => !isPlusSeparator(el));
     if (idx === -1) {
       // Cannot happen: matchTriggerRule required exactly one such element.
       throw new Error(
         `retargetDeadkey: internal error — trigger rule lost its context element`,
       );
     }
-    rule.context[idx] = { kind: "vkey", name: newTriggerKey, modifiers: [] };
+    const ruleIdx = group.rules.indexOf(rule);
+    group.rules[ruleIdx] = withRuleParts(rule, group, {
+      preContext: [],
+      keystroke: { kind: "vkey", name: newTriggerKey, modifiers: [] },
+    });
   }
 
   const deadkey = listDeadkeys(next).find((d) => d.id === id);

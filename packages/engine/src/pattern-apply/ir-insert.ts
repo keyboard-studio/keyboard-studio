@@ -13,6 +13,7 @@
  */
 
 import type { IRGroup, IRRule } from "@keyboard-studio/contracts";
+import { ruleLhsKind } from "../shared/rule-shape.js";
 
 /**
  * The entry group: the first writable using-keys group (KMN's `begin` target).
@@ -32,7 +33,7 @@ export function entryGroupOf(groups: IRGroup[]): IRGroup | undefined {
  * after.
  */
 export function insertBeforeTerminalRules(rules: IRRule[], rule: IRRule): IRRule[] {
-  const idx = rules.findIndex((r) => r.matchKind === "match" || r.matchKind === "nomatch");
+  const idx = rules.findIndex((r) => ruleLhsKind(r) !== "input");
   if (idx === -1) return [...rules, rule];
   return [...rules.slice(0, idx), rule, ...rules.slice(idx)];
 }
@@ -49,7 +50,7 @@ export function insertBeforeTerminalRules(rules: IRRule[], rule: IRRule): IRRule
  */
 export function insertBlockBeforeTerminalRules(rules: IRRule[], block: IRRule[]): IRRule[] {
   if (block.length === 0) return rules;
-  const idx = rules.findIndex((r) => r.matchKind === "match" || r.matchKind === "nomatch");
+  const idx = rules.findIndex((r) => ruleLhsKind(r) !== "input");
   if (idx === -1) return [...rules, ...block];
   return [...rules.slice(0, idx), ...block, ...rules.slice(idx)];
 }

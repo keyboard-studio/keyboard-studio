@@ -1,0 +1,60 @@
+{
+  "$comment": "Differences between the legacy reader (parse-legacy.ts) and the new reader (lower.ts) that the comparison suite (reader-differential.corpus.test.ts, deleted with the legacy reader in T045) accepted. Entries name one line; classes name a kind of difference, each checked by that suite's own verifier, with per-file counts in reader-differential.md. reader-regression.corpus.test.ts still requires every grammar-rejected line to be an entry here.",
+  "entries": [
+    {
+      "file": "experimental/gff/gff_geez_emufi/extras/gff_geez_emufi-pua.kmn",
+      "line": 1342,
+      "old": "typed rule, output raw `fix`, the `''` dropped",
+      "new": "fragment removed-statement, emitted verbatim",
+      "reason": "Keyman-19 removed statement; old reader dropped the `''` (research R1, finding 4); the grammar rejects the line"
+    },
+    {
+      "file": "experimental/gff/gff_geez_emufi/extras/gff_geez_emufi-pua.kmn",
+      "line": 1346,
+      "old": "typed rule, output raw `fix`, the `''` dropped",
+      "new": "fragment removed-statement, emitted verbatim",
+      "reason": "Keyman-19 removed statement; old reader dropped the `''` (research R1, finding 4); the grammar rejects the line"
+    },
+    {
+      "file": "fixture:ldml-export/__fixtures__/all-opaque.kmn",
+      "line": 13,
+      "old": "fragment if-option-store",
+      "new": "grammar rejects the line; the legacy line reader keeps fragment if-option-store",
+      "reason": "The Keyman grammar has no `<>` comparison; contracts/lowering.md keeps `<>` as if-option-store"
+    },
+    {
+      "file": "fixture:ldml-export/__fixtures__/reread-rows.kmn",
+      "line": 14,
+      "old": "typed rule with raw `[NUMLOCK K_A]`",
+      "new": "grammar rejects the line; the legacy line reader keeps the typed rule",
+      "reason": "The Keyman grammar has no NUMLOCK modifier; the legacy line reader keeps the key raw as before"
+    },
+    {
+      "file": "fixture:ldml-export/__fixtures__/reread-rows.kmn",
+      "line": 15,
+      "old": "typed rule with raw `[NUMLOCK K_A]`",
+      "new": "grammar rejects the line; the legacy line reader keeps the typed rule",
+      "reason": "The Keyman grammar has no NUMLOCK modifier; the legacy line reader keeps the key raw as before"
+    }
+  ],
+  "classes": [
+    {
+      "class": "smp-literal-typed",
+      "old": "fragment smp-literal",
+      "new": "typed rule or store with the supplementary-plane character",
+      "reason": "The Keyman lexer reads `U+XXXXX` above U+FFFF as a character (contracts/lowering.md §3); smp-literal is retained only for persisted drafts"
+    },
+    {
+      "class": "space-before-paren",
+      "old": "a call written with whitespace before its `(` (`any (x)`, `index (s, 2)`) split into two raw elements",
+      "new": "the typed element",
+      "reason": "kmcmplib accepts whitespace between a keyword and its `(`; the legacy splitTokens cut the token at the space"
+    },
+    {
+      "class": "glued-calls",
+      "old": "calls written with no space between them (`any(a)any(b)`, `index(a,2)index(b,3)`) kept as one raw element",
+      "new": "one typed element per call",
+      "reason": "kmcmplib lexes each call separately; the legacy splitTokens kept a glued paren run as one token"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import {
   buildOutputRepertoire,
+  makeRule,
   type KeyboardIR,
   type NormalizationMap,
   type NormalizationRefusalReason,
@@ -87,12 +88,15 @@ export async function proposeNormalizationStep(
   if (packed === null || expired()) return refused("time-bound");
   if ("tooLarge" in packed) return refused("time-bound", `too large: ${packed.tooLarge}`);
 
-  const delegateTo = (matchKind: "match" | "nomatch", n: number) => ({
-    nodeId: `generated_cn_rule_${n}`,
-    matchKind,
-    context: [],
-    output: [{ kind: "useGroup" as const, groupName: entry }],
-  });
+  const delegateTo = (matchKind: "match" | "nomatch", n: number) =>
+    makeRule(
+      {
+        nodeId: `generated_cn_rule_${n}`,
+        lhsKind: matchKind,
+        output: [{ kind: "useGroup" as const, groupName: entry }],
+      },
+      { usingKeys: false },
+    );
   const step: NormalizationStep = {
     groupName: NORMALIZATION_GROUP,
     originalEntry: entry,

@@ -28,6 +28,7 @@ import type {
 import { createVirtualFS, isValidTouchKeyIdentifier } from "@keyboard-studio/contracts";
 import type { ParseResult } from "../codec/parse.js";
 import { tokenize } from "../codec/tokenize.js";
+import { isPlusSeparator, ruleContextElements } from "../shared/rule-shape.js";
 import { computeSha256Hex } from "../codec/hash.js";
 import { generateCorpus } from "./corpus.js";
 
@@ -777,11 +778,11 @@ export function checkBehaviourNulOnTextContext(ir: KeyboardIR): LintFinding[] {
         rule.output[0]?.kind === "nul" &&
         rule.output.slice(1).every((el) => el.kind === "beep");
       if (!outputIsNul) continue;
-      const textBearing = rule.context.some(
+      const textBearing = ruleContextElements(rule).some(
         (el) =>
           el.kind !== "vkey" &&
           el.kind !== "deadkey" &&
-          !(el.kind === "raw" && el.text === "+"),
+          !isPlusSeparator(el),
       );
       if (!textBearing) continue;
       findings.push({

@@ -29,7 +29,9 @@ import {
   type SourceCopy,
   type SourceOwner,
 } from "../lib/openSourceChoice.ts";
-import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT, galleryForwardBtnStyle } from "../lib/galleryTheme.ts";
+import { Button } from "../ui/Button.tsx";
+import { BORDER, TEXT_DIM } from "../ui/theme.ts";
+import { sectionHeading, surveyCard } from "../survey/surveyStyles.ts";
 
 /**
  * Open `keyboard` for update: preview it, then record the starting keyboard
@@ -114,21 +116,13 @@ export function OpenKeyboardEntry(): React.JSX.Element {
   const showChoice = choice !== null && choice.differ && choice.upstream !== null && choice.fork !== null;
   const warnCurated = showChoice && replacesCuratedCopy(sourceRef);
 
+  // Same composition as the survey steps (#2567): the accent-topped survey
+  // card, not the old centred card with a plain 18px title this entry used
+  // to render. The screen title lives on the StartScreen; this h2 is the
+  // card's own section heading.
   return (
-    <section
-      aria-labelledby="open-entry-heading"
-      style={{
-        maxWidth: 560,
-        margin: "24px auto",
-        padding: 20,
-        background: BG_CARD,
-        border: `1px solid ${BORDER}`,
-        borderRadius: 8,
-        fontFamily: FONT,
-        color: TEXT_MAIN,
-      }}
-    >
-      <h2 id="open-entry-heading" style={{ margin: "0 0 8px", fontSize: 18 }}>
+    <section aria-labelledby="open-entry-heading" style={surveyCard}>
+      <h2 id="open-entry-heading" style={sectionHeading}>
         <Trans id="open.entry.title">Open an existing keyboard</Trans>
       </h2>
       <p style={{ margin: "0 0 12px", fontSize: 13, lineHeight: 1.6, color: TEXT_DIM }}>
@@ -190,21 +184,16 @@ export function OpenKeyboardEntry(): React.JSX.Element {
           </Trans>
         </p>
       )}
-      <button
-        type="button"
+      <Button
+        variant="primary"
         disabled={chosen === null || checking}
         onClick={() => {
           if (chosen !== null) openExistingKeyboard(chosen, sourceRef);
         }}
-        style={{
-          ...galleryForwardBtnStyle,
-          marginTop: 12,
-          cursor: chosen === null || checking ? "not-allowed" : "pointer",
-          opacity: chosen === null || checking ? 0.6 : 1,
-        }}
+        style={{ marginTop: 12 }}
       >
         <Trans id="open.entry.button">Open this keyboard</Trans>
-      </button>
+      </Button>
     </section>
   );
 }
