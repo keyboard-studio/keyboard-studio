@@ -567,8 +567,12 @@ describe("deprecated target-selector prefixes", () => {
   });
 
   it("an opaque prefixed rule is kept verbatim (with its prefix) and escalated", () => {
+    // call(foo, 1): a bare call(foo) is a typed call element since spec 116
+    // (parse-opaque.test.ts pins it), so the opaque example is the
+    // argument-list form the typed member cannot hold — still a
+    // call-return fragment (parse-opaque.test.ts pins that too).
     const result = parse(
-      kmn(stdPrelude(), `$keymanweb: + [K_A] > call(foo)\n`),
+      kmn(stdPrelude(), `$keymanweb: + [K_A] > call(foo, 1)\n`),
       "kb",
     );
     expect(result.ir.raw).toHaveLength(1);
@@ -577,7 +581,7 @@ describe("deprecated target-selector prefixes", () => {
     expect(rw).toHaveLength(1);
     expect(rw[0]?.rewrittenText).toContain("kept as-is");
     // Faithful emit: the one place a $keyman*: prefix may still appear.
-    expect(emit(result.ir)).toContain(`$keymanweb: + [K_A] > call(foo)`);
+    expect(emit(result.ir)).toContain(`$keymanweb: + [K_A] > call(foo, 1)`);
   });
 
   it("emit never writes a $keyman*: prefix for a stale hand-built IR", () => {

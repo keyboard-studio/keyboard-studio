@@ -71,12 +71,15 @@
 // is stable across renders when the working copy has not changed.
 
 import { useMemo, useRef } from "react";
-import type { Pattern, VirtualFS } from "@keyboard-studio/contracts";
+import type { CodeEdit, Pattern, VirtualFS } from "@keyboard-studio/contracts";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { KeyEditOperation } from "@keyboard-studio/engine";
 import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
+import {
+  projectWorkingCopyVfs,
+  type ProjectWorkingCopyVfsInput,
+} from "../lib/projectWorkingCopyVfs.ts";
 import {
   capsHandlingFromDecisions,
   marksGuardsFromValue,
@@ -206,6 +209,14 @@ export interface UseWorkingCopyTransformOptions {
    * store's committed value. A primitive, so it keys the memo directly.
    */
   liveCss?: string | null;
+
+  /**
+   * An observer of the `.kmn` after each late rule-writing projection step (see
+   * `ProjectWorkingCopyVfsInput.kmnStageTap`). Pass a STABLE function (a ref-writing callback): it
+   * is part of the memo key, so a fresh function each render would rebuild the transform each
+   * render. The Code tab uses it to tell which rules a step after the `kmn-edits` replay made.
+   */
+  kmnStageTap?: NonNullable<ProjectWorkingCopyVfsInput["kmnStageTap"]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -235,6 +246,7 @@ export function useWorkingCopyTransform(
   // the option's doc comment (UseWorkingCopyTransformOptions.liveLayoutOverride).
   const liveLayoutOverride = opts?.liveLayoutOverride;
   const liveCss = opts?.liveCss;
+  const kmnStageTap = opts?.kmnStageTap;
   const storeCustomCss = useWorkingCopyStore((s) => s.customCss);
   const customCss = liveCss !== undefined ? liveCss : storeCustomCss;
   // Documentation-step overrides (specs/html-editor): the authored doc files
@@ -496,6 +508,7 @@ export function useWorkingCopyTransform(
     return (
       vfs: VirtualFS,
       keyboardId: string,
+      candidateKmnEdit?: CodeEdit,
     ): { warnings: string[]; effectiveKeyboardId?: string } => {
       // Assignment-warning: when assignments exist but no patternMap was supplied,
       // emit a diagnostic and skip assignments (pass empty array to projectWorkingCopyVfs).
@@ -567,11 +580,15 @@ export function useWorkingCopyTransform(
             getPattern: (id) => patternMap?.get(id),
             identity: identityArg,
             marksTreatment,
-            kmnEdits,
+            kmnEdits:
+              candidateKmnEdit === undefined
+                ? kmnEdits
+                : { entries: [...(kmnEdits?.entries ?? []), candidateKmnEdit] },
             capsHandling: capsHandlingMode === null ? undefined : { mode: capsHandlingMode },
             ...(storeStartDisplayName !== null ? { baseDisplayName: storeStartDisplayName } : {}),
             ...(storeStartKeyboardId !== null ? { startKeyboardId: storeStartKeyboardId } : {}),
             ...(liveLayoutOverride !== undefined ? { liveLayoutOverride } : {}),
+            ...(kmnStageTap !== undefined ? { kmnStageTap } : {}),
           },
         ),
       );
@@ -604,6 +621,7 @@ export function useWorkingCopyTransform(
     storeContextToleranceOverlay,
     marksGuardsKey,
     kmnEditsKey,
+    kmnStageTap,
     capsHandlingMode,
     customCss,
     authoredWelcomeHtm,

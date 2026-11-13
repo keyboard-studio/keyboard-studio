@@ -10,16 +10,22 @@ import {
   act,
   cleanup,
   fireEvent,
+  renderHook,
   screen,
   waitFor,
 } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
+import { createVirtualFS, type StartKeyboard } from "@keyboard-studio/contracts";
 import { emitKmn, parseKmn } from "@keyboard-studio/engine";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { installDialogShim } from "../../test/dialogShim.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
+import type { MarksTreatmentValue } from "../../survey/marks/marksValue.ts";
 import { KmnCodePane, lineForNode } from "./KmnCodePane.tsx";
+import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
+import { projectWorkingCopyForOutput } from "../../lib/serializeWorkingCopy.ts";
+import { getPatternByIdSync } from "../../lib/services.ts";
 import type { CandidateCompileResult } from "../../lib/compileCandidateKmn.ts";
 import type { CodeEdit, KmnEditsValue } from "@keyboard-studio/contracts";
 
@@ -114,8 +120,79 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  useWorkingCopyStore.setState({ ir: null });
+  useWorkingCopyStore.getState().recordAssignments([]);
+  useDecisionStore.setState({ decisions: {} as never });
+  useWorkingCopyStore.setState({
+    ir: null,
+    startIr: null,
+    startVfs: null,
+    startKeyboard: null,
+    deletedNodeIds: new Set(),
+    deletedItemIds: new Set(),
+    carveChars: new Set(),
+  });
 });
+
+// A minimal parseable base for projection tests: the pane's canonical text
+// comes from the projected VFS .kmn, so the seed file and the parsed startIr
+// must agree.
+const BASE_KMN =
+  "store(&VERSION) '10.0'\n" +
+  "store(&NAME) 'Test'\n" +
+  "store(&TARGETS) 'any'\n" +
+  "begin Unicode > use(main)\n" +
+  "\n" +
+  "group(main) using keys\n" +
+  "+ [K_A] > 'a'\n";
+
+const TEST_KEYBOARD = {
+  id: "testkbd",
+  path: "release/t/testkbd",
+  script: "Latn",
+  targets: [],
+  displayName: "Test Keyboard",
+  version: "1.0",
+} as unknown as StartKeyboard;
+
+function seedProjectedBase(): KeyboardIR {
+  const ir = parseKmn(BASE_KMN, "testkbd").ir;
+  useWorkingCopyStore.setState({
+    ir,
+    startIr: ir,
+    startVfs: createVirtualFS([
+      { path: "source/testkbd.kmn", content: BASE_KMN, isBinary: false },
+    ]),
+    startKeyboard: TEST_KEYBOARD,
+  });
+  return ir;
+}
+
+const CARON = "\u030C";
+
+/** One S-02 deadkey pair (a → ǎ via K_COLON), the engine's caron() shape. */
+function recordCaronDeadkey(): void {
+  useWorkingCopyStore.getState().recordAssignments([
+    {
+      scope: "individual",
+      target: "ǎ",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "deadkey_single_tap",
+          strategyId: "S-02",
+          slotValues: {
+            triggerKey: "K_COLON",
+            deadkeyName: "3000",
+            baseLetters: "a",
+            accentedForms: "ǎ",
+            accentChar: ";",
+          },
+        },
+      ],
+      source: "user",
+    },
+  ]);
+}
 
 describe("KmnCodePane", () => {
   it("renders the disabled empty state when ir is null", () => {
@@ -125,13 +202,60 @@ describe("KmnCodePane", () => {
     expect(screen.queryByTestId("mock-editor")).toBeNull();
   });
 
-  it("starts clean: Apply disabled, editor shows the canonical emit", () => {
+  it("starts clean: Apply disabled, editor shows the canonical emit (no startVfs fallback)", () => {
     const ir = makeIR();
     useWorkingCopyStore.setState({ ir });
     render(<KmnCodePane />);
+    // No startVfs in this test, so the pane falls back to the carve-filtered
+    // emit — with no overlay that is emitKmn(ir).
     expect(editorText()).toBe(emitKmn(ir));
     expect(applyButton().disabled).toBe(true);
     expect(screen.queryByTestId("kmn-code-dirty")).toBeNull();
+  });
+
+  it("with a startVfs, shows the projected .kmn text, not the emit of the working IR", () => {
+    const ir = makeIR();
+    const fileText = "c the base file's own text, verbatim\n";
+    useWorkingCopyStore.setState({
+      ir,
+      startIr: ir,
+      startVfs: createVirtualFS([
+        { path: "source/testkbd.kmn", content: fileText, isBinary: false },
+      ]),
+      startKeyboard: {
+        id: "testkbd",
+        path: "release/t/testkbd",
+        script: "Latn",
+        targets: [],
+        displayName: "Test Keyboard",
+        version: "1.0",
+      } as unknown as StartKeyboard,
+    });
+    render(<KmnCodePane />);
+    // No carve/assignment/identity layers: the projection leaves the file's own text (it only
+    // adds the `any` targets store every copy ships), which differs from emitKmn(ir) for this
+    // synthetic IR.
+    expect(editorText()).toContain(fileText.trim());
+    expect(editorText()).toContain("store(&TARGETS) 'any'");
+    expect(editorText()).not.toBe(emitKmn(ir));
+    expect(applyButton().disabled).toBe(true);
+  });
+
+  it("with a startVfs that holds no .kmn, shows the carve-filtered emit instead of going blank", () => {
+    const ir = parseKmn(BASE_KMN, "testkbd").ir;
+    useWorkingCopyStore.setState({
+      ir,
+      startIr: ir,
+      startVfs: createVirtualFS([
+        // A VFS with no .kmn entry at all: findKmnPath finds nothing, so
+        // the projected text is null and the carve floor applies.
+        { path: "source/testkbd.kvks", content: "not a kmn", isBinary: false },
+      ]),
+      startKeyboard: TEST_KEYBOARD,
+    });
+    render(<KmnCodePane />);
+    // No carve overlay: the carve floor is emitKmn(ir).
+    expect(editorText()).toBe(emitKmn(ir));
   });
 
   it("typing marks the pane dirty and enables Apply", () => {
@@ -228,6 +352,7 @@ describe("KmnCodePane", () => {
 describe("KmnCodePane Apply (spec 117 US8)", () => {
   const KMN = [
     "store(&NAME) 'testkbd'",
+    "store(&TARGETS) 'any'",
     "begin Unicode > use(main)",
     "group(main) using keys",
     "+ 'a' > 'b'",
@@ -237,8 +362,21 @@ describe("KmnCodePane Apply (spec 117 US8)", () => {
 
   const startOf = (): KeyboardIR => parseKmn(KMN, "testkbd").ir;
 
-  function seed(ir: KeyboardIR = startOf(), startIr: KeyboardIR = startOf()): KeyboardIR {
-    useWorkingCopyStore.setState({ ir, startIr, undoStack: [], desktopLocked: false });
+  // Copy: the pane shows the built keyboard, so each test seeds a startVfs holding the starting
+  // point's text (`vfsKmn`, default the same keyboard) beside the working IR and startIr.
+  function seed(
+    ir: KeyboardIR = startOf(),
+    startIr: KeyboardIR = startOf(),
+    vfsKmn: string = KMN,
+  ): KeyboardIR {
+    useWorkingCopyStore.setState({
+      ir,
+      startIr,
+      startVfs: createVirtualFS([{ path: "source/testkbd.kmn", content: vfsKmn, isBinary: false }]),
+      startKeyboard: TEST_KEYBOARD,
+      undoStack: [],
+      desktopLocked: false,
+    });
     return ir;
   }
 
@@ -256,7 +394,8 @@ describe("KmnCodePane Apply (spec 117 US8)", () => {
   const recorded = (): KmnEditsValue | undefined =>
     useDecisionStore.getState().decisions["kmn-edits"]?.value as KmnEditsValue | undefined;
 
-  const changedRule = () => editorText().replace("+ U+0063 > U+0064", "+ U+0063 > U+0065");
+  // The built text is the file's own (raw `'c' > 'd'`) until a step re-emits it (`U+0063 > U+0064`).
+  const changedRule = () => editorText().replace(/(\+ (?:U\+0063|'c') > )(?:U\+0064|'d')/, "$1'e'");
 
   beforeEach(() => assignedMock.fn.mockResolvedValue([]));
 
@@ -343,17 +482,20 @@ describe("KmnCodePane Apply (spec 117 US8)", () => {
     expect(compileMock.fn).not.toHaveBeenCalled();
   });
 
-  it("a formatting-only change records nothing when the IR holds a freestanding comment", async () => {
-    const ir = startOf();
-    ir.comments.push({ nodeId: "comment#900", text: "", anchor: "freestanding", sourceLine: 1 });
-    seed(ir, startOf());
+  it("a formatting-only change records nothing when the built text holds a freestanding comment", async () => {
+    // The diff base is the parse of the text on screen, so a comment the parser reads one way is
+    // read the same way on both sides (this replaces the base-is-the-working-IR variant).
+    const withComment = KMN.replace("group(main) using keys", "c note\n\ngroup(main) using keys");
+    seed(parseKmn(withComment, "testkbd").ir, parseKmn(withComment, "testkbd").ir, withComment);
     render(<KmnCodePane />);
+    expect(editorText()).toBe(withComment);
     edit(`${editorText()}
 
 `);
     await clickApply();
     expect(recorded()).toBeUndefined();
     expect(compileMock.fn).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("kmn-code-dirty")).toBeNull();
   });
 
   it("an Apply records one CodeEdit, pushes undo kind c, and never calls setWorkingIR with a re-parsed IR", async () => {
@@ -378,10 +520,12 @@ describe("KmnCodePane Apply (spec 117 US8)", () => {
   });
 
   function seedOverride(): KeyboardIR {
-    const start = parseKmn(KMN.replace("+ 'c' > 'd'\n", ""), "testkbd").ir;
+    const startKmn = KMN.replace("+ 'c' > 'd'\n", "");
+    const start = parseKmn(startKmn, "testkbd").ir;
     const ir = startOf();
     ir.groups[0]!.rules[1]!.rulesStepAdded = true;
-    return seed(ir, start);
+    // The rules step's rule reaches the built text through the projection's rule additions.
+    return seed(ir, start, startKmn);
   }
 
   it("an override shows the owner confirm; nothing is recorded until it is confirmed", async () => {
@@ -416,6 +560,7 @@ describe("KmnCodePane Apply (spec 117 US8)", () => {
   describe("a key the Assign tab owns (ruling 10)", () => {
     const KEYED = [
       "store(&NAME) 'testkbd'",
+      "store(&TARGETS) 'any'",
       "begin Unicode > use(main)",
       "group(main) using keys",
       "+ [K_G] > 'g'",
@@ -423,10 +568,10 @@ describe("KmnCodePane Apply (spec 117 US8)", () => {
       "",
     ].join("\n");
     const keyedIr = (): KeyboardIR => parseKmn(KEYED, "testkbd").ir;
-    const changedG = () => editorText().replace("+ [K_G] > U+0067", "+ [K_G] > U+011D");
+    const changedG = () => editorText().replace("+ [K_G] > 'g'", "+ [K_G] > U+011D");
 
     it("anchors the edit by key, names the Assign tab in the confirm, and the gate sees the keystroke", async () => {
-      seed(keyedIr(), keyedIr());
+      seed(keyedIr(), keyedIr(), KEYED);
       assignedMock.fn.mockResolvedValue([{ vkey: "K_G", modifiers: [] }]);
       compileMock.fn.mockResolvedValue({ status: "ok" } satisfies CandidateCompileResult);
       render(<KmnCodePane />);
@@ -444,7 +589,7 @@ describe("KmnCodePane Apply (spec 117 US8)", () => {
     });
 
     it("does not anchor or flag an edit on a key no assignment claims", async () => {
-      seed(keyedIr(), keyedIr());
+      seed(keyedIr(), keyedIr(), KEYED);
       assignedMock.fn.mockResolvedValue([{ vkey: "K_H", modifiers: [] }]);
       compileMock.fn.mockResolvedValue({ status: "ok" } satisfies CandidateCompileResult);
       render(<KmnCodePane />);
@@ -477,22 +622,685 @@ describe("KmnCodePane Apply (spec 117 US8)", () => {
     expect(useWorkingCopyStore.getState().ir).toBe(before);
   });
 
- it("Apply still goes through for an edit that keeps a grandfathered raw-Ctrl rule", async () => {
-   const ir = parseKmn(
-     `store(&VERSION) '10.0'\nstore(&NAME) 'testkbd'\n\nbegin Unicode > use(main)\n\ngroup(main) using keys\n\n+ [CTRL K_A] > 'é'\n+ [K_B] > 'b'\n`,
-     "testkbd",
-   ).ir;
-   seed(ir, ir);
-   render(<KmnCodePane />);
-   edit(editorText().replace("+ [K_B] > U+0062", "+ [K_B] > U+0063"));
-   await clickApply();
-   if (screen.queryByTestId("kmn-code-owner-confirm")) {
-     await act(async () => {
-       fireEvent.click(screen.getByText("Apply anyway"));
-     });
-   }
-   await waitFor(() => expect(recorded()?.entries).toHaveLength(1));
-   expect(screen.queryByTestId("kmn-code-apply-error")).toBeNull();
-   expect(useWorkingCopyStore.getState().ir).not.toBe(ir);
- });
+  it("Apply still goes through for an edit that keeps a grandfathered raw-Ctrl rule", async () => {
+    const kmn = `store(&VERSION) '10.0'\nstore(&NAME) 'testkbd'\nstore(&TARGETS) 'any'\n\nbegin Unicode > use(main)\n\ngroup(main) using keys\n\n+ [CTRL K_A] > 'é'\n+ [K_B] > 'b'\n`;
+    const ir = parseKmn(kmn, "testkbd").ir;
+    seed(ir, ir, kmn);
+    render(<KmnCodePane />);
+    edit(editorText().replace("+ [K_B] > 'b'", "+ [K_B] > 'c'"));
+    await clickApply();
+    if (screen.queryByTestId("kmn-code-owner-confirm")) {
+      await act(async () => {
+        fireEvent.click(screen.getByText("Apply anyway"));
+      });
+    }
+    await waitFor(() => expect(recorded()?.entries).toHaveLength(1));
+    expect(screen.queryByTestId("kmn-code-apply-error")).toBeNull();
+    expect(useWorkingCopyStore.getState().ir).not.toBe(ir);
+  });
+});
+
+describe("KmnCodePane built view (Copy)", () => {
+  describe("recorded assignments in the projected text", () => {
+    it("shows a recorded mechanism assignment's rule through the real projection", () => {
+      const ir = seedProjectedBase();
+      render(<KmnCodePane />);
+      // Grounding: before any assignment the pane shows the base file text.
+      expect(editorText()).toBe(BASE_KMN);
+      act(() => {
+        useWorkingCopyStore.getState().recordAssignments([
+          {
+            scope: "individual",
+            target: "ŋ",
+            modality: "physical",
+            mechanisms: [
+              {
+                patternId: "simple_swap",
+                strategyId: "S-01",
+                slotValues: { kmnRules: "+ [K_N] > U+014B" },
+              },
+            ],
+            source: "user",
+          },
+        ]);
+      });
+      expect(editorText()).toContain("+ [K_N] > U+014B");
+      expect(editorText()).not.toBe(emitKmn(ir));
+      // The projection clones the VFS: the base file itself is untouched.
+      expect(
+        useWorkingCopyStore.getState().startVfs?.get("source/testkbd.kmn")
+          ?.content,
+      ).toBe(BASE_KMN);
+    });
+
+    it("without a recorded output form, a deadkey assignment shows its precomposed pair", () => {
+      seedProjectedBase();
+      act(() => {
+        recordCaronDeadkey();
+      });
+      render(<KmnCodePane />);
+      expect(editorText()).toMatch(/store\(dk_3000_output\)\s+'ǎ'/);
+      expect(editorText()).not.toContain("index(dk_3000_bases, 2)");
+    });
+
+    it("with base-plus-mark recorded, the same deadkey shows the NFD seam shape", () => {
+      seedProjectedBase();
+      const marksTreatment: MarksTreatmentValue = {
+        answers: {},
+        completion: {
+          worklist: {
+            ownLetterUnits: ["a"],
+            markUnits: [{ mark: CARON, inputOrder: "postfix" }],
+            blockedCombinations: [],
+          },
+          outputForm: "base-plus-mark",
+        },
+        contextTolerance: null,
+      };
+      act(() => {
+        useDecisionStore.setState({
+          decisions: {
+            "marks-treatment": {
+              id: "marks-treatment",
+              value: marksTreatment,
+            } as never,
+          },
+        });
+        recordCaronDeadkey();
+      });
+      render(<KmnCodePane />);
+      // The NFD seam shape — reachable only because the pane preloads
+      // OUTPUT_FORM_SEAM_PATTERN_IDS (deadkey_single_tap_nfd) into the
+      // projection's pattern map alongside the recorded assignment's own id.
+      // The pane shows the projection's re-emitted .kmn, so stores use
+      // single-space alignment and the mark is written as U+030C (unlike
+      // the raw fragment text applyAssignments returns at engine level).
+      expect(editorText()).toContain("store(dk_3000_bases) 'a'");
+      expect(editorText()).toContain(
+        "dk(3000) + any(dk_3000_bases) > index(dk_3000_bases, 2) U+030C",
+      );
+      expect(editorText()).not.toContain("dk_3000_output");
+    });
+  });
+
+  describe("Apply and dirty drafts on the projected text", () => {
+    const recorded = (): KmnEditsValue | undefined =>
+      useDecisionStore.getState().decisions["kmn-edits"]?.value as KmnEditsValue | undefined;
+
+    beforeEach(() => {
+      assignedMock.fn.mockResolvedValue([]);
+      useWorkingCopyStore.setState({ undoStack: [], desktopLocked: false });
+    });
+
+    it("Apply of a real edit records a kept edit, and the built text then shows it (the edit stays visible)", async () => {
+      const ir = seedProjectedBase();
+      render(<KmnCodePane />);
+      expect(editorText()).toBe(BASE_KMN);
+      act(() => {
+        fireEvent.change(screen.getByTestId("mock-editor"), {
+          target: { value: BASE_KMN.replace("+ [K_A] > 'a'", "+ [K_A] > 'b'") },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(applyButton());
+      });
+      expect(recorded()?.entries).toHaveLength(1);
+      const next = useWorkingCopyStore.getState().ir;
+      expect(next).not.toBe(ir);
+      // The emitter writes the 'b' output as its U+ codepoint.
+      expect(emitKmn(next!)).toContain("+ [K_A] > U+0062");
+      // The canonical moved because the edit is now in the build: the editor shows the built text
+      // (re-emitted by the replay), not a draft the build ignores, and nothing is left unapplied.
+      await waitFor(() => expect(editorText()).toContain("+ [K_A] > U+0062"));
+      expect(screen.queryByTestId("kmn-code-dirty")).toBeNull();
+      expect(applyButton().disabled).toBe(true);
+    });
+
+    it("a formatting-only Apply records nothing, clears the dirty badge and keeps the draft", async () => {
+      seedProjectedBase();
+      render(<KmnCodePane />);
+      expect(editorText()).toBe(BASE_KMN);
+      const draft = BASE_KMN + "\n";
+      act(() => {
+        fireEvent.change(screen.getByTestId("mock-editor"), {
+          target: { value: draft },
+        });
+      });
+      expect(screen.getByTestId("kmn-code-dirty")).toBeTruthy();
+      await act(async () => {
+        fireEvent.click(applyButton());
+      });
+      expect(recorded()).toBeUndefined();
+      expect(editorText()).toBe(draft);
+      expect(screen.queryByTestId("kmn-code-dirty")).toBeNull();
+      expect(applyButton().disabled).toBe(true);
+    });
+
+    it("an Apply does not leave a stale flag that wipes a later dirty draft", async () => {
+      seedProjectedBase();
+      render(<KmnCodePane />);
+      act(() => {
+        fireEvent.change(screen.getByTestId("mock-editor"), {
+          target: { value: BASE_KMN.replace("+ [K_A] > 'a'", "+ [K_A] > 'b'") },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(applyButton());
+      });
+      await waitFor(() => expect(screen.queryByTestId("kmn-code-dirty")).toBeNull());
+      const draft = editorText() + "\n+ [K_C] > 'c'\n";
+      act(() => {
+        fireEvent.change(screen.getByTestId("mock-editor"), { target: { value: draft } });
+      });
+      // A change to the built text (an assignment) while the draft is dirty must not snap it.
+      act(() => {
+        useWorkingCopyStore.getState().recordAssignments([
+          {
+            scope: "individual",
+            target: "ŋ",
+            modality: "physical",
+            mechanisms: [
+              { patternId: "simple_swap", strategyId: "S-01", slotValues: { kmnRules: "+ [K_N] > U+014B" } },
+            ],
+            source: "user",
+          },
+        ]);
+      });
+      expect(editorText()).toBe(draft);
+      expect(screen.getByTestId("kmn-code-dirty")).toBeTruthy();
+    });
+
+    it("a dirty draft survives a recorded assignment instead of snapping to the new canonical", () => {
+      seedProjectedBase();
+      render(<KmnCodePane />);
+      expect(editorText()).toBe(BASE_KMN);
+      const draft = editorText() + "\n";
+      act(() => {
+        fireEvent.change(screen.getByTestId("mock-editor"), {
+          target: { value: draft },
+        });
+      });
+      expect(screen.getByTestId("kmn-code-dirty")).toBeTruthy();
+      // Recording an assignment changes the canonical (the ŋ rule arrives
+      // via the projection) — the dirty draft must stay put.
+      act(() => {
+        useWorkingCopyStore.getState().recordAssignments([
+          {
+            scope: "individual",
+            target: "ŋ",
+            modality: "physical",
+            mechanisms: [
+              {
+                patternId: "simple_swap",
+                strategyId: "S-01",
+                slotValues: { kmnRules: "+ [K_N] > U+014B" },
+              },
+            ],
+            source: "user",
+          },
+        ]);
+      });
+      expect(editorText()).toBe(draft);
+      expect(editorText()).not.toContain("+ [K_N] > U+014B");
+      expect(screen.getByTestId("kmn-code-dirty")).toBeTruthy();
+    });
+  });
+});
+
+// Owner ruling 2026-11-13, "built view plus kept edits" (research R15): on Copy the Code tab shows
+// the keyboard as it will be built, and Apply records the difference from that view as a kept
+// `kmn-edits` entry, so the tab, the preview and the download agree.
+describe("KmnCodePane built view plus kept edits", () => {
+  const norm = (text: string): string => emitKmn(parseKmn(text, "testkbd").ir);
+  const recorded = (): KmnEditsValue | undefined =>
+    useDecisionStore.getState().decisions["kmn-edits"]?.value as KmnEditsValue | undefined;
+  const edit = (text: string) =>
+    act(() => {
+      fireEvent.change(screen.getByTestId("mock-editor"), { target: { value: text } });
+    });
+  const clickApply = async () => {
+    await act(async () => {
+      fireEvent.click(applyButton());
+    });
+  };
+  const confirmIfAsked = async () => {
+    if (screen.queryByTestId("kmn-code-owner-confirm") !== null) {
+      await act(async () => {
+        fireEvent.click(screen.getByText("Apply anyway"));
+      });
+    }
+  };
+  const assign = (target: string, rules: string) =>
+    act(() => {
+      useWorkingCopyStore.getState().recordAssignments([
+        {
+          scope: "individual",
+          target,
+          modality: "physical",
+          mechanisms: [{ patternId: "simple_swap", strategyId: "S-01", slotValues: { kmnRules: rules } }],
+          source: "user",
+        },
+      ]);
+    });
+
+  beforeEach(() => {
+    assignedMock.fn.mockResolvedValue([]);
+    seedProjectedBase();
+    useWorkingCopyStore.setState({ undoStack: [], desktopLocked: false });
+  });
+
+  // The version-stamp lines are the only ones the routes may differ on.
+  const stripStamps = (text: string): string =>
+    text
+      .split("\n")
+      .filter((l) => !/VERSION|COPYRIGHT/i.test(l))
+      .join("\n");
+
+  /** The preview route: the OSK preview's transform over a clone of the starting VFS. */
+  function previewKmn(): string {
+    const startVfs = useWorkingCopyStore.getState().startVfs!;
+    const simpleSwap = getPatternByIdSync("simple_swap");
+    const { result } = renderHook(() =>
+      useWorkingCopyTransform({
+        previewedStartId: "testkbd",
+        patternMap: new Map(simpleSwap === undefined ? [] : [["simple_swap", simpleSwap]]),
+      }),
+    );
+    const vfs = createVirtualFS(startVfs.entries());
+    result.current!(vfs, "testkbd");
+    return vfs.get("source/testkbd.kmn")!.content as string;
+  }
+
+  /** The download route: the output projection the zip and the pull request read. */
+  async function downloadKmn(): Promise<string> {
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected).not.toBeNull();
+    const entry = [...projected!.vfs.entries()].find((e) => e.path.startsWith("source/") && e.path.endsWith(".kmn"));
+    return entry!.content as string;
+  }
+
+  /** Apply `applied`, then prove the pane, the preview and the download all hold exactly that text. */
+  async function applyAndExpectBuilt(applied: string): Promise<void> {
+    render(<KmnCodePane />);
+    edit(applied);
+    await clickApply();
+    await confirmIfAsked();
+    await waitFor(() => expect(recorded()?.entries).toHaveLength(1));
+    // The pane's own (re-)projection after the recorded entry is the text the author applied.
+    await waitFor(() => expect(norm(editorText())).toBe(norm(applied)));
+    expect(screen.queryByTestId("kmn-code-dirty")).toBeNull();
+    const pane = editorText();
+    // A fresh pane, projecting from the stores alone (a rebuild), shows the same text.
+    cleanup();
+    render(<KmnCodePane />);
+    expect(norm(editorText())).toBe(norm(applied));
+    cleanup();
+    // The preview and the download agree with the pane and with each other.
+    const preview = previewKmn();
+    const download = await downloadKmn();
+    expect(stripStamps(norm(preview))).toBe(stripStamps(norm(download)));
+    expect(stripStamps(norm(pane))).toBe(stripStamps(norm(download)));
+    expect(stripStamps(norm(applied))).toBe(stripStamps(norm(download)));
+    render(<KmnCodePane />);
+  }
+
+  it("an edit to a starting-point rule: record, rebuild, and the projection is the applied text", async () => {
+    await applyAndExpectBuilt(BASE_KMN.replace("+ [K_A] > 'a'", "+ [K_A] > 'b'"));
+  });
+
+  it("an added rule and a removed rule: the projection is the applied text", async () => {
+    await applyAndExpectBuilt(BASE_KMN.replace("+ [K_A] > 'a'\n", "+ [K_B] > 'b'\n"));
+  });
+
+  it("an edit to an Assign-tab rule: the projection is the applied text and the live IR is not refused", async () => {
+    assign("ŋ", "+ [K_N] > U+014B");
+    const before = emitKmn(useWorkingCopyStore.getState().ir!);
+    render(<KmnCodePane />);
+    expect(editorText()).toContain("+ [K_N] > U+014B");
+    const applied = editorText().replace("+ [K_N] > U+014B", "+ [K_N] > U+014A");
+    cleanup();
+    await applyAndExpectBuilt(applied);
+    expect(editorText()).not.toContain("U+014B");
+    // The working IR holds no assignment rule, so the change could not anchor there: it is
+    // skipped live, not refused, and the recorded entry carries it.
+    expect(emitKmn(useWorkingCopyStore.getState().ir!)).toBe(before);
+  });
+
+  it("a second Apply with no further typing records nothing; formatting-only typing records nothing", async () => {
+    await applyAndExpectBuilt(BASE_KMN.replace("+ [K_A] > 'a'", "+ [K_A] > 'b'"));
+    cleanup();
+    render(<KmnCodePane />);
+    expect(applyButton().disabled).toBe(true);
+    edit(editorText().replace("group(main) using keys", "group(main)   using   keys\n\n"));
+    await clickApply();
+    expect(recorded()?.entries).toHaveLength(1);
+    expect(screen.queryByTestId("kmn-code-dirty")).toBeNull();
+    expect(compileMock.fn).toHaveBeenCalledTimes(1);
+  });
+
+  describe("a key the Assign tab owns", () => {
+    it("the most recent edit wins: the edit is keyed to the keystroke, so it survives a re-assignment", async () => {
+      assign("ā", "+ [K_A] > U+0101");
+      assignedMock.fn.mockResolvedValue([{ vkey: "K_A", modifiers: [] }]);
+      cleanup();
+      render(<KmnCodePane />);
+      // The assignment's rule replaced the starting rule on K_A in the built text.
+      expect(editorText()).toContain("+ [K_A] > U+0101");
+      expect(editorText()).not.toContain("+ [K_A] > 'a'");
+      edit(editorText().replace("+ [K_A] > U+0101", "+ [K_A] > U+0102"));
+      await clickApply();
+      expect(screen.getByTestId("kmn-code-owner-confirm").textContent).toMatch(/Assign tab/);
+      await confirmIfAsked();
+      await waitFor(() => expect(recorded()?.entries).toHaveLength(1));
+      const entry = recorded()!.entries[0] as CodeEdit;
+      expect(entry.overrides).toContainEqual({ change: 0, owner: "assign-tab" });
+      await waitFor(() => expect(editorText()).toContain("+ [K_A] > U+0102"));
+      // Re-assign the key with a different output: the edit, keyed to K_A, still wins.
+      assign("ā", "+ [K_A] > U+0103");
+      await waitFor(() => expect(editorText()).toContain("+ [K_A] > U+0102"));
+      expect(editorText()).not.toContain("U+0103");
+    });
+  });
+
+  describe("rules made by a build step after the kmn-edits replay", () => {
+    const CASED = [
+      "store(&VERSION) '10.0'",
+      "store(&NAME) 'Test'",
+      "store(&TARGETS) 'any'",
+      "begin Unicode > use(main)",
+      "",
+      "group(main) using keys",
+      "+ [K_A] > 'a'",
+      "+ [SHIFT K_A] > 'A'",
+      "+ [K_B] > 'b'",
+      "",
+    ].join("\n");
+
+    function seedCased(): void {
+      const ir = parseKmn(CASED, "testkbd").ir;
+      useWorkingCopyStore.setState({
+        ir,
+        startIr: ir,
+        startVfs: createVirtualFS([{ path: "source/testkbd.kmn", content: CASED, isBinary: false }]),
+      });
+      useDecisionStore.getState().recordAll([
+        { id: "character-inventory", value: { chars: ["a", "A", "b"] }, provenance: "asked" },
+        { id: "caps-handling", value: { mode: "cased-keys" }, provenance: "default" },
+      ] as never);
+      cleanup();
+      render(<KmnCodePane />);
+    }
+
+    it("shows the caps store the caps step writes, and refuses an Apply that changes it", async () => {
+      seedCased();
+      expect(editorText()).toContain("store(&CasedKeys)");
+      edit(editorText().replace(/store\(&CasedKeys\) .*/, "store(&CasedKeys) [K_A K_B]"));
+      await clickApply();
+      expect(recorded()).toBeUndefined();
+      expect(compileMock.fn).not.toHaveBeenCalled();
+      const line = editorText().split("\n").findIndex((l) => l.startsWith("store(&CasedKeys)")) + 1;
+      expect(screen.getByTestId("kmn-code-apply-error").textContent).toMatch(
+        new RegExp(`Line ${line}: .*caps handling choice`),
+      );
+    });
+
+    it("an edit to an ordinary rule is still recorded when a later step is active, and the other step's output stays", async () => {
+      seedCased();
+      edit(editorText().replace("+ [K_B] > U+0062", "+ [K_B] > U+0063"));
+      await clickApply();
+      await waitFor(() => expect(recorded()?.entries).toHaveLength(1));
+      await waitFor(() => expect(editorText()).toContain("+ [K_B] > U+0063"));
+      expect(editorText()).toContain("store(&CasedKeys)");
+    });
+
+    it("refuses an edit that a later step rewrites in place: the build would override it", async () => {
+      seedCased();
+      // The caps step drops the NCAPS token on a cased key, so the rule would build as `[K_A]`.
+      edit(editorText().replace("+ [K_A] > U+0061", "+ [K_A] > U+0061\n+ [NCAPS K_A] > U+0078"));
+      await clickApply();
+      expect(recorded()).toBeUndefined();
+      expect(compileMock.fn).not.toHaveBeenCalled();
+      expect(screen.getByTestId("kmn-code-apply-error").textContent).toMatch(/later build step changes this back/);
+      expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
+    });
+
+    describe("a mark-guard rule", () => {
+      const ACUTE = "\u0301";
+      const MARKS_KMN =
+        "store(&VERSION) '10.0'\nstore(&NAME) 'Test'\nstore(&TARGETS) 'any'\nbegin Unicode > use(main)\n\n" +
+        "group(main) using keys\n+ [K_A] > 'a'\n+ [K_5] > U+0301\n";
+
+      function seedGuarded(): void {
+        const ir = parseKmn(MARKS_KMN, "testkbd").ir;
+        useWorkingCopyStore.setState({
+          ir,
+          startIr: ir,
+          startVfs: createVirtualFS([{ path: "source/testkbd.kmn", content: MARKS_KMN, isBinary: false }]),
+        });
+        const value: MarksTreatmentValue = {
+          answers: {},
+          completion: {
+            worklist: {
+              ownLetterUnits: ["a", "k"],
+              markUnits: [{ mark: ACUTE, inputOrder: "postfix" }],
+              blockedCombinations: [{ base: "k", mark: ACUTE }],
+            },
+            outputForm: "base-plus-mark",
+          },
+          contextTolerance: null,
+        };
+        useDecisionStore.setState({
+          decisions: { "marks-treatment": { id: "marks-treatment", value } as never },
+        });
+        cleanup();
+        render(<KmnCodePane />);
+      }
+
+      it("shows the guard the marks step writes, and refuses an Apply that changes it", async () => {
+        seedGuarded();
+        expect(editorText()).toContain("nul U+0301 > nul");
+        edit(editorText().replace("nul U+0301 > nul", "nul U+0301 > U+0041"));
+        await clickApply();
+        expect(recorded()).toBeUndefined();
+        expect(compileMock.fn).not.toHaveBeenCalled();
+        expect(screen.getByTestId("kmn-code-apply-error").textContent).toMatch(/marks step/);
+      });
+    });
+
+    describe("a context-tolerance rule", () => {
+      const TOL_KMN =
+        "store(&VERSION) '10.0'\nstore(&NAME) 'Test'\nstore(&TARGETS) 'any'\nbegin Unicode > use(main)\n\n" +
+        "group(main) using keys\nU+00E0 + ']' > U+00E2\n+ ']' > U+00B4\n";
+
+      it("refuses an Apply that changes a rule the tolerance fix adds", async () => {
+        const ir = parseKmn(TOL_KMN, "testkbd").ir;
+        useWorkingCopyStore.setState({
+          ir,
+          startIr: ir,
+          startVfs: createVirtualFS([{ path: "source/testkbd.kmn", content: TOL_KMN, isBinary: false }]),
+        });
+        useWorkingCopyStore.getState().setContextToleranceOverlay({
+          fingerprint: "f1",
+          acceptedSiteIds: ["site-1"],
+          overlay: {
+            batches: [
+              {
+                siteKey: "site-1",
+                groupName: "main",
+                beforeRuleText: "+ U+005D > U+00B4",
+                comment: "Accept the decomposed form too.",
+                rules: [
+                  {
+                    nodeId: "decomposed_accent_r1_0",
+                    context: [
+                      { kind: "char", value: "a" },
+                      { kind: "char", value: "\u0300" },
+                      { kind: "raw", text: "+" },
+                      { kind: "char", value: "]" },
+                    ],
+                    output: [{ kind: "char", value: "\u00E2" }],
+                  },
+                ],
+              },
+            ],
+          },
+        });
+        cleanup();
+        render(<KmnCodePane />);
+        expect(editorText()).toContain("Accept the decomposed form too.");
+        const added = editorText().split("\n").find((l) => l.includes("U+0300") && l.includes("+"))!;
+        expect(added).toBeDefined();
+        edit(editorText().replace(added, added.replace(/> .*$/, "> U+0041")));
+        await clickApply();
+        expect(recorded()).toBeUndefined();
+        expect(compileMock.fn).not.toHaveBeenCalled();
+        expect(screen.getByTestId("kmn-code-apply-error").textContent).toMatch(/context-tolerance/);
+        useWorkingCopyStore.getState().setContextToleranceOverlay(null);
+      });
+    });
+
+    describe("the header", () => {
+      it("an edit to &TARGETS is refused, naming that rule: the build forces it to any", async () => {
+        seedCased();
+        edit(editorText().replace("store(&TARGETS) 'any'", "store(&TARGETS) 'windows'"));
+        await clickApply();
+        expect(recorded()).toBeUndefined();
+        expect(compileMock.fn).not.toHaveBeenCalled();
+        expect(screen.getByTestId("kmn-code-apply-error").textContent).toMatch(/&TARGETS/);
+      });
+
+      it("an edit to the &NAME the identity step wrote reaches the identity confirm, not the late-rule refusal", async () => {
+        seedCased();
+        useWorkingCopyStore.getState().setIdentity({ displayName: "My Keyboard" } as never);
+        cleanup();
+        render(<KmnCodePane />);
+        expect(editorText()).toContain("My Keyboard");
+        edit(editorText().replace("My Keyboard", "Other Name"));
+        await clickApply();
+        expect(screen.queryByTestId("kmn-code-apply-error")).toBeNull();
+        expect(screen.getByTestId("kmn-code-owner-confirm").textContent).toMatch(/keyboard identity/);
+        useWorkingCopyStore.getState().setIdentity(null as never);
+      });
+    });
+
+    it("an Apply that changes a late rule and an ordinary rule records neither (all or nothing)", async () => {
+      seedCased();
+      edit(
+        editorText()
+          .replace(/store\(&CasedKeys\) .*/, "store(&CasedKeys) [K_A K_B]")
+          .replace("+ [K_B] > U+0062", "+ [K_B] > U+0063"),
+      );
+      await clickApply();
+      expect(recorded()).toBeUndefined();
+      expect(screen.getByTestId("kmn-code-apply-error")).toBeTruthy();
+    });
+  });
+
+  describe("view in code on the built text", () => {
+    it("reveals the line of the rule in the projected text, which an assignment has shifted", () => {
+      assign("ŋ", "+ [K_N] > U+014B\n+ [K_M] > U+0271");
+      const ir = useWorkingCopyStore.getState().ir!;
+      const rule = ir.groups.find((g) => g.name === "main")!.rules[0]!;
+      cleanup();
+      render(<KmnCodePane revealNodeId={rule.nodeId} />);
+      const lines = editorText().split("\n");
+      const line = lines.findIndex((l) => l.includes("[K_A]")) + 1;
+      expect(line).toBeGreaterThan(0);
+      expect(editorMocks.revealLineInCenter).toHaveBeenCalledWith(line);
+    });
+  });
+});
+
+describe("KmnCodePane Apply guards and drafts", () => {
+  const edit = (text: string) =>
+    act(() => {
+      fireEvent.change(screen.getByTestId("mock-editor"), { target: { value: text } });
+    });
+  const recorded = (): KmnEditsValue | undefined =>
+    useDecisionStore.getState().decisions["kmn-edits"]?.value as KmnEditsValue | undefined;
+  const assign = (target: string, rules: string) =>
+    act(() => {
+      useWorkingCopyStore.getState().recordAssignments([
+        {
+          scope: "individual",
+          target,
+          modality: "physical",
+          mechanisms: [{ patternId: "simple_swap", strategyId: "S-01", slotValues: { kmnRules: rules } }],
+          source: "user",
+        },
+      ]);
+    });
+
+  beforeEach(() => {
+    assignedMock.fn.mockResolvedValue([]);
+    seedProjectedBase();
+    useWorkingCopyStore.setState({ undoStack: [], desktopLocked: false });
+  });
+
+  it("a double click starts one Apply: one compile, one entry, no 'changed while Apply was running'", async () => {
+    render(<KmnCodePane />);
+    edit(BASE_KMN.replace("+ [K_A] > 'a'", "+ [K_A] > 'b'"));
+    await act(async () => {
+      fireEvent.click(applyButton());
+      fireEvent.click(applyButton());
+    });
+    await waitFor(() => expect(recorded()?.entries).toHaveLength(1));
+    expect(compileMock.fn).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("kmn-code-apply-error")).toBeNull();
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(1);
+  });
+
+  it("an Apply is possible again after the first one finished", async () => {
+    render(<KmnCodePane />);
+    edit(BASE_KMN.replace("+ [K_A] > 'a'", "+ [K_A] > 'b'"));
+    await act(async () => {
+      fireEvent.click(applyButton());
+    });
+    await waitFor(() => expect(recorded()?.entries).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByTestId("kmn-code-dirty")).toBeNull());
+    edit(editorText().replace("+ [K_A] > U+0062", "+ [K_A] > U+0063"));
+    await act(async () => {
+      fireEvent.click(applyButton());
+    });
+    // The rule is the earlier edit's, so the owner confirm asks first.
+    await act(async () => {
+      fireEvent.click(screen.getByText("Apply anyway"));
+    });
+    await waitFor(() => expect(recorded()?.entries).toHaveLength(2));
+  });
+
+  describe("a dirty draft whose build changed underneath it", () => {
+    it("refuses to apply, keeps the draft, and offers to reload the current text", async () => {
+      render(<KmnCodePane />);
+      const draft = BASE_KMN.replace("+ [K_A] > 'a'", "+ [K_A] > 'b'");
+      edit(draft);
+      assign("ŋ", "+ [K_N] > U+014B");
+      expect(screen.getByTestId("kmn-code-draft-stale")).toBeTruthy();
+      await act(async () => {
+        fireEvent.click(applyButton());
+      });
+      expect(recorded()).toBeUndefined();
+      expect(compileMock.fn).not.toHaveBeenCalled();
+      expect(screen.getByTestId("kmn-code-apply-error").textContent).toMatch(/changed underneath your draft/);
+      // The draft is still there.
+      expect(editorText()).toBe(draft);
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("kmn-code-reload"));
+      });
+      expect(editorText()).toContain("+ [K_N] > U+014B");
+      expect(screen.queryByTestId("kmn-code-dirty")).toBeNull();
+      expect(screen.queryByTestId("kmn-code-draft-stale")).toBeNull();
+    });
+  });
+
+  describe("view in code", () => {
+    it("says so when the built keyboard has no line for the rule (an assignment replaced it)", () => {
+      const rule = useWorkingCopyStore.getState().ir!.groups.find((g) => g.name === "main")!.rules[0]!;
+      assign("ā", "+ [K_A] > U+0101");
+      cleanup();
+      render(<KmnCodePane revealNodeId={rule.nodeId} />);
+      expect(editorText()).not.toContain("+ [K_A] > 'a'");
+      expect(screen.getByTestId("kmn-code-reveal-missing")).toBeTruthy();
+    });
+  });
 });

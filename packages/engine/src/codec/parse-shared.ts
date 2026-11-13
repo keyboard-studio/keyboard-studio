@@ -5,16 +5,31 @@
  * Moved verbatim from parse.ts (spec 116 T032); no behaviour change.
  */
 
-import type { ContextElement, KeyboardIR, OutputElement, StoreItem } from "@keyboard-studio/contracts";
+import type {
+  ContextElement,
+  DeprecatedRewrite,
+  KeyboardIR,
+  OutputElement,
+  StoreItem,
+} from "@keyboard-studio/contracts";
 
 import { isNamedDeadkeyName, hasRawCallPrefix, classifyRawElement } from "@keyboard-studio/contracts";
 
 import { OPAQUE_REASONS, type OpaqueReason } from "./opaque-reasons.js";
+import { tryLegacyValue, type LegacyValueOptions } from "./deprecated-forms.js";
+import { isRewritePlatformGuard } from "./target-guards.js";
 
 /** What a .kmn reader returns: the IR and its opaque-feature inventory. */
 export interface ParseResult {
   ir: KeyboardIR;
   opaqueFeatures: Array<{ feature: string; count: number }>;
+  /**
+   * Deprecated .kmn forms rewritten during parse (#2633), in source order.
+   * Each entry is one visible rewrite: the parser still accepts the form,
+   * but the emitted .kmn carries the modern equivalent. Empty when the
+   * source used no deprecated forms.
+   */
+  rewrites: DeprecatedRewrite[];
 }
 
 /** Parse a codepoint literal U+XXXX → string character, or return null. */
@@ -467,6 +482,8 @@ export function parseStoreItems(
    * literals as characters); the legacy reader keeps the default.
    */
   allowSmp = false,
+  /** Legacy value-format decoding (#2633 §3): ANSI guard + rewrite recording. */
+  legacyOpts?: LegacyValueOptions,
 ): { items: StoreItem[]; opaqueReason: OpaqueReason | null } {
   const toks = splitTokens(rawValue);
   const items: StoreItem[] = [];
@@ -498,6 +515,15 @@ export function parseStoreItems(
     const cp = parseCodepoint(tok);
     if (cp !== null) {
       items.push({ kind: "char", value: cp });
+      i++;
+      continue;
+    }
+    // Legacy value format (#2633): d### / x### / octal ### → the character.
+    // Decoded here so emit spells it U+XXXX (ANSI-guarded: see
+    // tryLegacyValue — an escalated token falls through to the raw item).
+    const legacy = tryLegacyValue(tok, legacyOpts);
+    if (legacy !== null) {
+      items.push({ kind: "char", value: legacy });
       i++;
       continue;
     }
@@ -595,7 +621,8 @@ export const MAX_SKETCH_ITEMS = 0x20000;
 
 export function sketchStoreItems(
   rawValue: string,
-  known: Map<string, StoreItem[]>
+  known: Map<string, StoreItem[]>,
+  isAnsiSketch = false,
 ): StoreItem[] | undefined {
   const out: StoreItem[] = [];
   const toks = splitTokens(rawValue);
@@ -613,6 +640,10 @@ export function sketchStoreItems(
     i++;
     const cp = parseCodepoint(tok);
     if (cp !== null) { out.push({ kind: "char", value: cp }); continue; }
+    // Legacy value format (#2633): decode silently, ANSI-guarded — the
+    // sketch is best-effort and the fragment preserves the source text.
+    const legacy = tryLegacyValue(tok, { isAnsi: isAnsiSketch });
+    if (legacy !== null) { out.push({ kind: "char", value: legacy }); continue; }
     if (isSmpLiteral(tok)) {
       const m = /^U\+([0-9A-Fa-f]+)$/.exec(tok);
       out.push({ kind: "char", value: String.fromCodePoint(parseInt(m?.[1] ?? "0", 16)) });
@@ -667,6 +698,8 @@ export function parseContextElements(
   opaqueOut: { reason: string | null },
   /** Context elements already read before these tokens (head-position checks look at them too). */
   prior: readonly ContextElement[] = [],
+  /** Legacy value-format decoding (#2633 §3): ANSI guard + rewrite recording. */
+  legacyOpts?: LegacyValueOptions,
 ): ContextElement[] | null {
   const elements: ContextElement[] = [];
   for (const tok of toks) {
@@ -679,6 +712,13 @@ export function parseContextElements(
     const cp = parseCodepoint(tok);
     if (cp !== null) {
       elements.push({ kind: "char", value: cp });
+      continue;
+    }
+    // Legacy value format (#2633): d### / x### / octal ### → the character
+    // (ANSI-guarded: an escalated token falls through to the raw element).
+    const legacy = tryLegacyValue(tok, legacyOpts);
+    if (legacy !== null) {
+      elements.push({ kind: "char", value: legacy });
       continue;
     }
     // quoted string
@@ -778,8 +818,15 @@ export function parseContextElements(
     }
     // platform('x') — typed in head position only, with a quoted literal
     // argument; anywhere else (or malformed) it stays a raw element.
+    // The four #2633 rewrite spellings (platform('web') / 'phone native' /
+    // 'tablet native' / 'desktop native') stay raw: the rewrite produces
+    // them as raw guards, and a re-parse must read them back the same way
+    // or parse → emit → parse is not stable — and deadkey mining's
+    // platform-gated skip keys on the raw spelling. No corpus keyboard
+    // sources those four values (verified 2026-11-11), so this changes
+    // nothing the spec 116 reader differential records.
     const platformValue = parsePlatform(tok);
-    if (platformValue !== null && isHeadClusterSoFar([...prior, ...elements])) {
+    if (platformValue !== null && !isRewritePlatformGuard(tok) && isHeadClusterSoFar([...prior, ...elements])) {
       elements.push({ kind: "platform", value: platformValue });
       continue;
     }
@@ -795,15 +842,19 @@ export function parseContextElements(
  */
 export function parseOutputElements(
   toks: string[],
-  opaqueOut: { reason: string | null }
+  opaqueOut: { reason: string | null },
+  /** Legacy value-format decoding (#2633 §3): ANSI guard + rewrite recording. */
+  legacyOpts?: LegacyValueOptions,
 ): OutputElement[] | null {
-  return parseOutputElementsCore(toks, "strict", opaqueOut);
+  return parseOutputElementsCore(toks, "strict", opaqueOut, legacyOpts);
 }
 
 export function parseOutputElementsCore(
   toks: string[],
   mode: "strict" | "lenient",
-  opaqueOut: { reason: string | null }
+  opaqueOut: { reason: string | null },
+  /** Legacy value-format decoding (#2633 §3): ANSI guard + rewrite recording. */
+  legacyOpts?: LegacyValueOptions,
 ): OutputElement[] | null {
   const elements: OutputElement[] = [];
   for (const tok of toks) {
@@ -817,6 +868,15 @@ export function parseOutputElementsCore(
     const cp = parseCodepoint(tok);
     if (cp !== null) {
       elements.push({ kind: "char", value: cp });
+      continue;
+    }
+    // Legacy value format (#2633): d### / x### / octal ### → the character
+    // (ANSI-guarded: an escalated token falls through to the raw element).
+    // In lenient mode (produced-output sketch) the decode is silent: the
+    // sketch is best-effort and the fragment preserves the source text.
+    const legacy = tryLegacyValue(tok, legacyOpts);
+    if (legacy !== null) {
+      elements.push({ kind: "char", value: legacy });
       continue;
     }
     // quoted string

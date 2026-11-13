@@ -20,16 +20,9 @@ import { loadServerDraftMeta } from "../lib/serverDraftStore.ts";
 import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { startFreshSession } from "../lib/freshSession.ts";
 import { recordAuthoringTrack } from "../lib/recordAuthoringTrack.ts";
-import {
-  BG_PAGE,
-  BG_CARD,
-  ACCENT,
-  TEXT_DIM,
-  TEXT_MAIN,
-  FONT,
-  galleryForwardBtnStyle,
-  galleryGhostBtn,
-} from "../lib/galleryTheme.ts";
+import { BG_PAGE, BG_CARD, ACCENT, TEXT_DIM, TEXT_MAIN, FONT } from "../ui/theme.ts";
+import { Button } from "../ui/Button.tsx";
+import { phaseHeading, surveyPageColumn } from "../survey/surveyStyles.ts";
 import {
   StepNavContext,
   usePublishStepNav,
@@ -55,7 +48,6 @@ const newCardStyle = {
 } as const;
 
 const newButtonStyle = {
-  ...galleryForwardBtnStyle,
   padding: "12px 28px",
   fontSize: 16,
 } as const;
@@ -112,6 +104,11 @@ function StartScreenBody(): React.JSX.Element {
 
   usePublishStepNav(navSpec);
 
+  // Same composition as the survey steps (#2567): left-aligned survey
+  // column with the display title above the cards — not the old centred
+  // column with a plain 24px title this hub used to render. The New card
+  // keeps its accent-bordered lead treatment; only its buttons move to the
+  // shared ui/Button.
   return (
     <div
       style={{
@@ -120,12 +117,11 @@ function StartScreenBody(): React.JSX.Element {
         boxSizing: "border-box",
         fontFamily: FONT,
         color: TEXT_MAIN,
-        padding: 32,
         overflowY: "auto",
       }}
     >
-      <div style={{ maxWidth: 640, margin: "0 auto" }}>
-        <h1 style={{ margin: "0 0 8px", fontSize: 24 }}>
+      <div style={surveyPageColumn}>
+        <h1 style={phaseHeading}>
           <Trans id="start.title">What would you like to do?</Trans>
         </h1>
         {resumable && (
@@ -165,24 +161,20 @@ function StartScreenBody(): React.JSX.Element {
                   This closes your current keyboard and discards its draft.
                 </Trans>
               </p>
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 style={newButtonStyle}
                 onClick={createNewKeyboard}
               >
                 <Trans id="start.new.confirm.yes">Start a new keyboard</Trans>
-              </button>{" "}
-              <button
-                type="button"
-                style={galleryGhostBtn}
-                onClick={() => setConfirmingNew(false)}
-              >
+              </Button>{" "}
+              <Button onClick={() => setConfirmingNew(false)}>
                 <Trans id="start.new.confirm.cancel">Cancel</Trans>
-              </button>
+              </Button>
             </div>
           ) : (
-            <button
-              type="button"
+            <Button
+              variant="primary"
               data-testid="start-new"
               style={newButtonStyle}
               onClick={() =>
@@ -190,7 +182,7 @@ function StartScreenBody(): React.JSX.Element {
               }
             >
               <Trans id="start.new.button">Create a new keyboard</Trans>
-            </button>
+            </Button>
           )}
         </section>
         <OpenKeyboardEntry />

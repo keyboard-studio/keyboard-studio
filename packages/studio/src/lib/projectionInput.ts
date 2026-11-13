@@ -91,6 +91,8 @@ export interface ProjectionExtras {
    * gated through {@link capsHandlingFromDecisions}; undefined when not asked.
    */
   capsHandling: CapsHandlingValue | undefined;
+  /** Observer of the `.kmn` after each late rule-writing step; see ProjectWorkingCopyVfsInput.kmnStageTap. */
+  kmnStageTap?: NonNullable<ProjectWorkingCopyVfsInput["kmnStageTap"]>;
   baseDisplayName?: string;
   startKeyboardId?: string;
   welcomeFolderFiles?: readonly string[];

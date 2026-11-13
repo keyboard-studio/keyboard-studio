@@ -60,6 +60,7 @@ import {
   parseIfGuard,
   isHeadClusterSoFar,
   splitOnArrow,
+  stripTrailingComment,
   parseRuleLine,
   parseStoreLine,
   parseGroupLine,
@@ -67,6 +68,11 @@ import {
   parseBeginLine,
 } from "./parse-shared.js";
 import type { ParseResult } from "./parse-shared.js";
+import {
+  DeprecatedRewriter,
+  parseHeaderStatement,
+  type LegacyValueOptions,
+} from "./deprecated-forms.js";
 
 export type { ParseResult };
 
@@ -241,8 +247,16 @@ function storeName(node: ASTNode): string | undefined {
 /**
  * Lower one context-side element node, appending to `out`. Returns false (with
  * `opaque.reason` set) when the rule must be preserved as a fragment.
+ * `legacyOpts` decodes d### / x### / octal tokens on the legacy-reader
+ * fallback (#2633 §3); the typed fast paths never see one.
  */
-function lowerContextNode(node: ASTNode, l: NgLine, out: ContextElement[], opaque: { reason: string | null }): boolean {
+function lowerContextNode(
+  node: ASTNode,
+  l: NgLine,
+  out: ContextElement[],
+  opaque: { reason: string | null },
+  legacyOpts?: LegacyValueOptions,
+): boolean {
   switch (node.nodeType) {
     case NodeType.STRING: {
       for (const ch of unquote(node.token.text)) out.push({ kind: "char", value: ch });
@@ -318,7 +332,7 @@ function lowerContextNode(node: ASTNode, l: NgLine, out: ContextElement[], opaqu
   }
   // No fast path: read the element's exact source slice with the legacy reader.
   // `out` is passed as the prior context so a head-position check (platform) sees the whole rule so far.
-  const els = parseContextElements(splitTokens(nodeSlice(node, l), true), opaque, out);
+  const els = parseContextElements(splitTokens(nodeSlice(node, l), true), opaque, out, legacyOpts);
   if (els === null) return false;
   for (const e of els) out.push(e);
   return true;
@@ -327,8 +341,16 @@ function lowerContextNode(node: ASTNode, l: NgLine, out: ContextElement[], opaqu
 /**
  * Lower one output-side element node, appending to `out` (strict mode).
  * Returns false (with `opaque.reason` set) when the rule must be a fragment.
+ * `legacyOpts` decodes d### / x### / octal tokens on the legacy-reader
+ * fallback (#2633 §3); the typed fast paths never see one.
  */
-function lowerOutputNode(node: ASTNode, l: NgLine, out: OutputElement[], opaque: { reason: string | null }): boolean {
+function lowerOutputNode(
+  node: ASTNode,
+  l: NgLine,
+  out: OutputElement[],
+  opaque: { reason: string | null },
+  legacyOpts?: LegacyValueOptions,
+): boolean {
   switch (node.nodeType) {
     case NodeType.STRING: {
       for (const ch of unquote(node.token.text)) out.push({ kind: "char", value: ch });
@@ -399,7 +421,7 @@ function lowerOutputNode(node: ASTNode, l: NgLine, out: OutputElement[], opaque:
     default:
       break;
   }
-  const els = parseOutputElementsCore(splitTokens(nodeSlice(node, l)), "strict", opaque);
+  const els = parseOutputElementsCore(splitTokens(nodeSlice(node, l)), "strict", opaque, legacyOpts);
   if (els === null) return false;
   for (const e of els) out.push(e);
   return true;
@@ -410,6 +432,8 @@ function producedOutputOf(rhs: ASTNode, l: NgLine): OutputElement[] {
   const out: OutputElement[] = [];
   for (let i = 0; i < rhs.childCount; i++) {
     const node = rhs.childAt(i);
+    // No legacy opts: the sketch decodes legacy tokens silently, as the old
+    // extractProducedOutput did (the fragment preserves the source text).
     const els = parseOutputElementsCore(splitTokens(nodeSlice(node, l)), "lenient", { reason: null }) ?? [];
     for (const e of els) out.push(e);
   }
@@ -442,6 +466,60 @@ function commentAgrees(l: NgLine, comment: CommentRecord, rhs: ASTNode): boolean
   return b.lastLine < comment.line || (b.lastLine === comment.line && b.lastChar <= comment.column);
 }
 
+/** One grammar-lexed logical line, with the token range that produced it. */
+interface LogicalLine {
+  /** Raw source of the line, final line break included (token columns index into it, BOM included). */
+  raw: string;
+  /** 1-based physical line the logical line starts on. */
+  line: number;
+  /** Number of physical lines it spans. */
+  span: number;
+  /** Physical lines joined the way codec/continuation.ts joins them. */
+  joined: string;
+  /** Index of the first token of the line in the lexed token stream. */
+  tokenStart: number;
+  /** Index of the NEWLINE token terminating the line. */
+  newlineIndex: number;
+}
+
+/**
+ * Split the lexed token stream into logical lines (continuations already
+ * joined). Extracted from lowerDetailed's loop so the #2633 encoding
+ * pre-pass can walk the same lines before the main loop runs.
+ */
+function splitLogicalLines(ngTokens: NgToken[]): LogicalLine[] {
+  const lines: LogicalLine[] = [];
+  let physical = 1;
+  let start = 0;
+  let firstLine = true;
+  for (let ti = 0; ti < ngTokens.length; ti++) {
+    const nl = ngTokens[ti]!;
+    if (nl.tokenType !== TokenType.NEWLINE) continue;
+    const lineStart = start;
+    start = ti + 1;
+
+    // Raw source of the line, final line break included (token columns index
+    // into it, BOM included; slices never reach the break). classifyLine trims,
+    // so a single physical line needs no copy.
+    const raw = nl.line ?? "";
+    const end = raw.length - nl.text.length;
+    const bom = firstLine && raw.charCodeAt(0) === 0xfeff ? 1 : 0;
+    firstLine = false;
+    let span = 1;
+    let joined = bom === 0 ? raw : raw.slice(1);
+    const cr = raw.indexOf("\r");
+    const lf = raw.indexOf("\n");
+    if ((cr >= 0 && cr < end) || (lf >= 0 && lf < end)) {
+      const pieces = raw.slice(bom, end).split(LINE_BREAK_RE);
+      span = pieces.length;
+      joined = joinPhysical(pieces);
+    }
+    lines.push({ raw, line: physical, span, joined, tokenStart: lineStart, newlineIndex: ti });
+    physical += span;
+  }
+  return lines;
+}
+
 /** lower()'s result plus the lines the grammar rejected (for the comparison suite). */
 export interface LowerResult extends ParseResult {
   /** 1-based source lines of rule lines the grammar rejected, in order. */
@@ -449,8 +527,8 @@ export interface LowerResult extends ParseResult {
 }
 
 export function lower(text: string, keyboardId: string): ParseResult {
-  const { ir, opaqueFeatures } = lowerDetailed(text, keyboardId);
-  return { ir, opaqueFeatures };
+  const { ir, opaqueFeatures, rewrites } = lowerDetailed(text, keyboardId);
+  return { ir, opaqueFeatures, rewrites };
 }
 
 /**
@@ -466,6 +544,7 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
 
   // Lex once; the comment channel records the comment on each physical line.
   const { tokens: ngTokens, comments: commentRecords } = lexWithComments(text);
+  const logicalLines = splitLogicalLines(ngTokens);
 
   const stores: IRStore[] = [];
   const groups: IRGroup[] = [];
@@ -483,6 +562,35 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
   let beginEntryGroup: string | undefined;
   let pendingComments: Array<{ text: string; line: number }> = [];
   const sysStores: Record<string, string> = {};
+
+  // Encoding breakpoints for the #2633 ANSI guard: (line, encoding) of each
+  // `begin` directive in source order. A line's enclosing encoding is the
+  // most recent begin at or before it; before any begin, the file's FIRST
+  // begin encoding. Computed in a pre-pass — the main loop meets pre-begin
+  // lines before it has seen any begin.
+  const encodingBreakpoints: Array<{ line: number; encoding: "Unicode" | "ANSI" }> = [];
+  for (const ll of logicalLines) {
+    const t = classifyLine(ll.joined, ll.line);
+    if (t.kind !== "begin") continue;
+    const b = parseBeginLine(t.text);
+    if (b !== null && (b.encoding === "Unicode" || b.encoding === "ANSI")) {
+      encodingBreakpoints.push({ line: t.line, encoding: b.encoding });
+    }
+  }
+
+  // Deprecated-form rewrites (#2633): header statements, legacy value
+  // formats and target-selector prefixes, recorded here and returned in
+  // ParseResult.rewrites. Finalised after the loop (merges + headers need
+  // the whole file seen first).
+  const rewriter = new DeprecatedRewriter({
+    stores,
+    groups,
+    rawFragments,
+    sysStores,
+    minter,
+    getCurrentGroup: () => currentGroup,
+    encodingBreakpoints,
+  });
 
   function flushCommentsFreestanding(): void {
     for (const c of pendingComments) {
@@ -509,9 +617,14 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
     const parsedLine = parseRuleLine(tok.text);
     if (!parsedLine) throw new Error(`Malformed rule at line ${tok.line}:${tok.col}: ${tok.text}`);
     const opaqueCheck = { reason: null as string | null };
-    const ctxElements = parseContextElements(splitTokens(parsedLine.contextRaw, true), opaqueCheck);
+    const ctxElements = parseContextElements(
+      splitTokens(parsedLine.contextRaw, true),
+      opaqueCheck,
+      [],
+      rewriter.legacyOptsFor(tok.line),
+    );
     let outElements: OutputElement[] | null = null;
-    if (ctxElements !== null) outElements = parseOutputElementsCore(splitTokens(parsedLine.outputRaw), "strict", opaqueCheck);
+    if (ctxElements !== null) outElements = parseOutputElementsCore(splitTokens(parsedLine.outputRaw), "strict", opaqueCheck, rewriter.legacyOptsFor(tok.line));
     if (ctxElements === null || outElements === null) {
       const sketch = parseOutputElementsCore(splitTokens(parsedLine.outputRaw), "lenient", { reason: null }) ?? [];
       pushRuleFragment(tok, ruleNodeId, opaqueCheck.reason ?? "unknown", sketch);
@@ -522,7 +635,20 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
 
   function pushRuleFragment(tok: LineToken, ruleNodeId: string, reason: string, sketch: OutputElement[] | null): void {
     bumpOpaque(reason);
-    const frag: RawKmnFragment = { nodeId: ruleNodeId, origin: "imported", sourceText: tok.text, reason, sourceLine: tok.line };
+    const frag: RawKmnFragment = {
+      nodeId: ruleNodeId,
+      origin: "imported",
+      // An opaque line is NOT rewritten, so a stripped target-selector
+      // prefix stays visible in the fragment text (#2633 D9 fidelity).
+      sourceText: rewriter.fragmentSourceText(tok),
+      reason,
+      sourceLine: tok.line,
+    };
+    // A target-prefixed opaque rule cannot be rewritten: the prefix stays
+    // in the fragment text and the escalation is recorded so the user can
+    // see it needs review. `$keyman:` ("both") is dropped, as everywhere.
+    rewriter.recordKeymanDrop(tok);
+    rewriter.recordTargetEscalation(tok, `(kept as-is — opaque rule; target gating could not be rewritten, needs review)`);
     if (currentGroup !== null) frag.groupNodeId = currentGroup.nodeId;
     if (sketch !== null && sketch.some((e) => e.kind === "char" || e.kind === "index" || e.kind === "outs")) {
       frag.producedOutput = sketch;
@@ -537,11 +663,17 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
     output: OutputElement[],
     trailingComment: string | undefined,
   ): void {
-    const rule: IRRule = trailingComment !== undefined
+    const base: IRRule = trailingComment !== undefined
       ? { nodeId: ruleNodeId, context, output, trailingComment, sourceLine: tok.line }
       : { nodeId: ruleNodeId, context, output, sourceLine: tok.line };
-    if (tok.targetSelector !== undefined) rule.targetSelector = tok.targetSelector;
-    if (currentGroup) currentGroup.rules.push(rule);
+    // Target-selector rewrite (#2633 §1): `$keyman:` dropped,
+    // `$keymanonly:` one platform('desktop native')-guarded rule,
+    // `$keymanweb:` three platform-guarded copies. The first copy keeps
+    // ruleNodeId, so the leading/trailing comments anchor to it.
+    const rulesToPush = rewriter.applyTargetSelectorToRule(base, tok);
+    for (const rule of rulesToPush) {
+      if (currentGroup) currentGroup.rules.push(rule);
+    }
     if (trailingComment !== undefined) {
       comments.push({
         nodeId: minter.mint("comment"),
@@ -569,6 +701,9 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
     }
 
     const opaque = { reason: null as string | null };
+    // Legacy value formats on this line decode with the ANSI guard and a
+    // rewrite record (#2633 §3).
+    const legacyOpts = rewriter.legacyOptsFor(tok.line);
     // A keystroke with more than one element: kmcmplib uses only the first and warns.
     const keystroke = lhs.getSoleChildOfType(NodeType.KEYSTROKE);
     if (keystroke != null && keystroke.numberOfChildren() > 1) {
@@ -582,16 +717,16 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
       const child = lhs.childAt(ci);
       if (child.nodeType === NodeType.INPUT_CONTEXT) {
         for (let ei = 0; ei < child.childCount; ei++) {
-          if (!(ok = lowerContextNode(child.childAt(ei), l, context, opaque))) break;
+          if (!(ok = lowerContextNode(child.childAt(ei), l, context, opaque, legacyOpts))) break;
         }
       } else if (child.nodeType === NodeType.KEYSTROKE) {
         // The legacy reader strips a leading `+` and keeps any other as a raw separator.
         if (!tok.text.startsWith("+")) context.push({ kind: "raw", text: "+" });
         for (let ei = 0; ei < child.childCount; ei++) {
-          if (!(ok = lowerContextNode(child.childAt(ei), l, context, opaque))) break;
+          if (!(ok = lowerContextNode(child.childAt(ei), l, context, opaque, legacyOpts))) break;
         }
       } else {
-        ok = lowerContextNode(child, l, context, opaque);
+        ok = lowerContextNode(child, l, context, opaque, legacyOpts);
       }
       if (!ok) break;
     }
@@ -600,7 +735,7 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
     if (ok) {
       output = [];
       for (let ei = 0; ei < rhs.childCount; ei++) {
-        if (!lowerOutputNode(rhs.childAt(ei), l, output, opaque)) {
+        if (!lowerOutputNode(rhs.childAt(ei), l, output, opaque, legacyOpts)) {
           output = null;
           break;
         }
@@ -616,40 +751,14 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
   }
 
   // ---- the line loop ----
-  let physical = 1;
-  let start = 0;
-  let firstLine = true;
   const root = new ASTNode(NodeType.ROOT);
-  for (let ti = 0; ti < ngTokens.length; ti++) {
-    const nl = ngTokens[ti]!;
-    if (nl.tokenType !== TokenType.NEWLINE) continue;
-    const lineStart = start;
-    start = ti + 1;
-
-    // Raw source of the line, final line break included (token columns index
-    // into it, BOM included; slices never reach the break). classifyLine trims,
-    // so a single physical line needs no copy.
-    const raw = nl.line ?? "";
-    const end = raw.length - nl.text.length;
-    const bom = firstLine && raw.charCodeAt(0) === 0xfeff ? 1 : 0;
-    firstLine = false;
-    let span = 1;
-    let joined = bom === 0 ? raw : raw.slice(1);
-    const cr = raw.indexOf("\r");
-    const lf = raw.indexOf("\n");
-    if ((cr >= 0 && cr < end) || (lf >= 0 && lf < end)) {
-      const pieces = raw.slice(bom, end).split(LINE_BREAK_RE);
-      span = pieces.length;
-      joined = joinPhysical(pieces);
-    }
-    const l: NgLine = { raw, line: physical, span };
-    physical += span;
-
-    const tok = classifyLine(joined, l.line);
+  for (const ll of logicalLines) {
+    const l: NgLine = { raw: ll.raw, line: ll.line, span: ll.span };
+    const tok = classifyLine(ll.joined, l.line);
 
     root.truncateChildren(0);
-    const buffer = new TokenBuffer(ngTokens, lineStart, ti + 1);
-    const accepted = lineRule.parse(buffer, root) && buffer.currentPosition === ti + 1;
+    const buffer = new TokenBuffer(ngTokens, ll.tokenStart, ll.newlineIndex + 1);
+    const accepted = lineRule.parse(buffer, root) && buffer.currentPosition === ll.newlineIndex + 1;
 
     switch (tok.kind) {
       case "blank":
@@ -665,6 +774,10 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
       case "begin": {
         const parsed = parseBeginLine(tok.text);
         if (!parsed) throw new Error(`Malformed begin directive at line ${tok.line}:${tok.col}: ${tok.text}`);
+        // A target-prefixed begin line is pathological (no corpus case):
+        // the prefix is dropped, the entry point kept, and the drop recorded.
+        rewriter.recordKeymanDrop(tok);
+        rewriter.recordTargetEscalation(tok, `${tok.text} (prefix dropped — an entry point cannot be target-gated; needs review)`);
         headerParsed = true;
         if (beginEncoding === undefined) {
           beginEncoding = parsed.encoding as "Unicode" | "ANSI";
@@ -679,17 +792,25 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
         const storeNodeId = minter.mint("store");
         attachLeading("store", storeNodeId);
         if (parsed.isSystem) sysStores[parsed.name] = parsed.rawValue;
-        const { items, opaqueReason } = parseStoreItems(parsed.rawValue, true);
+        // Legacy value formats in the body are decoded (ANSI-guarded) and the
+        // rewrite recorded against this line.
+        const { items, opaqueReason } = parseStoreItems(parsed.rawValue, true, rewriter.legacyOptsFor(tok.line));
         if (opaqueReason !== null) {
           bumpOpaque(opaqueReason);
           const frag: RawKmnFragment = {
             nodeId: storeNodeId,
             origin: "imported",
-            sourceText: tok.text,
+            // An opaque store is NOT rewritten, so a stripped target-selector
+            // prefix stays visible in the fragment text (#2633 D9 fidelity).
+            sourceText: rewriter.fragmentSourceText(tok),
             reason: opaqueReason,
             sourceLine: tok.line,
           };
-          const sketch = sketchStoreItems(parsed.rawValue, knownStoreItems);
+          // A target-prefixed opaque store cannot be rewritten: the prefix
+          // stays in the fragment text and the escalation is recorded.
+          rewriter.recordKeymanDrop(tok);
+          rewriter.recordTargetEscalation(tok, `(kept as-is — opaque store; target gating could not be rewritten, needs review)`);
+          const sketch = sketchStoreItems(parsed.rawValue, knownStoreItems, rewriter.isAnsiLine(tok.line));
           if (sketch !== undefined) {
             frag.storeSketch = sketch;
             knownStoreItems.set(parsed.name.toLowerCase(), sketch);
@@ -701,11 +822,21 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
           // flatten through it: keep the flattened items, as the sketch of the
           // fragment this store used to be.
           const flat = items.some((it) => it.kind === "outs")
-            ? sketchStoreItems(parsed.rawValue, knownStoreItems)
+            ? sketchStoreItems(parsed.rawValue, knownStoreItems, rewriter.isAnsiLine(tok.line))
             : items;
           if (flat !== undefined) knownStoreItems.set(parsed.name.toLowerCase(), flat);
           const irStore: IRStore = { nodeId: storeNodeId, name: parsed.name, items, isSystem: parsed.isSystem, sourceLine: tok.line };
-          if (tok.targetSelector !== undefined) irStore.targetSelector = tok.targetSelector;
+          // Target-prefixed stores are merged after the loop (desktop body
+          // wins); `$keyman:` ("both") is dropped now, with a rewrite record.
+          rewriter.recordKeymanDrop(tok);
+          if (tok.targetSelector === "keymanweb" || tok.targetSelector === "keymanonly") {
+            irStore.targetSelector = tok.targetSelector;
+            rewriter.recordStoreSource(storeNodeId, {
+              text: tok.text,
+              rawValue: parsed.rawValue,
+              selector: tok.targetSelector,
+            });
+          }
           if (parsed.trailingComment !== undefined) irStore.trailingComment = parsed.trailingComment;
           stores.push(irStore);
         }
@@ -715,6 +846,10 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
       case "group": {
         const parsed = parseGroupLine(tok.text);
         if (!parsed) throw new Error(`Malformed group declaration at line ${tok.line}:${tok.col}: ${tok.text}`);
+        // A target-prefixed group line is pathological (no corpus case):
+        // the prefix is dropped, the group kept, and the drop recorded.
+        rewriter.recordKeymanDrop(tok);
+        rewriter.recordTargetEscalation(tok, `${tok.text} (prefix dropped — a group cannot be target-gated; needs review)`);
         flushCommentsFreestanding();
         currentGroup = {
           nodeId: minter.mint("group"),
@@ -741,8 +876,15 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
           matchKind: tok.kind,
           sourceLine: tok.line,
         };
-        if (tok.targetSelector !== undefined) rule.targetSelector = tok.targetSelector;
-        if (currentGroup) currentGroup.rules.push(rule);
+        // Target-prefixed transitions are merged after the loop (desktop
+        // wins); `$keyman:` ("both") is dropped now, with a rewrite record.
+        rewriter.recordKeymanDrop(tok);
+        if (tok.targetSelector === "keymanweb" || tok.targetSelector === "keymanonly") {
+          rule.targetSelector = tok.targetSelector;
+        }
+        if (currentGroup) {
+          currentGroup.rules.push(rule);
+        }
         break;
       }
 
@@ -762,15 +904,48 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
           break;
         }
         if (!headerParsed) {
+          // Old-style header statement (NAME, VERSION, ...) — collected for
+          // finalisation after the loop, once it is known whether a real
+          // store() already provides the value. A trailing c-comment rides
+          // along as a freestanding comment so no text is lost.
+          const { rhs: headerText, trailingComment: headerComment } =
+            stripTrailingComment(tok.text);
+          const header = parseHeaderStatement(headerText);
+          if (header !== null) {
+            rewriter.collectHeader(header, tok.line, tok.text);
+            flushCommentsFreestanding();
+            if (headerComment !== undefined) {
+              comments.push({
+                nodeId: minter.mint("comment"),
+                text: headerComment,
+                anchor: "freestanding",
+                sourceLine: tok.line,
+              });
+            }
+            // A target-prefixed header statement is pathological; the
+            // prefix is dropped with the header (recorded here).
+            rewriter.recordKeymanDrop(tok);
+            rewriter.recordTargetEscalation(tok, `${tok.text} (prefix dropped — a header statement cannot be target-gated; needs review)`);
+            break;
+          }
+          // Rule before begin — treat as raw.
           flushCommentsFreestanding();
           bumpOpaque(OPAQUE_REASONS.UNKNOWN_PRE_BEGIN);
           rawFragments.push({
             nodeId: minter.mint("raw"),
             origin: "imported",
-            sourceText: tok.text,
+            // An opaque pre-begin line is NOT rewritten, so a stripped
+            // target-selector prefix stays visible in the fragment text.
+            sourceText: rewriter.fragmentSourceText(tok),
             reason: OPAQUE_REASONS.UNKNOWN_PRE_BEGIN,
             sourceLine: tok.line,
+            // groupNodeId is intentionally absent: pre-begin = global/no group
           });
+          // A target-prefixed pre-begin line cannot be rewritten (D9
+          // fidelity): the prefix stays in the fragment text and the
+          // escalation is recorded so the user can see it needs review.
+          rewriter.recordKeymanDrop(tok);
+          rewriter.recordTargetEscalation(tok, `(kept as-is — pre-begin line; target gating could not be rewritten, needs review)`);
           break;
         }
         const ruleNodeId = minter.mint("rule");
@@ -795,6 +970,13 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
   }
 
   flushCommentsFreestanding();
+
+  // Deprecated-form finalisation (#2633) — post-loop passes: merge
+  // targeted stores/transitions, resolve the &CasedKeys/&mnemonicLayout
+  // conflict, finalise pending headers, raise the version for added
+  // platform() guards. Runs BEFORE the header is built: finalisation
+  // synthesises stores and fixes up sysStores.
+  rewriter.finalize();
 
   const sysVal = (name: string): string => unquote((sysStores[name] ?? "").trim());
   const targetsRaw = sysVal("TARGETS");
@@ -829,5 +1011,5 @@ export function lowerDetailed(text: string, keyboardId: string): LowerResult {
     raw: rawFragments,
     recognizedPatterns: [],
   };
-  return { ir, opaqueFeatures, rejectedLines };
+  return { ir, opaqueFeatures, rewrites: rewriter.rewrites, rejectedLines };
 }

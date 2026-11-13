@@ -4,17 +4,18 @@
 // compile service the download path uses (`buildOutputBundle`). It is not part of the 300 ms
 // validation cycle (decision D3): it starts no timer and races nothing.
 //
-// The candidate is the output projection plus the edit's changes, replayed onto the projected
-// .kmn exactly as the projection will replay the recorded entry. Compiling the editor's own text
-// instead would be wrong: it is the working IR's text, before the projection renames the
-// keyboard's files and rewrites its asset stores, so a keyboard that compiles as shipped could
-// fail here on a file it no longer has. A change that finds no anchor in the projected keyboard
-// is `unplaceable`: it would apply live and vanish from the download. The clone is never the
-// store's own VFS.
+// The candidate is the output projection run with the edit appended to the recorded `kmn-edits`
+// (`projectWorkingCopyForOutput({ candidateKmnEdit })`), so the candidate .kmn is exactly what the
+// real replay at step 2.2 builds, with the later steps acting on it, and the compile sees what the
+// download will ship. Compiling the editor's own text instead would be wrong: it is the working
+// IR's text, before the projection renames the keyboard's files and rewrites its asset stores, so a
+// keyboard that compiles as shipped could fail here on a file it no longer has. A change the
+// replay reports as a miss finds no anchor in the keyboard as it will be built: it is
+// `unplaceable` (it would apply live and vanish from the download). The projected VFS is a clone,
+// never the store's own.
 
 import type { CompilerDiagnostic, IRChange } from "@keyboard-studio/contracts";
-import { applyIRChanges, emitKmn, parseKmn } from "@keyboard-studio/engine";
-import { readVfsText } from "./vfsText.ts";
+import { nextCodeEdit } from "./nextCodeEdit.ts";
 import { getCompile, USE_REAL } from "./services.ts";
 import { projectWorkingCopyForOutput } from "./serializeWorkingCopy.ts";
 
@@ -31,21 +32,14 @@ export type CandidateCompileResult =
   | { status: "unavailable" };
 
 export async function compileCandidateKmn(changes: readonly IRChange[]): Promise<CandidateCompileResult> {
-  const projected = await projectWorkingCopyForOutput();
-  if (projected === null) return { status: "unavailable" };
   if (!USE_REAL) return { status: "unavailable" };
-  const { vfs, keyboardId } = projected;
-  const projectedText = readVfsText(vfs, `source/${keyboardId}.kmn`);
-  if (projectedText === undefined) return { status: "unavailable" };
-  let candidate: string;
-  try {
-    const applied = applyIRChanges(parseKmn(projectedText, keyboardId).ir, changes);
-    if (applied.misses.length > 0) return { status: "unplaceable" };
-    candidate = emitKmn(applied.ir);
-  } catch {
-    return { status: "errors", diagnostics: [] };
+  const candidate = nextCodeEdit(changes);
+  const projected = await projectWorkingCopyForOutput({ candidateKmnEdit: candidate });
+  if (projected === null) return { status: "unavailable" };
+  const { vfs, keyboardId, warnings } = projected;
+  if (warnings.some((w) => w.startsWith(`[project-working-copy] layout edit ${candidate.seq} skipped`))) {
+    return { status: "unplaceable" };
   }
-  vfs.set(`source/${keyboardId}.kmn`, candidate, false);
   // A wired service that cannot load or throws blocks the Apply (fail closed): a broken
   // compile service must not let an unchecked edit through. Empty diagnostics render the
   // generic "does not compile" message.

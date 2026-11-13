@@ -79,9 +79,9 @@ describe("diffIR", () => {
   it("an opaque fragment edit is one replace", () => {
     const a = parseText(RAW_KMN);
     expect(a.raw.length).toBeGreaterThan(0);
-    const b = parseText(editLine(RAW_KMN, "outs(base) 'def'", "outs(base) 'xyz'"));
+    const b = parseText(editLine(RAW_KMN, "U+0063 .. U+0061", "U+0064 .. U+0061"));
     const changes = diffIR(a, b);
-    // The fragment (an opaque store) is the only difference.
+    // The fragment (an opaque descending-range store, which the codec keeps verbatim) is the only difference.
     expect(kinds(changes)).toEqual(["replace"]);
     const c = changes[0]!;
     if (c.change !== "replace") throw new Error("unreachable");

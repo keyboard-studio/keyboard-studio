@@ -1303,7 +1303,17 @@ export interface WorkingCopyState {
    */
   commitKmnEdit: (
     op: KmnEditInput,
-    options?: { partner?: KmnEditInput; extra?: readonly KmnEditInput[] },
+    options?: {
+      partner?: KmnEditInput;
+      extra?: readonly KmnEditInput[];
+      /**
+       * Code-tab Apply only. The Code tab shows the built keyboard, so a change can name a rule the
+       * live working IR does not hold (an Assign-tab rule, which the projection adds). With this set,
+       * such a change is left out of the live IR (and its undo) instead of refusing the entry; the
+       * recorded entry is unchanged and the projection places it.
+       */
+      skipLiveMisses?: boolean;
+    },
   ) => CommitKmnEditResult;
   /**
    * Undo the most recent Layout-tab edit (an `l` or `lb` entry): records `kmn-edits` without
@@ -2116,6 +2126,7 @@ function commitCodeEntry(
   s: WorkingCopyState,
   set: StoreSet,
   input: Extract<KmnEditInput, { op: "code-apply" | "review-kept" }>,
+  skipLiveMisses: boolean,
 ): CommitKmnEditResult {
   const earlier = recordedKmnEdits();
   const seq = earlier.reduce((max, e) => Math.max(max, e.seq), 0) + 1;
@@ -2126,14 +2137,17 @@ function commitCodeEntry(
   }
   if (entry.op !== "code-apply" || s.ir === null) return { ok: false, reason: "refused" };
   let ir: KeyboardIR;
+  let applied: typeof entry.changes = entry.changes;
   try {
     const result = applyIRChanges(s.ir, entry.changes);
-    if (result.misses.length > 0) return { ok: false, reason: "refused" };
+    if (result.misses.length > 0 && !skipLiveMisses) return { ok: false, reason: "refused" };
     ir = applyMutatePatch(s.ir, codeEditPatch(s.ir, result.ir), CODE_WRITES);
+    const missed = new Set(result.misses);
+    applied = entry.changes.filter((_, i) => !missed.has(i));
   } catch {
     return { ok: false, reason: "refused" };
   }
-  const undoEntry: UndoEntry = { k: "c", seq, inverse: invertChanges(entry.changes) };
+  const undoEntry: UndoEntry = { k: "c", seq, inverse: invertChanges(applied) };
   set((cur) => ({ ir, undoStack: [...cur.undoStack, undoEntry] }));
   recordKmnEdits([...earlier, entry]);
   return { ok: true, seqs: [seq] };
@@ -2143,12 +2157,14 @@ function commitKmnEditImpl(
   get: StoreGet,
   set: StoreSet,
   op: KmnEditInput,
-  options: { partner?: KmnEditInput; extra?: readonly KmnEditInput[] } | undefined,
+  options: { partner?: KmnEditInput; extra?: readonly KmnEditInput[]; skipLiveMisses?: boolean } | undefined,
 ): CommitKmnEditResult {
   const s = get();
   if (s.ir === null || s.startIr === null) return { ok: false, reason: "no-working-copy" };
   if (s.desktopLocked) return { ok: false, reason: "locked" };
-  if (op.op === "code-apply" || op.op === "review-kept") return commitCodeEntry(s, set, op);
+  if (op.op === "code-apply" || op.op === "review-kept") {
+    return commitCodeEntry(s, set, op, options?.skipLiveMisses === true);
+  }
   if (useRulesDemoArtifactStore.getState().artifact.status !== "ready") {
     return { ok: false, reason: "not-compiled" };
   }

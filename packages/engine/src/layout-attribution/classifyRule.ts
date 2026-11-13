@@ -95,7 +95,7 @@ function keyOfChar(ch: string): KeyRef | null {
 }
 
 function isCondition(el: ContextElement): boolean {
-  if (el.kind === "if" || el.kind === "baselayout") return true;
+  if (el.kind === "if" || el.kind === "baselayout" || el.kind === "platform") return true;
   return el.kind === "raw" && /^\s*(platform|if|layer|baselayout)\s*\(/i.test(el.text);
 }
 

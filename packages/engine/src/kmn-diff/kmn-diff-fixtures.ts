@@ -24,7 +24,7 @@ group(tail)
 'z' > 'Z'
 `;
 
-/** A keyboard with a user store and an opaque fragment (an `outs()` store) inside the main group. */
+/** A keyboard with a user store and an opaque fragment (a descending-range store) inside the main group. */
 export const RAW_KMN = `store(&VERSION) '10.0'
 store(&NAME) 'diff-raw'
 store(&TARGETS) 'any'
@@ -33,7 +33,7 @@ begin Unicode > use(main)
 group(main) using keys
 
 store(base) 'abc'
-store(more) outs(base) 'def'
+store(more) U+0063 .. U+0061
 + [K_A] > 'a'
 + [K_B] > 'b'
 + [K_C] > 'c'

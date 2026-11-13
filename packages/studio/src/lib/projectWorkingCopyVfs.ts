@@ -178,6 +178,16 @@ import {
 } from "../survey/rules/ruleAdditions.ts";
 import { applyDeadkeyOpsToVfs } from "./deadkeyOps.ts";
 
+/** The projection stages {@link ProjectWorkingCopyVfsInput.kmnStageTap} reports, in build order. */
+export type KmnStage =
+  | "kmn-edits"
+  | "mark-guards"
+  | "context-tolerance"
+  | "caps"
+  | "identity"
+  | "targets"
+  | "id-rename";
+
 /** Every vkey that appears in a rule testing CAPS or NCAPS (step 2.8's `none` mode). */
 function allCapsRuleKeys(ir: KeyboardIR): Set<string> {
   const keys = new Set<string>();
@@ -416,6 +426,16 @@ export interface ProjectWorkingCopyVfsInput {
    */
   kmnEdits?: KmnEditsValue;
   /**
+   * An observer of the `.kmn` as it stands after each step that can write rules at or after the
+   * `kmn-edits` replay (spec 117, research R15). Called with the text after step 2.2 (`kmn-edits`:
+   * the keyboard exactly as the NEXT recorded edit will be replayed onto it), then after 2.6
+   * (`mark-guards`), 2.7 (`context-tolerance`), 2.8 (`caps`), 3 (`identity`), 3.1 (`targets`) and
+   * 4 (`id-rename`, before the files are renamed). It reads the VFS and changes nothing, so it
+   * cannot alter an output, and a tap that throws is ignored; the Code tab uses it to tell which
+   * rules a later step generated. Omit it and the projection does no extra work.
+   */
+  kmnStageTap?: (stage: KmnStage, text: string) => void;
+  /**
    * Open mode (a keyboard opened for update, spec 111). Present only on the
    * Open track; absent for Copy, whose projection is unchanged.
    *
@@ -578,7 +598,18 @@ export function projectWorkingCopyVfs(
     capsHandling = null,
     ruleAdditions,
     kmnEdits,
+    kmnStageTap,
   } = input;
+  const tapKmn = (stage: KmnStage): void => {
+    if (kmnStageTap === undefined) return;
+    // An observer must never change the projection: a read or a throwing tap is swallowed.
+    try {
+      const text = readVfsText(vfs, `source/${keyboardId}.kmn`);
+      if (text !== undefined) kmnStageTap(stage, text);
+    } catch {
+      // ignored by design
+    }
+  };
 
   const warnings: string[] = [];
   const openMode = input.openMode;
@@ -1175,6 +1206,8 @@ export function projectWorkingCopyVfs(
     }
   }
 
+  tapKmn("kmn-edits");
+
   // Step 2.5: Desktop -> touch layer propagation — surface any generalized
   // S-08 (modifier_as_layer_switch) combo layer already in the IR, or about
   // to be authored via a physical assignment just projected above, onto the
@@ -1269,6 +1302,8 @@ export function projectWorkingCopyVfs(
     }
   }
 
+  tapKmn("mark-guards");
+
   // Step 2.7: Context-tolerance projection (spec 078). Replays the author's
   // accepted fix: the generated rules were computed and verified once, by
   // hooks/useContextToleranceApply.ts, because generating them compiles and
@@ -1302,6 +1337,8 @@ export function projectWorkingCopyVfs(
       }
     }
   }
+
+  tapKmn("context-tolerance");
 
   // Step 2.8: Caps handling (spec 112, research R10). The caps-handling
   // decision is the only thing that decides the &CasedKeys store and the
@@ -1356,6 +1393,8 @@ export function projectWorkingCopyVfs(
     }
   }
 
+  tapKmn("caps");
+
   // Step 3: Identity projection — write &NAME (display name) into the .kmn.
   //
   // The display name is treated as an EDIT, reflected only when it CHANGES.
@@ -1405,6 +1444,8 @@ export function projectWorkingCopyVfs(
     }
   }
 
+  tapKmn("identity");
+
   // Step 3.1: Target platforms — always `store(&TARGETS) 'any'` (product owner
   // ruling, 2026-11-07). Every produced keyboard ships desktop and touch, the
   // two outputs that adapt per OS, so none picks individual platforms; and the
@@ -1414,6 +1455,8 @@ export function projectWorkingCopyVfs(
   if (openMode === undefined && vfs.get(`source/${keyboardId}.kmn`) !== undefined) {
     applyTargetsAnyMutation(vfs, keyboardId);
   }
+
+  tapKmn("targets");
 
   // Step 3.5: Keycap label projection — patch .kvks and .keyman-touch-layout so
   // the desktop and touch OSK preview shows the swapped character on the keycap.
@@ -1539,6 +1582,8 @@ export function projectWorkingCopyVfs(
         );
       }
     }
+    // Still under the pre-rename path, which is where the tap reads.
+    tapKmn("id-rename");
     renameFilesInVfs(vfs, keyboardId, targetKeyboardId);
   }
 

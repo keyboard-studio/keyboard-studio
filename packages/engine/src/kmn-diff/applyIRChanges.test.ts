@@ -21,7 +21,7 @@ const EDITS: Array<[string, string, string, string]> = [
   ["header", BASE_KMN, "'diff-test'", "'diff-renamed'"],
   ["begin", BASE_KMN, "begin Unicode > use(main)", "begin Unicode > use(tail)"],
   ["new group", BASE_KMN, "group(tail)\n", "group(extra)\n\n'q' > 'Q'\n\ngroup(tail)\n"],
-  ["raw: change fragment", RAW_KMN, "outs(base) 'def'", "outs(base) 'xyz'"],
+  ["raw: change fragment", RAW_KMN, "U+0063 .. U+0061", "U+0064 .. U+0061"],
   ["raw: insert rule", RAW_KMN, "+ [K_B] > 'b'", "+ [K_B] > 'b'\n+ [K_G] > 'g'"],
   ["raw: insert first", RAW_KMN, "+ [K_A] > 'a'", "+ [K_Z] > 'z'\n+ [K_A] > 'a'"],
   ["raw: delete rule", RAW_KMN, "+ [K_B] > 'b'\n", ""],

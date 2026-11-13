@@ -535,3 +535,89 @@ A mnemonic keyboard is read-only throughout (FR-018), so it reads 0%.
 | thai_kedmanee_mattix | literal-context | 101 | 101 | 100.0% | yes |
 | txo_toto | literal-context | 52 | 51 | 98.1% | no |
 
+## R15. The Code tab's built view, and what Apply keeps (owner ruling 2026-11-13)
+
+**OWNER RULING 2026-11-13.** The product owner chose "built view plus kept edits" over keeping
+either side of the merge with main. On Copy the Code tab shows the keyboard as it will be built (the
+projected `.kmn`), and Apply records the difference from that view as a kept `kmn-edits` entry, so
+the tab, the preview, and the download agree. It supersedes in rulings 9 and 10 the premise that
+the Code tab hides Assign-tab rules: an edit to an Assign-tab rule is now an edit the author can
+see, ruling 10's outcome stands (the most recent edit wins on an assigned key, keyed to the
+keystroke, the confirm names the Assign tab, "changed in code" is shown), and ruling 9 still
+governs only an edit made before its key is assigned (the edit's rule is gone in the build, so it
+is flagged under FR-063 b; that case still arises, so its tests stay). It supersedes in main's
+Code-tab fix the Apply that wrote a re-parsed IR the output ignored, and its accepted trade-off
+that an applied edit vanishes from view: the edit is now in the build, so it stays.
+On Open nothing changes: the tab shows the file text and Apply replaces the starting point.
+
+**PENDING OWNER RULING (raised 2026-11-13).** Rules made by a projection step that runs after step
+2.2 (mark guards 2.6, context tolerance 2.7, caps handling 2.8, the target-platform step 3.1, and
+anything later that writes the `.kmn`) are in the built view but cannot be anchored by a kept edit
+without changing which build step wins. Interim behaviour, in force until the owner rules: an Apply
+whose diff touches such a rule (changes or removes it) is refused with a message at its line naming
+where the rule comes from, and records nothing; edits elsewhere in the same Apply are not recorded
+either (all or nothing, like the other gate errors). Reason: it refuses rather than anchors, so no
+build step's precedence changes. The projection steps are not reordered. **Question for the owner:**
+should a rule a later build step generates be (a) refused, as now, (b) shown read-only, or (c)
+editable with the edit winning over that step? Until answered, none of the three is settled.
+
+**How it works.**
+- *Diff base.* The base is the parse of the text the author was shown, not the working IR. The
+  replay at step 2.2 acts on the `.kmn` after the assignments and the earlier entries; anchors are
+  content-based (`ContentAnchor`: the node's emitted text, neighbours only to break ties), so a
+  change computed against the built text finds the same rule in the replay's text unless a later
+  step made it. The recorded entry therefore rebuilds to the applied text (proved in
+  `KmnCodePane.test.tsx`, "built view plus kept edits", for a starting rule, an Assign-tab rule,
+  and an added and a removed rule), and a second Apply with no typing, or with formatting only,
+  records nothing.
+- *Telling late rules apart.* By differential, not by inspecting rules. The projection takes an
+  optional observer, `kmnStageTap`, that reports the `.kmn` after steps 2.2, 2.6, 2.7, 2.8, 3
+  (`identity`), 3.1 (`targets`) and 4 (`id-rename`) (reads only; supplying it changes no output, and
+  a tap that throws is ignored). The step-2.2 text is exactly what the next entry
+  will be replayed onto. A change whose anchor is in that text is fine; one that is in a later
+  stage's text (or only in the final text) was made by that stage, and names it. One found
+  nowhere is left to the candidate compile's "does not fit". A store a later step rewrote (for
+  example `&CasedKeys`) is caught by comparing the store's content as well as its name.
+  `lib/builtKmnView.ts`.
+- *Live IR.* The working IR does not hold Assign-tab or other projected rules, so a change that
+  names one cannot anchor there. `commitKmnEdit(..., { skipLiveMisses: true })` (Code tab only)
+  leaves such a change out of the live IR and its undo instead of refusing the entry; the recorded
+  entry carries all changes and the projection places them.
+- *Header and identity.* Steps 3, 3.1 and 4 rewrite header stores only. Editing `&NAME` and the
+  like keeps its FR-062 owner "identity" confirm; the late-rule refusal covers rules and stores a
+  later step generates, not the identity overlay. The exception is `&TARGETS`, which step 3.1 forces
+  to `any` on Copy: an edit to it is refused with a message that names it.
+- *A rule a later step rewrites in place.* Caught two ways. A change that fits the step-2.2 text but
+  not a later rule stage's text names a rule that stage rewrote. And, as the backstop, Apply
+  predicts the build with the entry included (the real projection run with the candidate entry,
+  `ProjectForOutputOptions.candidateKmnEdit` / the transform's third argument) and refuses, at the
+  first differing line, when that is not the text the author applied (header items aside).
+- *Snapshot.* The shown text and the stage texts of that same projection are held together. If the
+  build changed while the draft was dirty, Apply refuses (the simpler of the two sound options)
+  and offers to reload the current text; the draft stays in the editor until the author reloads.
+  Apply is not re-entrant.
+- *The candidate compile.* It compiles the output projection run with the candidate entry
+  appended, so the compiled `.kmn` is what the real replay builds, not the entry laid over the final
+  text.
+- *View in code.* The working IR's node id is matched to its line in the shown text by content
+  (group or store by name, a rule by its group and emitted line, the nth duplicate to the nth),
+  since the shown text is a different parse. A rule the build does not hold reveals nothing.
+- *Dirty draft.* Apply now moves the canonical (the projection changes after `commitKmnEdit`), so
+  a successful Apply sets a flag consumed by the next render, which snaps the clean editor to the
+  built text. A change to the built text while a draft is dirty never snaps it (unchanged).
+- *Pattern map.* The pane resolves patterns with `getPatternByIdSync`, the memoized index the
+  preview's async `getById` wraps, loaded eagerly on first use; it is never colder than the
+  preview's map, so the pane does not wait.
+- *Known limit.* An edit to an Assign-tab rule on a key with no starting rule is content-anchored,
+  and its confirm says "another step" rather than "the Assign tab" (ruling 10's keystroke anchor
+  and owner label come from the starting rules an assignment claims).
+
+**Known limits (R15).**
+- Attribution is by comparing stage texts, so a rule that is identical in two stages (a later step
+  that rewrites a rule into the text it already had, or two equal rules) can be misattributed to the
+  wrong step or missed; the prediction check above is what catches an override then.
+- The pane runs its own projection (the same function, the same inputs as the preview) rather than
+  reading the preview's; the two agree because they share `projectWorkingCopyVfs`, not because the
+  pane observes the preview.
+- "View in code" matches a working-IR rule to a line by content; a rule a later step rewrote or an
+  Assign-tab rule replaced has no line, and the tab says so.

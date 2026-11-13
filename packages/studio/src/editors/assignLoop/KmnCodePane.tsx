@@ -3,33 +3,76 @@
 // A Monaco editor over the `.kmn` source with syntax highlighting,
 // following the TouchCodePane pattern ("view swap, not a fork"):
 //
-// - Text source: `emitKmn(ir)` where `ir` is the working-copy KeyboardIR —
-//   canonical formatting, always coherent with the Assign tab.
+// - Text source: the PROJECTED `.kmn` — the same text the preview compiles
+//   and the download ships. The pane clones `startVfs`, applies the shared
+//   working-copy transform (`useWorkingCopyTransform` → `projectWorkingCopyVfs`,
+//   the single projection the OSK preview and `serializeWorkingCopy` both use),
+//   and reads the `.kmn` back out of the projected VFS. Carve deletions,
+//   mechanism assignments, identity, mark guards, caps handling, deadkey ops,
+//   context-tolerance fixes and rules-step additions are all reflected, so the
+//   pane is always coherent with the Assign tab and the preview — the
+//   `emitKvks(effectiveKvks)` precedent OskCodePane already follows.
+//   When no `startVfs` is available (not yet instantiated), the pane falls
+//   back to the carve floor: `emitKmn(applyCarveMutate(startIr, …))`.
 //   `ir === null` renders the empty state.
 // - Lint: debounced per keystroke through kmnCodeLint.ts (parseKmn;
 //   syntax errors become positioned Monaco markers).
 // - Apply (spec 117 US8): the edit becomes one structural `CodeEdit` in the `kmn-edits`
-//   decision, never a wholesale re-parsed IR. The gate runs in order: parse and lint, Layer A
-//   validator errors, then ONE candidate compile on the author's click (no timer: D3). Any
-//   error records nothing and is shown at its line. Then `diffIR(workingIr, parsed)` (empty =
-//   formatting-only, nothing recorded), an owner confirm when the edit overrides another
-//   editor's work, and `commitKmnEdit` (which applies the changes live and pushes undo kind `c`).
+//   decision, never a wholesale re-parsed IR. On Copy the pane shows the keyboard as it will be
+//   built, so the diff base is the parse of the text the author was shown (the projected `.kmn`),
+//   not the working IR: `diffIR(parse(shown), parse(edited))`. The gate runs in order: parse and
+//   lint, Layer A validator errors, a refusal when the diff touches a rule a build step after the
+//   `kmn-edits` replay made or rewrote (mark guards, context tolerance, caps handling: anchoring it
+//   would change which step wins; research R15), a prediction of the build with the entry included
+//   (a later step that overrides the edit refuses it), then ONE candidate compile on the author's
+//   click (no timer: D3). The shown text and the stage texts it was classified against are one
+//   snapshot of one projection; if the build changed under a dirty draft, Apply refuses and offers
+//   to reload the current text (the draft stays in the editor until then). Apply is not
+//   re-entrant: a second click while one runs does nothing. Any error records nothing and is shown at its line. Then an empty diff
+//   (formatting-only) records nothing, an owner confirm when the edit overrides another editor's
+//   work, and `commitKmnEdit` (which applies the changes live and pushes undo kind `c`). The
+//   recorded entry changes the projection, so the pane snaps to the new built text and the edit
+//   stays visible because it is now in the build. On Open the pane shows the file text and Apply
+//   replaces the starting point with it.
 //   Monaco-local undo covers typing.
 
 import "./touchBuilder/monacoSetup.ts";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
-import { diffIR, emitKmn, findOwners, parseKmn, runAllChecks } from "@keyboard-studio/engine";
+import { createVirtualFS, type Pattern } from "@keyboard-studio/contracts";
+import { devLog } from "@keyboard-studio/contracts/dev-log";
+import {
+  diffIR,
+  emitKmn,
+  findOwners,
+  parseKmn,
+  runAllChecks,
+  OUTPUT_FORM_SEAM_PATTERN_IDS,
+} from "@keyboard-studio/engine";
 import type { IRChange, KeyboardIR, LintFinding, OwnerRef } from "@keyboard-studio/contracts";
+import { findRawCtrlRules } from "@keymanapp/keyboard-lint";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
+import { applyCarveMutate } from "../../steps/editorMutate.ts";
+import { physicalAssignmentsOf } from "../../lib/physicalAssignments.ts";
+import { findKmnPath } from "../../lib/findKmnPath.ts";
+import { getPatternByIdSync } from "../../lib/services.ts";
 import { compileCandidateKmn } from "../../lib/compileCandidateKmn.ts";
+import { nextCodeEdit } from "../../lib/nextCodeEdit.ts";
 import { loadAssignedKeys } from "../../lib/assignedKeys.ts";
 import { anchorAssignedKeys } from "../../lib/claimedInputs.ts";
+import {
+  buildRevealLines,
+  findBuildMismatch,
+  findLateRuleTouch,
+  type KmnStageTexts,
+  type LateSource,
+} from "../../lib/builtKmnView.ts";
+import type { KmnStage } from "../../lib/projectWorkingCopyVfs.ts";
 import { ConfirmDialog } from "./parts/ConfirmDialog.tsx";
-import { findRawCtrlRules } from "@keymanapp/keyboard-lint";
 import { isOpenMode } from "../../lib/openMode.ts";
 import { readVfsText } from "../../lib/vfsText.ts";
 import {
@@ -60,9 +103,17 @@ function findingMarker(f: LintFinding): KmnCodeMarker {
   };
 }
 
+function sameStages(a: KmnStageTexts, b: KmnStageTexts): boolean {
+  if (a.size !== b.size) return false;
+  for (const [k, v] of a) if (b.get(k) !== v) return false;
+  return true;
+}
+
 /** An Apply awaiting the owner confirm: what it would record, and who it overrides. */
 interface PendingApply {
   readonly irAtClick: KeyboardIR;
+  /** The built text on screen when Apply was clicked: the edit was made against it. */
+  readonly canonicalAtClick: string;
   readonly changes: IRChange[];
   readonly overrides: OwnerRef[];
 }
@@ -131,13 +182,88 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
       ? startKeyboard.id
       : (ir?.header.name ?? "keyboard");
 
-  // The canonical text for the current IR, with the node-to-line map the
-  // reveal uses.
-  const emitted = useMemo(
-    () => (ir === null ? null : emitKmn(ir, { lineMap: true })),
-    [ir],
-  );
-  const canonical = ir === null ? null : (openText ?? emitted?.text ?? null);
+  // The canonical text for the current IR (Open: the file's text, verbatim).
+  //
+  // Projected `.kmn` (primary): the same projection the preview and the
+  // download run, applied to a clone of `startVfs` so the base is never
+  // mutated. The pattern map is resolved synchronously from the recorded
+  // assignments (plus the output-form seam ids, mirroring
+  // `serializeWorkingCopy` step 3) so mechanism assignments are reflected
+  // too — `useWorkingCopyTransform` without a pattern map would skip them.
+  // The sync library cache is the memoized index the preview's async
+  // `getById` wraps, so it is never colder than the preview's map.
+  // `previewedStartId` is the store's own base id: this call site only ever
+  // renders the committed base, so the F4 gate never suppresses the overlay.
+  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
+  const patternMap = useMemo(() => {
+    const ids = new Set(
+      physicalAssignmentsOf(phaseResults).flatMap((a) =>
+        a.mechanisms.map((m) => m.patternId),
+      ),
+    );
+    for (const id of OUTPUT_FORM_SEAM_PATTERN_IDS) ids.add(id);
+    const map = new Map<string, Pattern>();
+    for (const id of ids) {
+      const pattern = getPatternByIdSync(id);
+      if (pattern !== undefined) map.set(id, pattern);
+    }
+    return map;
+  }, [phaseResults]);
+  // The projection reports the `.kmn` after each step that can write rules at or after the
+  // `kmn-edits` replay. Each run collects them into its own map, handed back with the text, so the
+  // stage texts and the text they came from are one value (nothing persists from render: the
+  // collector is set only around the synchronous projection call).
+  const stageCollectorRef = useRef<Map<KmnStage, string> | null>(null);
+  const stageTap = useCallback((stage: KmnStage, text: string) => {
+    stageCollectorRef.current?.set(stage, text);
+  }, []);
+  const vfsTransform = useWorkingCopyTransform({
+    patternMap: patternMap.size > 0 ? patternMap : null,
+    previewedStartId: startKeyboard?.id ?? null,
+    kmnStageTap: stageTap,
+  });
+  const startIr = useWorkingCopyStore((s) => s.startIr);
+  const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
+  const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const carveChars = useWorkingCopyStore((s) => s.carveChars);
+  const projection = useMemo((): { text: string; stages: KmnStageTexts } | null => {
+    if (vfsTransform === null || startVfs === null || startKeyboard === null)
+      return null;
+    const stages = new Map<KmnStage, string>();
+    stageCollectorRef.current = stages;
+    try {
+      // Shallow-entry clone: the projection replaces whole entries via
+      // vfs.set() rather than mutating entry buffers in place (the same
+      // clone contract `serializeWorkingCopy` relies on).
+      const clone = createVirtualFS(startVfs.entries());
+      vfsTransform(clone, startKeyboard.id);
+      const kmnPath = findKmnPath(clone);
+      if (kmnPath === undefined) return null;
+      const text = readVfsText(clone, kmnPath);
+      return text === undefined ? null : { text, stages };
+    } catch (err) {
+      devLog.warn(
+        "[KmnCodePane] projected .kmn unavailable; showing carve-filtered emit",
+        err,
+      );
+      return null;
+    } finally {
+      stageCollectorRef.current = null;
+    }
+  }, [vfsTransform, startVfs, startKeyboard]);
+  const projectedKmn = projection?.text ?? null;
+  // Carve floor (no `startVfs` yet): the carve-applied working IR through
+  // the mutate seam — the same derivation the projection's step 1 runs.
+  const carveFallback = useMemo(() => {
+    if (ir === null || startIr === null) return null;
+    return emitKmn(
+      applyCarveMutate(startIr, deletedNodeIds, deletedItemIds, carveChars),
+    );
+  }, [ir, startIr, deletedNodeIds, deletedItemIds, carveChars]);
+  const canonical =
+    ir === null
+      ? null
+      : (openText ?? projectedKmn ?? carveFallback ?? emitKmn(ir));
 
   // Raw-Ctrl baseline (issue #2359): the rules already in the working copy
   // never block Apply — only rules the edited text ADDS do. Content-keyed,
@@ -153,11 +279,32 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
   // Editor text. `null` until the first canonical text arrives.
   const [text, setText] = useState<string | null>(null);
   const textRef = useRef<string | null>(null);
-  // The canonical text the current draft was last synced to / applied from.
+  // The canonical text the current draft was last synced to / applied from, and the stage texts of
+  // the projection that text came from: the one snapshot Apply diffs and classifies against.
   const lastAppliedRef = useRef<string | null>(null);
-  // Set around Apply: the store update changes the IR, the new canonical
-  // text then snaps the editor (and clears dirty) via the effect below.
+  const shownStagesRef = useRef<KmnStageTexts>(new Map());
+  // The stage texts of the newest projection, kept after each render (never written during one).
+  const latestStagesRef = useRef<KmnStageTexts>(new Map());
+  const projectionStages = projection?.stages;
+  useEffect(() => {
+    latestStagesRef.current = projectionStages ?? new Map();
+    // The same text from a projection whose stages moved is still a clean follow of the build.
+    if (canonical !== null && lastAppliedRef.current === canonical) shownStagesRef.current = latestStagesRef.current;
+  });
+  // Apply in flight: set synchronously at the top of Apply, cleared in `finally`, so a double
+  // click cannot start a second Apply before the first has reached its own `compiling` state.
+  const applyingRef = useRef(false);
+  const [revealMissing, setRevealMissing] = useState(false);
+  // Set by a successful Apply (Open: the starting-point replacement; Copy: the recorded
+  // `kmn-edits` entry). Either moves what is built, so the new canonical snaps the editor (and
+  // clears dirty) via the effect below. `appliedTick` re-runs that effect when the built text
+  // came out identical, so the flag is always consumed by the render right after the Apply and a
+  // later dirty draft is never wiped by a stale flag.
   const justAppliedRef = useRef(false);
+  const [appliedTick, setAppliedTick] = useState(0);
+  // The canonical at render time, for Apply's "did the keyboard change meanwhile" guards.
+  const canonicalRef = useRef<string | null>(null);
+  canonicalRef.current = canonical;
 
   const [markers, setMarkers] = useState<readonly KmnCodeMarker[]>([]);
   const [parsed, setParsed] = useState(true);
@@ -210,19 +357,24 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
 
   // Follow the canonical text while clean; snap to it after Apply; keep a
   // dirty draft across external changes (Assign-tab edits).
+  const snapToCanonical = (next: string) => {
+    justAppliedRef.current = false;
+    lastAppliedRef.current = next;
+    shownStagesRef.current = latestStagesRef.current;
+    textRef.current = next;
+    setText(next);
+    setApplyError(null);
+    runLint(next);
+  };
   useEffect(() => {
     if (canonical === null) return;
     if (justAppliedRef.current) {
-      justAppliedRef.current = false;
-      lastAppliedRef.current = canonical;
-      textRef.current = canonical;
-      setText(canonical);
-      setApplyError(null);
-      runLint(canonical);
+      snapToCanonical(canonical);
       return;
     }
     if (textRef.current === null || textRef.current === lastAppliedRef.current) {
       lastAppliedRef.current = canonical;
+      shownStagesRef.current = latestStagesRef.current;
       if (textRef.current !== canonical) {
         textRef.current = canonical;
         setText(canonical);
@@ -232,18 +384,29 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
     // Dirty draft: kept as-is.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canonical]);
+  // An Apply that left the built text exactly as it was (the entry's replay changed nothing the
+  // view shows) does not move `canonical`, so the effect above would not run; this one consumes
+  // the flag. A formatting-only Apply bumps the tick too, without the flag: it only re-renders.
+  useEffect(() => {
+    if (justAppliedRef.current && canonical !== null) snapToCanonical(canonical);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appliedTick]);
 
-  // Reveal once the editor is mounted and holds text. Uses the canonical
-  // line map: it matches the editor text while the draft is clean, and is the
+  // Reveal once the editor is mounted and holds text. The lines come from the
+  // canonical text: they match the editor while the draft is clean, and are the
   // best available guess for a dirty one.
   const hasText = text !== null;
   useEffect(() => {
     const nodeId = pendingRevealRef.current;
     if (nodeId === undefined || !editorReady || !hasText) return;
     const editor = editorRef.current;
-    if (editor === null || ir === null || emitted === null) return;
-    const line = lineForNode(ir, emitted.lineByNodeId, nodeId);
+    if (editor === null || ir === null || canonical === null) return;
+    // The line in the shown text (the built keyboard, or the file on Open), found by content.
+    const lines = buildRevealLines(ir, canonical, keyboardId);
+    const line = lineForNode(ir, lines, nodeId);
     pendingRevealRef.current = undefined;
+    // No line of its own in the built text (a step replaced the rule): say so, whatever is revealed.
+    setRevealMissing(!lines.has(nodeId));
     if (line === undefined) return;
     editor.revealLineInCenter(line);
     editor.setSelection({
@@ -286,6 +449,9 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
   }
 
   const dirty = text !== null && text !== lastAppliedRef.current;
+  // A dirty draft whose built text moved on (an assignment, a Layout-tab edit): the draft was made
+  // against text that is no longer what is built, so Apply refuses until the author reloads.
+  const draftStale = dirty && openText === undefined && canonical !== null && canonical !== lastAppliedRef.current;
   const errorCount = markers.filter((m) => m.severity === "error").length;
   const warningCount = markers.filter((m) => m.severity === "warning").length;
 
@@ -338,13 +504,18 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
 
   const commitPending = (p: PendingApply) => {
     const store = useWorkingCopyStore.getState();
-    if (store.ir !== p.irAtClick) {
+    if (store.ir !== p.irAtClick || canonicalRef.current !== p.canonicalAtClick) {
       changedMeanwhile();
       return;
     }
     // The live IR changes only through the store's commit: applyIRChanges under CODE_WRITES.
     justAppliedRef.current = true;
-    const result = store.commitKmnEdit({ op: "code-apply", changes: p.changes, overrides: p.overrides });
+    // The built text can name a rule the working IR lacks (an Assign-tab rule); the projection
+    // places it, so the live IR skips what it cannot anchor instead of refusing the entry.
+    const result = store.commitKmnEdit(
+      { op: "code-apply", changes: p.changes, overrides: p.overrides },
+      { skipLiveMisses: true },
+    );
     if (!result.ok) {
       justAppliedRef.current = false;
       setApplyError(
@@ -356,9 +527,35 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
       return;
     }
     setApplyError(null);
+    setAppliedTick((n) => n + 1);
   };
 
+  /** Replace the draft with the text that is built now (the author chose this; nothing else wipes a draft). */
+  const reloadCurrent = () => {
+    const now = canonicalRef.current;
+    if (now !== null) snapToCanonical(now);
+  };
+
+  const staleMessage = () =>
+    setApplyError(
+      t({
+        id: "editor.assignLoop.mechanisms.code.draftStale",
+        message:
+          "The keyboard changed underneath your draft (another tab changed what is built). Nothing was applied. Reload the current text, then make your edit again.",
+      }),
+    );
+
   const handleApply = async () => {
+    if (applyingRef.current) return;
+    applyingRef.current = true;
+    try {
+      await runApply();
+    } finally {
+      applyingRef.current = false;
+    }
+  };
+
+  const runApply = async () => {
     const current = textRef.current;
     if (compiling || current === null || canonical === null) return;
     const irAtClick = useWorkingCopyStore.getState().ir;
@@ -397,19 +594,67 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
         return;
       }
       justAppliedRef.current = true;
+      setAppliedTick((n) => n + 1);
       setApplyError(null);
       return;
     }
-    if (current === canonical) {
-      // Formatting-only change: nothing to commit.
+    if (current === lastAppliedRef.current) {
+      // Nothing typed since the text was shown: nothing to commit.
       return;
     }
+    const markFormattingOnlyApplied = () => {
+      // Nothing to record, and the built text is the truth, so this draft is as applied as it will
+      // get: clear the badge, keep the text. A later change to the built text snaps it, as for any
+      // clean editor.
+      lastAppliedRef.current = current;
+      setApplyError(null);
+      setAppliedTick((n) => n + 1);
+    };
     // 2. The structural diff; empty means formatting-only, which records nothing.
-    // The base is the working IR as the editor shows it: the emitted text, re-parsed. A comment the
-    // working IR holds as freestanding (a blank line used to follow it) is re-parsed as leading a
-    // store, so diffing the live IR itself would report an edit the author never made.
-    const diffed = diffIR(parseKmn(emitKmn(irAtClick), id).ir, after.ir);
-    if (diffed.length === 0) return;
+    // The base is the text the author was shown (the built keyboard), re-parsed: the edit is the
+    // difference from that view. A comment the shown text holds as freestanding is parsed the same
+    // way on both sides, so a formatting-only change never reports an edit the author did not make.
+    const shownText = lastAppliedRef.current ?? canonical;
+    // One snapshot: the text the author was shown and the stage texts of that same projection. If
+    // the build has moved on since, the draft's base is gone and classifying against the newest
+    // stages would be wrong, so refuse (the simpler of the two sound options) and let the author
+    // reload; the draft stays in the editor until then.
+    if (canonical !== shownText || !sameStages(latestStagesRef.current, shownStagesRef.current)) {
+      staleMessage();
+      return;
+    }
+    let shownIr: KeyboardIR;
+    try {
+      shownIr = parseKmn(shownText, id).ir;
+    } catch (err) {
+      setApplyError(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    const diffed = diffIR(shownIr, after.ir);
+    if (diffed.length === 0) {
+      markFormattingOnlyApplied();
+      return;
+    }
+    // A rule a build step after the `kmn-edits` replay made cannot be anchored by a kept edit
+    // without changing which step wins, so an Apply that touches one records nothing.
+    const late = findLateRuleTouch(diffed, shownStagesRef.current, shownText, id);
+    if (late !== null) {
+      showBlocked([
+        {
+          code: "kmn-code-built-rule",
+          severity: "error",
+          message: t({
+            id: "editor.assignLoop.mechanisms.code.lateRule",
+            message: `This rule is made by ${{ source: lateSourceWords(late.source) }} when the keyboard is built, so an edit to it cannot be kept. Change it there instead.`,
+          }),
+          startLineNumber: late.line,
+          startColumn: 1,
+          endLineNumber: late.line,
+          endColumn: 2,
+        },
+      ]);
+      return;
+    }
     // Ruling 10: a rule on a key the Assign tab owns is anchored by key (before the compile gate
     // below, so the projection finds it) and flagged as overriding the Assign tab.
     let assignedKeys: Awaited<ReturnType<typeof loadAssignedKeys>> = [];
@@ -420,6 +665,41 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
     }
     if (!mountedRef.current) return;
     const { changes, overrides: assignOverrides } = anchorAssignedKeys(diffed, assignedKeys);
+    // The build with this entry included must be the text the author applied: a later step that
+    // rewrites the edited rule (caps, mark guards, context tolerance) would otherwise override it
+    // and the pane would snap back with the edit silently lost.
+    if (vfsTransform !== null && startVfs !== null && startKeyboard !== null) {
+      let predictedText: string | undefined;
+      try {
+        const clone = createVirtualFS(startVfs.entries());
+        vfsTransform(clone, startKeyboard.id, nextCodeEdit(changes));
+        const kmnPath = findKmnPath(clone);
+        predictedText = kmnPath === undefined ? undefined : readVfsText(clone, kmnPath);
+      } catch (err) {
+        // The prediction is a safeguard, not a gate of its own: without it the compile gate remains.
+        devLog.warn("[KmnCodePane] could not predict the build with the edit", err);
+        predictedText = undefined;
+      }
+      const mismatch = predictedText === undefined ? null : findBuildMismatch(predictedText, current, id);
+      if (mismatch !== null) {
+        showBlocked([
+          {
+            code: "kmn-code-overridden",
+            severity: "error",
+            message: t({
+              id: "editor.assignLoop.mechanisms.code.overriddenByBuild",
+              message:
+                "A later build step changes this back, so the keyboard as built would not match what you wrote. Change it in the step that produces it instead.",
+            }),
+            startLineNumber: mismatch,
+            startColumn: 1,
+            endLineNumber: mismatch,
+            endColumn: 2,
+          },
+        ]);
+        return;
+      }
+    }
     // 1c. One candidate compile, on this click only.
     setCompiling(true);
     setApplyError(null);
@@ -435,7 +715,7 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
     }
     if (!mountedRef.current) return;
     setCompiling(false);
-    if (useWorkingCopyStore.getState().ir !== irAtClick) {
+    if (useWorkingCopyStore.getState().ir !== irAtClick || canonicalRef.current !== canonical) {
       changedMeanwhile();
       return;
     }
@@ -464,12 +744,27 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
     // 3. Who does this override?
     const startIr = useWorkingCopyStore.getState().startIr;
     const overrides = [...(startIr === null ? [] : findOwners(irAtClick, startIr, changes)), ...assignOverrides];
-    const candidate: PendingApply = { irAtClick, changes, overrides };
+    const candidate: PendingApply = { irAtClick, canonicalAtClick: canonical, changes, overrides };
     if (overrides.length > 0) {
       setPending(candidate);
       return;
     }
     commitPending(candidate);
+  };
+
+  const lateSourceWords = (source: LateSource): string => {
+    switch (source) {
+      case "mark-guards":
+        return t({ id: "editor.assignLoop.mechanisms.code.lateSource.markGuards", message: "the marks step" });
+      case "context-tolerance":
+        return t({ id: "editor.assignLoop.mechanisms.code.lateSource.contextTolerance", message: "the context-tolerance fix" });
+      case "caps":
+        return t({ id: "editor.assignLoop.mechanisms.code.lateSource.caps", message: "the caps handling choice" });
+      case "targets":
+        return t({ id: "editor.assignLoop.mechanisms.code.lateSource.targets", message: "the target platforms step (the &TARGETS store, always set to any)" });
+      case "build":
+        return t({ id: "editor.assignLoop.mechanisms.code.lateSource.build", message: "a later build step" });
+    }
   };
 
   const ownerWords = (owner: OwnerRef["owner"]): string => {
@@ -562,6 +857,27 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
         }}
         onSecondary={() => setPending(null)}
       />
+      {draftStale && (
+        <div data-testid="kmn-code-draft-stale" role="status">
+          <span>
+            {t({
+              id: "editor.assignLoop.mechanisms.code.draftStaleNotice",
+              message: "The keyboard changed since you started editing, so this draft is out of date.",
+            })}
+          </span>{" "}
+          <button type="button" data-testid="kmn-code-reload" onClick={reloadCurrent}>
+            {t({ id: "editor.assignLoop.mechanisms.code.reloadCurrent", message: "Reload the current text" })}
+          </button>
+        </div>
+      )}
+      {revealMissing && (
+        <div data-testid="kmn-code-reveal-missing" role="status">
+          {t({
+            id: "editor.assignLoop.mechanisms.code.revealMissing",
+            message: "That rule is not in the keyboard as it will be built, so no line matches it. Another step replaced it.",
+          })}
+        </div>
+      )}
       {applyError !== null && (
         <div data-testid="kmn-code-apply-error" role="alert">
           {applyError}

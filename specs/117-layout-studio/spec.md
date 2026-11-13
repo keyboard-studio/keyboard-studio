@@ -84,15 +84,16 @@ Mechanical Gallery and use it, not when the component exists.
    (two replays per R12, step 2.2's parse and re-emit) is accepted as measured (research R12,
    "Replay cost"); one-replay and no-re-parse designs are not pursued in this spec.
 9. **On a key the Assign tab assigns, the assignment wins over a Code-tab edit, and the edit is
-   flagged, never lost silently.** The Code tab shows the working copy, and Assign-tab
-   assignments enter the keyboard only when the output is built (projection step 2, which also
-   drops the starting rule the assignment claims). So the Code tab can never edit an
-   assignment's rule, and a code edit aimed at the rule an assignment replaces does not fit in
-   the built keyboard. This is acceptance scenario 4 and FR-063 (b), whichever tab was used
+   flagged, never lost silently.** *Amended by ruling 11: the Code tab now shows the built
+   keyboard, so it can edit an assignment's rule; this ruling still governs a code edit made
+   BEFORE the key is assigned.* Assign-tab
+   assignments enter the keyboard when the output is built (projection step 2, which also
+   drops the starting rule the assignment claims). A code edit aimed at the rule an assignment
+   replaces, made before the assignment, does not fit in the built keyboard. This is acceptance scenario 4 and FR-063 (b), whichever tab was used
    first; Assign-tab assignments are therefore not an owner under FR-062. A rule a code edit
    adds that an assignment's rule shadows in the built keyboard is flagged under FR-063 (c).
-   Showing Assign-tab rules in the Code tab is deferred (Assumptions, "Assign-tab rules in the
-   Code tab"). *Amended by ruling 10 for the order "assign first, then code edit".*
+   *Amended by ruling 10 for the order "assign first, then code edit", and by ruling 11, which
+   shows Assign-tab rules in the Code tab.*
 10. **On an assigned key, the most recent edit wins; a character it displaces returns to be
     placed** (amends ruling 9). The order is decided when the later edit is made and is recorded
     in it, so the projection needs no timestamps:
@@ -110,6 +111,19 @@ Mechanical Gallery and use it, not when the component exists.
       to place through the **existing** inventory coverage, exactly as when an assignment is
       removed in the galleries. That coverage reads the starting keyboard plus assignments today,
       so it is extended to count `kmn-edits`; no new reminder surface is built.
+
+## Ruling (product owner, 2026-11-13)
+
+11. **On Copy the Code tab shows the keyboard as it will be built, and Apply keeps the
+    difference from that view** (owner ruling 2026-11-13; research R15). The tab, the preview, and
+    the download agree. The tab's text is the projected `.kmn` (carve, assignments, deadkey
+    operations, rules-step additions, mark guards, context tolerance, caps handling), not the
+    working IR's emit. Apply diffs the edited text against the text the author was shown and
+    records that difference as one `kmn-edits` entry, so the edit is in the build and stays
+    visible. An Apply that changes or removes a rule a build step after the `kmn-edits` replay
+    makes (mark guards, context tolerance, caps handling) is refused with a message at its line
+    naming that step, and records nothing (interim: pending owner ruling, research R15). On Open nothing changes: the tab shows the file text
+    and Apply replaces the starting point.
 
 ## Clarifications
 
@@ -695,15 +709,19 @@ recorded.
 **Code-tab edits (US8) — ruling 7**
 
 - **FR-060**: Code-tab Apply MUST record the edit as one entry in `kmn-edits`: the **structural
-  difference** between the working copy's IR the text was emitted from and the IR parsed from the
-  edited text — rules inserted, removed, or replaced; stores, groups, headers, and opaque
+  difference** between the text the author was shown (on Copy the built keyboard, ruling 11; on
+  Open the file) and the IR parsed from the edited text — rules inserted, removed, or replaced; stores, groups, headers, and opaque
   fragments added, changed, or removed. The entry holds IR changes, never `.kmn` text, so the
   text is parsed once at Apply and never re-parsed on replay (spec 082 FR-015 forbids the text
   path for behaviours). Apply MUST change the live working copy by applying that difference, not
   by replacing the IR wholesale, so untouched nodes keep their identity.
 - **FR-061**: **Errors are blocked.** Apply MUST record nothing and leave the working copy
   unchanged when the edited text does not parse, has a validator error (Layer A), or does not
-  compile. The errors are shown at their lines. Warnings do not block.
+  compile. The errors are shown at their lines. Warnings do not block. On Copy, an Apply whose
+  difference changes or removes a rule made by a build step after the `kmn-edits` replay (mark
+  guards, context tolerance, caps handling) is refused the same way, with the message naming
+  that step (ruling 11; the refusal itself is the interim behaviour, pending the owner ruling
+  recorded in research R15).
 - **FR-062**: **The code edit wins.** When the difference changes or removes a node another
   decision produced — a deadkey (spec 083), a Layout-tab edit, a rules step addition,
   identity's header stores, an Assign-tab assignment on the edited key (ruling 10: the change
@@ -842,14 +860,13 @@ recorded.
   as "types nothing" on never-defined keys. Until the enumerator and data ship, unhandled keys show
   "base keyboard fallback — character not yet available" rather than a guessed character. US1–US5
   for handled keys do not wait for 109. Owner of the interim wording: the Engine team. Trigger: when spec 109's enumerator and base data ship, the fallback cells show the base keyboard character and "types nothing" states; until then the interim wording stays.
-- **Assign-tab rules in the Code tab** (ruling 9; Art XI: owner and trigger). The Code tab shows
-  the working copy, which does not hold Assign-tab assignments; they are added at projection
-  step 2. Showing them, and letting a code edit win over them, means putting assignments into the
-  working copy, which changes how output is built. Owner: the product owner with the Engine team.
-  Trigger: an author report of a Code-tab edit flagged because an Assign-tab assignment replaced
-  its rule, or any spec that moves assignments into the working copy; decide then whether a
-  follow-up spec is opened. If neither has happened by this spec's retirement pass, this note is
-  carried into the AS-BUILT as a known limit, not rolled forward as a plan.
+- **Assign-tab rules in the Code tab** (resolved by ruling 11, 2026-11-13). The Code tab shows
+  the built keyboard, so Assign-tab rules are visible there and a code edit to one is kept as a
+  `kmn-edits` entry. Assignments stay a projection step; they were not moved into the working
+  copy. Known limit: a rule made by a step after the `kmn-edits` replay (mark guards, context
+  tolerance, caps handling) is shown but cannot be edited from the Code tab; Apply refuses it. This
+  refusal is the interim behaviour, PENDING OWNER RULING (raised 2026-11-13, research R15): refuse
+  (current), show read-only, or editable with the edit winning over that step.
 - **Placement tray gate** (Art XI: owner and trigger). Owner: the product owner. Trigger: when
   US1–US6 have shipped, the product owner decides go or no-go on US7. If no-go, or if no decision
   is recorded by this spec's retirement pass, FR-050 and US7 are removed from the spec rather than

@@ -5,7 +5,7 @@
 // not compiled, or the step is locked (FR-025).
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { parseKmn, emitKmn } from "@keyboard-studio/engine";
+import { parseKmn, emitKmn, diffIR } from "@keyboard-studio/engine";
 import type { KmnEditsValue } from "@keyboard-studio/contracts";
 import type { DeadkeysDefinedValue } from "../lib/deadkeyOps.ts";
 import { useWorkingCopyStore } from "./workingCopyStore.ts";
@@ -293,5 +293,40 @@ describe("commitLayoutDeadkeyOp / undo kind ld", () => {
     expect(text()).toContain("RALT");
     useWorkingCopyStore.getState().undoKmnEdit();
     expect(text()).toBe(before);
+  });
+});
+
+describe("commitKmnEdit: a Code-tab entry naming a rule the live IR lacks (built view)", () => {
+  // The Code tab shows the built keyboard, so a change can name a rule the projection adds (an
+  // Assign-tab rule) that the working IR never holds.
+  const built = KMN.replace("+ [K_B] > 'b'\n", "+ [K_B] > 'b'\n+ [K_N] > U+014B\n");
+  const changes = () =>
+    diffIR(parseKmn(built, "wc-kmn-edits").ir, parseKmn(
+      built.replace("+ [K_N] > U+014B", "+ [K_N] > U+014A").replace("+ [K_B] > 'b'", "+ [K_B] > 'x'"),
+      "wc-kmn-edits",
+    ).ir);
+
+  it("refuses the whole entry by default, writing nothing", () => {
+    seed();
+    const before = text();
+    const result = useWorkingCopyStore.getState().commitKmnEdit({ op: "code-apply", changes: changes(), overrides: [] });
+    expect(result).toEqual({ ok: false, reason: "refused" });
+    expect(text()).toBe(before);
+    expect(logged()).toBeUndefined();
+  });
+
+  it("with skipLiveMisses applies what anchors, records the whole entry, and undoes only what it applied", () => {
+    seed();
+    const before = text();
+    const entryChanges = changes();
+    const result = useWorkingCopyStore
+      .getState()
+      .commitKmnEdit({ op: "code-apply", changes: entryChanges, overrides: [] }, { skipLiveMisses: true });
+    expect(result.ok).toBe(true);
+    expect(text()).toContain("+ [K_B] > U+0078");
+    expect((logged()?.entries[0] as { changes: unknown[] }).changes).toHaveLength(entryChanges.length);
+    expect(useWorkingCopyStore.getState().undoKmnEdit()).toBe(true);
+    expect(text()).toBe(before);
+    expect(logged()?.entries).toEqual([]);
   });
 });

@@ -81,6 +81,27 @@ describe("projectionInputFromState — preview/download parity", () => {
     },
   );
 
+  it.each(["observing", "throwing"] as const)(
+    "supplying a kmnStageTap (%s) does not change the preview, and the preview still equals the download",
+    async (kind) => {
+      const startVfs = seed("swallow");
+      const plain = await previewKmn(startVfs);
+      const seen: string[] = [];
+      const tap = (stage: string): void => {
+        seen.push(stage);
+        if (kind === "throwing") throw new Error("tap failed");
+      };
+      const { result } = renderHook(() =>
+        useWorkingCopyTransform({ previewedStartId: basicKbdus.id, kmnStageTap: tap }),
+      );
+      const vfs = createVirtualFS(startVfs.entries());
+      result.current!(vfs, basicKbdus.id);
+      expect(seen.length).toBeGreaterThan(0);
+      expect(vfs.get(KMN_PATH)!.content).toBe(plain);
+      expect(await downloadKmn()).toBe(plain);
+    },
+  );
+
   it("passes no key-edit ops unless a live layout override supplies them", () => {
     seed("swallow");
     const state = useWorkingCopyStore.getState();

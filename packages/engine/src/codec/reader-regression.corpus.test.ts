@@ -11,6 +11,12 @@
  *   4. no file fails to import.
  * A change that moves a count on purpose updates the report in the same commit.
  * Without the corpus only check 3 runs, on the fixtures, with a [WARN].
+ * With a PARTIAL corpus (CI checks out release/ only) check 3 runs over the
+ * files actually walked — an entry for a file the checkout does not contain
+ * cannot be used, so it is skipped, not failed — and checks 1-2 are skipped
+ * with a [WARN]: the report's Phase 6 numbers cover the full release +
+ * experimental corpus, so a release-only walk cannot match them. A full
+ * local corpus checkout runs every check.
  */
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
@@ -21,6 +27,12 @@ import { lowerDetailed } from "./lower.js";
 const __dir = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env["KS_KEYBOARDS"] ?? path.resolve(__dir, "../../../../../keyboards");
 const rootExists = fs.existsSync(path.join(ROOT, "release"));
+// CI's corpus checkout is release/ only (see .github/workflows/ci.yml:
+// "Checkout keyboard-studio/keyboards corpus (pinned, release/ only,
+// shallow)"), while the report's Phase 6 numbers cover release +
+// experimental. The count checks below only run on a complete corpus.
+const experimentalExists = fs.existsSync(path.join(ROOT, "experimental"));
+const corpusComplete = rootExists && experimentalExists;
 const EVIDENCE_DIR = path.resolve(__dir, "../../../../specs/116-ng-parser-adoption/evidence");
 const ENGINE_SRC = path.resolve(__dir, "..");
 
@@ -85,8 +97,14 @@ describe(".kmn reader holds the final comparison's numbers (corpus and fixtures)
     const anchors = new Map<string, number>();
     const entries = new Set(allowList.entries.map((e) => `${e.file}:${e.line}`));
     const used = new Set<string>();
+    // Files actually walked: on a partial corpus (release/ only) an
+    // allow-list entry for an unwalked file cannot be used, and must not
+    // fail — its file simply is not in this checkout (main CI run
+    // 43140522180 failed the two experimental/gff entries this way).
+    const walked = new Set<string>();
 
     for (const { key, file } of sources()) {
+      walked.add(key);
       let r: ReturnType<typeof lowerDetailed>;
       try {
         r = lowerDetailed(fs.readFileSync(file, "utf8"), "kbd");
@@ -104,13 +122,21 @@ describe(".kmn reader holds the final comparison's numbers (corpus and fixtures)
     }
     for (const e of allowList.entries) {
       const k = `${e.file}:${e.line}`;
-      if ((rootExists || e.file.startsWith("fixture:")) && !used.has(k)) failures.push(`allow-list entry unused: ${k}`);
+      // Fixture entries are always checked: fixtures live in-repo, so a
+      // missing one is a stale entry, not a partial corpus.
+      if ((walked.has(e.file) || e.file.startsWith("fixture:")) && !used.has(k)) {
+        failures.push(`allow-list entry unused: ${k}`);
+      }
     }
 
     expect(failures).toEqual([]);
-    if (rootExists) {
+    if (corpusComplete) {
       expect(sorted(reasons)).toEqual(sorted(reportColumn("### Phase 6 fragment reasons")));
       expect(sorted(anchors)).toEqual(sorted(reportColumn("### Phase 6 comments by anchor")));
+    } else if (rootExists) {
+      console.warn(
+        `[WARN] experimental/ not in the corpus at ${ROOT}; skipping the report's fragment/comment count checks (their Phase 6 numbers cover the full release + experimental corpus)`,
+      );
     }
   }, 900_000);
 });
