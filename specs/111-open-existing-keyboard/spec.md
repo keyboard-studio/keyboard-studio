@@ -218,8 +218,8 @@ The walk on Open:
 
 - **FR-006**: Opening MUST bring every file of the keyboard folder into the working copy. Files are stored as their text, with structured models derived for the source, on-screen keyboard, touch layout and package descriptor. Package entries that point at build output are rewritten to point at the files the studio builds.
 - **FR-007**: For each structured file, the text MUST be the source of truth, and its model MUST always be the result of reading that text.
-- **FR-008**: A change made by a studio tool MUST be applied as a change to the text that covers only the affected part (replace, insert or delete), and the model re-read afterwards.
-- **FR-009**: When a change cannot be placed precisely, the studio MUST name the file that will be reformatted and get the author's agreement before regenerating it.
+- **FR-008** *(amended 2026-11-13)*: A change made by a studio tool MUST be applied as a change to the text that covers only the affected part (replace, insert or delete), and the model re-read afterwards. The text MUST change when the author applies the change, not later at output (FR-041).
+- **FR-009** *(amended 2026-11-13)*: When a change cannot be placed precisely, the studio MUST name the file that will be reformatted and get the author's agreement before regenerating it. The studio MUST ask when the author applies the change. If the author declines, the change is not applied and the file is unchanged.
 - **FR-010**: With no author changes, submitted files MUST be byte-identical to the opened files, except for the version change and the new HISTORY entry.
 - **FR-011**: The language list MUST come from the package descriptor and be editable (add, remove, reorder). Submission MUST write exactly that list.
 - **FR-012**: The package descriptor MUST be updated in place. Fields the author didn't change (description, files, author, copyright, languages) MUST be kept.
@@ -227,7 +227,7 @@ The walk on Open:
 
 **Editing**
 
-- **FR-014**: Code views for the source, on-screen keyboard and touch layout MUST show the actual file text on Open. Applying an edit MUST save the text as written and refresh every surface from it.
+- **FR-014** *(amended 2026-11-13)*: Code views for the source, on-screen keyboard and touch layout MUST show the actual file text on Open. Applying an edit MUST save the text as written and refresh every surface from it. "Every surface" includes the preview and the criteria (FR-043). Because tool changes are now written to the file when applied (FR-041), the code view also shows every tool change.
 - **FR-015**: Applying a code edit MUST be refused only when the text cannot be read (a parse error), with positioned errors and the edited text kept.
 - **FR-016** *(amended 2026-11-06)*: The Mechanisms step is walked on Open for a non-`basic_*` keyboard (FR-031). The remove tool and the other feature galleries MUST be optional on Open, reachable from the menu and from findings. All of them MUST change only the parts they concern (FR-008).
 - **FR-017**: The on-screen keyboard and touch editors MUST edit the existing files and MUST offer generation only when the file is missing.
@@ -248,7 +248,7 @@ The walk on Open:
 
 **Documentation**
 
-- **FR-028**: Hand-written documentation MUST be kept. Regenerating a document or one of its sections MUST be a suggested fix, with a preview of current and proposed text.
+- **FR-028** *(amended 2026-11-13)*: Hand-written documentation MUST be kept. Regenerating a document or one of its sections MUST be a suggested fix, with a preview of current and proposed text. An edit in the documentation editor and an accepted regeneration MUST both change the same file (FR-047).
 - **FR-029**: The help step on Open MUST ask only about documentation that is missing or fails its criteria, prefilled from the existing documents.
 
 **The Open walk** *(added 2026-11-05)*
@@ -259,6 +259,19 @@ The walk on Open:
 - **FR-034**: Upgrades MUST list each failing upgrade criterion with its paired fix (FR-025), starting with cased keys (7.28), the touch caps layer (18.16, the full Capsifesto behaviour: caps layers for shift, right-alt and ctrl, double-tap Shift, one-shot Shift), consistent Ctrl/RAlt touch keys, and a symbols layer. Applying one MUST change only what that upgrade concerns; skipping one MUST keep it from coming back in this session.
 
 **Ctrl and removing letters** *(moved 2026-11-06)*
+
+**Live files** *(added 2026-11-13; see [Amendment 2026-11-13](#amendment-2026-11-13-live-files))*
+
+- **FR-041**: On Open, every change the author applies MUST be written to the file it concerns when it is applied. This covers the Mechanisms step, the remove tool, added rules, the touch editor in all its views, the on-screen keyboard editor, the documentation and style editors, the language list, upgrades and every suggested fix. No change waits in the session to be placed at output.
+- **FR-042**: On Open, recorded decisions are a record only. They feed the decision trail, the review notes and the PR body. They MUST NOT be applied to the files again, after a code edit or at any other time. Changing an earlier choice is a new change to the files as they now stand.
+- **FR-043**: On Open, every surface MUST read the working copy's current files, or models read from them: visual views, code views, the preview, the criteria, the character inventory, the consistency check, test builds, the download and the PR. No surface keeps its own copy of the opened files.
+- **FR-044**: After any applied change, all views of a file MUST agree. What a visual view shows, what the code view shows, what the preview compiles and what is submitted are the same text.
+- **FR-045**: Undo, and "Discard changes and go back", MUST restore file text on Open. They MUST cover code-view edits as well as tool changes, and MUST leave every view and the output in the restored state.
+- **FR-046**: On Open, leaving a code view that holds text the author has not applied (switching tab or file, or pressing Continue) MUST NOT drop that text silently. The studio asks whether to apply or discard it.
+- **FR-047**: On Open, the documentation and style editors MUST edit the files themselves. No separate edited copy may replace a file at output. A page the author has edited still gets suggested fixes when the keyboard changes (FR-023, FR-028).
+- **FR-048**: Only these changes are made at output and not before: the version bump and the HISTORY entry (FR-013), and a test build's own version and label.
+- **FR-049**: An Open draft MUST save the current files and the record of decisions. On restore, the models are read from the saved text. A draft saved before this amendment has its waiting changes placed into the files once on restore, under FR-009, and is a live-file session from then on.
+- **FR-050**: The Letters step's list of letters to add is a session list, not a file change. A letter leaves the list when the keyboard produces it (FR-018).
 
 FR-035..FR-040 (raw Ctrl reporting and its fix, no new Ctrl content or layers, `LCTRL`/`RCTRL` advisory, the proposed `CTRL ALT` to `RALT` upgrade, and the warning on removing a letter a listed language needs) moved to [spec 114](../114-ctrl-and-letter-removal/spec.md), with their tasks (formerly T070-T077). The numbers are not reused here.
 
@@ -290,13 +303,18 @@ FR-035..FR-040 (raw Ctrl reporting and its fix, no new Ctrl content or layers, `
 - **SC-007**: Opening upstream basic_kbdus shows the cased-keys finding with its suggested fix. Accepting it makes the criterion pass, and the change touches only the declaration and the CAPS rules.
 - **SC-008**: No change reaches a file without either the author's own edit or the author's acceptance of a suggestion. Verified by opening, waiting and submitting with no interaction.
 - **SC-009** *(amended 2026-11-06)*: An author goes from the start screen to the first step of the Open walk (Languages) in at most three interactions when the two repositories agree.
+- **SC-010** *(added 2026-11-13)*: After any single applied change in any Open step, the affected file is byte-identical in the code view, in what the preview compiled, and in the download (the download apart from the version change and HISTORY entry). Checked for each step of the walk and each view of the Mechanisms, on-screen keyboard, touch and documentation steps.
+- **SC-011** *(added 2026-11-13)*: Remove a rule with the remove tool, then insert a new rule above it in the code view and apply. The removed rule stays removed and no other rule is removed.
+- **SC-012** *(added 2026-11-13)*: A code edit applied to a keyboard with no other changes reaches the preview and the criteria in the same validation cycle. An applied upgrade makes its criterion pass without any other change.
+- **SC-013** *(added 2026-11-13)*: In the touch step, a key edit is in the output exactly when the key grid shows it, after each of: Continue, undo, a code-view apply, and a later change in the character view.
+- **SC-014** *(added 2026-11-13)*: Edit a documentation page, then accept a regeneration fix for it. The editor, the preview and the output all show the regenerated text.
 
 ## Constitution impact
 
 These are named here so `/speckit-plan`'s Constitution Check can't miss them:
 
 - **Article II (IR is the spine; mutations never on raw text)**: Open makes the file text the source and the IR its parse. Tool changes are still computed on the IR, then placed into the text as precise edits, extending the existing carve splice. Author code edits are text. This needs an amendment that recognises text-sourced working copies, with the carve splice as precedent.
-- **Article III (working copy recalculated from decisions)**: on Open, file text and applied changes are the state. Decisions cover only real choices (source repository, accepted and declined suggestions). Text, including review notes, is never stored as a decision. This needs an amendment, plus a rule for how decision replay coexists with text edits (e.g. a text edit is a checkpoint that replay never crosses).
+- **Article III (working copy recalculated from decisions)**: on Open, file text and applied changes are the state. Decisions cover only real choices (source repository, accepted and declined suggestions). Text, including review notes, is never stored as a decision. This needs an amendment, plus a rule for how decision replay coexists with text edits (e.g. a text edit is a checkpoint that replay never crosses). *(2026-11-13: the live-files amendment removes replay on Open altogether, FR-042. It changes Article III again and needs owner approval; proposed wording is in [Amendment 2026-11-13](#amendment-2026-11-13-live-files).)*
 - **Article IX**: removing the identity-first steps from Open is done with screen gates and step declarations (FR-005).
 - **Article X**: carried values on Open are the keyboard's own content, not proposals from another keyboard, so they take effect without confirmation. Every change the studio proposes is a suggestion requiring acceptance (FR-024).
 - **Article VII**: byte-identical round trip stays out of scope as a general guarantee. FR-010 promises only that content the author didn't touch is carried unchanged.
@@ -326,3 +344,67 @@ These are named here so `/speckit-plan`'s Constitution Check can't miss them:
 - Fetching from both repositories is fast enough to compare on open. Comparison covers the keyboard source and package descriptor.
 - Reviewers at keyboard-studio/keyboards read review notes in the PR body. No separate review UI is needed.
 - Criterion 7.28 (cased keys) was on branch `km/casedkeys-criterion` when this was written; it is now on this branch (`KM_LINT_CASEDKEYS_MISSING`), so FR-025 and SC-007 are unblocked.
+
+## Amendment 2026-11-13: live files
+
+### Why
+
+Open was built with two ways of writing a change. Code views, upgrades, the on-screen keyboard editor and the documentation fixes write the file at once. The Mechanisms step, the remove tool, the touch editor's visual views, the documentation editor and the language list record a decision, and the change is placed into the file later. After a code edit to the keyboard source, the recorded decisions are applied again on top of the new text.
+
+An audit of every step of the Open walk on 2026-11-13 found that the views of a keyboard disagree because of this. The findings were traced in the code. None was reproduced in the running studio.
+
+| # | What goes wrong on Open | Requirement that fixes it |
+|---|---|---|
+| 1 | The preview and the criteria work from their own copy of the opened files, taken when the keyboard is fetched. On-screen keyboard edits and accepted documentation fixes reach the download but not the preview or the criteria. A code edit to the source reaches them only once a removal or added rule exists. An applied upgrade's criterion may never pass. | FR-043 |
+| 2 | The Mechanisms and touch code views show the opened file. Assignments, removals and touch edits made in the visual views do not appear there, though the preview shows them. | FR-041, FR-044 |
+| 3 | The touch step holds three versions of the layout. Continue rebuilds the one the output reads and loses key-grid edits. Undo reverts the grid but not the output. A code-view apply replaces earlier key edits in the output while the grid still shows them. The character view ignores keys added in the key grid. | FR-041, FR-044, FR-045 |
+| 4 | The on-screen keyboard editor does not show key changes made in the Mechanisms step. Its next save writes the old labels back to the file. | FR-041, FR-043 |
+| 5 | An edited documentation page is held as a separate copy that replaces the file at output. An accepted regeneration fix changes the file, so its finding clears while the output is unchanged. The edited page also stops following later keyboard changes. | FR-047 |
+| 6 | Text in a code view that has not been applied is dropped without warning on a tab or file switch, or on Continue. | FR-046 |
+| 7 | A removal is recorded against a rule's position. After a code edit that adds or removes a rule above it, the removal can apply to a different rule. No code was found that corrects for this. | FR-042 |
+
+The tree of decisions earns its keep on the Copy path, where later answers follow from earlier ones and changing one must recompute the rest. Open has no such chain: the identity steps are gone (FR-005), and effects across files are suggestions the author accepts (FR-023, FR-024). So Open keeps the model read from the text, which the criteria, the baseline, the inventory and the consistency check need, and drops the second way of writing.
+
+### What stays
+
+- The models. Each is read again from its file after every applied change (FR-007).
+- The precise text edit of FR-008. It becomes the step each tool takes when the author applies a change.
+- The record of decisions, for the trail, the review notes and the PR body.
+- The validation cycle. Criteria are rechecked on apply and Open adds no timer (FR-022).
+- The Copy path (FR-030).
+
+### Constitution impact
+
+Article III was amended for this feature on 2026-11-03 to say that decisions replay on top of a replaced starting point. FR-042 reverses that for Open. Proposed wording, replacing the sentence added then:
+
+> On a keyboard opened for update, the working copy is the current file text
+> and its parse. Every applied change (a code edit, a tool change or an
+> accepted fix) is written into the text when it is applied. Decisions are a
+> record of what was done and are not replayed. File text, including review
+> notes, is never stored as a decision.
+
+The table row becomes: "What renders / emits: the KeyboardIR working copy; **on Open, the current file text**".
+
+This needs owner approval. Per Governance it lands in the same PR as the change that prompts it, with a version bump. Article II is unchanged: tool changes are still computed on the model and placed as a splice, and a full re-emit still needs consent.
+
+### Out of scope here
+
+The audit also found defects on the Copy path. FR-030 keeps Copy out of this feature, so each needs its own fix:
+
+- Applying a code edit to the keyboard source writes a model that the output ignores. The edit shows in the remove tool but not in the preview or the download, the next completed step overwrites it, and rules added by the rules step are lost.
+- The touch step's three layout versions (finding 3) exist on Copy too.
+- On-screen keyboard edits are recorded but nothing writes them to the output, and the editor does not follow Mechanisms changes.
+- An edited documentation page stops following later keyboard changes.
+- Unapplied code-view text is dropped silently.
+
+### Open questions
+
+1. **Key labels on the on-screen keyboard.** Today a Mechanisms change updates the on-screen keyboard file's key labels automatically at output. With live files, is that part of the same applied change, or a consistency suggestion the author accepts (FR-023, FR-024)? Recommended: part of the same change, shown in its preview, because the on-screen keyboard pictures the same keys. The same question applies to carrying a desktop layer change into the touch layout.
+2. **Drafts saved before this amendment.** FR-049 places their waiting changes once on restore. The alternative is to list them for the author to keep or revert, as the old-Adapt drafts are (Edge Cases).
+3. **Depth of undo.** Whether undo on Open is one step per applied change for the whole session, or only back to the snapshot taken on arriving at a step.
+
+### Notes for planning
+
+- Finding 1 comes first. Until the preview and the criteria read the working copy's files, writing more changes to those files makes more views disagree, not fewer.
+- Not yet determined: which of the two touch hosts is live on Open; where the icon editor's result is saved; whether a visual save of the on-screen keyboard after a code edit loses content the model does not hold.
+- Tasks for this amendment are not yet written.
