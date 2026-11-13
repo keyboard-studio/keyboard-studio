@@ -128,6 +128,34 @@ export function capsHandlingFromDecisions(decisions: DecisionSet): CapsHandlingV
   return isCasedAlphabet(alphabetOf(decisions["character-inventory"]?.value)) ? value : undefined;
 }
 
+/**
+ * The Open-mode projection options, built once for the download and the
+ * preview so both place a `.kmn` change and patch the descriptor identically.
+ *
+ * `consentedReemit` is the author's agreement to a full re-emit of a file whose
+ * change cannot be placed precisely. The download passes it only once the
+ * author has agreed; the preview passes it always, so it compiles the
+ * reformatted text the author would be asked to accept (it writes nothing the
+ * output does not).
+ */
+export function openModeProjection(args: {
+  identity: {
+    displayName?: string | undefined;
+    languages?: ReadonlyArray<{ tag: string; name?: string }> | undefined;
+  } | null;
+  startDisplayName: string;
+  consentedReemit?: boolean;
+}): NonNullable<ProjectWorkingCopyVfsInput["openMode"]> {
+  const { identity, startDisplayName, consentedReemit } = args;
+  return {
+    kps: {
+      nameEdited: identity?.displayName !== undefined && identity.displayName !== startDisplayName,
+      ...(identity?.languages !== undefined ? { languages: identity.languages } : {}),
+    },
+    ...(consentedReemit === true ? { consentedReemit: true } : {}),
+  };
+}
+
 export function projectionInputFromState(
   state: ProjectionState,
   extras: ProjectionExtras,
@@ -165,8 +193,8 @@ export function projectionInputFromState(
       authoredReadmeMd: state.authoredReadmeMd,
       authoredHelpPhp: state.authoredHelpPhp,
     },
-    // Open is read from the store, not from `openMode`: the preview passes no
-    // openMode, and the authored welcome page must land at the same path on both.
+    // Open is read from the store, not from `openMode`, so the authored welcome
+    // page lands at the same path on every caller whether or not it passes one.
     welcomePath: welcomePagePath(
       isOpenedWithDescriptor(state.instantiationMode, state.startVfs, callSite.keyboardId),
       state.startWelcomeConvention,

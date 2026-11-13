@@ -25,7 +25,7 @@ import { OUTPUT_FORM_SEAM_PATTERN_IDS } from "@keyboard-studio/engine";
 import { getToZip, getPatternLibraryService } from "./services.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
-import { capsHandlingFromDecisions, projectionInputFromState } from "./projectionInput.ts";
+import { capsHandlingFromDecisions, openModeProjection, projectionInputFromState } from "./projectionInput.ts";
 import { getMarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
 import { resolveOutputKeyboardId } from "./outputKeyboardId.ts";
@@ -582,14 +582,11 @@ export async function projectWorkingCopyForOutput(
       baseDisplayName: startKeyboard.displayName,
       ...(isOpen
         ? {
-            openMode: {
-              kps: {
-                nameEdited:
-                  identity?.displayName !== undefined && identity.displayName !== startKeyboard.displayName,
-                ...(identity?.languages !== undefined ? { languages: identity.languages } : {}),
-              },
+            openMode: openModeProjection({
+              identity,
+              startDisplayName: startKeyboard.displayName,
               ...(opts?.consentedReemit === true ? { consentedReemit: true } : {}),
-            },
+            }),
           }
         : {}),
     }),

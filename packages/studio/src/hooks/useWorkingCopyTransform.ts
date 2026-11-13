@@ -77,7 +77,13 @@ import type { KeyEditOperation } from "@keyboard-studio/engine";
 import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
-import { capsHandlingFromDecisions, marksGuardsFromValue, projectionInputFromState } from "../lib/projectionInput.ts";
+import {
+  capsHandlingFromDecisions,
+  marksGuardsFromValue,
+  openModeProjection,
+  projectionInputFromState,
+} from "../lib/projectionInput.ts";
+import { isOpenMode, isOpenedWithDescriptor } from "../lib/openMode.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { physicalAssignmentsOf } from "../lib/physicalAssignments.ts";
@@ -451,6 +457,10 @@ export function useWorkingCopyTransform(
   // spec 059: the descriptor's <Language> display text. Forwarded so the OSK
   // preview sees the same package descriptor the zip does (FR-004/SC-005).
   const identityLanguageName = identity?.languageName ?? null;
+  // Open (spec 111): the descriptor's language list. Keyed by content in the
+  // memo deps so a reference-only change does not rebuild the transform.
+  const identityLanguages = identity?.languages;
+  const identityLanguagesKey = JSON.stringify(identityLanguages ?? null);
 
   return useMemo<VfsTransform | null>(() => {
     // No startIr → carve step cannot run. The transform is not usable yet.
@@ -500,6 +510,31 @@ export function useWorkingCopyTransform(
         }
         effectiveAssignments = [];
       }
+
+      // Open (spec 111 FR-043): the preview reads the working copy's CURRENT
+      // files, not the fetch-time copy the artifact hook restores before each
+      // re-apply. Tools write the author's edits straight into the store's
+      // starting point (replaceStartingPointFromText); overlaying its entries
+      // makes them reach the compile on the first run (including after a draft
+      // restore, where the fetch returns the pristine keyboard) and on every
+      // re-apply. Overlay, not replace: a file only the fetch holds is kept.
+      // Copy is untouched.
+      const openOverlay = isOpenMode(instantiationMode) && startVfs !== null;
+      if (openOverlay) {
+        for (const entry of startVfs.entries()) {
+          vfs.set(entry.path, entry.content, entry.isBinary);
+        }
+      }
+      // The same Open options the download passes (splice, in-place descriptor).
+      // `consentedReemit` is preview-only: a change the splice cannot place is
+      // compiled as the reformatted text the author would be asked to accept.
+      const openMode = isOpenedWithDescriptor(instantiationMode, startVfs, keyboardId)
+        ? openModeProjection({
+            identity: { displayName: identityDisplayName ?? undefined, languages: identityLanguages },
+            startDisplayName: storeStartDisplayName ?? "",
+            consentedReemit: true,
+          })
+        : undefined;
 
       // Delegate to the pure projection helper. The VfsTransform contract is
       // in-place mutation of `vfs`; projectWorkingCopyVfs also mutates in-place.
@@ -562,6 +597,7 @@ export function useWorkingCopyTransform(
             ...(storeStartDisplayName !== null ? { baseDisplayName: storeStartDisplayName } : {}),
             ...(storeStartKeyboardId !== null ? { startKeyboardId: storeStartKeyboardId } : {}),
             ...(liveLayoutOverride !== undefined ? { liveLayoutOverride } : {}),
+            ...(openMode !== undefined ? { openMode } : {}),
           },
         ),
       );
@@ -587,6 +623,7 @@ export function useWorkingCopyTransform(
     identityKeyboardId,
     identityBcp47,
     identityLanguageName,
+    identityLanguagesKey,
     patternMap,
     touchLayoutJson,
     keyEditOpsKey,
