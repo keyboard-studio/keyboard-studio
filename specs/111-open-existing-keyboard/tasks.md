@@ -235,3 +235,47 @@ Polish (T048–T051) after the last story shipped in this spec
 ## Phase 13: Ctrl and removing letters (moved)
 
 T070-T077 (FR-035..FR-040) moved to [spec 114](../114-ctrl-and-letter-removal/spec.md) on 2026-11-06. Their ids are not reused here.
+
+## Phase 14: One read source (live-files amendment 2026-11-13, FR-043)
+
+**Goal**: on Open, the preview and the criteria read the working copy's current files, and the preview places changes the way the output does. No constitution change.
+
+**Independent test**: open a keyboard, apply a code edit to the source with no other change, and check the preview and the criteria follow it; edit the on-screen keyboard and check the preview shows it (SC-012).
+
+- [ ] T078 On Open, the preview projection starts from the working copy's current files, not the files as fetched (`packages/studio/src/hooks/useWorkingCopyTransform.ts`, `packages/studio/src/hooks/useKeyboardArtifact.ts`). A change to any working-copy file re-runs the projection in the existing validation cycle; no new timer (FR-022). Copy is unchanged.
+- [ ] T079 On Open, the preview passes Open mode to the projection, so a changed source is spliced as in the output (`useWorkingCopyTransform.ts`, `packages/studio/src/lib/projectionInput.ts`). Where the splice cannot place a change, the preview compiles the reformatted text the author would be asked to accept.
+- [ ] T080 Tests for SC-012: a source code edit with no other change, an on-screen keyboard edit, and an accepted documentation fix each reach the projected preview files; an applied upgrade's criterion passes; the session baseline (FR-019) is still the keyboard as opened; preview and output files agree on Open (extend `projectionInput.parity.test.ts`).
+
+## Phase 15: The apply seam for the keyboard source (FR-041, FR-042, FR-009 amended)
+
+**Goal**: on Open, the remove tool, Mechanisms assignments and added rules write the source file when applied, and decisions are no longer replayed. The Article III amendment lands with this phase (owner approval needed).
+
+- [ ] T081 One Open-only apply function: compute the change on the model, splice it into the current text, replace the file and re-read the model; ask for reformat consent here (FR-009 amended).
+- [ ] T082 Route the remove tool, Mechanisms assignments and rule additions through it on Open; applied changes then read as existing content.
+- [ ] T083 Stop replaying decisions after a code edit on Open; decisions remain as the record (trail, review notes, PR body).
+- [ ] T084 Measure across the corpus sample how often a tool change cannot be spliced; report before converting more tools.
+- [ ] T085 Apply the Article III wording from the spec amendment to `.specify/memory/constitution.md`, with the version bump (owner-approved only).
+- [ ] T086 Tests: SC-010 and SC-011 for the source file.
+
+## Phase 16: Touch (FR-044)
+
+- [ ] T087 Settle which touch host is live on Open, then make key-grid, builder and character edits patch the touch file's text when applied; Continue no longer rebuilds the layout on Open.
+- [ ] T088 Tests: SC-013.
+
+## Phase 17: Remaining files (FR-041, FR-047)
+
+- [ ] T089 The documentation and style editors write their files on Open; no separate edited copy replaces a file at output.
+- [ ] T090 The language list patches the package descriptor when applied.
+- [ ] T091 On-screen keyboard key labels after a Mechanisms change, per the owner's answer to open question 1.
+- [ ] T092 Tests: SC-014, and SC-010 for these files.
+
+## Phase 18: Undo, drafts, unapplied text (FR-045, FR-046, FR-049)
+
+- [ ] T093 Undo and "Discard changes and go back" restore file text on Open, including code-view edits (depth per open question 3).
+- [ ] T094 Leaving a code view with unapplied text asks whether to apply or discard it.
+- [ ] T095 Open drafts save the current files and the record; drafts saved earlier are migrated on restore (per open question 2).
+
+## Phase 19: Cleanup
+
+- [ ] T096 Remove the Open branches of the output projection that no longer do anything, leaving the version bump and HISTORY entry (FR-048).
+- [ ] T097 Extend the Open end-to-end walk to assert SC-010 on every step.
