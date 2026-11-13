@@ -252,6 +252,9 @@ T070-T077 (FR-035..FR-040) moved to [spec 114](../114-ctrl-and-letter-removal/sp
 
 - [ ] T081 One Open-only apply function: compute the change on the model, splice it into the current text, replace the file and re-read the model; ask for reformat consent here (FR-009 amended).
 - [ ] T082 Route the remove tool, Mechanisms assignments and rule additions through it on Open; applied changes then read as existing content.
+- [ ] T082a Route Layout-tab edits (spec 117) through the apply function on Open, keeping their decision as the record; Copy keeps the replay. Depends on the Layout tab having merged.
+- [ ] T082b The preview drops a file the working copy no longer holds (phase 14's overlay only adds and replaces); needed before any tool can remove a file.
+- [ ] T082c Trace whether the caps step and the id rename can re-emit the whole source on Open, and route them through the splice if so.
 - [ ] T083 Stop replaying decisions after a code edit on Open; decisions remain as the record (trail, review notes, PR body).
 - [ ] T084 Measure across the corpus sample how often a tool change cannot be spliced; report before converting more tools.
 - [ ] T085 Apply the Article III wording from the spec amendment to `.specify/memory/constitution.md`, with the version bump (owner-approved only).

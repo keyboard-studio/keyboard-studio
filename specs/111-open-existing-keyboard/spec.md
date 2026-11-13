@@ -355,7 +355,7 @@ An audit of every step of the Open walk on 2026-11-13 found that the views of a 
 
 | # | What goes wrong on Open | Requirement that fixes it |
 |---|---|---|
-| 1 | The preview and the criteria work from their own copy of the opened files, taken when the keyboard is fetched. On-screen keyboard edits and accepted documentation fixes reach the download but not the preview or the criteria. A code edit to the source reaches them only once a removal or added rule exists. An applied upgrade's criterion may never pass. | FR-043 |
+| 1 | The preview works from its own copy of the opened files, taken when the keyboard is fetched. On-screen keyboard edits and accepted documentation fixes reach the download but not the preview. A code edit to the source reaches it only once a removal or added rule exists. *(Corrected 2026-11-13: the criteria already judged the working copy's output; they only waited on the stale preview. Fixed in phase 14.)* | FR-043 |
 | 2 | The Mechanisms and touch code views show the opened file. Assignments, removals and touch edits made in the visual views do not appear there, though the preview shows them. | FR-041, FR-044 |
 | 3 | The touch step holds three versions of the layout. Continue rebuilds the one the output reads and loses key-grid edits. Undo reverts the grid but not the output. A code-view apply replaces earlier key edits in the output while the grid still shows them. The character view ignores keys added in the key grid. | FR-041, FR-044, FR-045 |
 | 4 | The on-screen keyboard editor does not show key changes made in the Mechanisms step. Its next save writes the old labels back to the file. | FR-041, FR-043 |
@@ -396,6 +396,10 @@ The audit also found defects on the Copy path. FR-030 keeps Copy out of this fea
 - On-screen keyboard edits are recorded but nothing writes them to the output, and the editor does not follow Mechanisms changes.
 - An edited documentation page stops following later keyboard changes.
 - Unapplied code-view text is dropped silently.
+
+### The Layout tab (spec 117)
+
+The Layout tab is reachable on Open. Its edits are recorded in a decision and replayed over the source at output. Under FR-041 and FR-042, on Open a Layout-tab edit is written to the source file when applied, through the same apply step as the other tools, and its decision is kept as the record only. Copy keeps the replay. Until phase 15 lands, the replay on Open goes through the precise text edit of FR-008 and no longer reformats the file.
 
 ### Open questions
 
