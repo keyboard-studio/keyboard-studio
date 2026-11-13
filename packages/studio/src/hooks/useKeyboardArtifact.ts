@@ -620,10 +620,12 @@ export function useKeyboardArtifact(
   const engineReadyPromise = useRef<Promise<void> | null>(null);
   // Persistent VFS across recompiles — lifted out of the run closure.
   const vfsRef = useRef<VirtualFS | null>(null);
-  // Snapshot of the clean populated VFS (after fetch/scaffold, before any
-  // transform mutation). Restored into vfsRef before each transform-version
-  // reapply so that applyCarveToVfs's no-op fast-path (empty deletedNodeIds)
-  // does not cause assignments to accumulate on a stale .kmn.
+  // Snapshot of the populated VFS as fetched/scaffolded, before any transform
+  // mutation. Restored into vfsRef before each transform-version reapply so
+  // that applyCarveToVfs's no-op fast-path (empty deletedNodeIds) does not
+  // cause assignments to accumulate on a stale .kmn. It is the fetched copy,
+  // not the working copy: on Open the transform overlays the store's current
+  // files onto each restored copy.
   const startVfsRef = useRef<VirtualFS | null>(null);
   // Effective keyboard id reported by the last vfsTransform application, when
   // it differs from the id the transform was invoked with (Track 1 identity
@@ -1332,7 +1334,11 @@ export function useKeyboardArtifact(
             const criteriaStore = useCriteriaRecordStore.getState();
             criteriaStore.setOpenBaseline(null);
             useDecisionStore.getState().forget("open-issues");
-            const openedVfs = vfs;
+            // A snapshot, not `vfs`: the judge awaits the inventory lookup
+            // before it reads the documentation files, and the transform below
+            // mutates `vfs` in place (on Open it overlays the working copy's
+            // current files), so a live reference could read edited files.
+            const openedVfs = createVirtualFS(vfs.entries());
             void judgeForeignKeyboard(openedVfs, kb.id, kb.displayName, {
               placement: placementFromRepoPath(kb.path),
               inventoryFor: openBaselineInventory,
@@ -1517,8 +1523,10 @@ export function useKeyboardArtifact(
     const keyboardId = scaffoldSpec?.keyboardId ?? startKeyboard.id;
     const transform = vfsTransformRef.current;
     if (transform !== null && transform !== undefined) {
-      // Restore the clean base VFS snapshot so the transform always starts from
-      // the unmodified keyboard source, not an accumulated previous result.
+      // Restore the clean fetched-files snapshot so the transform never starts
+      // from an accumulated previous result. (On Open the transform then
+      // overlays the working copy's current files onto it; on Copy it projects
+      // onto these files as fetched.)
       if (startVfsRef.current !== null) {
         vfsRef.current = createVirtualFS(startVfsRef.current.entries());
       }
@@ -1546,8 +1554,9 @@ export function useKeyboardArtifact(
         // The transform threw. effectiveKeyboardIdRef was already reset to
         // null above and vfsRef.current is the clean, un-renamed base
         // snapshot restored a few lines up (no partial carve/assignment/
-        // identity edit applied) — so the recompile below reads
-        // source/<baseId>.kmn against unmodified source. No warning is
+        // identity edit applied, and on Open no working-copy overlay) — so the
+        // recompile below reads source/<baseId>.kmn against the files as
+        // fetched. No warning is
         // attached anywhere for this failure (it is silent beyond whatever
         // the transform itself may log); that pre-existing gap is not
         // introduced by this comment fix and is left as-is here.

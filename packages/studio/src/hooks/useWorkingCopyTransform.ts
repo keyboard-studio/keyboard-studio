@@ -78,12 +78,13 @@ import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
 import {
+  applyOpenWorkingCopyFiles,
   capsHandlingFromDecisions,
   marksGuardsFromValue,
   openModeProjection,
   projectionInputFromState,
 } from "../lib/projectionInput.ts";
-import { isOpenMode, isOpenedWithDescriptor } from "../lib/openMode.ts";
+import { isOpenedWithDescriptor } from "../lib/openMode.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { physicalAssignmentsOf } from "../lib/physicalAssignments.ts";
@@ -460,7 +461,7 @@ export function useWorkingCopyTransform(
   // Open (spec 111): the descriptor's language list. Keyed by content in the
   // memo deps so a reference-only change does not rebuild the transform.
   const identityLanguages = identity?.languages;
-  const identityLanguagesKey = JSON.stringify(identityLanguages ?? null);
+  const identityLanguagesKey = useMemo(() => JSON.stringify(identityLanguages ?? null), [identityLanguages]);
 
   return useMemo<VfsTransform | null>(() => {
     // No startIr → carve step cannot run. The transform is not usable yet.
@@ -519,20 +520,16 @@ export function useWorkingCopyTransform(
       // restore, where the fetch returns the pristine keyboard) and on every
       // re-apply. Overlay, not replace: a file only the fetch holds is kept.
       // Copy is untouched.
-      const openOverlay = isOpenMode(instantiationMode) && startVfs !== null;
-      if (openOverlay) {
-        for (const entry of startVfs.entries()) {
-          vfs.set(entry.path, entry.content, entry.isBinary);
-        }
-      }
+      applyOpenWorkingCopyFiles(vfs, instantiationMode, startVfs);
       // The same Open options the download passes (splice, in-place descriptor).
       // `consentedReemit` is preview-only: a change the splice cannot place is
       // compiled as the reformatted text the author would be asked to accept.
       const openMode = isOpenedWithDescriptor(instantiationMode, startVfs, keyboardId)
         ? openModeProjection({
             identity: { displayName: identityDisplayName ?? undefined, languages: identityLanguages },
-            startDisplayName: storeStartDisplayName ?? "",
+            startDisplayName: storeStartDisplayName,
             consentedReemit: true,
+            preview: true,
           })
         : undefined;
 

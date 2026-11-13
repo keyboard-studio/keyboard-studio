@@ -44,7 +44,7 @@ import { alphabetOf, isCasedAlphabet } from "../survey/caps/capsLogic.ts";
 import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.ts";
 import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
 import { welcomePagePath } from "./welcomeFolder.ts";
-import { isOpenedWithDescriptor } from "./openMode.ts";
+import { isOpenMode, isOpenedWithDescriptor } from "./openMode.ts";
 
 /** The store fields the projection reads. `startIr` must already be set. */
 export type ProjectionState = Pick<
@@ -143,17 +143,47 @@ export function openModeProjection(args: {
     displayName?: string | undefined;
     languages?: ReadonlyArray<{ tag: string; name?: string }> | undefined;
   } | null;
-  startDisplayName: string;
+  /** The starting point's display name; null/undefined (not known) reads as "not edited". */
+  startDisplayName: string | null | undefined;
   consentedReemit?: boolean;
+  /** The projection feeds the preview: the re-emit warning does not claim agreement. */
+  preview?: boolean;
 }): NonNullable<ProjectWorkingCopyVfsInput["openMode"]> {
-  const { identity, startDisplayName, consentedReemit } = args;
+  const { identity, startDisplayName, consentedReemit, preview } = args;
   return {
     kps: {
-      nameEdited: identity?.displayName !== undefined && identity.displayName !== startDisplayName,
+      nameEdited:
+        startDisplayName !== null &&
+        startDisplayName !== undefined &&
+        identity?.displayName !== undefined &&
+        identity.displayName !== startDisplayName,
       ...(identity?.languages !== undefined ? { languages: identity.languages } : {}),
     },
     ...(consentedReemit === true ? { consentedReemit: true } : {}),
+    ...(preview === true ? { preview: true } : {}),
   };
+}
+
+/**
+ * Open mode: overlays the working copy's current files (`startVfs`) onto `vfs`
+ * in place, so a projection starts from what the author's tools wrote rather
+ * than from the keyboard as fetched. A no-op outside Open or without a
+ * starting-point VFS (Copy is untouched).
+ *
+ * Overlay only (add / replace): a file only `vfs` holds is kept. Known limit:
+ * a file the working copy no longer holds is therefore not removed from the
+ * preview. Nothing removes a file from `startVfs` today; if something starts
+ * to, this needs a deletion step.
+ */
+export function applyOpenWorkingCopyFiles(
+  vfs: VirtualFS,
+  instantiationMode: WorkingCopyState["instantiationMode"],
+  startVfs: VirtualFS | null | undefined,
+): void {
+  if (!isOpenMode(instantiationMode) || startVfs === null || startVfs === undefined) return;
+  for (const entry of startVfs.entries()) {
+    vfs.set(entry.path, entry.content, entry.isBinary);
+  }
 }
 
 export function projectionInputFromState(

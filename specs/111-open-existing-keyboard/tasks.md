@@ -244,7 +244,7 @@ T070-T077 (FR-035..FR-040) moved to [spec 114](../114-ctrl-and-letter-removal/sp
 
 - [x] T078 On Open, the preview projection starts from the working copy's current files, not the files as fetched (`packages/studio/src/hooks/useWorkingCopyTransform.ts`, `packages/studio/src/hooks/useKeyboardArtifact.ts`). A change to any working-copy file re-runs the projection in the existing validation cycle; no new timer (FR-022). Copy is unchanged.
 - [x] T079 On Open, the preview passes Open mode to the projection, so a changed source is spliced as in the output (`useWorkingCopyTransform.ts`, `packages/studio/src/lib/projectionInput.ts`). Where the splice cannot place a change, the preview compiles the reformatted text the author would be asked to accept.
-- [ ] T080 Tests for SC-012: a source code edit with no other change, an on-screen keyboard edit, and an accepted documentation fix each reach the projected preview files; an applied upgrade's criterion passes; the session baseline (FR-019) is still the keyboard as opened; preview and output files agree on Open (extend `projectionInput.parity.test.ts`).
+- [x] T080 Tests for SC-012: a source code edit with no other change, an on-screen keyboard edit, and an accepted documentation fix each reach the projected preview files; an applied upgrade's criterion passes; the session baseline (FR-019) is still the keyboard as opened; preview and output files agree on Open (extend `projectionInput.parity.test.ts`).
 
 ## Phase 15: The apply seam for the keyboard source (FR-041, FR-042, FR-009 amended)
 

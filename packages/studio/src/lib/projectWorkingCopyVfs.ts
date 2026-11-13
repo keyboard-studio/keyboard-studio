@@ -424,6 +424,12 @@ export interface ProjectWorkingCopyVfsInput {
      * the result's `reformatRequired`.
      */
     consentedReemit?: boolean;
+    /**
+     * The projection feeds the preview, not the download. Only the wording of
+     * the re-emit warning changes: the preview shows the reformatted text
+     * without the author having agreed to it.
+     */
+    preview?: boolean;
   };
 }
 
@@ -594,7 +600,11 @@ export function projectWorkingCopyVfs(
     }
     if (openMode.consentedReemit === true) {
       vfs.set(path, emitKmn(nextIr), false);
-      warnings.push(`[open] ${path} was reformatted with the author's agreement (${projected.reason})`);
+      warnings.push(
+        openMode.preview === true
+          ? `[open] ${path} cannot be updated in place (${projected.reason}); the preview shows it reformatted`
+          : `[open] ${path} was reformatted with the author's agreement (${projected.reason})`,
+      );
       return;
     }
     reformatRequired.push(path);
