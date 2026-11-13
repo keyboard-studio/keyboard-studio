@@ -6,7 +6,8 @@
 export { applyLayoutOp } from "./applyLayoutOp.js";
 export type { ApplyLayoutOpResult } from "./applyLayoutOp.js";
 export { replayKmnEdits, normaliseKmnEdits } from "./replayKmnEdits.js";
-export type { ReplayResult } from "./replayKmnEdits.js";
+export type { ReplayResult, ReplayScope } from "./replayKmnEdits.js";
+export { supersededChangeIndexes } from "./supersede.js";
 export { clearKeyLive } from "./clearKeyLive.js";
 export { invertEffect } from "./invertEffect.js";
 export { sameRuleIdentity } from "./ruleMatch.js";

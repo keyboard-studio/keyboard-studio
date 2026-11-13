@@ -15,7 +15,7 @@ export interface ReplayMissLike {
 }
 
 export type ReviewFlag =
-  | { kind: "overrode"; seq: number; owners: OwnerRef["owner"][]; changes: number }
+  | { kind: "overrode"; seq: number; owners: OwnerRef["owner"][]; steps: NonNullable<OwnerRef["step"]>[]; changes: number }
   | { kind: "missed"; seq: number; reason: string }
   | { kind: "shadowed"; seq: number | null; ruleNodeId: string; shadowedBy: string; projected?: true };
 
@@ -75,7 +75,8 @@ export function reviewFlags(
   const flags: ReviewFlag[] = [];
   for (const e of codeEdits(value.entries)) {
     if (e.overrides.length === 0 || kept.has(e.seq)) continue;
-    flags.push({ kind: "overrode", seq: e.seq, owners: [...new Set(e.overrides.map((o) => o.owner))], changes: e.changes.length });
+    const steps = [...new Set(e.overrides.flatMap((o) => (o.step === undefined ? [] : [o.step])))];
+    flags.push({ kind: "overrode", seq: e.seq, owners: [...new Set(e.overrides.map((o) => o.owner))], steps, changes: e.changes.length });
   }
   for (const m of misses) {
     if (!kept.has(m.seq)) flags.push({ kind: "missed", seq: m.seq, reason: m.reason });

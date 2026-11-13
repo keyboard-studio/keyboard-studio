@@ -1,5 +1,5 @@
 // The kmnStageTap observer (spec 117, research R15): it reports the `.kmn` after steps 2.2, 2.6,
-// 2.7 and 2.8 in build order, and supplying it changes nothing the projection writes.
+// 2.7, 2.8, 2.9 (Code-tab edits), 3 and 3.1 in build order, and supplying it changes nothing the projection writes.
 
 import { describe, expect, it } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
@@ -35,6 +35,7 @@ describe("projectWorkingCopyVfs kmnStageTap", () => {
       "mark-guards",
       "context-tolerance",
       "caps",
+      "code-edits",
       "identity",
       "targets",
     ]);

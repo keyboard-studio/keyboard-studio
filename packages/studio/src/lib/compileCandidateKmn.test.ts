@@ -1,8 +1,9 @@
 // compileCandidateKmn (spec 117 US8, research R15): the candidate it compiles is what the real
-// replay at projection step 2.2 builds, so it is the .kmn the download will ship once the entry is
+// replay at projection step 2.9 (after the generating steps) builds, so it is the .kmn the download will ship once the entry is
 // recorded. Real projection and a real store; only the compile service is a stand-in that keeps
 // the .kmn it was given.
 
+import "../decisions/rebuildWorkingCopy.ts"; // registers the kmn-edits fold a Code-tab commit needs
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createVirtualFS, type StartKeyboard, type VirtualFS } from "@keyboard-studio/contracts";
 import { diffIR, parseKmn } from "@keyboard-studio/engine";
@@ -89,7 +90,7 @@ describe("compileCandidateKmn", () => {
     expect(await compileCandidateKmn(missing)).toEqual({ status: "unplaceable" });
   });
 
-  it("compiles what a later build step makes of the replayed edit, not the edit laid over the final text", async () => {
+  it("compiles the edit as replayed after the generating steps: a rule on a cased key keeps its NCAPS token", async () => {
     const cased =
       "store(&VERSION) '10.0'\nstore(&NAME) 'Test'\nstore(&TARGETS) 'any'\nbegin Unicode > use(main)\n\n" +
       "group(main) using keys\n+ [K_A] > 'a'\n+ [SHIFT K_A] > 'A'\n+ [K_B] > 'b'\n";
@@ -103,14 +104,15 @@ describe("compileCandidateKmn", () => {
       { id: "character-inventory", value: { chars: ["a", "A", "b"] }, provenance: "asked" },
       { id: "caps-handling", value: { mode: "cased-keys" }, provenance: "default" },
     ] as never);
-    // The edit adds an NCAPS rule on a cased key; the caps step (2.8) drops the NCAPS token.
+    // The edit adds an NCAPS rule on a cased key. The caps step (2.8) would drop the token, but
+    // the edit replays after it (2.9), so the candidate keeps it.
     const changes = diffIR(
       ir,
       parseKmn(cased.replace("+ [K_A] > 'a'", "+ [K_A] > 'a'\n+ [NCAPS K_A] > 'x'"), "testkbd").ir,
     );
     expect(await compileCandidateKmn(changes)).toEqual({ status: "ok" });
     const candidate = kmnOf(compiled.vfs!);
-    expect(candidate).not.toContain("NCAPS");
+    expect(candidate).toContain("NCAPS");
     useWorkingCopyStore.getState().commitKmnEdit({ op: "code-apply", changes, overrides: [] }, { skipLiveMisses: true });
     expect(kmnOf((await projectWorkingCopyForOutput())!.vfs)).toBe(candidate);
   });

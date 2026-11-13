@@ -550,55 +550,89 @@ Code-tab fix the Apply that wrote a re-parsed IR the output ignored, and its acc
 that an applied edit vanishes from view: the edit is now in the build, so it stays.
 On Open nothing changes: the tab shows the file text and Apply replaces the starting point.
 
-**PENDING OWNER RULING (raised 2026-11-13).** Rules made by a projection step that runs after step
-2.2 (mark guards 2.6, context tolerance 2.7, caps handling 2.8, the target-platform step 3.1, and
-anything later that writes the `.kmn`) are in the built view but cannot be anchored by a kept edit
-without changing which build step wins. Interim behaviour, in force until the owner rules: an Apply
-whose diff touches such a rule (changes or removes it) is refused with a message at its line naming
-where the rule comes from, and records nothing; edits elsewhere in the same Apply are not recorded
-either (all or nothing, like the other gate errors). Reason: it refuses rather than anchors, so no
-build step's precedence changes. The projection steps are not reordered. **Question for the owner:**
-should a rule a later build step generates be (a) refused, as now, (b) shown read-only, or (c)
-editable with the edit winning over that step? Until answered, none of the three is settled.
+**OWNER RULING 2026-11-13 (generated rules).** The product owner ruled on the question the interim
+behaviour left open, in these words: "Have those things [mark guards, context tolerance, caps rules]
+added before the user gets to the Code tab. Then they can edit, and if it becomes non-compliant
+they'll have to deal with the compiler and the reviewer." In plain terms: the rules mark guards,
+context tolerance and caps handling generate are ordinary text by the time the author edits code. An
+edit to one is allowed and stays in the build; nothing is refused for being generated, and
+compliance is left to the compile gate (which already runs on Apply) and to review. This replaces
+the interim behaviour, in force until this ruling, that refused an Apply whose diff touched such a
+rule (and recorded nothing for the rest of that Apply).
+
+Implementing the ruling moves where `code-apply` entries replay. They now replay at projection step
+2.9, after caps handling (2.8) and before identity (3); Layout-tab entries (every other `kmn-edits`
+op) stay at step 2.2, so guards, tolerance and caps rules are still generated for keys the author
+changed in the Layout tab. Consequence, stated plainly: a code edit is applied after ALL Layout-tab
+edits, whatever order they were recorded in, except where the supersede rule below applies. Where a
+Layout-tab edit and a code edit touch different rules, both land, in either order. Where a later
+assignment or a later change in what a step generates removes the rule a code change was anchored
+on, the code change finds no anchor, is not applied, and the existing "no longer fits" flag
+(FR-063 b) names it; the rest of the build is intact. Ruling 10 holds: its tests pass
+unchanged, because the keystroke anchor is resolved at the new replay point too. One expectation did
+change with the supersede rule below: in `projectWorkingCopyVfs.codeEditOrder.test.ts`, a Layout-tab
+edit recorded after a code edit on the same rule used to leave the code change as a reported miss;
+it is now superseded (skipped, no flag). Coverage: `projectWorkingCopyVfs.codeEditOrder.test.ts`.
+
+**LEAD RULING (scope)** (changes no architecture; a decision about how the ruling is carried out):
+- An edit to a generated rule gets the existing owner confirm ("Apply anyway") naming the step it
+  came from (the marks step, the context-tolerance fix, the caps handling choice), and the entry is
+  flagged in the existing review list as an override by "another step"; the `OwnerRef` carries an
+  additive optional `step` (`mark-guards`, `context-tolerance`, `caps`) so the review list names the
+  step as well. The step is named from the stage-text comparison below; it no longer refuses.
+- `&TARGETS` stays refused by name: an earlier owner ruling forces it to `any` on Copy (step 3.1).
+  `&NAME` and the other identity edits keep the identity confirm.
+- The prediction backstop stays: the build is predicted with the entry included (the same replay as
+  the real projection) and Apply refuses at the first differing line if some later step still
+  overrides the edit. After this change the prediction equals the applied text for edits to
+  generated rules.
+- The live IR holds no generated rule, so these edits are built-keyboard-only like Assign-tab rule
+  edits (`skipLiveMisses`). `replayKmnEdits` itself orders code entries after the others, so a
+  full rebuild matches the projection; incremental and full-rebuild paths are proved equivalent for a
+  generated-rule edit, and undo returns the built text to the pre-Apply text
+  (`kmnEdits.rebuildEquivalence.test.ts`).
+- Cost: at most one more parse and emit of the `.kmn`, only when `code-apply` entries exist; an
+  unedited keyboard, or a log with only `review-kept` entries, re-emits at neither replay point. On
+  Open every `.kmn` write at both points goes through the splice.
 
 **How it works.**
 - *Diff base.* The base is the parse of the text the author was shown, not the working IR. The
-  replay at step 2.2 acts on the `.kmn` after the assignments and the earlier entries; anchors are
-  content-based (`ContentAnchor`: the node's emitted text, neighbours only to break ties), so a
-  change computed against the built text finds the same rule in the replay's text unless a later
-  step made it. The recorded entry therefore rebuilds to the applied text (proved in
+  replay at step 2.9 acts on the `.kmn` after the assignments, the Layout-tab edits and the
+  generating steps; anchors are content-based (`ContentAnchor`: the node's emitted text, neighbours
+  only to break ties), so a change computed against the built text finds the same rule in the
+  replay's text. The recorded entry therefore rebuilds to the applied text (proved in
   `KmnCodePane.test.tsx`, "built view plus kept edits", for a starting rule, an Assign-tab rule,
   and an added and a removed rule), and a second Apply with no typing, or with formatting only,
   records nothing.
-- *Telling late rules apart.* By differential, not by inspecting rules. The projection takes an
-  optional observer, `kmnStageTap`, that reports the `.kmn` after steps 2.2, 2.6, 2.7, 2.8, 3
-  (`identity`), 3.1 (`targets`) and 4 (`id-rename`) (reads only; supplying it changes no output, and
-  a tap that throws is ignored). The step-2.2 text is exactly what the next entry
-  will be replayed onto. A change whose anchor is in that text is fine; one that is in a later
-  stage's text (or only in the final text) was made by that stage, and names it. One found
-  nowhere is left to the candidate compile's "does not fit". A store a later step rewrote (for
-  example `&CasedKeys`) is caught by comparing the store's content as well as its name.
-  `lib/builtKmnView.ts`.
+- *Naming the generating step.* By differential, not by inspecting rules. The projection takes an
+  optional observer, `kmnStageTap`, that reports the `.kmn` after steps 2.2, 2.6, 2.7, 2.8, 2.9
+  (`code-edits`), 3 (`identity`), 3.1 (`targets`) and 4 (`id-rename`) (reads only; supplying it
+  changes no output, and a tap that throws is ignored). The step-2.2 text is the keyboard with the
+  Layout-tab edits and nothing generated. A change whose anchor is in it is an ordinary edit; one
+  that is in a generating stage's text only was made by that stage, and names it for the confirm.
+  A rule an earlier code edit made is in none of those texts and is not called generated (the owner
+  check covers it). One found nowhere is left to the candidate compile's "does not fit". A store a
+  generating step rewrote (for example `&CasedKeys`) is caught by comparing the store's content as
+  well as its name. `lib/builtKmnView.ts` (`findGeneratedRuleTouches`).
 - *Live IR.* The working IR does not hold Assign-tab or other projected rules, so a change that
   names one cannot anchor there. `commitKmnEdit(..., { skipLiveMisses: true })` (Code tab only)
   leaves such a change out of the live IR and its undo instead of refusing the entry; the recorded
   entry carries all changes and the projection places them.
 - *Header and identity.* Steps 3, 3.1 and 4 rewrite header stores only. Editing `&NAME` and the
-  like keeps its FR-062 owner "identity" confirm; the late-rule refusal covers rules and stores a
-  later step generates, not the identity overlay. The exception is `&TARGETS`, which step 3.1 forces
+  like keeps its FR-062 owner "identity" confirm. The exception is `&TARGETS`, which step 3.1 forces
   to `any` on Copy: an edit to it is refused with a message that names it.
-- *A rule a later step rewrites in place.* Caught two ways. A change that fits the step-2.2 text but
-  not a later rule stage's text names a rule that stage rewrote. And, as the backstop, Apply
-  predicts the build with the entry included (the real projection run with the candidate entry,
-  `ProjectForOutputOptions.candidateKmnEdit` / the transform's third argument) and refuses, at the
-  first differing line, when that is not the text the author applied (header items aside).
+- *A rule a later step still overrides.* Steps after the code replay write header stores only, so
+  this should not arise for rules; the backstop remains. Apply predicts the build with the entry
+  included (the real projection run with the candidate entry, `ProjectForOutputOptions.candidateKmnEdit`
+  / the transform's third argument) and refuses, at the first differing line, when that is not the
+  text the author applied (header items aside).
 - *Snapshot.* The shown text and the stage texts of that same projection are held together. If the
   build changed while the draft was dirty, Apply refuses (the simpler of the two sound options)
   and offers to reload the current text; the draft stays in the editor until the author reloads.
   Apply is not re-entrant.
 - *The candidate compile.* It compiles the output projection run with the candidate entry
-  appended, so the compiled `.kmn` is what the real replay builds, not the entry laid over the final
-  text.
+  appended, so the compiled `.kmn` is what the real replay (step 2.9) builds, not the entry laid over
+  the final text.
 - *View in code.* The working IR's node id is matched to its line in the shown text by content
   (group or store by name, a rule by its group and emitted line, the nth duplicate to the nth),
   since the shown text is a different parse. A rule the build does not hold reveals nothing.
@@ -612,10 +646,53 @@ editable with the edit winning over that step? Until answered, none of the three
   and its confirm says "another step" rather than "the Assign tab" (ruling 10's keystroke anchor
   and owner label come from the starting rules an assignment claims).
 
+**LEAD RULING (supersede and the live model)** (implements ruling 10, "on a key the most recent
+edit wins"; it changes no writer, no output producer, and nothing the `kmn-edits` decision stores).
+
+*The supersede rule.* Replay runs Layout-tab entries first and code entries last, so by order alone a
+code change would beat a later Layout-tab edit on the same key. The rule restores "most recent wins":
+a change inside a `code-apply` entry is skipped when a Layout-tab entry with a HIGHER `seq` targets the
+same key or the same rule. The relation is defined in one place, `supersededChangeIndexes`
+(engine `layout-ops/supersede.ts`), and used by the one replay both the projection (step 2.2 replays
+the Layout-tab scope, step 2.9 the code scope, each given the whole log) and the whole-log replay use:
+- `set-key` / `clear-key` on (vkey, layer): a change that touches a context-free rule on exactly that
+  vkey and modifier set, where "touches" is the change's keystroke anchor, or the rule it inserts,
+  removes or replaces. A `clear-key` counts even though replay spends it: the key goes back to its
+  starting rule, so an earlier code edit on that key does not come back.
+- `set-row` / `remove-row`: the same, for the contextual row with exactly that context.
+- `decline-case-partner` and `review-kept` have no IR effect and supersede nothing. Store, group,
+  `begin` and header changes touch no rule and are never superseded. Deadkey lifecycle ops are not
+  `kmn-edits` entries (they replay at step 1.8, before every entry), so they are not in the relation.
+- A superseded change is not a miss: no "no longer fits" flag. The other changes of the same entry
+  still apply. A code edit made AFTER a Layout-tab edit still wins (its seq is higher).
+
+*The live model follows the build order.* The live (incremental) path used recording order, which
+disagreed with the build. Now, whenever the log holds a `code-apply` entry, the live IR after every
+`kmn-edits` commit and every undo is re-derived, not patched: it is the decision fold (the rebuild's
+own `replayKeyboard` over the decision order, started at the starting point) with the candidate log
+standing in for the recorded `kmn-edits` value, so the same order and supersede rule apply
+(`workingCopyStore` `deriveLiveIr`, fold registered by `decisions/rebuildWorkingCopy.ts`, as `registerRouteProvider` is). With no registered fold, or a fold that returns nothing, the commit or undo is refused and the previous live IR kept; there is no `startIr`-only fallback. Deadkey (`ld`) undo entries are marked stale too and re-derive from the decisions. Undo drops the
+entry from the log and re-derives; the undo entries below a re-derive are marked stale (their effects
+name nodes the re-derive re-minted) and re-derive when undone. A log with no code entry keeps the
+incremental path and its local-inverse undo unchanged (performance budget, ruling 8). `clearKeyLive`
+therefore only ever runs on logs without a code entry, where its code-last replay and the live IR agree.
+
 **Known limits (R15).**
-- Attribution is by comparing stage texts, so a rule that is identical in two stages (a later step
-  that rewrites a rule into the text it already had, or two equal rules) can be misattributed to the
-  wrong step or missed; the prediction check above is what catches an override then.
+- A later `clear-key` returns the key to its starting rule and discards an earlier code edit on that
+  key, with no notice to the author (it follows ruling 10: the most recent edit on a key wins, and a
+  `clear-key` is an edit on the key).
+- The live IR, and so the Layout tab, never contains rules the build generates at steps 2.6-2.8
+  (mark guards, context tolerance, caps handling). A code edit to a generated rule is built-keyboard-only
+  (skipped live); the Layout tab does not show generated rules. Live and build agree on every rule
+  the live IR can hold.
+- Attribution is by comparing stage texts, so a rule that is identical in two stages (a step that
+  rewrites a rule into the text it already had, or two equal rules) can be named for the wrong step
+  or not named; the edit is kept either way, only the confirm's wording and the flag differ.
+- A code change anchored on a generated rule is a content anchor on the rule as built. If what a
+  step generates later changes (another assignment, another caps choice), the rule is gone and the
+  change is reported as not fitting rather than moved; the author reviews it.
+- A keystroke-anchored change (ruling 10) on a key the caps step rewrites matches by key and
+  modifiers, which the caps step may have changed; the prediction check refuses it then.
 - The pane runs its own projection (the same function, the same inputs as the preview) rather than
   reading the preview's; the two agree because they share `projectWorkingCopyVfs`, not because the
   pane observes the preview.

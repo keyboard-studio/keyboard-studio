@@ -1,6 +1,7 @@
 // reviewFlags (spec 117 US8, FR-063/FR-064): the three flag kinds, keep clearing (a), and the two
 // revert routes (latest entry undone; an older one reverted by an appended inverse entry).
 
+import "../../decisions/rebuildWorkingCopy.ts"; // registers the kmn-edits fold a Code-tab commit needs
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyIRChanges, diffIR, emitKmn, parseKmn } from "@keyboard-studio/engine";
 import type { CodeEdit, KeyboardIR, KmnEdit, KmnEditsValue } from "@keyboard-studio/contracts";
@@ -33,7 +34,14 @@ describe("reviewFlags", () => {
   it("(a) flags a CodeEdit with overrides and no ReviewKept, once per entry", () => {
     const e = codeEdit(1, base, KMN.replace("'d'", "'e'"), OVERRIDE);
     const flags = reviewFlags(value([e]), [], null);
-    expect(flags).toEqual([{ kind: "overrode", seq: 1, owners: ["rules-step"], changes: e.changes.length }]);
+    expect(flags).toEqual([{ kind: "overrode", seq: 1, owners: ["rules-step"], steps: [], changes: e.changes.length }]);
+  });
+
+  it("(a) carries the generating step an `another-step` override names", () => {
+    const e = codeEdit(1, base, KMN.replace("'d'", "'e'"), [{ change: 0, owner: "another-step", step: "caps" }]);
+    expect(reviewFlags(value([e]), [], null)).toEqual([
+      { kind: "overrode", seq: 1, owners: ["another-step"], steps: ["caps"], changes: e.changes.length },
+    ]);
   });
 
   it("(a) does not flag an entry without overrides", () => {

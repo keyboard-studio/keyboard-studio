@@ -117,12 +117,28 @@ export function CodeReviewList({ flags, value, onViewInCode }: CodeReviewListPro
     }
   };
 
+  const stepWords = (step: NonNullable<OwnerRef["step"]>): string => {
+    switch (step) {
+      case "mark-guards":
+        return t({ id: "editor.assignLoop.mechanisms.code.lateSource.markGuards", message: "the marks step" });
+      case "context-tolerance":
+        return t({ id: "editor.assignLoop.mechanisms.code.lateSource.contextTolerance", message: "the context-tolerance fix" });
+      case "caps":
+        return t({ id: "editor.assignLoop.mechanisms.code.lateSource.caps", message: "the caps handling choice" });
+    }
+  };
+
+  // A rule made by a build step is named by the step; the generic "another step" stays only for
+  // an owner nothing more specific is known about.
+  const ownersFor = (f: Extract<ReviewFlag, { kind: "overrode" }>): string =>
+    [...(f.steps.length > 0 ? f.owners.filter((o) => o !== "another-step").map(ownerWords) : f.owners.map(ownerWords)), ...f.steps.map(stepWords)].join(", ");
+
   const what = (f: ReviewFlag): string => {
     switch (f.kind) {
       case "overrode":
         return t({
           id: "editor.assignLoop.mechanisms.code.review.overrode",
-          message: `Code edit ${{ seq: f.seq }} changed work made by ${{ owners: f.owners.map(ownerWords).join(", ") }}.`,
+          message: `Code edit ${{ seq: f.seq }} changed work made by ${{ owners: ownersFor(f) }}.`,
         });
       case "missed":
         return t({

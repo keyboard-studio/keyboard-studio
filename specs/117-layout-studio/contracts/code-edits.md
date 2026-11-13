@@ -35,6 +35,7 @@ type IRChange =
 interface OwnerRef {
   change: number;          // index into `changes`
   owner: "deadkeys" | "rules-step" | "layout-tab" | "code-tab" | "identity" | "assign-tab" | "another-step";
+  step?: "mark-guards" | "context-tolerance" | "caps"; // with `another-step`: the generating build step
 }
 
 interface CodeEdit   { seq: number; at: number; op: "code-apply"; changes: IRChange[]; overrides: OwnerRef[] }

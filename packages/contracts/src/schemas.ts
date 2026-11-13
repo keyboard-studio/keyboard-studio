@@ -1122,6 +1122,7 @@ export const IRChangeSchema = z.discriminatedUnion("change", [
 const OwnerRefSchema = z.object({
   change: z.number().int().nonnegative(),
   owner: z.enum(["deadkeys", "rules-step", "layout-tab", "code-tab", "identity", "assign-tab", "another-step"]),
+  step: z.enum(["mark-guards", "context-tolerance", "caps"]).optional(),
 });
 
 const entryBase = { seq: z.number().int().nonnegative(), at: z.number() };

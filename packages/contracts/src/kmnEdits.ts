@@ -68,6 +68,8 @@ export interface OwnerRef {
   /** Index into the entry's `changes`. */
   change: number;
   owner: "deadkeys" | "rules-step" | "layout-tab" | "code-tab" | "identity" | "assign-tab" | "another-step";
+  /** With `another-step`: the build step that generated the rule (named in the review list). */
+  step?: "mark-guards" | "context-tolerance" | "caps";
 }
 
 /** One Code-tab Apply. */

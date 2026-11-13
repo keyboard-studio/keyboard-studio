@@ -3,6 +3,7 @@
 // is faked: `fetch` returns placeholder bytes and the simulator is replaced by a table of what
 // "the compiled keyboard" types, which a test changes to republish the artifact.
 
+import "../../decisions/rebuildWorkingCopy.ts"; // registers the kmn-edits fold a Code-tab commit needs
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { diffIR, parseKmn } from "@keyboard-studio/engine";

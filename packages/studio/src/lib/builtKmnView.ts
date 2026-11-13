@@ -4,13 +4,15 @@
 // records the difference from that text as a kept `kmn-edits` entry. Two things follow from that
 // and live here, as pure functions over text and IR:
 //
-// - `findLateRuleTouch`: the projection replays the `kmn-edits` log at step 2.2, and later steps
-//   (mark guards 2.6, context tolerance 2.7, caps handling 2.8, the identity steps after them)
-//   write the `.kmn` again. A rule one of those steps makes is in the view but is not in the
-//   keyboard the replay acts on, so an edit to it cannot be anchored without changing which build
-//   step wins. It is found by differential, not by looking at the rule: the projection reports the
-//   `.kmn` after each step (`kmnStageTap`), and a change whose anchor is in a later stage's text
-//   but not in the step-2.2 text touches something that stage made.
+// - `findGeneratedRuleTouches`: the projection generates some rules after the Layout-tab edits
+//   (mark guards 2.6, context tolerance 2.7, caps handling 2.8) and replays the Code-tab edits
+//   after them (2.9), so an edit to such a rule is kept like any other. It is still worth naming:
+//   the author is asked to confirm that the edit overrides that step, and the entry is flagged for
+//   review. A generated rule is found by differential, not by looking at the rule: the projection
+//   reports the `.kmn` after each step (`kmnStageTap`), and a change whose anchor is in a
+//   generating stage's text but not in the Layout-edit text (`kmn-edits`) touches something that
+//   stage made or rewrote. `&TARGETS` (step 3.1 forces it to `any` on Copy) is the one exception
+//   that is still refused.
 // - `buildRevealLines`: "view in code" names a node of the working IR; the shown text is a
 //   different parse, so the node is matched to its line in the shown text by content.
 
@@ -19,16 +21,16 @@ import { applyIRChanges, diffIR, emitKmn, parseKmn } from "@keyboard-studio/engi
 import type { KmnStage } from "./projectWorkingCopyVfs.ts";
 
 /**
- * Which later step made, or rewrote, the rule an edit touched. `targets` is the `&TARGETS` store
- * step 3.1 forces on Copy; `build` is any other step after the caps step. The identity steps (3 and
- * 4) own the header stores, whose edits keep the identity confirm, so they are never a source.
+ * Which step made, or rewrote, the rule an edit touched. `targets` is the `&TARGETS` store step 3.1
+ * forces on Copy (the only source an Apply refuses). The identity steps (3 and 4) own the header
+ * stores, whose edits keep the identity confirm, so they are never a source.
  */
-export type LateSource = "mark-guards" | "context-tolerance" | "caps" | "targets" | "build";
+export type GeneratedSource = "mark-guards" | "context-tolerance" | "caps" | "targets";
 
-export interface LateRuleTouch {
+export interface GeneratedRuleTouch {
   /** Index into the Apply's changes. */
   readonly change: number;
-  readonly source: LateSource;
+  readonly source: GeneratedSource;
   /** 1-based line in the text the author was shown (1 when the change carries none). */
   readonly line: number;
 }
@@ -36,8 +38,8 @@ export interface LateRuleTouch {
 /** The `.kmn` text after each reported stage, as `kmnStageTap` delivers it. */
 export type KmnStageTexts = ReadonlyMap<KmnStage, string>;
 
-/** The stages after the replay that can make or rewrite a rule, in build order. */
-const LATER_RULE_STAGES: ReadonlyArray<KmnStage & ("mark-guards" | "context-tolerance" | "caps")> = [
+/** The stages that can make or rewrite a rule between the Layout-tab edits and the Code-tab edits, in build order. */
+const GENERATING_STAGES: ReadonlyArray<KmnStage & ("mark-guards" | "context-tolerance" | "caps")> = [
   "mark-guards",
   "context-tolerance",
   "caps",
@@ -120,26 +122,26 @@ function lineOfChange(change: IRChange, shown: KeyboardIR | null): number {
 }
 
 /**
- * The first change that touches a rule (or store) a step after the `kmn-edits` replay made or
- * rewrote, or `null`. `stages` holds the `.kmn` after each reported step; `shownText` is the final
- * projected text the author edited. With no step-2.2 text (no projection ran) nothing can be told
- * late.
+ * The changes that touch a rule (or store) a generating step made or rewrote, in change order.
+ * `stages` holds the `.kmn` after each reported step; `shownText` is the final projected text the
+ * author edited. With no Layout-edit text (no projection ran) nothing can be told generated.
  *
- * A change fits the replay base when its anchor is found in the step-2.2 text. One that does not
- * fit there but fits a later stage's text (or the final text) was made by that stage. One that fits
- * the base but not a later rule stage's text names a rule that stage rewrote in place (the caps
- * step rewriting a cased key's rule, a guard, a tolerance fix). One that fits nowhere is not late:
- * it is left to the compile gate's "does not fit". Header stores the identity steps write are not
- * late (they keep the identity confirm), except `&TARGETS`, which step 3.1 forces.
+ * The base is the `kmn-edits` text (Layout-tab edits applied, nothing generated). A change that
+ * does not fit there but fits a generating stage's text was made by that stage; one that fits the
+ * base but not a generating stage's text names a rule that stage rewrote in place. One that fits
+ * nowhere (a rule an earlier Code-tab edit made, an Assign-tab rule that is not in the base...) is
+ * not generated: it is left to the owner check and the compile gate's "does not fit". Header
+ * stores the identity steps write are not generated (they keep the identity confirm), except
+ * `&TARGETS`, which step 3.1 forces.
  */
-export function findLateRuleTouch(
+export function findGeneratedRuleTouches(
   changes: readonly IRChange[],
   stages: KmnStageTexts,
   shownText: string,
   keyboardId: string,
-): LateRuleTouch | null {
+): GeneratedRuleTouch[] {
   const baseText = stages.get("kmn-edits");
-  if (baseText === undefined) return null;
+  if (baseText === undefined) return [];
   const parse = (text: string): KeyboardIR | null => {
     try {
       return parseKmn(text, keyboardId).ir;
@@ -148,36 +150,35 @@ export function findLateRuleTouch(
     }
   };
   const base = parse(baseText);
-  if (base === null) return null;
+  if (base === null) return [];
   const shown = parse(shownText);
-  const later: Array<{ source: LateSource; ir: KeyboardIR }> = [];
-  for (const stage of LATER_RULE_STAGES) {
+  const generated: Array<{ source: GeneratedSource; ir: KeyboardIR }> = [];
+  for (const stage of GENERATING_STAGES) {
     const text = stages.get(stage);
     const ir = text === undefined || text === baseText ? null : parse(text);
-    if (ir !== null) later.push({ source: stage, ir });
+    if (ir !== null) generated.push({ source: stage, ir });
   }
-  const targetsText = stages.get("targets");
-  const targetsIr = targetsText === undefined || targetsText === baseText ? null : parse(targetsText);
-  const anyLater = [...later];
-  if (targetsIr !== null) anyLater.push({ source: "targets", ir: targetsIr });
-  if (shown !== null) anyLater.push({ source: "build", ir: shown });
 
+  const out: GeneratedRuleTouch[] = [];
   for (let i = 0; i < changes.length; i++) {
     const change = changes[i]!;
     const header = headerClass(change);
     if (header === "identity") continue;
-    if (header === "targets") return { change: i, source: "targets", line: lineOfChange(change, shown) };
+    if (header === "targets") {
+      out.push({ change: i, source: "targets", line: lineOfChange(change, shown) });
+      continue;
+    }
     if (!fitsIn(base, change)) {
-      const hit = anyLater.find((l) => fitsIn(l.ir, change));
-      if (hit !== undefined) return { change: i, source: hit.source, line: lineOfChange(change, shown) };
+      const hit = generated.find((l) => fitsIn(l.ir, change));
+      if (hit !== undefined) out.push({ change: i, source: hit.source, line: lineOfChange(change, shown) });
       continue;
     }
     if (change.change === "insert" || change.change === "remove" || change.change === "replace") {
-      const rewritten = later.find((l) => !fitsIn(l.ir, change));
-      if (rewritten !== undefined) return { change: i, source: rewritten.source, line: lineOfChange(change, shown) };
+      const rewritten = generated.find((l) => !fitsIn(l.ir, change));
+      if (rewritten !== undefined) out.push({ change: i, source: rewritten.source, line: lineOfChange(change, shown) });
     }
   }
-  return null;
+  return out;
 }
 
 function isIdentityChange(change: IRChange): boolean {

@@ -102,6 +102,7 @@ import {
   type TouchAssignment,
 } from "@keyboard-studio/contracts";
 import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useDecisionStore } from "./decisionStore.ts";
 import { useRulesDemoArtifactStore } from "./rulesDemoArtifactStore.ts";
 import { applyMutatePatch } from "../steps/mutateApply.ts";
@@ -256,13 +257,16 @@ export type UndoEntry =
   | { k: "kb"; seqs: number[] }
   // Spec 117: one Layout-tab edit (`l`) or one edit plus its accepted case partner (`lb`). The
   // effect is what the edit did to the live IR, so undo is a local inverse, never a rebuild.
-  | { k: "l"; seq: number; effect: KmnEditEffect }
-  | { k: "lb"; seqs: number[]; effects: KmnEditEffect[] }
+  // `stale` marks an entry whose effect no longer names live nodes (the log holds a Code-tab entry,
+  // so the live IR is re-derived, not patched): its undo re-derives too (spec 117 R15).
+  | { k: "l"; seq: number; effect: KmnEditEffect; stale?: true }
+  | { k: "lb"; seqs: number[]; effects: KmnEditEffect[]; stale?: true }
   // Spec 117: one Layout-tab deadkey lifecycle edit (spec 083; one confirm, one undo step). Holds
   // the inverse `DeadkeyOperation`s in the order undo applies them, each captured from the IR
   // before its op ran; undo applies them and appends them to the (append-only) deadkey overlay, so
   // the emitted .kmn after undo equals the text before the edit.
-  | { k: "ld"; inverse: DeadkeyOperation[] }
+  // `stale`: a re-derive re-minted the live node ids, so undo re-derives from the log too.
+  | { k: "ld"; inverse: DeadkeyOperation[]; stale?: true }
   // Spec 117 US8: one Code-tab Apply. Holds the inverse of its changes, content-anchored, so undo
   // is `applyIRChanges(ir, inverse)` and never a rebuild.
   | { k: "c"; seq: number; inverse: IRChange[] };
@@ -2108,6 +2112,61 @@ function recordKmnEdits(entries: KmnEdit[]): void {
   });
 }
 
+/**
+ * The working IR the decision fold gives for a candidate `kmn-edits` log: every decision folded in
+ * order, with `entries` standing in for the recorded `kmn-edits` value (the rebuild's own fold).
+ *
+ * Registration pattern (mirrors `registerRouteProvider` in decisions/routeProvider.ts): the store
+ * cannot import decisions/rebuildWorkingCopy.ts (it imports the store), so that module registers
+ * the fold when it is loaded. There is deliberately NO fallback: a `startIr`-only replay would
+ * silently lose every other decision (assignments, marks). An unregistered fold, or a fold that
+ * returns null, makes the commit or undo REFUSE and keeps the previous live IR; the unregistered
+ * case is also logged once. A test that commits a Code-tab entry must load rebuildWorkingCopy.ts
+ * (any import of it registers the fold; nothing resets the registration).
+ */
+type KmnEditsFold = (entries: readonly KmnEdit[]) => KeyboardIR | null;
+let kmnEditsFold: KmnEditsFold | null = null;
+let warnedUnregisteredFold = false;
+export function registerKmnEditsFold(fold: KmnEditsFold | null): void {
+  kmnEditsFold = fold;
+  warnedUnregisteredFold = false;
+}
+
+const logHasCodeEntry = (entries: readonly KmnEdit[]): boolean => entries.some((e) => e.op === "code-apply");
+
+/**
+ * One ordering rule for the live model (spec 117 R15, owner ruling 2026-11-13): whenever the log
+ * holds a Code-tab entry, the live IR is the decision fold with `replayKmnEdits(base, entries)` as its `kmn-edits` step -- the build's order
+ * (Layout-tab entries, then Code-tab entries) and supersede rule -- not an incremental patch, so a
+ * `kmn-edits` commit, an undo and a rebuild all land on the same rules. A log without a Code-tab
+ * entry keeps the incremental path (performance budget, spec 117 ruling 8). Known limit: the live
+ * IR holds no rules the build generates (marks, tolerance, caps).
+ */
+function deriveLiveIr(s: WorkingCopyState, entries: readonly KmnEdit[]): KeyboardIR {
+  if (s.startIr === null || s.ir === null) throw new Error("deriveLiveIr: no working copy");
+  if (kmnEditsFold === null) {
+    if (!warnedUnregisteredFold) {
+      warnedUnregisteredFold = true;
+      devLog.error("[workingCopyStore] kmn-edits fold is not registered; refusing the edit (load decisions/rebuildWorkingCopy.ts)");
+    }
+    throw new Error("deriveLiveIr: the kmn-edits fold is not registered");
+  }
+  const replayed = kmnEditsFold(entries);
+  if (replayed === null) throw new Error("deriveLiveIr: the decision fold returned no IR");
+  return applyMutatePatch(s.ir, codeEditPatch(s.ir, replayed), CODE_WRITES);
+}
+
+/**
+ * The undo stack after a re-derive: the Layout-tab (`l`, `lb`) and deadkey (`ld`) entries below no
+ * longer name live nodes. Conservative: undoing the `c` entry marks the rest stale even when no code
+ * entry remains (the re-derive re-minted the ids either way); stale entries undo by re-deriving.
+ */
+function markUndoStale(stack: readonly UndoEntry[]): UndoEntry[] {
+  return stack.map((e) => (e.k === "l" || e.k === "lb" || e.k === "ld" ? { ...e, stale: true as const } : e));
+}
+
+const NO_EFFECT: KmnEditEffect = { groupNodeId: "", inserted: [], removed: [] };
+
 /** True when the static attribution says the target slot cannot be edited (FR-025). */
 function slotIsReadOnly(ir: KeyboardIR, entry: KmnEdit): boolean {
   if (entry.op !== "set-key" && entry.op !== "clear-key") return false;
@@ -2139,16 +2198,18 @@ function commitCodeEntry(
   let ir: KeyboardIR;
   let applied: typeof entry.changes = entry.changes;
   try {
+    // The pre-check runs on the live IR: a change whose anchor is gone refuses the entry, unless the
+    // caller accepts built-keyboard-only changes. The live IR itself is re-derived from the log.
     const result = applyIRChanges(s.ir, entry.changes);
     if (result.misses.length > 0 && !skipLiveMisses) return { ok: false, reason: "refused" };
-    ir = applyMutatePatch(s.ir, codeEditPatch(s.ir, result.ir), CODE_WRITES);
+    ir = deriveLiveIr(s, [...earlier, entry]);
     const missed = new Set(result.misses);
     applied = entry.changes.filter((_, i) => !missed.has(i));
   } catch {
     return { ok: false, reason: "refused" };
   }
   const undoEntry: UndoEntry = { k: "c", seq, inverse: invertChanges(applied) };
-  set((cur) => ({ ir, undoStack: [...cur.undoStack, undoEntry] }));
+  set((cur) => ({ ir, undoStack: [...markUndoStale(cur.undoStack), undoEntry] }));
   recordKmnEdits([...earlier, entry]);
   return { ok: true, seqs: [seq] };
 }
@@ -2176,28 +2237,43 @@ function commitKmnEditImpl(
   const added: KmnEdit[] = [];
   const effects: KmnEditEffect[] = [];
   let ir = s.ir;
+  // A log with a Code-tab entry re-derives the live IR (deriveLiveIr); the entries are then only
+  // checked here (read-only slot), and replay refuses what an op refuses.
+  const rederive = logHasCodeEntry(earlier);
   for (const input of inputs) {
     const entry = { ...input, seq: ++seq, at } as KmnEdit;
     if (slotIsReadOnly(ir, entry)) return { ok: false, reason: "read-only" };
     try {
       if (!isLayoutOperation(entry)) return { ok: false, reason: "refused" };
-      const result =
-        entry.op === "clear-key"
-          ? clearKeyLive(ir, entry, s.startIr, [...earlier, ...added])
-          : applyLayoutOp(ir, entry);
-      ir = applyMutatePatch(ir, { groups: result.ir.groups }, LAYOUT_WRITES);
-      effects.push(result.effect);
+      if (rederive) {
+        effects.push(NO_EFFECT);
+      } else {
+        const result =
+          entry.op === "clear-key"
+            ? clearKeyLive(ir, entry, s.startIr, [...earlier, ...added])
+            : applyLayoutOp(ir, entry);
+        ir = applyMutatePatch(ir, { groups: result.ir.groups }, LAYOUT_WRITES);
+        effects.push(result.effect);
+      }
     } catch {
       return { ok: false, reason: "refused" };
     }
     added.push(entry);
   }
+  if (rederive) {
+    try {
+      ir = deriveLiveIr(s, [...earlier, ...added]);
+    } catch {
+      return { ok: false, reason: "refused" };
+    }
+  }
 
   const seqs = added.map((e) => e.seq);
+  const stale = rederive ? ({ stale: true } as const) : {};
   const undoEntry: UndoEntry =
     added.length === 1 && effects[0] !== undefined
-      ? { k: "l", seq: seqs[0]!, effect: effects[0] }
-      : { k: "lb", seqs, effects };
+      ? { k: "l", seq: seqs[0]!, effect: effects[0], ...stale }
+      : { k: "lb", seqs, effects, ...stale };
   set((cur) => ({ ir, undoStack: [...cur.undoStack, undoEntry] }));
   recordKmnEdits([...earlier, ...added]);
   return { ok: true, seqs };
@@ -2250,12 +2326,29 @@ function commitLayoutDeadkeyOpImpl(
     return { ok: false, reason: "refused" };
   }
   const ops = [...s.deadkeyOverlay.ops, ...list];
+  // The build applies deadkey ops (step 1.8) BEFORE the Layout-tab and Code-tab entries, so with a
+  // Code-tab entry in the log the live IR is re-derived through the same fold (the incremental ops
+  // above only supplied the inverses and the refusal check). The decision is recorded first because
+  // the fold reads it, and put back if the fold cannot be made.
+  const rederive = logHasCodeEntry(recordedKmnEdits());
+  if (rederive) {
+    const prior = s.deadkeyOverlay.ops;
+    recordDeadkeysDefined(ops);
+    try {
+      ir = deriveLiveIr(s, recordedKmnEdits());
+    } catch {
+      recordDeadkeysDefined(prior);
+      return { ok: false, reason: "refused" };
+    }
+  }
   set((cur) => ({
     ir,
     deadkeyOverlay: { ops },
-    undoStack: undoable ? [...cur.undoStack, { k: "ld", inverse: inverses }] : cur.undoStack,
+    undoStack: undoable
+      ? [...cur.undoStack, rederive ? { k: "ld", inverse: inverses, stale: true as const } : { k: "ld", inverse: inverses }]
+      : cur.undoStack,
   }));
-  recordDeadkeysDefined(ops);
+  if (!rederive) recordDeadkeysDefined(ops);
   return { ok: true, seqs: [] };
 }
 
@@ -2265,12 +2358,35 @@ function undoKmnEditImpl(get: StoreGet, set: StoreSet): boolean {
   if (top === undefined || (top.k !== "l" && top.k !== "lb" && top.k !== "ld" && top.k !== "c") || s.ir === null) {
     return false;
   }
-  if (top.k === "c") {
-    const result = applyIRChanges(s.ir, top.inverse);
-    if (result.misses.length > 0) return false;
-    const ir = applyMutatePatch(s.ir, codeEditPatch(s.ir, result.ir), CODE_WRITES);
-    set((cur) => ({ ir, undoStack: cur.undoStack.slice(0, -1) }));
-    recordKmnEdits(recordedKmnEdits().filter((e) => e.seq !== top.seq));
+  if (top.k === "c" || ((top.k === "l" || top.k === "lb") && top.stale === true)) {
+    // The live IR is derived from the log (see deriveLiveIr): undo drops the entry from the log
+    // and re-derives, so what remains is exactly the build's reading of the log without it.
+    const seqs = top.k === "l" || top.k === "c" ? [top.seq] : top.seqs;
+    const remaining = recordedKmnEdits().filter((e) => !seqs.includes(e.seq));
+    let ir: KeyboardIR;
+    try {
+      ir = deriveLiveIr(s, remaining);
+    } catch {
+      return false;
+    }
+    set((cur) => ({ ir, undoStack: markUndoStale(cur.undoStack.slice(0, -1)) }));
+    recordKmnEdits(remaining);
+    return true;
+  }
+  if (top.k === "ld" && top.stale === true) {
+    // Re-derive: record the deadkey list with the inverse appended, fold it with the log, and put
+    // the record back if the fold cannot be made (nothing is left half-undone).
+    const prior = s.deadkeyOverlay.ops;
+    const ops = [...prior, ...top.inverse];
+    recordDeadkeysDefined(ops);
+    let ir: KeyboardIR;
+    try {
+      ir = deriveLiveIr(s, recordedKmnEdits());
+    } catch {
+      recordDeadkeysDefined(prior);
+      return false;
+    }
+    set((cur) => ({ ir, deadkeyOverlay: { ops }, undoStack: markUndoStale(cur.undoStack.slice(0, -1)) }));
     return true;
   }
   if (top.k === "ld") {

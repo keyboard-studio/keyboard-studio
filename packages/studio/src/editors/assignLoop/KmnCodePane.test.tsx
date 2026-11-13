@@ -28,6 +28,7 @@ import { projectWorkingCopyForOutput } from "../../lib/serializeWorkingCopy.ts";
 import { getPatternByIdSync } from "../../lib/services.ts";
 import type { CandidateCompileResult } from "../../lib/compileCandidateKmn.ts";
 import type { CodeEdit, KmnEditsValue } from "@keyboard-studio/contracts";
+import { reviewFlags } from "./reviewFlags.ts";
 
 vi.mock("./touchBuilder/monacoSetup.ts", () => ({}));
 
@@ -1031,16 +1032,70 @@ describe("KmnCodePane built view plus kept edits", () => {
       render(<KmnCodePane />);
     }
 
-    it("shows the caps store the caps step writes, and refuses an Apply that changes it", async () => {
+    /**
+     * The owner ruling of 2026-11-13: generated rules are ordinary text by the time the author edits.
+     * Apply asks the owner confirm naming the step, records ONE entry, and the pane, the preview and
+     * the download all hold the edit; the entry is flagged for review.
+     */
+    async function applyGeneratedEdit(applied: string, step: RegExp, needle: string): Promise<void> {
+      edit(applied);
+      await clickApply();
+      expect(screen.queryByTestId("kmn-code-apply-error")).toBeNull();
+      expect(screen.getByTestId("kmn-code-owner-confirm").textContent).toMatch(step);
+      expect(recorded()).toBeUndefined();
+      await confirmIfAsked();
+      await waitFor(() => expect(recorded()?.entries).toHaveLength(1));
+      await waitFor(() => expect(editorText()).toContain(needle));
+      expect(screen.queryByTestId("kmn-code-dirty")).toBeNull();
+      const pane = editorText();
+      cleanup();
+      const preview = previewKmn();
+      const download = await downloadKmn();
+      expect(preview).toContain(needle);
+      expect(download).toContain(needle);
+      expect(stripStamps(norm(pane))).toBe(stripStamps(norm(download)));
+      expect(stripStamps(norm(preview))).toBe(stripStamps(norm(download)));
+      const flags = reviewFlags(recorded(), [], useWorkingCopyStore.getState().ir);
+      expect(flags).toContainEqual(expect.objectContaining({ kind: "overrode", seq: 1 }));
+      // The flag names the generating step, not the generic "another step".
+      expect(flags.some((f) => f.kind === "overrode" && f.steps.length === 1)).toBe(true);
+      render(<KmnCodePane />);
+    }
+
+    function seedCapsRewritten(): void {
+      // The caps step rewrites these four rules into the two the pane shows.
+      const kmn = CASED.replace(
+        "+ [K_A] > 'a'\n+ [SHIFT K_A] > 'A'\n",
+        "+ [NCAPS K_A] > 'a'\n+ [NCAPS SHIFT K_A] > 'A'\n+ [CAPS K_A] > 'A'\n+ [CAPS SHIFT K_A] > 'a'\n",
+      );
+      const ir = parseKmn(kmn, "testkbd").ir;
+      useWorkingCopyStore.setState({
+        ir,
+        startIr: ir,
+        startVfs: createVirtualFS([{ path: "source/testkbd.kmn", content: kmn, isBinary: false }]),
+      });
+      useDecisionStore.getState().recordAll([
+        { id: "character-inventory", value: { chars: ["a", "A", "b"] }, provenance: "asked" },
+        { id: "caps-handling", value: { mode: "cased-keys" }, provenance: "default" },
+      ] as never);
+      cleanup();
+      render(<KmnCodePane />);
+    }
+
+    it("an edit to a rule the caps step generated is kept: the confirm names the step, and the build holds the edit", async () => {
+      seedCapsRewritten();
+      expect(editorText()).toContain("+ [K_A] > U+0061");
+      expect(editorText()).not.toContain("NCAPS");
+      await applyGeneratedEdit(editorText().replace("+ [K_A] > U+0061", "+ [K_A] > U+0078"), /caps handling choice/, "+ [K_A] > U+0078");
+    });
+
+    it("an edit to the caps store the caps step wrote is kept the same way", async () => {
       seedCased();
       expect(editorText()).toContain("store(&CasedKeys)");
-      edit(editorText().replace(/store\(&CasedKeys\) .*/, "store(&CasedKeys) [K_A K_B]"));
-      await clickApply();
-      expect(recorded()).toBeUndefined();
-      expect(compileMock.fn).not.toHaveBeenCalled();
-      const line = editorText().split("\n").findIndex((l) => l.startsWith("store(&CasedKeys)")) + 1;
-      expect(screen.getByTestId("kmn-code-apply-error").textContent).toMatch(
-        new RegExp(`Line ${line}: .*caps handling choice`),
+      await applyGeneratedEdit(
+        editorText().replace(/store\(&CasedKeys\) .*/, "store(&CasedKeys) [K_A K_B]"),
+        /caps handling choice/,
+        "store(&CasedKeys) [K_A K_B]",
       );
     });
 
@@ -1053,15 +1108,14 @@ describe("KmnCodePane built view plus kept edits", () => {
       expect(editorText()).toContain("store(&CasedKeys)");
     });
 
-    it("refuses an edit that a later step rewrites in place: the build would override it", async () => {
+    it("an NCAPS rule the caps step would rewrite is kept as written: the edit replays after the step", async () => {
       seedCased();
-      // The caps step drops the NCAPS token on a cased key, so the rule would build as `[K_A]`.
       edit(editorText().replace("+ [K_A] > U+0061", "+ [K_A] > U+0061\n+ [NCAPS K_A] > U+0078"));
       await clickApply();
-      expect(recorded()).toBeUndefined();
-      expect(compileMock.fn).not.toHaveBeenCalled();
-      expect(screen.getByTestId("kmn-code-apply-error").textContent).toMatch(/later build step changes this back/);
-      expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
+      await waitFor(() => expect(recorded()?.entries).toHaveLength(1));
+      expect(screen.queryByTestId("kmn-code-apply-error")).toBeNull();
+      await waitFor(() => expect(editorText()).toContain("+ [NCAPS K_A] > U+0078"));
+      expect(useWorkingCopyStore.getState().undoStack).toHaveLength(1);
     });
 
     describe("a mark-guard rule", () => {
@@ -1096,14 +1150,10 @@ describe("KmnCodePane built view plus kept edits", () => {
         render(<KmnCodePane />);
       }
 
-      it("shows the guard the marks step writes, and refuses an Apply that changes it", async () => {
+      it("an edit to the guard the marks step writes is kept: the confirm names the step, and the build holds it", async () => {
         seedGuarded();
         expect(editorText()).toContain("nul U+0301 > nul");
-        edit(editorText().replace("nul U+0301 > nul", "nul U+0301 > U+0041"));
-        await clickApply();
-        expect(recorded()).toBeUndefined();
-        expect(compileMock.fn).not.toHaveBeenCalled();
-        expect(screen.getByTestId("kmn-code-apply-error").textContent).toMatch(/marks step/);
+        await applyGeneratedEdit(editorText().replace("nul U+0301 > nul", "nul U+0301 > U+0041"), /marks step/, "nul U+0301 > U+0041");
       });
     });
 
@@ -1112,7 +1162,7 @@ describe("KmnCodePane built view plus kept edits", () => {
         "store(&VERSION) '10.0'\nstore(&NAME) 'Test'\nstore(&TARGETS) 'any'\nbegin Unicode > use(main)\n\n" +
         "group(main) using keys\nU+00E0 + ']' > U+00E2\n+ ']' > U+00B4\n";
 
-      it("refuses an Apply that changes a rule the tolerance fix adds", async () => {
+      it("an edit to a rule the tolerance fix adds is kept: the confirm names the step, and the build holds it", async () => {
         const ir = parseKmn(TOL_KMN, "testkbd").ir;
         useWorkingCopyStore.setState({
           ir,
@@ -1150,12 +1200,12 @@ describe("KmnCodePane built view plus kept edits", () => {
         expect(editorText()).toContain("Accept the decomposed form too.");
         const added = editorText().split("\n").find((l) => l.includes("U+0300") && l.includes("+"))!;
         expect(added).toBeDefined();
-        edit(editorText().replace(added, added.replace(/> .*$/, "> U+0041")));
-        await clickApply();
-        expect(recorded()).toBeUndefined();
-        expect(compileMock.fn).not.toHaveBeenCalled();
-        expect(screen.getByTestId("kmn-code-apply-error").textContent).toMatch(/context-tolerance/);
-        useWorkingCopyStore.getState().setContextToleranceOverlay(null);
+        const edited = added.replace(/> .*$/, "> U+0041");
+        try {
+          await applyGeneratedEdit(editorText().replace(added, edited), /context-tolerance/, edited.trim());
+        } finally {
+          useWorkingCopyStore.getState().setContextToleranceOverlay(null);
+        }
       });
     });
 
@@ -1183,16 +1233,54 @@ describe("KmnCodePane built view plus kept edits", () => {
       });
     });
 
-    it("an Apply that changes a late rule and an ordinary rule records neither (all or nothing)", async () => {
+    it("an Apply that changes &TARGETS and an ordinary rule records neither (all or nothing)", async () => {
       seedCased();
       edit(
         editorText()
-          .replace(/store\(&CasedKeys\) .*/, "store(&CasedKeys) [K_A K_B]")
+          .replace("store(&TARGETS) 'any'", "store(&TARGETS) 'windows'")
           .replace("+ [K_B] > U+0062", "+ [K_B] > U+0063"),
       );
       await clickApply();
       expect(recorded()).toBeUndefined();
+      expect(compileMock.fn).not.toHaveBeenCalled();
+      expect(screen.getByTestId("kmn-code-apply-error").textContent).toMatch(/&TARGETS/);
+    });
+
+    it("a generated-rule edit that does not compile is rejected by the compile gate and records nothing", async () => {
+      seedCapsRewritten();
+      compileMock.fn.mockResolvedValue({
+        status: "errors",
+        diagnostics: [{ severity: "error", code: "KM0XX", message: "boom", line: 9 }],
+      } as never);
+      edit(editorText().replace("+ [K_A] > U+0061", "+ [K_A] > U+0078"));
+      await clickApply();
+      expect(compileMock.fn).toHaveBeenCalledTimes(1);
+      expect(recorded()).toBeUndefined();
       expect(screen.getByTestId("kmn-code-apply-error")).toBeTruthy();
+      expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
+    });
+
+    it("after a kept edit to a generated rule, a later assignment that changes the generated rules leaves the edit unplaced: flagged, nothing crashes", async () => {
+      seedCapsRewritten();
+      await applyGeneratedEdit(editorText().replace("+ [K_A] > U+0061", "+ [K_A] > U+0078"), /caps handling choice/, "+ [K_A] > U+0078");
+      // An assignment on K_A takes the key: step 2 drops the starting rules there, so the caps step
+      // has nothing to rewrite and the entry's anchor (the caps-made rule) is gone.
+      assign("ā", "+ [K_A] > U+0101");
+      const projected = await projectWorkingCopyForOutput();
+      expect(projected).not.toBeNull();
+      const missWarning = projected!.warnings.find((w) => /layout edit 1 skipped/.test(w));
+      expect(missWarning).toBeDefined();
+      const text = [...projected!.vfs.entries()].find((e) => e.path.startsWith("source/") && e.path.endsWith(".kmn"))!.content as string;
+      // The rest of the build is intact: the assignment, the other rules, the caps store.
+      expect(text).toContain("U+0101");
+      expect(text).toContain("[K_B]");
+      const misses = [...projected!.warnings.flatMap((w) => {
+        const m = /layout edit (\d+) skipped: (.*)$/.exec(w);
+        return m?.[1] !== undefined && m[2] !== undefined ? [{ seq: Number(m[1]), reason: m[2] }] : [];
+      })];
+      expect(reviewFlags(recorded(), misses, useWorkingCopyStore.getState().ir)).toContainEqual(
+        expect.objectContaining({ kind: "missed", seq: 1 }),
+      );
     });
   });
 

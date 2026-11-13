@@ -81,7 +81,7 @@ Mechanical Gallery and use it, not when the component exists.
    the README/docs generation every projection now runs, so a 0-edit run already measures
    ~17 ms. The gate is: with 20 `kmn-edits` entries on sil_euro_latin (`rebuildPerf.measure`),
    the warm-edit and cold-resume medians are each **≤ 30 ms**. The design's ~4.7 ms replay cost
-   (two replays per R12, step 2.2's parse and re-emit) is accepted as measured (research R12,
+   (two replays per R12, step 2.2's parse and re-emit; the Code-tab replay at step 2.9 adds at most one more parse and emit, only when `code-apply` entries exist) is accepted as measured (research R12,
    "Replay cost"); one-replay and no-re-parse designs are not pursued in this spec.
 9. **On a key the Assign tab assigns, the assignment wins over a Code-tab edit, and the edit is
    flagged, never lost silently.** *Amended by ruling 11: the Code tab now shows the built
@@ -106,6 +106,10 @@ Mechanical Gallery and use it, not when the component exists.
       change keeps its content anchor.
     - **Code edit first, then assign that key:** unchanged from ruling 9 — the assignment wins,
       and the code edit no longer fits and is flagged under FR-063 (b).
+    - **Code edit and Layout-tab edit on the same key (or row):** the most recent wins, in the
+      build and in the live model alike. Code edits replay after Layout-tab edits (research R15),
+      so a code change is skipped, with no flag, when a later Layout-tab edit targets the same key
+      or row; a code edit made after the Layout-tab edit stands.
     - **Displaced characters:** a confirmed-inventory character that the built keyboard no longer
       types after an edit (replace `g` with `ĝ`: `g` is now typed nowhere) returns to the letters
       to place through the **existing** inventory coverage, exactly as when an assignment is
@@ -121,8 +125,10 @@ Mechanical Gallery and use it, not when the component exists.
     working IR's emit. Apply diffs the edited text against the text the author was shown and
     records that difference as one `kmn-edits` entry, so the edit is in the build and stays
     visible. An Apply that changes or removes a rule a build step after the `kmn-edits` replay
-    makes (mark guards, context tolerance, caps handling) is refused with a message at its line
-    naming that step, and records nothing (interim: pending owner ruling, research R15). On Open nothing changes: the tab shows the file text
+    makes (mark guards, context tolerance, caps handling) is allowed: the confirm names the step,
+    the edit is kept and replays after those steps, and the entry is flagged for review (owner
+    ruling 2026-11-13, research R15). Only `&TARGETS`, which the build forces to `any` on Copy, is
+    refused. On Open nothing changes: the tab shows the file text
     and Apply replaces the starting point.
 
 ## Clarifications
@@ -718,10 +724,10 @@ recorded.
 - **FR-061**: **Errors are blocked.** Apply MUST record nothing and leave the working copy
   unchanged when the edited text does not parse, has a validator error (Layer A), or does not
   compile. The errors are shown at their lines. Warnings do not block. On Copy, an Apply whose
-  difference changes or removes a rule made by a build step after the `kmn-edits` replay (mark
-  guards, context tolerance, caps handling) is refused the same way, with the message naming
-  that step (ruling 11; the refusal itself is the interim behaviour, pending the owner ruling
-  recorded in research R15).
+  difference changes `&TARGETS` is refused the same way, with a message naming it (the build
+  forces it to `any`). A rule made by mark guards, context tolerance or caps handling is not
+  refused: it is ordinary text by the time the author edits code, and compliance is left to this
+  compile gate and to review (ruling 11; the owner ruling of 2026-11-13, research R15).
 - **FR-062**: **The code edit wins.** When the difference changes or removes a node another
   decision produced — a deadkey (spec 083), a Layout-tab edit, a rules step addition,
   identity's header stores, an Assign-tab assignment on the edited key (ruling 10: the change
@@ -787,7 +793,7 @@ recorded.
 - **KMN edits decision (`kmn-edits`)** — one bundled decision: the ordered list of the author's
   edits to the keyboard rules, from the Layout tab (key and layer edits, contextual rows) and the
   Code tab (structural differences). Recorded at each confirm or Apply; its `apply()` replays the
-  list in order, after every other decision that writes rules. Later entries win.
+  list in order, after every other decision that writes rules. Later entries win (a code edit replays after the Layout-tab edits, but one a later Layout-tab edit supersedes is skipped: research R15).
 - **Code edit entry** — one Code-tab Apply: the structural changes, each located by content
   (FR-065), plus its review flags and whether the author kept them.
 
@@ -863,10 +869,12 @@ recorded.
 - **Assign-tab rules in the Code tab** (resolved by ruling 11, 2026-11-13). The Code tab shows
   the built keyboard, so Assign-tab rules are visible there and a code edit to one is kept as a
   `kmn-edits` entry. Assignments stay a projection step; they were not moved into the working
-  copy. Known limit: a rule made by a step after the `kmn-edits` replay (mark guards, context
-  tolerance, caps handling) is shown but cannot be edited from the Code tab; Apply refuses it. This
-  refusal is the interim behaviour, PENDING OWNER RULING (raised 2026-11-13, research R15): refuse
-  (current), show read-only, or editable with the edit winning over that step.
+  copy. A rule made by mark guards, context tolerance or caps handling is shown and editable from
+  the Code tab (owner ruling 2026-11-13, research R15): the confirm names the step, the edit is
+  kept and wins, and the entry is flagged. Consequence: a kept code edit replays after all
+  Layout-tab edits, whatever order they were recorded in, except that a change a later Layout-tab edit
+  supersedes (same key or row) is skipped without a flag (ruling 10); where a later change in what a
+  step generates means a recorded change no longer fits, the FR-063 (b) flag names it. `&TARGETS` stays refused (the build forces it to `any`).
 - **Placement tray gate** (Art XI: owner and trigger). Owner: the product owner. Trigger: when
   US1–US6 have shipped, the product owner decides go or no-go on US7. If no-go, or if no decision
   is recorded by this spec's retirement pass, FR-050 and US7 are removed from the spec rather than

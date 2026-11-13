@@ -49,6 +49,9 @@
 //                         emitted string follows the one form (spec 106 US3);
 //                         a uniformity scan then warns on wrong-form text the
 //                         assignments introduced
+//   2.2 Layout-tab edits — the `kmn-edits` entries other than `code-apply`
+//                         (spec 117), before the generating steps 2.6-2.8 so
+//                         they generate for the edited keyboard
 //   2.5 Layer propagation — propagateDesktopLayersToTouch (surfaces S-08
 //                         generalized modifier-combo layers onto the
 //                         .keyman-touch-layout written by step 0; no-op when
@@ -63,7 +66,11 @@
 //                         derived &CasedKeys store and the copied keyboard's
 //                         CAPS/NCAPS rules (research R10). After 2.7 so the
 //                         set is derived from the keyboard as the author left it
-//   3. Identity         — applyIdentityStubMutation (writes &NAME)
+//   2.9 Code-tab edits  — the `code-apply` entries of `kmn-edits` (spec 117
+//                         US8, R15), replayed AFTER the generating steps so an
+//                         edit to a generated rule stays in the build; so a code
+//                         edit is applied after every Layout-tab edit
+//   3. Identity        — applyIdentityStubMutation (writes &NAME)
 //   3.1 Targets         — applyTargetsAnyMutation (always store(&TARGETS) 'any')
 //   3.5 Keycap labels   — applyKeycapLabelsToVfs (see step 3.5 below)
 //   3.6 Package descriptor — applyIdentityToKps writes the AUTHOR's language +
@@ -184,6 +191,7 @@ export type KmnStage =
   | "mark-guards"
   | "context-tolerance"
   | "caps"
+  | "code-edits"
   | "identity"
   | "targets"
   | "id-rename";
@@ -421,18 +429,20 @@ export interface ProjectWorkingCopyVfsInput {
    */
   ruleAdditions?: DerivedRuleAdditions;
   /**
-   * The Layout tab's `kmn-edits` decision value (spec 117). Replayed at step 2.2, only when it
-   * has entries, so an unedited keyboard keeps a byte-identical artifact.
+   * The `kmn-edits` decision value (spec 117). The Layout-tab entries replay at step 2.2 and the
+   * `code-apply` entries at step 2.9, each only when it has entries, so an unedited keyboard keeps
+   * a byte-identical artifact.
    */
   kmnEdits?: KmnEditsValue;
   /**
    * An observer of the `.kmn` as it stands after each step that can write rules at or after the
    * `kmn-edits` replay (spec 117, research R15). Called with the text after step 2.2 (`kmn-edits`:
-   * the keyboard exactly as the NEXT recorded edit will be replayed onto it), then after 2.6
-   * (`mark-guards`), 2.7 (`context-tolerance`), 2.8 (`caps`), 3 (`identity`), 3.1 (`targets`) and
-   * 4 (`id-rename`, before the files are renamed). It reads the VFS and changes nothing, so it
-   * cannot alter an output, and a tap that throws is ignored; the Code tab uses it to tell which
-   * rules a later step generated. Omit it and the projection does no extra work.
+   * the Layout-tab edits applied, nothing generated yet), then after 2.6 (`mark-guards`), 2.7
+   * (`context-tolerance`), 2.8 (`caps`: the keyboard the Code-tab edits are replayed onto), 2.9
+   * (`code-edits`), 3 (`identity`), 3.1 (`targets`) and 4 (`id-rename`, before the files are
+   * renamed). It reads the VFS and changes nothing, so it cannot alter an output, and a tap that
+   * throws is ignored; the Code tab uses it to tell which rules a generating step made. Omit it
+   * and the projection does no extra work.
    */
   kmnStageTap?: (stage: KmnStage, text: string) => void;
   /**
@@ -1179,14 +1189,18 @@ export function projectWorkingCopyVfs(
     }
   }
 
-  // Step 2.2: Layout-tab edits (spec 117, research R12). Replays the `kmn-edits` log over the
-  // projected .kmn: parse, replayKmnEdits, write (a full emit in Copy, a splice on Open). After the deadkey ops (1.8) and the assignments
-  // (2), so a key-first edit wins over an earlier character-first one on the same key; before
-  // layer propagation (2.5), mark guards (2.6) and context tolerance (2.7), so those see the
-  // edited keyboard (a tolerance batch anchored on a rule an edit removed is skipped there, with
-  // its own warning). Only when the log has entries: the .kmn is re-emitted, so an unedited
-  // keyboard must not pass through it (the step 1.7b precedent).
-  if (kmnEdits !== undefined && kmnEdits.entries.length > 0) {
+  // Step 2.2: Layout-tab edits (spec 117, research R12). Replays the Layout-tab entries of the
+  // `kmn-edits` log (every op except `code-apply`, which step 2.9 replays) over the projected
+  // .kmn: parse, replayKmnEdits, write (a full emit in Copy, a splice on Open). After the deadkey
+  // ops (1.8) and the assignments (2), so a key-first edit wins over an earlier character-first
+  // one on the same key; before layer propagation (2.5), mark guards (2.6), context tolerance
+  // (2.7) and caps handling (2.8), so those generate their rules for the edited keyboard (a
+  // tolerance batch anchored on a rule an edit removed is skipped there, with its own warning).
+  // Only when there are such entries: the .kmn is re-emitted, so an unedited keyboard must not
+  // pass through it (the step 1.7b precedent).
+  const layoutEntries = (kmnEdits?.entries ?? []).filter((e) => e.op !== "code-apply" && e.op !== "review-kept");
+  const codeEntries = (kmnEdits?.entries ?? []).filter((e) => e.op === "code-apply");
+  if (layoutEntries.length > 0) {
     const kmnPathForLayout = `source/${keyboardId}.kmn`;
     const kmnTextForLayout = readVfsText(vfs, kmnPathForLayout);
     if (kmnTextForLayout !== undefined) {
@@ -1194,7 +1208,7 @@ export function projectWorkingCopyVfs(
         // Parse the text about to be spliced into, so node ids and line spans agree with it.
         // On Open (spec 111 FR-008) writeKmn splices only the changed rules.
         const parsedForLayout = parseKmn(kmnTextForLayout, keyboardId).ir;
-        const replayed = replayKmnEdits(parsedForLayout, kmnEdits.entries);
+        const replayed = replayKmnEdits(parsedForLayout, kmnEdits?.entries ?? [], "layout");
         writeKmn(kmnPathForLayout, kmnTextForLayout, parsedForLayout, replayed.ir);
         warnings.push(
           ...replayed.misses.map((m) => `[project-working-copy] layout edit ${m.seq} skipped: ${m.reason}`),
@@ -1394,6 +1408,36 @@ export function projectWorkingCopyVfs(
   }
 
   tapKmn("caps");
+
+  // Step 2.9: Code-tab edits (spec 117 US8, research R15, owner ruling 2026-11-13). The generated
+  // rules (mark guards, context tolerance, caps handling) are ordinary text by the time the author
+  // edits code, so a kept `code-apply` entry replays here, over the keyboard exactly as the author
+  // was shown it, and an edit to a generated rule stays in the build. Consequence: a code edit is
+  // applied after ALL Layout-tab edits, whatever order they were recorded in; a code change whose
+  // rule a later generation changed no longer finds its anchor and is reported as a miss (the FR-063 b
+  // flag), never applied to the wrong rule; a change a LATER Layout-tab entry supersedes (same key or
+  // row, higher seq) is skipped, not a miss (engine layout-ops/supersede.ts: the most recent edit wins). Same warning text as
+  // step 2.2's misses, so the review list and the candidate compile read both alike. Before the
+  // identity steps (header stores only). Only when entries exist; on Open every write is a splice.
+  if (codeEntries.length > 0) {
+    const kmnPathForCode = `source/${keyboardId}.kmn`;
+    const kmnTextForCode = readVfsText(vfs, kmnPathForCode);
+    if (kmnTextForCode !== undefined) {
+      try {
+        const parsedForCode = parseKmn(kmnTextForCode, keyboardId).ir;
+        const replayed = replayKmnEdits(parsedForCode, kmnEdits?.entries ?? [], "code");
+        writeKmn(kmnPathForCode, kmnTextForCode, parsedForCode, replayed.ir);
+        warnings.push(
+          ...replayed.misses.map((m) => `[project-working-copy] layout edit ${m.seq} skipped: ${m.reason}`),
+        );
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        warnings.push(`[project-working-copy] code edit projection skipped: ${msg}`);
+      }
+    }
+  }
+
+  tapKmn("code-edits");
 
   // Step 3: Identity projection — write &NAME (display name) into the .kmn.
   //

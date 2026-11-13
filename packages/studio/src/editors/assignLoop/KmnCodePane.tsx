@@ -21,16 +21,18 @@
 //   decision, never a wholesale re-parsed IR. On Copy the pane shows the keyboard as it will be
 //   built, so the diff base is the parse of the text the author was shown (the projected `.kmn`),
 //   not the working IR: `diffIR(parse(shown), parse(edited))`. The gate runs in order: parse and
-//   lint, Layer A validator errors, a refusal when the diff touches a rule a build step after the
-//   `kmn-edits` replay made or rewrote (mark guards, context tolerance, caps handling: anchoring it
-//   would change which step wins; research R15), a prediction of the build with the entry included
-//   (a later step that overrides the edit refuses it), then ONE candidate compile on the author's
+//   lint, Layer A validator errors, a refusal when the diff touches `&TARGETS` (the build forces it
+//   to `any` on Copy), a prediction of the build with the entry included (a later step that
+//   overrides the edit refuses it), then ONE candidate compile on the author's
 //   click (no timer: D3). The shown text and the stage texts it was classified against are one
 //   snapshot of one projection; if the build changed under a dirty draft, Apply refuses and offers
 //   to reload the current text (the draft stays in the editor until then). Apply is not
 //   re-entrant: a second click while one runs does nothing. Any error records nothing and is shown at its line. Then an empty diff
 //   (formatting-only) records nothing, an owner confirm when the edit overrides another editor's
-//   work, and `commitKmnEdit` (which applies the changes live and pushes undo kind `c`). The
+//   work or changes a rule a generating step made (mark guards, context tolerance, caps handling:
+//   the confirm names the step; the owner ruling of 2026-11-13, research R15: those rules are
+//   ordinary text by the time the author edits, and the entry replays after those steps), and
+//   `commitKmnEdit` (which applies the changes live and pushes undo kind `c`). The
 //   recorded entry changes the projection, so the pane snaps to the new built text and the edit
 //   stays visible because it is now in the build. On Open the pane shows the file text and Apply
 //   replaces the starting point with it.
@@ -67,9 +69,9 @@ import { anchorAssignedKeys } from "../../lib/claimedInputs.ts";
 import {
   buildRevealLines,
   findBuildMismatch,
-  findLateRuleTouch,
+  findGeneratedRuleTouches,
+  type GeneratedSource,
   type KmnStageTexts,
-  type LateSource,
 } from "../../lib/builtKmnView.ts";
 import type { KmnStage } from "../../lib/projectWorkingCopyVfs.ts";
 import { ConfirmDialog } from "./parts/ConfirmDialog.tsx";
@@ -110,12 +112,17 @@ function sameStages(a: KmnStageTexts, b: KmnStageTexts): boolean {
 }
 
 /** An Apply awaiting the owner confirm: what it would record, and who it overrides. */
+/** The build steps that generate rules a kept edit may change (`&TARGETS` is refused, not confirmed). */
+type GeneratingStep = Exclude<GeneratedSource, "targets">;
+
 interface PendingApply {
   readonly irAtClick: KeyboardIR;
   /** The built text on screen when Apply was clicked: the edit was made against it. */
   readonly canonicalAtClick: string;
   readonly changes: IRChange[];
   readonly overrides: OwnerRef[];
+  /** The generating step each change that touches a generated rule came from, by change index. */
+  readonly generated: ReadonlyMap<number, GeneratingStep>;
 }
 const MARKER_OWNER = "kmn-code-lint";
 
@@ -635,26 +642,31 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
       markFormattingOnlyApplied();
       return;
     }
-    // A rule a build step after the `kmn-edits` replay made cannot be anchored by a kept edit
-    // without changing which step wins, so an Apply that touches one records nothing.
-    const late = findLateRuleTouch(diffed, shownStagesRef.current, shownText, id);
-    if (late !== null) {
+    // Generated rules (mark guards, context tolerance, caps handling) are ordinary text by the time
+    // the author edits, and a kept edit replays after those steps, so an edit to one is allowed and
+    // asks for the owner confirm. `&TARGETS` is the exception: the build forces it to `any`.
+    const touches = findGeneratedRuleTouches(diffed, shownStagesRef.current, shownText, id);
+    const targetsTouch = touches.find((tt) => tt.source === "targets");
+    if (targetsTouch !== undefined) {
       showBlocked([
         {
           code: "kmn-code-built-rule",
           severity: "error",
           message: t({
-            id: "editor.assignLoop.mechanisms.code.lateRule",
-            message: `This rule is made by ${{ source: lateSourceWords(late.source) }} when the keyboard is built, so an edit to it cannot be kept. Change it there instead.`,
+            id: "editor.assignLoop.mechanisms.code.targetsForced",
+            message:
+              "The target platforms are always set to any when the keyboard is built, so an edit to the &TARGETS store cannot be kept.",
           }),
-          startLineNumber: late.line,
+          startLineNumber: targetsTouch.line,
           startColumn: 1,
-          endLineNumber: late.line,
+          endLineNumber: targetsTouch.line,
           endColumn: 2,
         },
       ]);
       return;
     }
+    const generated = new Map<number, GeneratingStep>();
+    for (const tt of touches) if (tt.source !== "targets") generated.set(tt.change, tt.source);
     // Ruling 10: a rule on a key the Assign tab owns is anchored by key (before the compile gate
     // below, so the projection finds it) and flagged as overriding the Assign tab.
     let assignedKeys: Awaited<ReturnType<typeof loadAssignedKeys>> = [];
@@ -744,7 +756,14 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
     // 3. Who does this override?
     const startIr = useWorkingCopyStore.getState().startIr;
     const overrides = [...(startIr === null ? [] : findOwners(irAtClick, startIr, changes)), ...assignOverrides];
-    const candidate: PendingApply = { irAtClick, canonicalAtClick: canonical, changes, overrides };
+    // A change to a generated rule is flagged for review like any override: the owner is "another
+    // step" and `step` names the generating step, so the confirm and the review list say which.
+    for (const [index, step] of generated) {
+      const existing = overrides.findIndex((o) => o.change === index);
+      if (existing === -1) overrides.push({ change: index, owner: "another-step", step });
+      else if (overrides[existing]?.owner === "another-step") overrides[existing] = { change: index, owner: "another-step", step };
+    }
+    const candidate: PendingApply = { irAtClick, canonicalAtClick: canonical, changes, overrides, generated };
     if (overrides.length > 0) {
       setPending(candidate);
       return;
@@ -752,7 +771,7 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
     commitPending(candidate);
   };
 
-  const lateSourceWords = (source: LateSource): string => {
+  const stepWords = (source: GeneratingStep): string => {
     switch (source) {
       case "mark-guards":
         return t({ id: "editor.assignLoop.mechanisms.code.lateSource.markGuards", message: "the marks step" });
@@ -760,10 +779,6 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
         return t({ id: "editor.assignLoop.mechanisms.code.lateSource.contextTolerance", message: "the context-tolerance fix" });
       case "caps":
         return t({ id: "editor.assignLoop.mechanisms.code.lateSource.caps", message: "the caps handling choice" });
-      case "targets":
-        return t({ id: "editor.assignLoop.mechanisms.code.lateSource.targets", message: "the target platforms step (the &TARGETS store, always set to any)" });
-      case "build":
-        return t({ id: "editor.assignLoop.mechanisms.code.lateSource.build", message: "a later build step" });
     }
   };
 
@@ -786,7 +801,12 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
     }
   };
 
-  const ownersText = [...new Set((pending?.overrides ?? []).map((o) => ownerWords(o.owner)))].join(", ");
+  const ownersText = [
+    ...new Set([
+      ...(pending?.overrides ?? []).filter((o) => !pending?.generated.has(o.change)).map((o) => ownerWords(o.owner)),
+      ...[...(pending?.generated.values() ?? [])].map(stepWords),
+    ]),
+  ].join(", ");
 
   return (
     <div

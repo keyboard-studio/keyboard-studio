@@ -1301,12 +1301,14 @@ export {
   normaliseKmnEdits,
   replayKmnEdits,
   sameRuleIdentity,
+  supersededChangeIndexes,
 } from "./layout-ops/index.js";
 export type {
   ApplyLayoutOpResult,
   KmnEditEffect,
   ReplayMiss,
   ReplayResult,
+  ReplayScope,
 } from "./layout-ops/index.js";
 
 // Spec 117 US8: the Code tab's structural IR diff (contracts/code-edits.md).

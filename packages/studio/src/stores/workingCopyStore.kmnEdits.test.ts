@@ -4,7 +4,10 @@
 // no rebuild. Commits are refused, writing nothing, when the cell is read-only, the artifact is
 // not compiled, or the step is locked (FR-025).
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { foldWithKmnEdits } from "../decisions/rebuildWorkingCopy.ts"; // loading it registers the kmn-edits fold a Code-tab commit needs
+import { registerKmnEditsFold } from "./workingCopyStore.ts";
+import { devLog } from "@keyboard-studio/contracts/dev-log";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { parseKmn, emitKmn, diffIR } from "@keyboard-studio/engine";
 import type { KmnEditsValue } from "@keyboard-studio/contracts";
 import type { DeadkeysDefinedValue } from "../lib/deadkeyOps.ts";
@@ -328,5 +331,74 @@ describe("commitKmnEdit: a Code-tab entry naming a rule the live IR lacks (built
     expect(useWorkingCopyStore.getState().undoKmnEdit()).toBe(true);
     expect(text()).toBe(before);
     expect(logged()?.entries).toEqual([]);
+  });
+});
+
+// A Code-tab entry re-derives the live IR through the registered decision fold. With no fold, or a
+// fold that returns nothing, the commit is refused and the live IR stays as it was: a startIr-only
+// replay would quietly drop every other decision.
+describe("commitKmnEdit: the kmn-edits fold is required for a Code-tab entry", () => {
+  afterEach(() => {
+    registerKmnEditsFold(foldWithKmnEdits);
+    vi.restoreAllMocks();
+  });
+
+  const codeEdit = () => {
+    const before = parseKmn(KMN, "wc-kmn-edits").ir;
+    const after = parseKmn(KMN.replace("+ [K_B] > 'b'", "+ [K_B] > 'x'"), "wc-kmn-edits").ir;
+    return { op: "code-apply", changes: diffIR(before, after), overrides: [] } as const;
+  };
+
+  it("an unregistered fold refuses the entry, keeps the live IR and the log, and logs once", () => {
+    const spy = vi.spyOn(devLog, "error").mockImplementation(() => undefined);
+    registerKmnEditsFold(null);
+    const before = text();
+    expect(useWorkingCopyStore.getState().commitKmnEdit(codeEdit()).ok).toBe(false);
+    expect(useWorkingCopyStore.getState().commitKmnEdit(codeEdit()).ok).toBe(false);
+    expect(text()).toBe(before);
+    expect(logged()).toBeUndefined();
+    expect(useWorkingCopyStore.getState().undoStack).toEqual([]);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("a fold that returns null refuses the entry and keeps the live IR and the log", () => {
+    registerKmnEditsFold(() => null);
+    const before = text();
+    expect(useWorkingCopyStore.getState().commitKmnEdit(codeEdit()).ok).toBe(false);
+    expect(text()).toBe(before);
+    expect(logged()).toBeUndefined();
+  });
+
+  it("undo of a re-derived entry is refused, keeping the log, when the fold returns null", () => {
+    expect(useWorkingCopyStore.getState().commitKmnEdit(codeEdit()).ok).toBe(true);
+    registerKmnEditsFold(() => null);
+    const before = text();
+    expect(useWorkingCopyStore.getState().undoKmnEdit()).toBe(false);
+    expect(text()).toBe(before);
+    expect(logged()?.entries).toHaveLength(1);
+  });
+});
+
+describe("a deadkey (ld) undo entry below a re-derive", () => {
+  it("is marked stale and undoes by re-deriving from the decisions, restoring the text", () => {
+    const define = { kind: "define", triggerKey: "K_D", id: 0x3000, accentChar: "\u00b4" } as const;
+    useWorkingCopyStore.setState({ deadkeyOverlay: { ops: [] } });
+    const original = text();
+    const store = useWorkingCopyStore.getState();
+    expect(store.commitLayoutDeadkeyOp(define).ok).toBe(true);
+    const withDeadkey = text();
+    const before = parseKmn(KMN, "wc-kmn-edits").ir;
+    const after = parseKmn(KMN.replace("+ [K_B] > 'b'", "+ [K_B] > 'x'"), "wc-kmn-edits").ir;
+    expect(store.commitKmnEdit({ op: "code-apply", changes: diffIR(before, after), overrides: [] }).ok).toBe(true);
+    expect(text()).toContain("dk(3000)");
+    expect(useWorkingCopyStore.getState().undoStack.map((e) => e.k)).toEqual(["ld", "c"]);
+    expect((useWorkingCopyStore.getState().undoStack[0] as { stale?: true }).stale).toBe(true);
+
+    expect(useWorkingCopyStore.getState().undoKmnEdit()).toBe(true);
+    expect(text()).toBe(withDeadkey);
+    expect(useWorkingCopyStore.getState().undoKmnEdit()).toBe(true);
+    expect(text()).not.toContain("dk(3000)");
+    expect(text()).toBe(original);
+    expect(useWorkingCopyStore.getState().undoStack).toEqual([]);
   });
 });

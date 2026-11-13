@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { KmnEditsValue } from "@keyboard-studio/contracts";
-import { emitKmn, parseKmn, replayKmnEdits } from "@keyboard-studio/engine";
+import { diffIR, emitKmn, parseKmn, replayKmnEdits } from "@keyboard-studio/engine";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { ProjectWorkingCopyVfsInput } from "./projectWorkingCopyVfs.ts";
 
@@ -44,7 +44,7 @@ const SET_B: KmnEditsValue = {
   entries: [{ op: "set-key", vkey: "K_B", layer: [], output: { kind: "text", text: "ŋ" }, seq: 1, at: 0 }],
 };
 
-function run(openMode: ProjectWorkingCopyVfsInput["openMode"]) {
+function run(openMode: ProjectWorkingCopyVfsInput["openMode"], kmnEdits: KmnEditsValue = SET_B) {
   const vfs = createVirtualFS();
   vfs.set(`source/${ID}.kmn`, KMN, false);
   const result = projectWorkingCopyVfs({
@@ -55,7 +55,7 @@ function run(openMode: ProjectWorkingCopyVfsInput["openMode"]) {
     assignments: [],
     getPattern: () => undefined,
     identity: null,
-    kmnEdits: SET_B,
+    kmnEdits,
     ...(openMode !== undefined ? { openMode } : {}),
   });
   return { result, text: vfs.get(`source/${ID}.kmn`)!.content as string };
@@ -108,6 +108,34 @@ describe("projectWorkingCopyVfs step 2.2 on Open", () => {
     const text = vfs.get(`source/${ID}.kmn`)!.content as string;
     expect(text).toContain("dk(3001)");
     expect(text.startsWith("c leading comment\nstore(&VERSION) '10.0'\n\nstore(&NAME) 'Lay'\n")).toBe(true);
+  });
+
+  it("a Code-tab entry replays at step 2.9 as a splice too: only the changed rule's line moves", () => {
+    forced.refuse = false;
+    const changes = diffIR(
+      parseKmn(KMN, ID).ir,
+      parseKmn(KMN.replace("+ [K_C] > 'c'", "+ [K_C] > 'z'"), ID).ir,
+    );
+    const { text, result } = run(
+      { kps: { nameEdited: false } },
+      { entries: [{ op: "code-apply", seq: 1, at: 0, changes, overrides: [] }] },
+    );
+    expect(result.reformatRequired).toBeUndefined();
+    expect(text).toBe(KMN.replace("+ [K_C] > 'c'", "+ [K_C] > U+007A"));
+  });
+
+  it("a Code-tab entry on Open that the splice cannot place leaves the file unchanged and says so", () => {
+    forced.refuse = true;
+    const changes = diffIR(
+      parseKmn(KMN, ID).ir,
+      parseKmn(KMN.replace("+ [K_C] > 'c'", "+ [K_C] > 'z'"), ID).ir,
+    );
+    const { text, result } = run(
+      { kps: { nameEdited: false } },
+      { entries: [{ op: "code-apply", seq: 1, at: 0, changes, overrides: [] }] },
+    );
+    expect(text).toBe(KMN);
+    expect(result.reformatRequired).toEqual([`source/${ID}.kmn`]);
   });
 
   it("Copy mode keeps the full emit", () => {
