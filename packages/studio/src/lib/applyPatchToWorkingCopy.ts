@@ -23,7 +23,7 @@ import type { IRPath } from "@keyboard-studio/contracts";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { PatchOrigin, WorkingCopyPatch } from "../survey/types.ts";
 import type { OpenApplyResult, OpenChange } from "./openApply/types.ts";
-import { scopeToWrites } from "./openApply/scopeToWrites.ts";
+import { rebaseModelPatch } from "./openApply/rebaseModelPatch.ts";
 import { captureDecisionRollback } from "./decisionJournal.ts";
 import { applyMutatePatch } from "../steps/mutateApply.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -110,16 +110,19 @@ export function applyPatchToWorkingCopy(
       reportStrayWorkingIr(wc);
       carryHeaderEdits(wc, nextIr, patch);
       const label = "Apply a step's change";
-      // The patch replaces whole arrays (groups, stores), so it can only be applied
-      // later if what it writes in the file has not changed meanwhile; otherwise it
-      // would revert the change made in between, and it is treated as no longer applying.
-      const written = (ir: NonNullable<typeof wc.ir>): string => JSON.stringify(scopeToWrites({} as typeof ir, ir, writes));
-      const basis = written(base);
+      // The patch replaces whole arrays (groups, stores), so rebuilding it
+      // from the current parse would revert an intervening change to a node
+      // the patch does not touch. `build` re-bases the patch at node
+      // granularity instead (issue #2666): it still applies only while every
+      // node the patch changes still holds its base content, but an unrelated
+      // intervening change no longer rejects it.
       const build = (): OpenChange | null => {
         const now = useWorkingCopyStore.getState();
-        if (now.startIr === null || !isLiveOpen(now) || written(now.startIr) !== basis) return null;
+        if (now.startIr === null || !isLiveOpen(now)) return null;
         try {
-          return { kind: "model", nextIr: applyMutatePatch(now.startIr, patch.ir!, writes), writes, label };
+          const rebased = rebaseModelPatch(base, nextIr, now.startIr, writes);
+          if (rebased === null) return null;
+          return { kind: "model", nextIr: rebased, writes, label };
         } catch {
           return null;
         }

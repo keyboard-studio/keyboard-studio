@@ -43,7 +43,7 @@ vi.mock("./services.ts", () => ({
 const ID = "tiny";
 const KMN_PATH = `source/${ID}.kmn`;
 const KMN = [
-  "store(&NAME) 'Tiny'", "store(&VERSION) '10.0'", "", "begin Unicode > use(main)", "", "group(main) using keys",
+  "store(&NAME) 'Tiny'", "store(&VERSION) '10.0'", "store(testStore) 'one'", "store(otherStore) 'two'", "", "begin Unicode > use(main)", "", "group(main) using keys",
   "+ [K_A] > 'a'", "+ [K_B] > 'b'", "",
 ].join("\r\n");
 const KB = {
@@ -84,6 +84,34 @@ function removeBPatch() {
     rules: g.rules.filter((r) => !JSON.stringify(r).includes("K_B")),
   }));
   return { ir: { groups } } as never;
+}
+/** A patch changing the testStore items (a stores write, as a decision's apply returns it). */
+function testStorePatch(value: string) {
+  const stores = useWorkingCopyStore.getState().ir!.stores.map((s) =>
+    s.name === "testStore" ? { ...s, items: [{ kind: "char", value }] } : s,
+  );
+  return { ir: { stores } } as never;
+}
+/** The working copy, the preview and the download hold the same .kmn text. */
+async function expectFilePreviewDownloadAgree(): Promise<void> {
+  const text = fileText();
+  const s = useWorkingCopyStore.getState();
+  const { result } = renderHook(() => useWorkingCopyTransform({ previewedStartId: ID }));
+  const preview = createVirtualFS(s.startVfs!.entries());
+  result.current!(preview, ID);
+  const projected = await projectWorkingCopyForOutput();
+  expect(noVersion(readVfsText(preview, KMN_PATH)!)).toBe(noVersion(text));
+  expect(noVersion(projected!.vfs.get(KMN_PATH)!.content as string)).toBe(noVersion(text));
+}
+/** Record a decision the way a step's recorder does, so a sink handed an origin can roll it back. */
+function recordSampleDecision(summary: string): void {
+  // Through the gallery host's recordDecision: it journals the write first, which is what the rollback captures.
+  buildGalleryHostDeps().recordDecision({ id: "sample-ir", value: { note: summary }, provenance: "asked" });
+  useDecisionLogStore.getState().append({
+    stepId: "sample",
+    payload: { kind: "decision", decisionId: "sample-ir", value: { note: summary } as never, summary },
+    provenance: "asked",
+  });
 }
 const sinks = {
   reducer: () => createStudioReducerDeps({ instantiateFromStart: vi.fn(), clearTouchSeedChoice: vi.fn(), recordDecision: vi.fn() as never }).applyWorkingCopyPatch!,
@@ -255,7 +283,8 @@ describe("a declined or failed change is taken back out of the record", () => {
     expect(listed()).toBe(true);
   });
 
-  it("a queued change is not applied over a later one: it no longer applies, the later change stays, the record is put back", async () => {
+  it("a queued change and a later precise change to a different rule in the same group both land after the author agrees", async () => {
+    // The later change adds a rule the queued change does not touch, so the queued change is re-based onto it, not rejected.
     mountHost();
     unplaceable();
     await decide(DEFINE);
@@ -264,10 +293,11 @@ describe("a declined or failed change is taken back out of the record", () => {
     const edited = fileText().replace("+ [K_B] > 'b'", "+ [K_B] > 'b'\r\n+ [K_C] > 'c'");
     expect((await import("./openApply.ts")).applyOpenChange({ kind: "files", files: { [KMN_PATH]: edited }, label: "Edit" }).status).toBe("applied");
     await act(async () => { screen.getByTestId("reformat-consent-agree").click(); });
-    await vi.waitFor(() => expect(getDecisionSnapshot()["sample-ir"]).toBeUndefined());
-    expect(fileText()).toBe(edited); // the later change is untouched, nothing was reverted
+    await vi.waitFor(() => expect(fileText()).toContain("dk(3001)"));
     expect(fileText()).toContain("[K_C]");
-    expect((await screen.findByTestId("open-apply-notice")).textContent).toContain("could not be applied");
+    expect(getDecisionSnapshot()["sample-ir"]).toBeDefined();
+    expect(screen.queryByTestId("open-apply-notice")).toBeNull();
+    await expectFilePreviewDownloadAgree();
   });
 
   it("a queued change and a later change to something it does not write are both in the file after the author agrees", async () => {
@@ -283,8 +313,8 @@ describe("a declined or failed change is taken back out of the record", () => {
     expect(getDecisionSnapshot()["sample-ir"]).toBeDefined();
   });
 
-  it("a different rule in the same .kmn changed while a change waits: the waiting change is rejected, with the notice, and the later one stays", async () => {
-    // The change writes whole `groups`, so any change to a rule in the file means it no longer applies.
+  it("a different rule in the same .kmn changed while a change waits: both land after the author agrees", async () => {
+    // The queued change touches only the deadkey nodes it adds; the K_A edit is a different node, so the change is re-based onto it.
     mountHost();
     unplaceable();
     await decide(DEFINE);
@@ -292,9 +322,71 @@ describe("a declined or failed change is taken back out of the record", () => {
     const edited = fileText().replace("+ [K_A] > 'a'", "+ [K_A] > 'A'");
     expect((await import("./openApply.ts")).applyOpenChange({ kind: "files", files: { [KMN_PATH]: edited }, label: "Edit" }).status).toBe("applied");
     await act(async () => { screen.getByTestId("reformat-consent-agree").click(); });
+    await vi.waitFor(() => expect(fileText()).toContain("dk(3001)"));
+    expect(fileText()).toContain("+ [K_A] > 'A'");
+    expect(getDecisionSnapshot()["sample-ir"]).toBeDefined();
+    expect(screen.queryByTestId("open-apply-notice")).toBeNull();
+    await expectFilePreviewDownloadAgree();
+  });
+
+  it("a queued change whose own rule was changed meanwhile is still rejected, with the notice, and the later one stays", async () => {
+    mountHost();
+    unplaceable();
+    recordSampleDecision("removes a rule");
+    await act(async () => {
+      sinks.gallery()(removeBPatch(), [irPath("groups")], { decisionIds: ["sample-ir"] });
+    });
+    await screen.findByTestId("reformat-consent-dialog");
+    // meanwhile the very rule the queued change removes is edited
+    const edited = fileText().replace("+ [K_B] > 'b'", "+ [K_B] > 'B'");
+    expect((await import("./openApply.ts")).applyOpenChange({ kind: "files", files: { [KMN_PATH]: edited }, label: "Edit" }).status).toBe("applied");
+    await act(async () => { screen.getByTestId("reformat-consent-agree").click(); });
     await vi.waitFor(() => expect(getDecisionSnapshot()["sample-ir"]).toBeUndefined());
+    expect(listed()).toBe(false);
     expect(fileText()).toBe(edited);
     expect((await screen.findByTestId("open-apply-notice")).textContent).toContain("could not be applied");
+  });
+
+  it("a queued change whose own store was changed meanwhile is still rejected, with the notice, and the later one stays", async () => {
+    mountHost();
+    // The store change cannot be placed precisely while its source line is gone, so it waits for consent.
+    for (const s of useWorkingCopyStore.getState().startIr!.stores) {
+      if (s.name === "testStore") delete (s as { sourceLine?: number }).sourceLine;
+    }
+    recordSampleDecision("edits a store");
+    await act(async () => {
+      sinks.gallery()(testStorePatch("two"), [irPath("stores")], { decisionIds: ["sample-ir"] });
+    });
+    await screen.findByTestId("reformat-consent-dialog");
+    // meanwhile the very store the queued change writes is edited
+    const edited = fileText().replace("store(testStore) 'one'", "store(testStore) 'three'");
+    expect((await import("./openApply.ts")).applyOpenChange({ kind: "files", files: { [KMN_PATH]: edited }, label: "Edit" }).status).toBe("applied");
+    await act(async () => { screen.getByTestId("reformat-consent-agree").click(); });
+    await vi.waitFor(() => expect(getDecisionSnapshot()["sample-ir"]).toBeUndefined());
+    expect(listed()).toBe(false);
+    expect(fileText()).toBe(edited);
+    expect((await screen.findByTestId("open-apply-notice")).textContent).toContain("could not be applied");
+  });
+
+  it("a queued store change and a later change to a different store both land after the author agrees", async () => {
+    mountHost();
+    for (const s of useWorkingCopyStore.getState().startIr!.stores) {
+      if (s.name === "testStore") delete (s as { sourceLine?: number }).sourceLine;
+    }
+    recordSampleDecision("edits a store");
+    await act(async () => {
+      sinks.gallery()(testStorePatch("two"), [irPath("stores")], { decisionIds: ["sample-ir"] });
+    });
+    await screen.findByTestId("reformat-consent-dialog");
+    // meanwhile a different store is edited
+    const edited = fileText().replace("store(otherStore) 'two'", "store(otherStore) 'four'");
+    expect((await import("./openApply.ts")).applyOpenChange({ kind: "files", files: { [KMN_PATH]: edited }, label: "Edit" }).status).toBe("applied");
+    await act(async () => { screen.getByTestId("reformat-consent-agree").click(); });
+    await vi.waitFor(() => expect(fileText()).toContain("store(testStore) 'two'"));
+    expect(fileText()).toContain("store(otherStore) 'four'");
+    expect(getDecisionSnapshot()["sample-ir"]).toBeDefined();
+    expect(screen.queryByTestId("open-apply-notice")).toBeNull();
+    await expectFilePreviewDownloadAgree();
   });
 
   it("the author answers the same decision again while the change waits: declining the old one keeps the newer answer and its trail entry", async () => {
