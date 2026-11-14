@@ -23,6 +23,7 @@ import {
   type DocMechanismId,
   type IRRule,
   type KeyboardIR,
+  type MarkInputOrder,
   type TouchKeyIR,
   type TouchLayoutIR,
 } from "@keyboard-studio/contracts";
@@ -37,6 +38,11 @@ export interface DocContentInput {
   touchLayout: TouchLayoutIR | null;
   /** Track 2 welcome/help prose; `null` on Track 1. */
   inheritedProse: string | null;
+  /**
+   * The recorded `mark-input-order` answer. Undefined when no answer was
+   * recorded — the mechanisms below fall back to the produced-set sniff.
+   */
+  markInputOrder?: MarkInputOrder;
 }
 
 export interface DocContent {
@@ -236,16 +242,38 @@ function hasRepeatToCycle(rules: readonly IRRule[]): boolean {
   });
 }
 
-function detectMechanisms(ir: KeyboardIR, produced: readonly string[]): Set<DocMechanismId> {
+/**
+ * Which mechanism paragraphs the keyboard needs. `combiningOrder` follows
+ * the RECORDED mark-input-order answer, never the produced set on its own:
+ * `postfix` means marks are typed after their letter, so the paragraph is
+ * shown; `prefix` means the mark comes first, so it is hidden. The
+ * produced-set sniff below is only the fallback for keyboards with no
+ * recorded answer — it cannot tell the two apart, because
+ * buildProducedSet NFC-folds every base+mark run into its precomposed
+ * codepoint (frozen contract): a letter+mark keyboard never emits a lone
+ * combining mark, so the sniff hides the paragraph exactly when
+ * letter-then-mark is the required order, and shows it for lone-mark
+ * outputs that need no letter first.
+ */
+function detectMechanisms(
+  ir: KeyboardIR,
+  produced: readonly string[],
+  markInputOrder: MarkInputOrder | undefined,
+): Set<DocMechanismId> {
   const rules = allRules(ir);
   const found = new Set<DocMechanismId>();
   if (rules.some((r) => ruleContextElements(r).some((el) => el.kind === "deadkey"))) found.add("deadkeys");
   if (rules.some((r) => ruleModifier(r) === "ralt")) found.add("rightAlt");
   if (hasRepeatToCycle(rules)) found.add("repeatToCycle");
-  if (produced.some((ch) => {
-    const cat = getCategory(ch.codePointAt(0)!);
-    return cat === "Mn" || cat === "Mc";
-  })) found.add("combiningOrder");
+  if (markInputOrder === "postfix") found.add("combiningOrder");
+  else if (
+    markInputOrder === undefined &&
+    produced.some((ch) => {
+      const cat = getCategory(ch.codePointAt(0)!);
+      return cat === "Mn" || cat === "Mc";
+    })
+  )
+    found.add("combiningOrder");
   return found;
 }
 
@@ -419,7 +447,7 @@ export function buildDocContent(input: DocContentInput): DocContent {
   return {
     slots: {
       typingGuide,
-      mechanisms: renderMechanisms(detectMechanisms(ir, produced)),
+      mechanisms: renderMechanisms(detectMechanisms(ir, produced, input.markInputOrder)),
       layoutPictures: "",
       touchNotes: renderTouchNotes(touchLayout),
       characterInventory: renderInventory(produced),
