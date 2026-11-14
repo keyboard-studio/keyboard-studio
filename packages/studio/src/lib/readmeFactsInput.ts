@@ -3,7 +3,7 @@
 // place so the output projection and the live docs preview pass identical
 // input (FR-012).
 
-import type { FallbackPolicy, HelpDocsAnswers, KeyboardIR, TouchLayoutIR, VirtualFS } from "@keyboard-studio/contracts";
+import type { FallbackPolicy, HelpDocsAnswers, KeyboardIR, MarkInputOrder, OutputForm, TouchLayoutIR, VirtualFS } from "@keyboard-studio/contracts";
 import { extractReadmeDescription, parseKpsPackageDetails } from "@keyboard-studio/engine";
 import type { DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
 import { getLayoutFamilyAnswer } from "./layoutFamily.ts";
@@ -19,6 +19,8 @@ export interface ReadmeFactsSources {
   /** The keyboard's primary tag and the author-confirmed English language name. */
   primaryBcp47?: string;
   languageName?: string;
+  /** The recorded S4 whole-keyboard output-form answer (`session.marksOutputForm`). */
+  outputForm?: OutputForm;
   carveChars: ReadonlySet<string>;
   fallbackPolicy: FallbackPolicy;
   helpDocs: HelpDocsAnswers | null;
@@ -30,6 +32,17 @@ export interface ReadmeFactsSources {
 function decisionString(decisions: DecisionSet, id: DecisionId): string | undefined {
   const value = decisions[id]?.value;
   return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
+}
+
+/**
+ * The recorded `mark-input-order` decision, narrowed to the two valid
+ * answers. Undefined when the question was never answered (or the stored
+ * value is not a valid answer) — callers fall back to the produced-set
+ * sniff instead of inventing an order.
+ */
+export function markInputOrderFromDecisions(decisions: DecisionSet): MarkInputOrder | undefined {
+  const value = decisionString(decisions, "mark-input-order");
+  return value === "prefix" || value === "postfix" ? value : undefined;
 }
 
 /** Track 2: the starting point's own description — its `.kps` first, then its README. */
@@ -70,6 +83,7 @@ export function readmeFactsInputFrom(sources: ReadmeFactsSources): ReadmeFactsIn
     ...(layoutFamily !== undefined ? { layoutFamily } : {}),
     ...(useCase !== undefined ? { useCase } : {}),
     ...(markInputOrder !== undefined ? { markInputOrder } : {}),
+    ...(sources.outputForm !== undefined ? { outputForm: sources.outputForm } : {}),
     fallbackPolicy: sources.fallbackPolicy,
     ...(touchSeedSource !== undefined ? { touchSeedSource } : {}),
     carveChars: sources.carveChars,

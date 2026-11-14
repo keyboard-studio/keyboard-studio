@@ -119,6 +119,54 @@ describe("composition and fonts", () => {
     expect(buildReadmeFacts(input(COMBINING_FIXTURE)).composition).toBe("decomposed");
   });
 
+  // The recorded output-form answer wins over the produced-set inference:
+  // an NFD keyboard's base+mark outputs NFC-fold in buildProducedSet, so
+  // the inference alone always says "precomposed" for it (Bafut, 2026-11-11).
+  it("is decomposed for base+mark output even though the produced set NFC-folds", () => {
+    const nfd = parseKmn(
+      [
+        "store(&NAME) 'nfd'",
+        "begin Unicode > use(main)",
+        "group(main) using keys",
+        "+ [K_A] > 'a' U+0300",
+        "+ [K_E] > 'e' U+0301",
+        "+ [K_O] > 'o' U+0302",
+        "",
+      ].join("\n"),
+      "nfd",
+    ).ir;
+    expect(buildReadmeFacts(input(null, { ir: nfd, outputForm: "base-plus-mark" })).composition).toBe("decomposed");
+  });
+
+  it("is precomposed when the recorded output form is ready-made", () => {
+    const nfd = parseKmn(
+      [
+        "store(&NAME) 'nfd'",
+        "begin Unicode > use(main)",
+        "group(main) using keys",
+        "+ [K_A] > 'a' U+0300",
+        "+ [K_E] > 'e' U+0301",
+        "",
+      ].join("\n"),
+      "nfd",
+    ).ir;
+    expect(buildReadmeFacts(input(null, { ir: nfd, outputForm: "ready-made" })).composition).toBe("precomposed");
+  });
+
+  it("falls back to the produced-set inference when no output form was recorded", () => {
+    const nfd = parseKmn(
+      [
+        "store(&NAME) 'nfd'",
+        "begin Unicode > use(main)",
+        "group(main) using keys",
+        "+ [K_A] > 'a' U+0300",
+        "",
+      ].join("\n"),
+      "nfd",
+    ).ir;
+    expect(buildReadmeFacts(input(null, { ir: nfd })).composition).toBe("precomposed");
+  });
+
   it("asks for the font note only beyond Latin-1", () => {
     expect(buildReadmeFacts(input(RIGHT_ALT_FIXTURE)).needsFontNote).toBe(true);
     const latin1 = parseKmn("store(&NAME) 'l1'\nbegin Unicode > use(main)\ngroup(main) using keys\n+ [RALT K_E] > U+00E9\n", "l1").ir;

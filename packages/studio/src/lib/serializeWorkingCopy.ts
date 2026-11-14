@@ -31,7 +31,7 @@ import { physicalAssignmentsOf } from "./physicalAssignments.ts";
 import { resolveOutputKeyboardId } from "./outputKeyboardId.ts";
 import { buildDocContent, parseTouchLayoutOrNull } from "./docContent.ts";
 import { buildReadmeFacts } from "./readmeFacts.ts";
-import { readmeFactsInputFrom } from "./readmeFactsInput.ts";
+import { markInputOrderFromDecisions, readmeFactsInputFrom } from "./readmeFactsInput.ts";
 import { getDecisionSnapshot } from "../stores/decisionStore.ts";
 import {
   resolvePublishVersion,
@@ -684,10 +684,16 @@ export async function projectWorkingCopyForOutput(
   //     buildDocContent call useDocsPreview makes). The inherited prose
   //     is the start keyboard's welcome/help text, which exists on Track 2
   //     only; it decides whether the typing guide is already covered.
+  //     The recorded mark-input-order answer, so the "How This Keyboard
+  //     Works" section states the order the author chose instead of
+  //     sniffing the produced set (which NFC-folds and cannot see
+  //     letter-then-mark).
+  const markInputOrder = markInputOrderFromDecisions(getDecisionSnapshot());
   const docContent = buildDocContent({
     ir: shipped.ir,
     touchLayout: parseTouchLayoutOrNull(shipped.touchLayoutJson),
     inheritedProse: inheritedWelcomeHtmText ?? inheritedHelpPhpText,
+    ...(markInputOrder !== undefined ? { markInputOrder } : {}),
   });
   // Issue 1908: the author's ACCEPTED documentation-fix proposals become
   // render fixes here exactly as in useDocsPreview — adapt track only; the
@@ -721,6 +727,7 @@ export async function projectWorkingCopyForOutput(
         ...(identityForProjection.bcp47 !== undefined ? { primaryBcp47: identityForProjection.bcp47 } : {}),
         ...(identity?.languageName !== undefined ? { languageName: identity.languageName } : {}),
         carveChars: state.carveChars,
+        ...(state.session.marksOutputForm !== undefined ? { outputForm: state.session.marksOutputForm } : {}),
         fallbackPolicy: state.fallbackPolicy,
         helpDocs,
         startVfs,
