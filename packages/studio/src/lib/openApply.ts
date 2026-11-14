@@ -95,7 +95,12 @@ function applyModel(change: Extract<OpenChange, { kind: "model" }>, opts: OpenAp
   const spliced = spliceKmnIntended(current, startIr, intended, keyboardId, consented);
   if (!spliced.ok) return { status: "needs-consent", files: [kmnPath] };
   const next = spliced.text;
-  return applyFiles({ kind: "files", files: { [kmnPath]: next }, label: change.label });
+  return applyFiles({
+    kind: "files",
+    files: { [kmnPath]: next },
+    label: change.label,
+    ...(change.labelKey !== undefined ? { labelKey: change.labelKey } : {}),
+  });
 }
 
 /** Insert `rules` back into `text` at their recorded places; undefined when one cannot be placed. */

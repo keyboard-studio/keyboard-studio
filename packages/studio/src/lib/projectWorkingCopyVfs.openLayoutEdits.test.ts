@@ -11,12 +11,12 @@ import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { ProjectWorkingCopyVfsInput } from "./projectWorkingCopyVfs.ts";
 import { PROJECTION_STEPS, type ProjectionStep } from "./projectionSteps.ts";
 
-// `openMode.steps` is required on Open. Layout-tab edits run in the Open output row (an interim
-// replay, see projectionSteps.ts). `codeEdits` and `deadkeys` are in no Open row (the Code tab and the
-// deadkey editor write the files directly), so the tests that check their splice list the step
-// explicitly: the step still splices when a caller asks for it.
-const OUTPUT = PROJECTION_STEPS.output;
+// `openMode.steps` is required on Open. `layoutEdits`, `codeEdits` and `deadkeys` are in no Open row
+// (the Layout tab, the Code tab and the deadkey editor write the files directly through the apply
+// seam), so the tests that check their splice list the step explicitly: the step still splices when
+// a caller asks for it.
 const only = (...steps: ProjectionStep[]): ReadonlySet<ProjectionStep> => new Set(steps);
+const OUTPUT = only("layoutEdits");
 
 // Lets a test force the splice to refuse; otherwise the real implementation runs.
 const forced = vi.hoisted(() => ({ refuse: false }));
@@ -146,19 +146,19 @@ describe("projectWorkingCopyVfs step 2.2 on Open", () => {
     expect(result.reformatRequired).toEqual([`source/${ID}.kmn`]);
   });
 
-  it("the Open output row replays Layout-tab entries but never a Code-tab entry (the Code tab writes the file on Open)", () => {
+  it("the Open output row replays no kmn-edits entry: Layout-tab and Code-tab edits are written to the file when applied", () => {
     forced.refuse = false;
     const changes = diffIR(
       parseKmn(KMN, ID).ir,
       parseKmn(KMN.replace("+ [K_C] > 'c'", "+ [K_C] > 'z'"), ID).ir,
     );
     const { text } = run(
-      { steps: OUTPUT, kps: { nameEdited: false } },
-      { entries: [{ op: "code-apply", seq: 1, at: 0, changes, overrides: [] }] },
+      { steps: PROJECTION_STEPS.output, kps: { nameEdited: false } },
+      { entries: [...SET_B.entries, { op: "code-apply", seq: 2, at: 0, changes, overrides: [] }] },
     );
     expect(text).toBe(KMN);
-    expect(OUTPUT.has("layoutEdits")).toBe(true);
-    expect(OUTPUT.has("codeEdits")).toBe(false);
+    expect(PROJECTION_STEPS.output.has("layoutEdits")).toBe(false);
+    expect(PROJECTION_STEPS.output.has("codeEdits")).toBe(false);
   });
 
   it("Copy mode keeps the full emit", () => {

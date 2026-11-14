@@ -15,10 +15,9 @@
 // written when applied (lib/contextToleranceCommit). `codeEdits` (the Code-tab
 // `code-apply` entries) is in NO Open row either: on Open the Code tab writes the
 // file directly through the apply seam and records no `code-apply` entry.
-// `layoutEdits` is in the Open `output` row only as a TEMPORARY replay of one
-// decision (the Layout-tab `kmn-edits` entries, spliced through `writeKmn`) so a
-// Layout-tab edit made on Open is not lost; the task that routes Layout-tab edits
-// through the apply seam on Open (T082a) removes it.
+// `layoutEdits` (the Layout-tab `kmn-edits` entries) is in NO Open row either: on
+// Open a Layout-tab edit is written into the file through the apply seam when the
+// author confirms it (lib/layoutOpenCommit), and its entry is only the record.
 //
 // A step listed for a kind may still have nothing to do (an empty overlay); a
 // step left out never runs for that kind.
@@ -95,8 +94,6 @@ export const PROJECTION_STEPS: Readonly<Record<ProjectionKind, ReadonlySet<Proje
     "touchDeletions",
     "keyEdits",
     "assignments",
-    // TEMPORARY (T082a removes it): Layout-tab edits replayed on Open until they go through the apply seam.
-    "layoutEdits",
     "layerPropagation",
     "caps",
     "identity",

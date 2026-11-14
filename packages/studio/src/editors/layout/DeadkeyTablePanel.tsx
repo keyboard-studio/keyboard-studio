@@ -13,6 +13,7 @@ import { useLingui } from "@lingui/react/macro";
 import { listDeadkeys } from "@keyboard-studio/contracts";
 import type { LayerCombo } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { selectLayoutIr } from "./layoutIr.ts";
 import type { CommitKmnEditResult, KmnEditRefusal } from "../../stores/workingCopyStore.ts";
 import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../lib/galleryTheme.ts";
 import { codepointLabel } from "../../survey/codepointLabel.ts";
@@ -39,7 +40,7 @@ export function DeadkeyTablePanel({ deadkeyId, layers, onViewInCode, onShowAfter
   const { t } = useLingui();
   const copy = useLayoutCopy();
   const ids = { base: useId(), result: useId(), key: useId(), layer: useId(), keyResult: useId() };
-  const ir = useWorkingCopyStore((s) => s.ir);
+  const ir = useWorkingCopyStore(selectLayoutIr);
 
   const [newBase, setNewBase] = useState("");
   const [newResult, setNewResult] = useState("");
@@ -137,6 +138,8 @@ export function DeadkeyTablePanel({ deadkeyId, layers, onViewInCode, onShowAfter
         return t({ id: "editor.layout.deadkey.table.refusedReadOnly", message: "This row is read-only, so the change was not made. You can change it in the Code tab." });
       case "no-working-copy":
         return t({ id: "editor.layout.deadkey.table.refusedNoKeyboard", message: "There is no keyboard to change yet." });
+      case "no-host":
+        return t({ id: "editor.layout.deadkey.table.refusedNoHost", message: "The change needs your agreement, but nothing could ask you, so it was not made. Your files are unchanged." });
       case "refused":
         return t({ id: "editor.layout.deadkey.table.refusedOther", message: "The keyboard code cannot take this change here. You can change it in the Code tab." });
     }

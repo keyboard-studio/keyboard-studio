@@ -84,6 +84,8 @@ export function BecomesEditor({ vkey, layer, context, current, deadkeys, onDone,
         return t({ id: "editor.layout.becomes.refusedReadOnly", message: "This row is read-only, so the change was not made. You can change it in the Code tab." });
       case "no-working-copy":
         return t({ id: "editor.layout.becomes.refusedNoKeyboard", message: "There is no keyboard to change yet." });
+      case "no-host":
+        return t({ id: "editor.layout.becomes.refusedNoHost", message: "The change needs your agreement, but nothing could ask you, so it was not made. Your files are unchanged." });
       case "refused":
         return t({ id: "editor.layout.becomes.refusedOther", message: "The keyboard code cannot take this change here. You can change it in the Code tab." });
     }

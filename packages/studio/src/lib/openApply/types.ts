@@ -59,6 +59,8 @@ export type OpenChange =
       /** The change's declared write paths: only these parts of `nextIr` are diffed against the file. */
       writes: readonly IRPath[];
       label: string;
+      /** Marks a step the undo UI words itself. */
+      labelKey?: OpenUndoLabelKey;
     }
   | {
       /**

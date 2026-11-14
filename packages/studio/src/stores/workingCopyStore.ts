@@ -62,7 +62,6 @@ import {
   deriveRemapPosture,
   renameTouchKey,
   deriveFacets,
-  attributeLayer,
   applyLayoutOp,
   clearKeyLive,
   invertEffect,
@@ -94,6 +93,8 @@ import type { BaseLayoutId as LdmlBaseLayoutChoice } from "../lib/referenceBaseL
 import type { DeadkeyOperation, DeadkeyOverlay } from "../lib/deadkeyOps.ts";
 import { applyDeadkeyOp } from "../lib/deadkeyOps.ts";
 import { inverseDeadkeyOp } from "../lib/deadkeyInverse.ts";
+import type { CommitKmnEditResult, KmnEditInput, KmnEditRefusal } from "../lib/kmnEditTypes.ts";
+import { commitKmnEditOnOpen, commitLayoutDeadkeyOpOnOpen, slotIsReadOnly } from "../lib/layoutOpenCommit.ts";
 import type {
   ContextVariantsResult,
   ToleranceClassification,
@@ -278,18 +279,7 @@ export type UndoEntry =
   // is `applyIRChanges(ir, inverse)` and never a rebuild.
   | { k: "c"; seq: number; inverse: IRChange[] };
 
-/** A Layout-tab edit as the caller states it; the store assigns `seq` and `at` at commit. */
-export type KmnEditInput = DistributiveOmit<KmnEdit, "seq" | "at">;
-
-/** Why `commitKmnEdit` wrote nothing (FR-025). */
-export type KmnEditRefusal =
-  | "no-working-copy"
-  | "locked"
-  | "not-compiled"
-  | "read-only"
-  | "refused";
-
-export type CommitKmnEditResult = { ok: true; seqs: number[] } | { ok: false; reason: KmnEditRefusal };
+export type { KmnEditInput, KmnEditRefusal, CommitKmnEditResult };
 
 // ---------------------------------------------------------------------------
 // Key edit overlay (spec 063) — the ordered op log for the touch key grid,
@@ -1301,7 +1291,10 @@ export interface WorkingCopyState {
    * together (a changed combination is a remove plus an insert) are one confirm and one undo step,
    * and none is applied when any is refused.
    */
-  commitLayoutDeadkeyOp: (op: DeadkeyOperation | readonly DeadkeyOperation[]) => CommitKmnEditResult;
+  commitLayoutDeadkeyOp: (
+    op: DeadkeyOperation | readonly DeadkeyOperation[],
+    options?: { onAppliedLater?: () => void },
+  ) => CommitKmnEditResult;
   /**
    * Commit a Layout-tab edit (spec 117, research R12): applies `op` (and the accepted case
    * `partner`, same confirm) to the live IR through `applyMutatePatch` / `LAYOUT_WRITES`, then
@@ -1324,6 +1317,11 @@ export interface WorkingCopyState {
        * recorded entry is unchanged and the projection places it.
        */
       skipLiveMisses?: boolean;
+      /**
+       * Open only: runs once a change that came back `pending` (the author was asked to agree to a
+       * reformat) has been written. Never runs on a decline or a failure, nor for a change applied now.
+       */
+      onAppliedLater?: () => void;
     },
   ) => CommitKmnEditResult;
   /**
@@ -2198,14 +2196,6 @@ function markUndoStale(stack: readonly UndoEntry[]): UndoEntry[] {
 
 const NO_EFFECT: KmnEditEffect = { groupNodeId: "", inserted: [], removed: [] };
 
-/** True when the static attribution says the target slot cannot be edited (FR-025). */
-function slotIsReadOnly(ir: KeyboardIR, entry: KmnEdit): boolean {
-  if (entry.op !== "set-key" && entry.op !== "clear-key") return false;
-  const cell = attributeLayer(ir, entry.layer, [entry.vkey])[0];
-  if (cell === undefined || cell.frame) return true;
-  return cell.plain !== null && !cell.plain.editable;
-}
-
 /**
  * A Code-tab entry (spec 117 US8). `code-apply` applies its changes to the live IR through
  * `applyMutatePatch(..., CODE_WRITES)` and pushes undo kind `c`; a change whose anchor is gone
@@ -2251,7 +2241,9 @@ function commitKmnEditImpl(
   get: StoreGet,
   set: StoreSet,
   op: KmnEditInput,
-  options: { partner?: KmnEditInput; extra?: readonly KmnEditInput[]; skipLiveMisses?: boolean } | undefined,
+  options:
+    | { partner?: KmnEditInput; extra?: readonly KmnEditInput[]; skipLiveMisses?: boolean; onAppliedLater?: () => void }
+    | undefined,
 ): CommitKmnEditResult {
   const s = get();
   if (s.ir === null || s.startIr === null) return { ok: false, reason: "no-working-copy" };
@@ -2263,10 +2255,27 @@ function commitKmnEditImpl(
     return { ok: false, reason: "not-compiled" };
   }
 
+  const inputs = [op, ...(options?.partner === undefined ? [] : [options.partner]), ...(options?.extra ?? [])];
+  // On a keyboard opened for update the edit goes into the file through the apply seam (spec 111
+  // FR-041); the entry is only the record, made once it is in the file.
+  if (isLiveOpen(s)) {
+    return commitKmnEditOnOpen({
+      startIr: () => get().startIr,
+      inputs,
+      ...(options?.onAppliedLater !== undefined ? { onAppliedLater: options.onAppliedLater } : {}),
+      record: (applied) => {
+        const log = recordedKmnEdits();
+        let next = log.reduce((max, e) => Math.max(max, e.seq), 0);
+        const at = Date.now();
+        const added = applied.map((input) => ({ ...input, seq: ++next, at }) as KmnEdit);
+        recordKmnEdits([...log, ...added]);
+        return added.map((e) => e.seq);
+      },
+    });
+  }
   const earlier = recordedKmnEdits();
   let seq = earlier.reduce((max, e) => Math.max(max, e.seq), 0);
   const at = Date.now();
-  const inputs = [op, ...(options?.partner === undefined ? [] : [options.partner]), ...(options?.extra ?? [])];
   const added: KmnEdit[] = [];
   const effects: KmnEditEffect[] = [];
   let ir = s.ir;
@@ -2329,6 +2338,7 @@ function commitLayoutDeadkeyOpImpl(
   get: StoreGet,
   set: StoreSet,
   given: DeadkeyOperation | readonly DeadkeyOperation[],
+  options?: { onAppliedLater?: () => void },
 ): CommitKmnEditResult {
   const list: readonly DeadkeyOperation[] = Array.isArray(given) ? given : [given as DeadkeyOperation];
   const s = get();
@@ -2336,14 +2346,31 @@ function commitLayoutDeadkeyOpImpl(
   if (s.desktopLocked) return { ok: false, reason: "locked" };
   // A deadkey with an empty combination table does not compile (an empty any() store), so pair ops
   // that fill such a table are the way out of a not-compiled state and must not be refused by it.
+  // On Open the ops run on the file's parse, so that is the IR to look at.
+  const gateIr = isLiveOpen(s) && s.startIr !== null ? s.startIr : s.ir;
   const fillsEmptyTable = list.every((op) => {
     if (op.kind !== "add-pair" && op.kind !== "insert-pair") return false;
-    const info = listDeadkeys(s.ir!).find((d) => d.id === op.id);
-    const bases = info?.baseStore == null ? undefined : s.ir!.stores.find((st) => st.name === info.baseStore);
+    const info = listDeadkeys(gateIr).find((d) => d.id === op.id);
+    const bases = info?.baseStore == null ? undefined : gateIr.stores.find((st) => st.name === info.baseStore);
     return bases !== undefined && bases.items.length === 0;
   });
   if (!fillsEmptyTable && useRulesDemoArtifactStore.getState().artifact.status !== "ready") {
     return { ok: false, reason: "not-compiled" };
+  }
+  // On a keyboard opened for update the ops go into the file through the apply seam (spec 111
+  // FR-041); the op log and the `deadkeys-defined` decision are only the record, made once they
+  // are in the file. No undo entry here: the footer's Open undo takes the step back.
+  if (isLiveOpen(s)) {
+    return commitLayoutDeadkeyOpOnOpen({
+      startIr: () => get().startIr,
+      ops: list,
+      ...(options?.onAppliedLater !== undefined ? { onAppliedLater: options.onAppliedLater } : {}),
+      record: (applied) => {
+        const ops = [...get().deadkeyOverlay.ops, ...applied];
+        set({ deadkeyOverlay: { ops } });
+        recordDeadkeysDefined(ops);
+      },
+    });
   }
   let ir: KeyboardIR = s.ir;
   const inverses: DeadkeyOperation[] = [];
@@ -2608,7 +2635,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   },
 
   commitKmnEdit: (op, options) => commitKmnEditImpl(get, set, op, options),
-  commitLayoutDeadkeyOp: (op) => commitLayoutDeadkeyOpImpl(get, set, op),
+  commitLayoutDeadkeyOp: (op, options) => commitLayoutDeadkeyOpImpl(get, set, op, options),
 
   undoKmnEdit: () => undoKmnEditImpl(get, set),
 

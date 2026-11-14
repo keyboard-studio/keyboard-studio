@@ -25,6 +25,7 @@ import { codepointLabel } from "../../survey/codepointLabel.ts";
 import { deadkeyRefOf, hexId } from "./deadkeyTable.ts";
 import { BecomesEditor } from "./BecomesEditor.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { selectLayoutIr } from "./layoutIr.ts";
 import { contextToSeed, deadkeyOrdinals, useLayoutAttribution } from "./useLayoutAttribution.ts";
 import type { UseLayoutAttributionOptions } from "./useLayoutAttribution.ts";
 import { useLayoutCopy } from "./useLayoutCopy.ts";
@@ -72,7 +73,7 @@ export function AfterContextView({ deadkeyId, layer, layers, displayChar, onFoll
     (): LayoutContext | null => (deadkeyId !== undefined ? [{ kind: "deadkey", deadkeyId }] : chosen),
     [deadkeyId, chosen],
   );
-  const storeIr = useWorkingCopyStore((st) => st.ir);
+  const storeIr = useWorkingCopyStore(selectLayoutIr);
   const ir = options?.ir !== undefined ? options.ir : storeIr;
   const ordinals = useMemo(() => (ir === null ? new Map<number, number>() : deadkeyOrdinals(ir)), [ir]);
   const seedable = context !== null && contextToSeed(context, ordinals) !== null;

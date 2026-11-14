@@ -44,7 +44,7 @@ export type OpenUndoView =
   | { kind: "files" };
 
 /** Which known step a record is, so the UI can word it in the author's language. */
-export type OpenUndoLabelKey = "code-view" | "context-tolerance" | "earlier-changes" | "take-back";
+export type OpenUndoLabelKey = "code-view" | "context-tolerance" | "earlier-changes" | "take-back" | "layout-edit";
 
 export interface OpenUndoRecord {
   id: string;

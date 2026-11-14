@@ -17,6 +17,8 @@ import { attributeLayer, listContexts } from "@keyboard-studio/engine";
 import { listDeadkeys } from "@keyboard-studio/contracts";
 import type { LayerCombo } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { selectLayoutIr } from "./layoutIr.ts";
+import { isLiveOpen } from "../../lib/openMode.ts";
 import { usePickedWindowsLayouts } from "../../lib/layoutFamily.ts";
 import { plainDiagnosticMessage } from "../../lib/plainDiagnosticMessage.ts";
 import { groupDemoDiagnostics } from "../../components/rules/demoDiagnostics.ts";
@@ -51,12 +53,15 @@ const NO_CONFIRMED_CLASSES: ReadonlySet<FallbackClass> = new Set();
 export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
   const { t, i18n } = useLingui();
   const copy = useLayoutCopy();
-  const ir = useWorkingCopyStore((s) => s.ir);
+  const ir = useWorkingCopyStore(selectLayoutIr);
   const startIr = useWorkingCopyStore((s) => s.startIr);
   const desktopLocked = useWorkingCopyStore((s) => s.desktopLocked);
   const bases = usePickedWindowsLayouts();
   // The top undo entry is a Layout edit: undo is offered here (the shared stack also holds the
   // carve and touch entries, which their own tabs undo).
+  // On a keyboard opened for update the edit is in the file and the footer's Open undo takes it
+  // back (one record per confirm), so this pane's own undo is not offered there.
+  const live = useWorkingCopyStore((st) => isLiveOpen(st));
   const canUndoEdit = useWorkingCopyStore((st) => {
     const top = st.undoStack[st.undoStack.length - 1];
     return top !== undefined && (top.k === "l" || top.k === "lb" || top.k === "ld");
@@ -435,16 +440,18 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
             </select>
           </label>
         )}
-        <button
-          type="button"
-          onClick={() => useWorkingCopyStore.getState().undoKmnEdit()}
-          disabled={!canUndoEdit}
-          data-testid="layout-undo"
-          className="ks-focus-ring ks-hit-target ks-press"
-          style={addButtonStyle}
-        >
-          {t({ id: "editor.layout.pane.undo", message: "Undo last change" })}
-        </button>
+        {!live && (
+          <button
+            type="button"
+            onClick={() => useWorkingCopyStore.getState().undoKmnEdit()}
+            disabled={!canUndoEdit}
+            data-testid="layout-undo"
+            className="ks-focus-ring ks-hit-target ks-press"
+            style={addButtonStyle}
+          >
+            {t({ id: "editor.layout.pane.undo", message: "Undo last change" })}
+          </button>
+        )}
       </div>
 
       {unsaved && (
