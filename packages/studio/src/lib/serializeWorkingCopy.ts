@@ -573,7 +573,7 @@ export async function projectWorkingCopyForOutput(
       getPattern: (id) => patternCache.get(id),
       identity: identityForProjection,
       marksTreatment: getMarksTreatmentValue(),
-      capsHandling: capsHandlingFromDecisions(getDecisionSnapshot()),
+      capsHandling: capsHandlingFromDecisions(getDecisionSnapshot(), { askedOnly: isOpen }),
       welcomeFolderFiles,
       ...(state.startPackageFonts !== null ? { packageFonts: state.startPackageFonts } : {}),
       // Anchor for step 3's "is the display name an EDIT?" test. The no-identity

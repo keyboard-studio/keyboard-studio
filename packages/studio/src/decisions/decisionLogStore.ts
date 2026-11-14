@@ -37,6 +37,7 @@ import {
 import { normalizeDecisionRecord } from "@keyboard-studio/engine";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import { deepEqual } from "./deepEqual.ts";
+import { setTrailRollback } from "../lib/decisionJournal.ts";
 
 /**
  * A decision to record. The store owns `entryId`, `recordedAt`, and `supersedes`
@@ -442,3 +443,26 @@ export function applyDecisionRecordSnapshot(
 ): void {
   useDecisionLogStore.getState().hydrate(snapshot, droppedCount);
 }
+
+// A change on a keyboard opened for update that is declined or fails takes its
+// decisions back out of the record (spec 111 FR-009/FR-042); this is the trail
+// half. It remembers which entries exist now, and the returned function drops
+// the entries added afterwards for those decisions (the step's recorder appends
+// them after the change was handed over).
+setTrailRollback(() => {
+  const seen = new Set(useDecisionLogStore.getState().read().entries.map((e) => e.entryId));
+  return (restored) => {
+    if (restored.size === 0) return;
+    const record = useDecisionLogStore.getState().read();
+    const names = (e: (typeof record.entries)[number]): boolean => {
+      const p = e.payload;
+      if (p.kind === "decision") return restored.has(p.decisionId);
+      if (p.kind === "survey-answer") return (questionRegistry[p.questionId]?.provides ?? []).some((id) => restored.has(id));
+      return false;
+    };
+    const kept = record.entries.filter((e) => seen.has(e.entryId) || !names(e));
+    if (kept.length !== record.entries.length) {
+      useDecisionLogStore.getState().hydrate({ ...record, entries: kept });
+    }
+  };
+});

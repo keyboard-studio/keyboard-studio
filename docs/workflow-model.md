@@ -73,7 +73,7 @@ spine after instantiation:
   rewrites identity-bearing fields, and enters the shared spine at prefill.
 - **Track 2 — update an existing keyboard** (`instantiateFromExisting`): after
   identity-lite and base resolution, the user picks Track 2 to update the chosen base
-  in place. A single-language keyboard made from a country keyboard is a Copy (Track 1), not Track 2. Identity is preserved from the base; the project-name step is skipped.
+  in place. A single-language keyboard made from a country keyboard is a Copy (Track 1), not Track 2. Identity is preserved from the base; the project-name step is skipped. Track 2 is Open (spec 111): the files are live, every change is written into them when it is applied, and decisions are a record only and are never replayed (Constitution Article III).
   Both tracks converge at base-derived prefill.
 
 Identity-lite runs **first** for both tracks (user override of spec §8 line 1063):
@@ -127,7 +127,7 @@ graph TD
 - **Track choice follows base resolution.** The author evaluates the suggested
   base on its merits (script match, language match) and then decides whether to
   copy it under a new identity (Track 1) or update it in place (Track 2). Track 1
-  adds a project-name step before prefill; Track 2 skips it.
+  adds a project-name step before prefill; Track 2 skips it. Track 2 is also the live-files path: changes are written into the files when applied, not replayed from decisions (Article III, spec 111 FR-041..FR-050).
 - **Language and script are decoupled.** The keyboard's target is a **(language,
   script) pair**, and the script is an *independent* choice — not derived from the
   language's default. The motivating cases are **romanizations** (a Latin keyboard for
@@ -342,7 +342,7 @@ script family that silently gets a degraded strategy. Both need an explicit
   the diagram above is Track 1 (new keyboard from a base). Track 2 (update an
   existing keyboard) enters via source-picker, skips identity-lite (identity is
   already known), and instantiates the working copy from the existing keyboard's
-  IR with identity preserved. Both tracks converge on the same spine at the carve
+  IR with identity preserved (on Open the files are live: each applied change is written into them at once and decisions are a record only, per Article III and spec 111). Both tracks converge on the same spine at the carve
   gallery. The working copy (`KeyboardIR` + `VirtualFS`) is the session's single
   source of truth from instantiation to output, with no intermediate disk writes.
   Ratified in [spec.md](../spec.md) §8 and §12 as part of v1.3.0 (extends D9).

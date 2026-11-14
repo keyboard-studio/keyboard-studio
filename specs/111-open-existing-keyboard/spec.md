@@ -411,4 +411,15 @@ The Layout tab is reachable on Open. Its edits are recorded in a decision and re
 
 - Finding 1 comes first. Until the preview and the criteria read the working copy's files, writing more changes to those files makes more views disagree, not fewer.
 - Not yet determined: which of the two touch hosts is live on Open; where the icon editor's result is saved; whether a visual save of the on-screen keyboard after a code edit loses content the model does not hold.
-- Tasks for this amendment are not yet written.
+- Tasks for this amendment are written: [tasks.md](tasks.md) phases 15-19.
+- **Placement measurement (T084, 2026-11-14).** Run over the 20 sample keyboards in `src/test/openSampleKeyboards.ts` against the corpus checkout, with no consent given, using `packages/studio/src/lib/openApply.placement.measure.ts` (a measure file, not part of the suite; run it with `vitest.measure.config.ts`). "Placed" means the change went into the file as a precise edit; "consent" means the edit could not be placed and the author would be asked to accept a reformat. A tool was tried only where the keyboard has something to try it on.
+
+  | Tool | Tried on | Placed | Needed consent | Failed |
+  |---|---|---|---|---|
+  | Remove one character | 12 | 12 | 0 | 0 |
+  | Assign one character | 19 | 19 | 0 | 0 |
+  | Narrow exception | 1 | 1 | 0 | 0 |
+  | Mark guards | 6 | 6 | 0 | 0 |
+  | Edit one rule in the code view | 19 | 19 | 0 | 0 |
+
+  In plain words: removing, assigning, writing mark guards and a code-view edit were placed precisely on every keyboard they could be tried on, including the deadkey-heavy and touch-enabled ones. Not tried: removal on 8 keyboards that have no rule typing a single character from one key; assignment on `bj_naskapi_common`, which has no `group(main) using keys` to add to; mark guards on the 14 keyboards with no combining mark; the code-view edit on `anii`, whose rule lines all carry comments. Narrow could be tried only on `sil_cameroon_qwerty`, the one sample with a guard-shaped rule (`any(store) + key > context`), using a made-up guard on its first such rule. It was placed precisely when the blocked letter is an ordinary character. The first run asked for consent, and the reason was traced: the made-up guard's blocked "letter" was the space in the store, the exception rule wrote it as raw text, and after the splice the rule read back with different spacing (`any(final)` with three spaces became one), so the post-splice check in `openApply/core.ts` judged it not placed as meant. So a Narrow whose blocked character is a space or other whitespace would ask for consent; that is unusual for a real orthography and is not a failure of the splice in general. The Narrow row is one keyboard and a made-up guard, so it shows the cases that exist, not how often they happen.

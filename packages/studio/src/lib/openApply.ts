@@ -17,17 +17,18 @@
 // The shared projection run and undo record are in `openApply/core.ts`; the
 // assignment and marks kinds are in `openApply/assign.ts`.
 
-import { emitKmn, isKeyboardSource, parseKmn } from "@keyboard-studio/engine";
+import { emitKmn, isKeyboardSource, parseKmn, projectKmnText } from "@keyboard-studio/engine";
 import { useWorkingCopyStore, type WorkingCopyState } from "../stores/workingCopyStore.ts";
 import type { RemovedRuleRecord } from "../stores/openRemovalStore.ts";
 import { useOpenUndoStore, type OpenUndoView } from "../stores/openUndoStore.ts";
-import { isOpenedWithDescriptor } from "./openMode.ts";
+import { isLiveOpen } from "./openMode.ts";
 import { readVfsText } from "./vfsText.ts";
 import {
   beforeFrom,
   EARLIER_CHANGES_LABEL,
   failure,
   findAnchor,
+  intendedMatchesText,
   nextUndoId,
   projectChange,
   recordUndo,
@@ -36,6 +37,8 @@ import {
   applyRemoveOrIr,
 } from "./openApply/core.ts";
 import { applyAssign, applyMarks } from "./openApply/assign.ts";
+import { scopeToWrites } from "./openApply/scopeToWrites.ts";
+import { setOpenChangeApplier } from "./openApplyNotifier.ts";
 
 export type {
   OpenApplyOptions,
@@ -74,6 +77,35 @@ function applyFiles(change: Extract<OpenChange, { kind: "files" }>): OpenApplyRe
   if (!written.ok) return { status: "failed", reason: written.error };
   useOpenUndoStore.getState().push(record);
   return { status: "applied", changedPaths, undoId };
+}
+
+function applyModel(change: Extract<OpenChange, { kind: "model" }>, opts: OpenApplyOptions): OpenApplyResult {
+  const { startVfs, startKeyboard, startIr } = useWorkingCopyStore.getState();
+  if (startVfs === null || startKeyboard === null || startIr === null) {
+    return { status: "failed", reason: "No keyboard is open." };
+  }
+  const keyboardId = startKeyboard.id;
+  const kmnPath = `source/${keyboardId}.kmn`;
+  const current = readVfsText(startVfs, kmnPath);
+  if (current === undefined) return { status: "failed", reason: `${kmnPath} is missing.` };
+  const consented = opts.consentedReemit === true;
+  // Only what the change declared it writes is diffed against the file.
+  const intended = scopeToWrites(startIr, change.nextIr, change.writes);
+  const projected = projectKmnText(current, startIr, intended);
+  let next: string;
+  if (projected.ok) {
+    next = projected.text;
+    // A splice that does not give the rules the change meant is "not placed precisely".
+    if (!intendedMatchesText(intended, next, keyboardId)) {
+      if (!consented) return { status: "needs-consent", files: [kmnPath] };
+      next = emitKmn(intended);
+    }
+  } else if (consented) {
+    next = emitKmn(intended);
+  } else {
+    return { status: "needs-consent", files: [kmnPath] };
+  }
+  return applyFiles({ kind: "files", files: { [kmnPath]: next }, label: change.label });
 }
 
 /** Insert `rules` back into `text` at their recorded places; undefined when one cannot be placed. */
@@ -238,7 +270,7 @@ function applyReinsert(
 export function applyOpenChange(change: OpenChange, opts: OpenApplyOptions = {}): OpenApplyResult {
   const st: Pick<WorkingCopyState, "instantiationMode" | "startVfs" | "startKeyboard"> =
     useWorkingCopyStore.getState();
-  if (!isOpenedWithDescriptor(st.instantiationMode, st.startVfs, st.startKeyboard?.id ?? "")) {
+  if (!isLiveOpen(st)) {
     return { status: "failed", reason: "The working copy was not opened from an existing keyboard." };
   }
   // Any throw (a parse, a splice, a store write) is a failed apply with the
@@ -246,6 +278,7 @@ export function applyOpenChange(change: OpenChange, opts: OpenApplyOptions = {})
   try {
     if (change.kind === "reinsert") return applyReinsert(change, opts);
     if (change.kind === "files") return applyFiles(change);
+    if (change.kind === "model") return applyModel(change, opts);
     if (change.kind === "assign") return applyAssign(change, opts);
     if (change.kind === "marks") return applyMarks(opts);
     return applyRemoveOrIr(change, opts);
@@ -274,7 +307,7 @@ function revertView(view: OpenUndoView): void {
  */
 export function undoLastOpenApply(): { ok: true; id: string } | { ok: false; reason: string } {
   const st = useWorkingCopyStore.getState();
-  if (!isOpenedWithDescriptor(st.instantiationMode, st.startVfs, st.startKeyboard?.id ?? "")) {
+  if (!isLiveOpen(st)) {
     return { ok: false, reason: "The working copy was not opened from an existing keyboard." };
   }
   const keyboardId = st.startKeyboard!.id;
@@ -302,3 +335,6 @@ export function undoLastOpenApply(): { ok: true; id: string } | { ok: false; rea
   useOpenUndoStore.getState().drop(new Set([last.id]));
   return { ok: true, id: last.id };
 }
+
+// The patch sinks reach this seam through a registration (see openApplyNotifier.ts).
+setOpenChangeApplier(applyOpenChange);

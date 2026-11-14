@@ -225,9 +225,10 @@ const SESSION: ReadonlyArray<{ stepId: string; result: unknown; act: () => void 
       { questionId: "il_target_script", answerType: "select", value: "Latn" },
     ]),
     act: () => {
-      // A new keyboard id fires the projection's rename pass, so this ONE
-      // boundary changes the `.kmn`, `.kps`, `.kvks`, `.css` and `.ico` paths at
-      // once — the widened capture's real workload (055 FR-016).
+      // A new keyboard id used to fire the projection's rename pass, so this ONE
+      // boundary changed the `.kmn`, `.kps`, `.kvks`, `.css` and `.ico` paths at
+      // once (055 FR-016). On Open the id cannot change, so the pass is skipped
+      // and the boundary only exercises the ignored identity id.
       useWorkingCopyStore
         .getState()
         .setIdentity({ keyboardId: NEW_ID, displayName: "Hausa Standard" });
@@ -547,7 +548,10 @@ describe("FR-017a — the HISTORY.md normalizer never reaches the artifact", () 
     expect(carve!.impact?.state).toBe("captured");
     const changed =
       carve!.impact?.state === "captured" ? carve!.impact.files.map((f) => f.path) : [];
-    expect(changed).toContain(`source/${NEW_ID}.kmn`);
+    // The session sets a new identity keyboard id, but the keyboard id cannot
+    // change on Open (spec 111 Edge Cases): the projection skips the rename, so
+    // the change lands on the keyboard's own path.
+    expect(changed).toContain(`source/${START_ID}.kmn`);
     expect(changed).not.toContain("HISTORY.md");
 
     // And the file that SHIPS still carries the real, un-normalized stamps: the

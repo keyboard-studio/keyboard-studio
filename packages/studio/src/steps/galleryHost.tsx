@@ -39,7 +39,7 @@ import type {
   DecisionProvenance,
   DecisionSet,
 } from "../decisions/decisionTypes.ts";
-import type { ApplyContext, GalleryModule, WorkingCopyPatch } from "../survey/types.ts";
+import type { ApplyContext, GalleryModule, PatchOrigin, WorkingCopyPatch } from "../survey/types.ts";
 import { assertPatchChannelsAuthorized } from "./applyAuthorization.ts";
 
 /**
@@ -95,7 +95,7 @@ export interface GalleryHostDeps {
    * StudioShell injects into the reducer deps: the `ir` channel's checked
    * merge runs before any overlay channel is written.
    */
-  applyWorkingCopyPatch: (patch: WorkingCopyPatch, writes: readonly IRPath[]) => void;
+  applyWorkingCopyPatch: (patch: WorkingCopyPatch, writes: readonly IRPath[], origin?: PatchOrigin) => void;
 }
 
 /**
@@ -157,7 +157,7 @@ export function runGalleryApply<V>(
   };
   const patch = mod.apply(value, ctx);
   if (!assertPatchChannelsAuthorized(mod.definition.id, mod, patch)) return;
-  deps.applyWorkingCopyPatch(patch, writes);
+  deps.applyWorkingCopyPatch(patch, writes, { decisionIds: mod.provides });
 }
 
 /** The host's onChange core: record the decision, then run its apply (A6). */

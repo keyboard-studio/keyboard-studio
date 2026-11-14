@@ -8,13 +8,14 @@ import type { StartKeyboard } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveyAnswerStore, peekStepAnswers } from "../stores/surveyAnswerStore.ts";
 import { useDecisionStore, getDecisionSnapshot } from "../stores/decisionStore.ts";
-import { applyMutatePatch } from "../steps/mutateApply.ts";
 import type { ReducerDeps } from "../steps/reducer.ts";
 import { createStudioDecisionRecorder } from "../decisions/createStudioDecisionRecorder.ts";
 import { rebuildWorkingCopyFromStores } from "../decisions/rebuildWorkingCopy.ts";
 import { createSourceSnapshotter, type SourceSnapshotter } from "../decisions/snapshotSource.ts";
 import { instantiateFromStartIfConfirmed, instantiateFromExistingWithIdentitySeed } from "./confirmRebase.ts";
 import { projectWorkingCopyForOutput } from "./serializeWorkingCopy.ts";
+import { journalDecisionWrite } from "./decisionJournal.ts";
+import { applyPatchToWorkingCopy, irForApply } from "./applyPatchToWorkingCopy.ts";
 
 /**
  * The decision-audit snapshotter (spec 053). `readProjectedFiles` delegates
@@ -105,7 +106,7 @@ export function createStudioReducerDeps(input: StudioReducerDepsInput): ReducerD
     // These are INCREMENTAL patches to the working IR (mutate-apply US1 +
     // touch re-propagation US2), not base replacements, so they must NOT clear
     // the carve-deletion overlay (setIR would). See workingCopyStore.setWorkingIR.
-    getWorkingIR: () => useWorkingCopyStore.getState().ir,
+    getWorkingIR: irForApply,
     setWorkingIR: (next) => useWorkingCopyStore.getState().setWorkingIR(next),
     // Spec 053 FR-001/FR-002: record every step's decisions. Injected like
     // everything else here; the reducer knows only that it has a callback.
@@ -113,35 +114,25 @@ export function createStudioReducerDeps(input: StudioReducerDepsInput): ReducerD
     recordQuestionAnswers: recordDecision.recordQuestionAnswers,
     // Spec 088 FR-003 (contract C-2): the completion writer's decision
     // store access, injected so steps/reducer.ts never imports stores/.
-    writeDecisionRecords: (records) => useDecisionStore.getState().recordAll(records),
+    writeDecisionRecords: (records) => {
+      journalDecisionWrite(records.map((r) => r.id));
+      useDecisionStore.getState().recordAll(records);
+    },
     readDecisionSet: () => getDecisionSnapshot(),
-    // Spec 093 T009: after a completion records decisions, recalculate
-    // the downstream closure and rebuild the working copy by replay
-    // (decisions are the only stored state; the keyboard is derived).
+    // Spec 093 T009 (Copy): after a completion records decisions, recalculate
+    // the downstream closure and rebuild the working copy by replay.
+    // On a keyboard opened for update this is a NO-OP (spec 111 FR-042): the
+    // decisions are already recorded and `rebuildWorkingCopyFromStores`
+    // returns before replaying anything over the files. Nothing is lost: a
+    // later switch to Copy instantiates a new working copy and reseeds from
+    // the recorded decisions.
     rebuildFromDecisions: (changed) => {
       rebuildWorkingCopyFromStores(changed);
     },
-    // Spec 089 FR-001/FR-002 (apply-contract A4): the checked patch sink.
-    // The `ir` channel's containment-checked merge runs FIRST — a
-    // MutatePatchContainmentError throws before any overlay setter runs,
-    // so a patch is never partially applied. Channels then land in the
-    // contract's order (identity → attribution → helpDocs →
-    // historyEntryState → docFixProposals), each a whole-value replace. A null working IR
-    // (not yet instantiated) skips only the `ir` channel; the overlay
-    // channels still apply.
-    applyWorkingCopyPatch: (patch, writes) => {
-      const wc = useWorkingCopyStore.getState();
-      if (patch.ir !== undefined && wc.ir !== null) {
-        wc.setWorkingIR(applyMutatePatch(wc.ir, patch.ir, writes));
-      }
-      if (patch.identity !== undefined) wc.setIdentity(patch.identity);
-      if (patch.attribution !== undefined) wc.setAttribution(patch.attribution);
-      if (patch.helpDocs !== undefined) wc.setHelpDocs(patch.helpDocs);
-      if (patch.historyEntryState !== undefined) wc.setHistoryEntryState(patch.historyEntryState);
-      // Issue #2530: the body-parity answer's slice write (same whole-value
-      // replace as the other overlay channels, same order in the contract).
-      if (patch.docFixProposals !== undefined) wc.setDocFixProposals(patch.docFixProposals);
-    },
+    // Spec 089 FR-001/FR-002 (apply-contract A4): the checked patch sink, one
+    // function shared with the gallery host (`applyPatchToWorkingCopy`), which
+    // also routes the `ir` channel through the apply seam on Open (spec 111).
+    applyWorkingCopyPatch: applyPatchToWorkingCopy,
     getDecisions: () => getDecisionSnapshot(),
     getHistoryEntryState: () => useWorkingCopyStore.getState().historyEntryState,
     getDocFixProposals: () => useWorkingCopyStore.getState().docFixProposals,

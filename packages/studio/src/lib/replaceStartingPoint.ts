@@ -1,15 +1,22 @@
-// replaceStartingPointAndReplay -- Open mode's "Apply" seam (spec 111 FR-009).
+// replaceStartingPointAndReplay -- the earlier Adapt behaviour for a keyboard
+// opened WITHOUT its package descriptor (an old draft; spec 111 FR-009).
 //
 // The store action swaps the starting-point file (and, for a `.kmn`, `startIr`)
 // in one update; this wrapper then replays the retained decisions over the new
 // starting point so a later decision change builds on the author's edit rather
-// than clobbering it. Synchronous; no timer.
+// than clobbering it. On a keyboard opened with its descriptor nothing is
+// replayed (FR-042): `recalculateForStartingPointChangeFromStores` returns
+// first, and the code views go through `applyOpenChange` (kind `files`)
+// instead. Synchronous; no timer.
 
 import {
   useWorkingCopyStore,
   type ReplaceStartingPointResult,
 } from "../stores/workingCopyStore.ts";
 import { recalculateForStartingPointChangeFromStores } from "../decisions/rebuildWorkingCopy.ts";
+
+/** Plain label of the undo step a code-view Apply records on Open (not shown yet; the undo list is slice S4). */
+export const CODE_VIEW_EDIT_LABEL = "Edit the keyboard source in the code view";
 
 export function replaceStartingPointAndReplay(
   path: string,

@@ -254,18 +254,19 @@ T070-T077 (FR-035..FR-040) moved to [spec 114](../114-ctrl-and-letter-removal/sp
 - [x] T082 Route the remove tool, Mechanisms assignments and rule additions through it on Open; applied changes then read as existing content.
 - [ ] T082a Route Layout-tab edits (spec 117) through the apply function on Open, keeping their decision as the record; Copy keeps the replay. Depends on the Layout tab having merged.
 - [ ] T082b The preview drops a file the working copy no longer holds (phase 14's overlay only adds and replaces); needed before any tool can remove a file.
-- [ ] T082c Trace whether the caps step and the id rename can re-emit the whole source on Open, and route them through the splice if so.
-- [ ] T083 Stop replaying decisions after a code edit on Open; decisions remain as the record (trail, review notes, PR body).
-- [ ] T084 Measure across the corpus sample how often a tool change cannot be spliced; report before converting more tools.
-- [ ] T085 Apply the Article III wording from the spec amendment to `.specify/memory/constitution.md`, with the version bump (owner-approved only).
-- [ ] T086 Tests: SC-010 and SC-011 for the source file.
+- [x] T082c Trace whether the caps step and the id rename can re-emit the whole source on Open, and route them through the splice if so. (S3a: the caps step splices on Open and runs only for an answered decision; the id rename never runs on Open. Applying caps at the moment it is answered waits for the Layout tab, T082a.)
+- [x] T083 Stop replaying decisions after a code edit on Open; decisions remain as the record (trail, review notes, PR body).
+- [x] T084 Measure across the corpus sample how often a tool change cannot be spliced; report before converting more tools.
+- [x] T085 Apply the Article III wording from the spec amendment to `.specify/memory/constitution.md`, with the version bump (owner-approved only).
+- [ ] T086 Tests: SC-010 and SC-011 for the source file. (S3a: SC-011 done in `openApply.s3a.test.ts`; SC-010 remains.)
 - [x] T086a (slice S2) Retire on Open the disabled-families overlay (`disabledFamilyIds`): disabling a family writes the file when applied, then the overlay and its replay are dropped for Open.
 - [x] T086b (slice S2) Retire on Open the marks-guards overlay: guard rules are written into the file when applied; no guard state is replayed at output.
+- [ ] T086f (do before slice 3b, so 3b adds its steps to the table rather than new flags) Replace the projection's per-kind skip flags (`applyOnly`, `skipMarkGuards`, `skipIntendedCheck`) with one per-kind table of steps (`APPLY_STEPS`) before T087.
 - [ ] T086c (slice S3) Retire on Open the context-tolerance overlay store: the fix is spliced when applied, so `contextToleranceOverlay` is never held on Open (S1 carries a held one into the file on the next apply as a stopgap).
 - [ ] T086d (slice S3) Retire on Open the deadkey-ops overlay and the key-edit-ops overlay: each op is written to the file when applied; `keepAll` no longer needs the Open exception that keeps them (FR-041).
-- [ ] T086e (slice S1 follow-up) Wire the generic `files` change (`OpenChange` kind `files`) and `undoLastOpenApply` to their first editors; S4 builds the undo UI over the session undo list.
-- [ ] T086f Replace the projection's per-kind skip flags (`applyOnly`, `skipMarkGuards`, `skipIntendedCheck`) with one per-kind table of steps (`APPLY_STEPS`) before T087.
+- [x] T086e (slice S1 follow-up) Wire the generic `files` change (`OpenChange` kind `files`) and `undoLastOpenApply` to their first editors; S4 builds the undo UI over the session undo list.
 - [ ] T086g (slice S3) Remove the held-overlay flush in `openApply` (the flush that writes held overlays ahead of another change) once T086c and T086d retire the overlays.
+- [ ] T086h Retire on Open the output's rule-additions step (step 1.8's `ruleAdditions` splice from the working IR): the rules step's additions are written when applied (through the patch sink, `model` change), so the output derives none. Depends on T086c and T086g.
 
 ## Phase 16: Touch (FR-044)
 
@@ -276,6 +277,7 @@ T070-T077 (FR-035..FR-040) moved to [spec 114](../114-ctrl-and-letter-removal/sp
 ## Phase 17: Remaining files (FR-041, FR-047)
 
 - [ ] T089 The documentation and style editors write their files on Open; no separate edited copy replaces a file at output.
+- [ ] T089a Retire on Open the CSS output override: the OSK stylesheet (`customCss`, projection steps 0b and 4b) is written into the stylesheet file when the author applies it, so the output writes none. Goes with T089.
 - [ ] T090 The language list patches the package descriptor when applied.
 - [ ] T091 On-screen keyboard key labels after a Mechanisms change, per the owner's answer to open question 1.
 - [ ] T092 Tests: SC-014, and SC-010 for these files.

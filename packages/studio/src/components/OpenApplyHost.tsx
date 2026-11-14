@@ -13,11 +13,12 @@
 // change replaces it (nothing times out). The dismiss control is a native
 // button.
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { ReformatConsentDialog } from "./ReformatConsentDialog.tsx";
 import { useReformatConsent } from "../hooks/useReformatConsent.ts";
 import { ReformatConsentRequiredError } from "../lib/reformatConsentError.ts";
+import { setOpenApplyNotifier } from "../lib/openApplyNotifier.ts";
 import { applyOpenChange, type OpenApplyResult, type OpenChange, type RefusalCode } from "../lib/openApply.ts";
 
 export type ApplyOnOpen = (change: OpenChange) => Promise<OpenApplyResult>;
@@ -51,8 +52,12 @@ export function OpenApplyHost({ children }: { children: ReactNode }) {
   // files the first has since rewritten.
   const busyRef = useRef(false);
 
-  const applyOnOpen = useCallback<ApplyOnOpen>(
-    async (change) => {
+  // `source` is the change, or a function that makes it from the working copy as
+  // it stands when it runs. A handed-over change uses the function and it runs
+  // again after the author agrees, so a change applied while the dialog was open
+  // is never reverted by a stale one; null means it no longer applies (failed).
+  const applyBuilt = useCallback(
+    async (source: OpenChange | (() => OpenChange | null)): Promise<OpenApplyResult> => {
       if (busyRef.current) {
         setNotice("busy");
         return { status: "failed", reason: "Another change is waiting for an answer." };
@@ -61,6 +66,8 @@ export function OpenApplyHost({ children }: { children: ReactNode }) {
       setNotice(null);
       try {
         const result = await guard(async (consentedReemit) => {
+          const change = typeof source === "function" ? source() : source;
+          if (change === null) return { status: "failed", reason: "The change no longer applies to the keyboard." } as OpenApplyResult;
           const r = applyOpenChange(change, { consentedReemit });
           if (r.status === "needs-consent") throw new ReformatConsentRequiredError(r.files);
           return r;
@@ -89,6 +96,25 @@ export function OpenApplyHost({ children }: { children: ReactNode }) {
     },
     [guard],
   );
+  const applyOnOpen = useCallback<ApplyOnOpen>((change) => applyBuilt(change), [applyBuilt]);
+
+  // A change a patch sink could not write silently (a reducer or gallery step on
+  // Open) is handed over here (lib/openApplyNotifier.ts): it goes through the
+  // same `applyOnOpen`, so it gets the consent dialog or the notice. One at a
+  // time, in the order handed over, so none is refused as "busy".
+  const handedOver = useRef<Promise<unknown>>(Promise.resolve());
+  useEffect(() => {
+    setOpenApplyNotifier((item) => {
+      handedOver.current = handedOver.current
+        .then(async () => {
+          // Built when it is applied, from the working copy as it stands then.
+          const result = await applyBuilt(item.build);
+          if (result.status === "declined" || result.status === "failed") item.onNotApplied();
+        })
+        .catch(() => item.onNotApplied());
+    });
+    return () => setOpenApplyNotifier(null);
+  }, [applyBuilt]);
 
   const refusalMessage = (code: RefusalCode, store: string): string => {
     switch (code) {

@@ -1251,7 +1251,12 @@ export function projectWorkingCopyVfs(
   // applyMarkGuards strips and rebuilds its own artifacts, so a starting
   // keyboard that already carries them is not doubled; the .kmn is only
   // re-emitted when the IR changed.
-  if (marksGuards !== null && !(applyOnly && openMode?.skipMarkGuards === true)) {
+  // On Open (spec 111 FR-042) the guards were written into the file when the
+  // author finished the marks series (`openApply` kind `marks`), so the output
+  // and the preview leave them alone; only that apply run (`applyOnly`) writes
+  // them. Retired with the rest of the Open branches by T096.
+  const guardsInFile = openMode !== undefined && !applyOnly;
+  if (marksGuards !== null && !guardsInFile && !(applyOnly && openMode?.skipMarkGuards === true)) {
     const kmnPathForGuards = `source/${keyboardId}.kmn`;
     const kmnTextForGuards = readVfsText(vfs, kmnPathForGuards);
     if (kmnTextForGuards !== undefined) {
@@ -1326,6 +1331,10 @@ export function projectWorkingCopyVfs(
     if (kmnTextForCaps !== undefined) {
       try {
         const parsedForCaps = parseKmn(kmnTextForCaps, keyboardId).ir;
+        // Open (spec 111 FR-008): the result is a splice into the file's own
+        // text, never a whole re-emit; `currentIr` is a second parse of the
+        // text the splice starts from, the edits below mutate `parsedForCaps`.
+        const currentIrForCaps = openMode !== undefined ? parseKmn(kmnTextForCaps, keyboardId).ir : undefined;
         const bcp47 = identity?.bcp47 !== undefined && identity.bcp47 !== "" ? identity.bcp47 : undefined;
         if (capsHandling.mode === "cased-keys") {
           const set = deriveCasedKeys(parsedForCaps, { ...(bcp47 !== undefined ? { bcp47 } : {}) });
@@ -1337,7 +1346,11 @@ export function projectWorkingCopyVfs(
         }
         // explicit-rules leaves the copy exactly as it was: nothing to emit.
         if (capsHandling.mode !== "explicit-rules") {
-          vfs.set(kmnPathForCaps, emitKmn(parsedForCaps), false);
+          if (currentIrForCaps !== undefined) {
+            writeKmn(kmnPathForCaps, kmnTextForCaps, currentIrForCaps, parsedForCaps);
+          } else {
+            vfs.set(kmnPathForCaps, emitKmn(parsedForCaps), false);
+          }
         }
         // Touch caps: the same decision gives the touch layout its caps layer
         // (R8). Runs on the projected touch file, after the clean-touch clone
@@ -1508,7 +1521,14 @@ export function projectWorkingCopyVfs(
   // id via the result so callers that compile/re-read from the VFS after this
   // function returns know to use `targetKeyboardId`, not `keyboardId`.
   let effectiveKeyboardId: string | undefined;
-  if (!applyOnly && targetKeyboardId !== undefined && targetKeyboardId !== keyboardId) {
+  // On Open the keyboard's id cannot change (spec 111, Edge Cases): the rename
+  // re-emits the whole `.kmn` and moves every file, so it never runs.
+  const renameRequested = !applyOnly && targetKeyboardId !== undefined && targetKeyboardId !== keyboardId;
+  if (renameRequested && openMode !== undefined) {
+    warnings.push(
+      `[open] the keyboard id cannot change on a keyboard opened for update; the rename to "${targetKeyboardId}" was skipped`,
+    );
+  } else if (renameRequested && targetKeyboardId !== undefined) {
     effectiveKeyboardId = targetKeyboardId;
     const kmnPath = `source/${keyboardId}.kmn`;
     const kmnText = readVfsText(vfs, kmnPath);

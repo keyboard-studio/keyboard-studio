@@ -223,6 +223,15 @@ export interface ApplyContext {
  * (A3): the runner rejects an unauthorized channel with `ApplyChannelError`
  * and applies nothing.
  */
+export interface PatchOrigin {
+  /**
+   * The decision ids whose recording produced this patch. On a keyboard opened
+   * for update a change that is declined or fails is taken back out of the
+   * decision record (spec 111 FR-009/FR-042), so the record matches the files.
+   */
+  decisionIds: readonly string[];
+}
+
 export interface WorkingCopyPatch {
   /** IR patch, merged under the module's declared `writes` via the checked merge (A4). */
   ir?: Partial<KeyboardIR>;

@@ -204,19 +204,6 @@ export interface Projection {
   carried: boolean;
 }
 
-/**
- * Project one change onto a clone of the starting-point files.
- *
- * Held overlays that the re-parse in `replaceStartingPointFiles` clears are
- * carried INTO the same run, so they are spliced into the file together with
- * the change instead of being dropped: rules-step additions (derived from `ir`
- * against `startIr`), the applied context-tolerance fix, and carves held by
- * overlay-writing callers (`deletedNodeIds`, `deletedItemIds`, `carveChars`).
- * Overlays the re-parse does NOT clear stay overlays and are left empty here:
- * deadkey ops, key-edit ops, disabled families, touch-key deletions, touch
- * keep-inert chars, marks guards and caps handling (the projection regenerates
- * them from their own stores on every preview and download).
- */
 /** What an `assign` or `marks` projection adds to the common run. */
 export interface ProjectExtra {
   /**
@@ -238,6 +225,21 @@ export interface ProjectExtra {
   skipIntendedCheck?: boolean;
 }
 
+/**
+ * Project one change onto a clone of the starting-point files.
+ *
+ * Held overlays that the re-parse in `replaceStartingPointFiles` clears are
+ * carried INTO the same run, so they are spliced into the file together with
+ * the change instead of being dropped: rules-step additions (derived from `ir`
+ * against `startIr`), the applied context-tolerance fix, and carves held by
+ * overlay-writing callers (`deletedNodeIds`, `deletedItemIds`, `carveChars`).
+ * Overlays the re-parse does NOT clear stay overlays and are left empty here:
+ * deadkey ops, key-edit ops, disabled families, touch-key deletions, touch
+ * keep-inert chars (the projection regenerates them from their own stores on
+ * every preview and download). Marks guards are written by their own apply
+ * (`marks`) and the output no longer regenerates them; an answered caps
+ * decision is the one remaining decision-driven `.kmn` step at output.
+ */
 export function projectChange(
   change:
     | { kind: "remove"; itemIds: string[]; chars: string[]; disabledRuleIds?: string[] }

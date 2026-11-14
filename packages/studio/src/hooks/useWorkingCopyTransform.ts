@@ -84,7 +84,7 @@ import {
   openModeProjection,
   projectionInputFromState,
 } from "../lib/projectionInput.ts";
-import { isOpenedWithDescriptor } from "../lib/openMode.ts";
+import { isLiveOpen, isOpenedWithDescriptor } from "../lib/openMode.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { physicalAssignmentsOf } from "../lib/physicalAssignments.ts";
@@ -322,8 +322,10 @@ export function useWorkingCopyTransform(
   // spec 112: the caps-handling decision step 2.8 applies. Read through the
   // same gate the download uses (a caseless alphabet is not asked), keyed on
   // the mode so an unrelated re-record never rebuilds the projection.
+  // On Open only an answered value counts (the same gate the download uses).
+  const openWithDescriptor = useWorkingCopyStore((s) => isLiveOpen(s));
   const capsHandlingMode = useDecisionStore(
-    (s) => capsHandlingFromDecisions(s.decisions)?.mode ?? null,
+    (s) => capsHandlingFromDecisions(s.decisions, { askedOnly: openWithDescriptor })?.mode ?? null,
   );
   const marksGuardsKey = useMemo(
     () => JSON.stringify(marksGuardsFromValue(marksTreatment)),

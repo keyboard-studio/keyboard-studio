@@ -34,6 +34,7 @@ import { questionRegistry } from "../survey/questions/registry.ts";
 import { authoringTrackProviderModule } from "../survey/questions/authoringTrackProvider.ts";
 import { useDecisionStore, getDecisionSnapshot } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { isLiveOpen } from "../lib/openMode.ts";
 import type { Decision, DecisionId, DecisionSet } from "./decisionTypes.ts";
 import type { ExtractContext } from "./extractContext.ts";
 import { buildLiveExtractContext } from "./liveExtraction.ts";
@@ -323,6 +324,9 @@ export function rebuildWorkingCopyFromStores(
   if (changed.length === 0) return null;
   const wc = useWorkingCopyStore.getState();
   if (wc.startIr === null || wc.ir === null) return null;
+  // Spec 111 FR-042: on a keyboard opened for update the files are the truth
+  // and decisions are a record only; they are never replayed over them.
+  if (isLiveOpen(wc)) return null;
   const startingPointIR = wc.startIr;
 
   if (sessionTrail === null || sessionTrailBase !== startingPointIR) {
@@ -387,6 +391,8 @@ export function rebuildWorkingCopyFromStores(
 export function recalculateForStartingPointChangeFromStores(): RebuildOutcome | null {
   const wc = useWorkingCopyStore.getState();
   if (wc.startIr === null) return null;
+  // Spec 111 FR-042: no replay over the opened keyboard's files.
+  if (isLiveOpen(wc)) return null;
   const startingPointIR = wc.startIr;
 
   const ctx = buildLiveExtractContext();

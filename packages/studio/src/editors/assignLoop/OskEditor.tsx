@@ -162,6 +162,7 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   // Open mode (spec 111 FR-009): edit the keyboard's existing `.kvks`; generate
   // one only when the file is missing.
+  // isOpenMode, not isLiveOpen: a descriptor-less older Open draft still gets the Open view; its Apply goes through the store (the seam move is T091).
   const openKvksPath =
     isOpenMode(mode) && startKeyboard !== null
       ? openKvksFilePath(startKeyboard.id)

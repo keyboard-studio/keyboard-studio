@@ -10,16 +10,14 @@
 import { useCallback } from "react";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useOpenRemovalStore, type OpenRemovalEntry } from "../../stores/openRemovalStore.ts";
-import { isOpenedWithDescriptor } from "../../lib/openMode.ts";
+import { isLiveOpen } from "../../lib/openMode.ts";
 import { useApplyOnOpen } from "../../components/OpenApplyHost.tsx";
 
 const EMPTY: readonly OpenRemovalEntry[] = [];
 
 /** True when removals on this working copy are written into the files. */
 export function useIsLiveOpen(): boolean {
-  return useWorkingCopyStore((s) =>
-    isOpenedWithDescriptor(s.instantiationMode, s.startVfs, s.startKeyboard?.id ?? ""),
-  );
+  return useWorkingCopyStore((s) => isLiveOpen(s));
 }
 
 /** The removals applied to the keyboard that is open now (empty outside Open). */

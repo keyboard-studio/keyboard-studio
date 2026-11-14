@@ -1,5 +1,5 @@
 // Spec 111 FR-034: the Upgrades page lists each offer with a preview, applies
-// only on Apply (writing the file text through the starting-point seam), and a
+// only on Apply (writing the file text through the apply seam), and a
 // Skip keeps the offer from coming back.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,9 +22,9 @@ const offer: UpgradeOffer = {
   },
 };
 
-const replace = vi.hoisted(() => vi.fn(() => ({ ok: true as const })));
+const replace = vi.hoisted(() => vi.fn((_change: unknown) => ({ status: "applied" as const, changedPaths: [] as string[] })));
 
-vi.mock("../../lib/replaceStartingPoint.ts", () => ({ replaceStartingPointAndReplay: replace }));
+vi.mock("../../lib/openApply.ts", () => ({ applyOpenChange: replace }));
 vi.mock("../../lib/capsEngine.ts", () => ({ loadCapsEngine: () => Promise.resolve({}) }));
 vi.mock("../../criteria/upgradePairs.ts", () => ({ offerUpgrades: () => Promise.resolve([offer]) }));
 vi.mock("../../criteria/openRatchet.ts", () => ({
@@ -74,7 +74,11 @@ describe("UpgradesStep", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Apply: Use the test upgrade/ }));
     });
-    expect(replace).toHaveBeenCalledWith(FILE, "c upgraded\n");
+    expect(replace).toHaveBeenCalledWith({
+      kind: "files",
+      files: { [FILE]: "c upgraded\n" },
+      label: "Use the test upgrade",
+    });
     await waitFor(() => expect(screen.queryByText("Use the test upgrade")).toBeNull());
   });
 

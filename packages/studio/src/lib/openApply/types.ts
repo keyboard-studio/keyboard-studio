@@ -1,7 +1,7 @@
 // openApply types -- the change kinds, results and options shared by the apply
 // modules (kept apart so the modules do not import each other in a cycle).
 
-import type { KeyboardIR, MechanismAssignment } from "@keyboard-studio/contracts";
+import type { IRPath, KeyboardIR, MechanismAssignment } from "@keyboard-studio/contracts";
 import type { OpenRemovalEntry } from "../../stores/openRemovalStore.ts";
 
 /** A change the author applies to the opened keyboard. */
@@ -44,6 +44,19 @@ export type OpenChange =
        * applying the same decision again changes nothing.
        */
       kind: "marks";
+    }
+  | {
+      /**
+       * A whole next IR written into the `.kmn` as a splice of every node that
+       * differs from the file's own parse (stores, rules, groups, raw), not only
+       * rules-step additions. The patch sinks use it for a step's `ir` write.
+       * Needs consent when the splice cannot place the difference.
+       */
+      kind: "model";
+      nextIr: KeyboardIR;
+      /** The change's declared write paths: only these parts of `nextIr` are diffed against the file. */
+      writes: readonly IRPath[];
+      label: string;
     }
   | {
       /**

@@ -38,6 +38,7 @@ export function useOpenRatchet(
   const mode = useWorkingCopyStore((s) => s.instantiationMode);
   const baseline = useCriteriaRecordStore((s) => s.openBaseline);
   const storedNotes = useCriteriaRecordStore((s) => s.reviewNotes);
+  // isOpenMode: the ratchet judges, it writes nothing, so an older descriptor-less Open draft keeps it.
   const open = isOpenMode(mode);
 
   const failingKeys = useMemo(

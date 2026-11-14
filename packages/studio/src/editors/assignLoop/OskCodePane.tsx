@@ -63,6 +63,7 @@ export function OskCodePane({
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   // Open mode (spec 111 FR-009): show the file's own text; Apply writes it back
   // verbatim. A keyboard with no `.kvks` keeps the generated text.
+  // isOpenMode, not isLiveOpen: a descriptor-less older Open draft still gets the Open view; its Apply goes through the store (the seam move is T091).
   const openPath =
     isOpenMode(mode) && startKeyboard !== null
       ? `source/${startKeyboard.id}.kvks`

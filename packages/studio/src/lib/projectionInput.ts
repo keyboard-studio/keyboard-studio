@@ -120,11 +120,18 @@ export function marksGuardsFromValue(value: MarksTreatmentValue | undefined): Ma
  * Step 2.8's input from the decision set: the recorded caps-handling value,
  * or undefined when it was not asked. A caseless alphabet is never asked, so
  * a value left over from an earlier alphabet is ignored rather than writing a
- * store nothing needs.
+ * store nothing needs. `askedOnly` (Open) also ignores a value the author did
+ * not answer.
  */
-export function capsHandlingFromDecisions(decisions: DecisionSet): CapsHandlingValue | undefined {
+export function capsHandlingFromDecisions(
+  decisions: DecisionSet,
+  opts: { askedOnly?: boolean } = {},
+): CapsHandlingValue | undefined {
   const value = decisions["caps-handling"]?.value as CapsHandlingValue | undefined;
   if (value === undefined) return undefined;
+  // On Open (spec 111) a seeded default or an extracted value is not a change
+  // the author made, so it never edits the opened keyboard's caps handling.
+  if (opts.askedOnly === true && decisions["caps-handling"]?.provenance !== "asked") return undefined;
   return isCasedAlphabet(alphabetOf(decisions["character-inventory"]?.value)) ? value : undefined;
 }
 

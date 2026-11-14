@@ -14,7 +14,7 @@ import { runDecisionFlow } from "../decisions/decisionFlow.ts";
 import { buildExtractContext } from "../decisions/extractContext.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { applyDecisionEffects, type ReducerDeps } from "../steps/reducer.ts";
-import { applyMutatePatch } from "../steps/mutateApply.ts";
+import { applyPatchToWorkingCopy } from "../lib/applyPatchToWorkingCopy.ts";
 import { readVfsText } from "../lib/vfsText.ts";
 import { identityLanguagePatch } from "../lib/identityLanguagePatch.ts";
 import { authoringTrackProviderModule } from "../survey/questions/authoringTrackProvider.ts";
@@ -193,15 +193,7 @@ export function runAdaptFlow(kb: (typeof KEYBOARDS)[number]) {
       getDocFixProposals: () => store.getState().docFixProposals,
       applyWorkingCopyPatch: (patch, writes) => {
         applied++;
-        const wc = store.getState();
-        if (patch.ir !== undefined && wc.ir !== null) {
-          wc.setWorkingIR(applyMutatePatch(wc.ir, patch.ir, writes));
-        }
-        if (patch.identity !== undefined) wc.setIdentity(patch.identity);
-        if (patch.attribution !== undefined) wc.setAttribution(patch.attribution);
-        if (patch.helpDocs !== undefined) wc.setHelpDocs(patch.helpDocs);
-        if (patch.historyEntryState !== undefined) wc.setHistoryEntryState(patch.historyEntryState);
-        if (patch.docFixProposals !== undefined) wc.setDocFixProposals(patch.docFixProposals);
+        applyPatchToWorkingCopy(patch, writes);
       },
     } as ReducerDeps;
     applyDecisionEffects(

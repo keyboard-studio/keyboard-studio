@@ -19,6 +19,7 @@ import {
   recordMarksTreatmentValue,
   type MarksTreatmentValue,
 } from "../survey/marks/marksValue.ts";
+import { isLiveOpen } from "./openMode.ts";
 import { applyMutatePatch } from "../steps/mutateApply.ts";
 import { CONTEXT_TOLERANCE_WRITES } from "../steps/contextToleranceWrites.ts";
 import { applyContextToleranceDecision, contextTolerancePatch } from "./contextToleranceApply.ts";
@@ -33,7 +34,10 @@ export function commitOverlay(
 ): void {
   const store = useWorkingCopyStore.getState();
   const previous = store.contextToleranceOverlay?.overlay ?? null;
-  if (store.ir !== null) {
+  // On Open the working IR is the file's parse and only the apply seam changes it
+  // (spec 111 FR-041): the fix is held as the overlay alone, which the next apply
+  // carries into the file (`openApply` core), so no stray `ir` write is left behind.
+  if (store.ir !== null && !isLiveOpen(store)) {
     const patch = contextTolerancePatch(store.ir, previous, next?.overlay ?? null, OVERLAY_OPS);
     store.setWorkingIR(applyMutatePatch(store.ir, patch, CONTEXT_TOLERANCE_WRITES));
   }

@@ -1366,12 +1366,11 @@ export interface WorkingCopyState {
 
   /**
    * Open mode (spec 111 FR-009): replace one starting-point file with
-   * author-edited text. The VFS text and, for a `.kmn`, the re-parsed `startIr`
-   * are written in ONE update so the VFS and `startIr` never disagree. A `.kmn`
-   * that does not parse changes nothing and returns `{ ok: false }` (FR-015).
-   * Replay over the new `startIr` is the caller's next step
-   * (`replaceStartingPointAndReplay`); this action never imports the decisions
-   * layer.
+   * author-edited text; the one-file case of `replaceStartingPointFiles` (a
+   * `.kmn` that does not parse changes nothing and returns `{ ok: false }`,
+   * FR-015). On Open the author's code views go through `applyOpenChange`
+   * (kind `files`) instead, so the edit is undoable; this action is the
+   * store-level write beneath it and for non-code editors.
    */
   replaceStartingPointFromText: (path: string, text: string) => ReplaceStartingPointResult;
 
@@ -2401,39 +2400,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     }
   },
 
-  replaceStartingPointFromText: (path, text) => {
-    const { startVfs, startKeyboard } = get();
-    if (startVfs === null || startKeyboard === null) {
-      return { ok: false, error: "No keyboard is open." };
-    }
-    let nextIr: KeyboardIR | null = null;
-    if (path.endsWith(".kmn")) {
-      let parsedIr: KeyboardIR;
-      try {
-        parsedIr = parseKmn(text, startKeyboard.id).ir;
-      } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : String(err) };
-      }
-      // parse() keeps unreadable text as opaque fragments, so text that is not
-      // a keyboard at all comes back as an empty IR instead of throwing.
-      if (!isKeyboardSource(parsedIr)) {
-        return { ok: false, error: NOT_A_KEYBOARD_SOURCE_MESSAGE };
-      }
-      nextIr = deriveFacets(parsedIr);
-    }
-    // A fresh VFS object so subscribers see the change; the file text is the
-    // author's own, verbatim.
-    const nextVfs = createVirtualFS(startVfs.entries());
-    nextVfs.set(path, text, false);
-    set({
-      startVfs: nextVfs,
-      ...(nextIr !== null ? { startIr: nextIr, ir: nextIr } : {}),
-      // The touch layout the projection compares against the file: keep them
-      // identical so the author's text is not re-serialized.
-      ...(path.endsWith(".keyman-touch-layout") ? { touchLayoutJson: text } : {}),
-    });
-    return { ok: true };
-  },
+  // One file is the one-entry case of `replaceStartingPointFiles`.
+  replaceStartingPointFromText: (path, text) => get().replaceStartingPointFiles({ [path]: text }),
 
   replaceStartingPointFiles: (files) => {
     const { startVfs, startKeyboard, startIr: priorStartIr } = get();

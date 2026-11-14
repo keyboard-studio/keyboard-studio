@@ -25,7 +25,7 @@
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { IRPath, KeyboardIR, VirtualFS, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { StartKeyboard, RemovalCapability, SurveyAnswer, HistoryEntryState, DocFixProposals } from "@keyboard-studio/contracts";
-import type { ApplyContext, QuestionModule, WorkingCopyPatch } from "../survey/types.ts";
+import type { ApplyContext, PatchOrigin, QuestionModule, WorkingCopyPatch } from "../survey/types.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import type { Decision, DecisionId, DecisionSet } from "../decisions/decisionTypes.ts";
 import { answerProvenance } from "../decisions/answerProvenance.ts";
@@ -180,7 +180,7 @@ export interface ReducerDeps {
    * patch). Optional, and a no-op when absent — the same load-bearing
    * optionality as the deps above.
    */
-  applyWorkingCopyPatch?: (patch: WorkingCopyPatch, writes: readonly IRPath[]) => void;
+  applyWorkingCopyPatch?: (patch: WorkingCopyPatch, writes: readonly IRPath[], origin?: PatchOrigin) => void;
   /** Read the live decision set — the `decisions` an apply composes from. */
   getDecisions?: () => DecisionSet;
   /** Read the working copy's current HISTORY-entry state (apply context). */
@@ -476,6 +476,7 @@ export function applyDecisionEffects(
     questionId: string,
     mod: QuestionModule,
     value: string | string[] | undefined,
+    origin: readonly string[] = mod.provides ?? [],
   ): void => {
     const apply = mod.apply;
     if (apply === undefined) return;
@@ -489,7 +490,7 @@ export function applyDecisionEffects(
     };
     const patch = apply(value, ctx);
     if (!assertPatchChannelsAuthorized(questionId, mod, patch)) return;
-    sink(patch, writes);
+    sink(patch, writes, { decisionIds: origin });
   };
 
   // Pass 1 — per-answer dispatch, in answer order (A8).
@@ -528,7 +529,8 @@ export function applyDecisionEffects(
       const requires = mod.requires ?? [];
       if (requires.length === 0) continue;
       if (!requires.some((id) => recordedIds.has(id))) continue;
-      runApply(questionId, mod, undefined);
+      // A composed apply is caused by the decisions this completion recorded.
+      runApply(questionId, mod, undefined, [...recordedIds]);
     }
   }
 }

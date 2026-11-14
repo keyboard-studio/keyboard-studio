@@ -53,9 +53,11 @@ import { applyCarveMutate } from "../../steps/editorMutate.ts";
 import { physicalAssignmentsOf } from "../../lib/physicalAssignments.ts";
 import { findKmnPath } from "../../lib/findKmnPath.ts";
 import { getPatternByIdSync } from "../../lib/services.ts";
-import { isOpenMode } from "../../lib/openMode.ts";
+import { isLiveOpen, isOpenMode } from "../../lib/openMode.ts";
+import { useApplyOnOpen } from "../../components/OpenApplyHost.tsx";
 import { readVfsText } from "../../lib/vfsText.ts";
 import {
+  CODE_VIEW_EDIT_LABEL,
   replaceStartingPointAndReplay,
   startingPointPath,
 } from "../../lib/replaceStartingPoint.ts";
@@ -93,8 +95,10 @@ export function KmnCodePane() {
   const mode = useWorkingCopyStore((s) => s.instantiationMode);
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  const applyOnOpen = useApplyOnOpen();
   // Open mode (spec 111 FR-009): the pane shows the file's own text and Apply
   // replaces the starting point with it.
+  // isOpenMode here (the Open VIEW, also for a descriptor-less older draft); the live-files apply below is gated on isLiveOpen.
   const openPath =
     isOpenMode(mode) && startKeyboard !== null
       ? startingPointPath(startKeyboard.id, "kmn")
@@ -331,6 +335,29 @@ export function KmnCodePane() {
     if (openText !== undefined && openPath !== null) {
       // Open: a formatting-only change is still a change to the file.
       if (current === canonical) return;
+      if (isLiveOpen({ instantiationMode: mode, startVfs, startKeyboard })) {
+        // Live files (spec 111 FR-041/FR-045): the text goes into the file
+        // through the apply seam, so it is one undo step and gets the same
+        // post-checks as every other change. Nothing is replayed over it.
+        // The flag is raised BEFORE the write: the store update re-renders the
+        // pane and the canonical-text effect consumes it; it is lowered again
+        // when nothing was written.
+        justAppliedRef.current = true;
+        void applyOnOpen({
+          kind: "files",
+          files: { [openPath]: current },
+          label: CODE_VIEW_EDIT_LABEL,
+        }).then((result) => {
+          if (result.status === "applied") {
+            setApplyError(null);
+            return;
+          }
+          justAppliedRef.current = false;
+          if (result.status === "failed") setApplyError(result.reason);
+        });
+        return;
+      }
+      // A keyboard opened without its descriptor (an older draft): the earlier behaviour.
       const result = replaceStartingPointAndReplay(openPath, current);
       if (!result.ok) {
         setApplyError(result.error);

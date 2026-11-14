@@ -36,13 +36,14 @@ starting point ──▶ extraction (spec 092) ──▶ proposals ──▶ aut
 (base | existing        facts from base,       (extracted ≠        │ registry-ordered
  keyboard)              identity, CLDR)         decided)           ▼
                                               DECISION SET (088) ──▶ 053 decision record (audit)
-                                                   │ apply (at step completion) / replay (on change)
+                                                   │ Copy: apply (at step completion) / replay (on change)
+                                                   │ Open: each change written into the files when applied
                                                    ▼
                                      WORKING COPY — KeyboardIR + VirtualFS
                                                    │ mutate() seam · one 300 ms diagnostic cycle
                                                    ▼
                               validate (A/B/A′) ── compile (kmcmplib) ── Layer C lint
-                                                   │ projection (never emits raw working IR)
+                                                   │ projection (Copy: never emits raw working IR; Open: files as written)
                                                    ▼
                     OUTPUT: .kmp / source .zip / GitHub PR ──▶ criteria page verdict
                                                    ▲   │
@@ -77,13 +78,18 @@ starting point ──▶ extraction (spec 092) ──▶ proposals ──▶ aut
   step manifest is an unordered pool the derived order arranges. A decision
   lands two ways that MUST agree: incremental `apply` when its step completes,
   and **replay** — recalculation of the downstream closure from the checkpoint
-  before the first changed decision. Changing the starting point retains all
-  decisions and recalculates against the new base (constitution Art X).
+  before the first changed decision. This is the Copy path. Changing the
+  starting point on Copy retains all decisions and recalculates against the new
+  base (constitution Art X). On a keyboard opened for update (Open) decisions
+  are a record only: every change the author applies is written into the files
+  when it is applied, and nothing is replayed over them (constitution Art III,
+  spec 111 FR-041..FR-050).
   → `packages/studio/src/decisions/`, `steps/manifest.ts`
 - **Working copy.** One per project (Track 1 `instantiateFromBase` / Track 2
-  `instantiateFromExisting`), recalculated from the decision set as above.
-  It is what renders and what output projects from — never what is stored
-  directly (see Persistence).
+  `instantiateFromExisting`). On Copy it is recalculated from the decision set
+  as above. It is what renders and what output projects from — never what is
+  stored directly (see Persistence). On Open the working copy is the current
+  file text and its parse (spec 111).
 - **Step host.** Every step renders through one generic host — no per-step
   `switch` in the shell. `StepHost` resolves the manifest entry, renders its
   component in the declared layout's chrome, and runs the single completion
@@ -151,8 +157,9 @@ contribution record is recoverable history shown read-only, not a mechanism.
   corpus keyboard) — until then both paths are live architecture, and 062's
   spec says so. Fixes are computed async, committed sync: into the working IR
   through `applyMutatePatch` at manifest-declared paths, and into the artifact
-  as a persisted overlay replayed by `projectWorkingCopyVfs`, because output
-  is re-projected from the base and never emits the working IR.
+  as a persisted overlay replayed by `projectWorkingCopyVfs`, because on Copy
+  output is re-projected from the base and never emits the working IR. On Open
+  the same fix is written into the files when applied (spec 111 FR-041).
 - **Exemplar sourcing is one offline path** (spec 044): `sourceExemplars(bcp47)`
   reads a committed, version-pinned CLDR+SLDR index; all consumers read it,
   none wire their own loader. `null` means "no confident seed", never an

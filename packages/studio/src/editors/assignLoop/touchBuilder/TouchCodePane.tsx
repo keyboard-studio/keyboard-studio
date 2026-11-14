@@ -75,6 +75,7 @@ export function TouchCodePane({ layout }: { layout: TouchLayoutIR | null }) {
   // Open mode (spec 111 FR-009, research R7): the pane shows the file's own
   // text and Apply replaces the file, bypassing the structural-edit refusal --
   // the author is editing the real file, not composing key operations.
+  // isOpenMode, not isLiveOpen: a descriptor-less older Open draft still gets the Open view; its Apply goes through the store (the seam move is T087).
   const openPath =
     isOpenMode(mode) && startKeyboard !== null
       ? `source/${startKeyboard.id}.keyman-touch-layout`

@@ -150,6 +150,25 @@ describe("splice keeps a leading BOM and the quote style of a value-only replace
     });
   }
 
+  for (const [label, eol] of [["LF", "\n"], ["CRLF", "\r\n"]] as const) {
+    it(`value-only replace keeps its quote style when a BOM sits mid-file (${label})`, () => {
+      // A BOM in the middle of the file (a file pasted onto another) sits on the
+      // replaced line itself. Only a LEADING BOM is carried (above); here the
+      // line is rewritten, and the replace must keep the quotes and the EOL.
+      const lines = KMN.replace(/\n/g, eol).split(/(?<=\n)/);
+      const v = lines.findIndex((l) => l.includes("&VERSION"));
+      lines[v] = `\uFEFFstore(&VERSION) "10.0"${eol}`;
+      const t = lines.join("");
+      const { start, next } = guarded(t, "base-plus-mark");
+      const r = projectKmnText(t, start, next);
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(r.text).toContain(`${eol}store(&VERSION) "14.0"${eol}`);
+      expect(r.text).not.toContain("'14.0'");
+      if (eol === "\r\n") expect(r.text.replace(/\r\n/g, "")).not.toMatch(/[\r\n]/);
+    });
+  }
+
   it("a BOM survives a delete of the first line too", () => {
     const t = `\uFEFF${KMN}`;
     const ir = parse(t, "k").ir;
