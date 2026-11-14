@@ -407,6 +407,11 @@ The Layout tab is reachable on Open. Its edits are recorded in a decision and re
 2. **Drafts saved before this amendment.** *Answered 2026-11-13: no migration; backward compatibility is not needed (FR-049).*
 3. *Answered 2026-11-13: one step per applied change for the whole session, held in memory only (not carried over a reload).* **Depth of undo.** Whether undo on Open is one step per applied change for the whole session, or only back to the snapshot taken on arriving at a step.
 
+### Touch on Open (owner rulings 2026-11-14)
+
+- OWNER RULING 2026-11-14: on Open, placing a letter on the desktop keyboard does not write a touch key. The touch step offers it as a suggestion, as on the Copy path. (Key labels and layers that mirror a desktop change are still part of the same applied change, per the earlier ruling.)
+- OWNER RULING 2026-11-14: "Reseed touch from desktop" stays available on Open but understated (a secondary action, not the step's lead). The studio's reseed (with a symbols layer and working Caps) may be cleaner than an existing touch layout. Using it replaces the touch file as one applied change: the author sees what will change and agrees first (FR-009), and it can be undone (FR-045). When the keyboard has no touch file, the same action creates one (FR-017).
+
 ### Notes for planning
 
 - Finding 1 comes first. Until the preview and the criteria read the working copy's files, writing more changes to those files makes more views disagree, not fewer.
