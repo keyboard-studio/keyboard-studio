@@ -152,7 +152,9 @@ deviations rather than inventing new ones.
 - **Working-copy spine (spec v1.3.0).** A single persistent working copy is instantiated when the
   user picks a keyboard — Track 1 `instantiateFromBase` (copy/adapt) or Track 2
   `instantiateFromExisting` (import). Every step mutates that one copy; it is serialized only at
-  output. See [docs/workflow-model.md](docs/workflow-model.md).
+  output. On a keyboard opened for update, each change is instead written to the files when it is
+  applied, and decisions are a record only (constitution Art III; spec 111 FR-041..FR-050). See
+  [docs/workflow-model.md](docs/workflow-model.md).
 - **Validator layering (spec §10).** Three layers — Layer A validity + Layer B style + Layer C
   hygiene; Layer A is 9 TS-portable checks + 5 WASM-only (spec §10 has the per-check `kmcmplib`
   source references). **In code:** Layer A/B — plus the Layer A' import-fidelity checks I1–I6
