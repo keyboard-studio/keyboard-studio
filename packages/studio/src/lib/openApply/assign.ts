@@ -129,11 +129,7 @@ function holdsOverlays(st: WorkingCopyState): boolean {
   const startIr = st.startIr;
   if (startIr === null) return false;
   return (
-    hasRuleAdditions(deriveRuleAdditions(st.ir ?? startIr, startIr)) ||
-    (st.contextToleranceOverlay?.overlay.batches.length ?? 0) > 0 ||
-    st.deletedNodeIds.size > 0 ||
-    st.deletedItemIds.size > 0 ||
-    st.carveChars.size > 0
+    hasRuleAdditions(deriveRuleAdditions(st.ir ?? startIr, startIr))
   );
 }
 
@@ -343,10 +339,8 @@ function runAssign(ctx: AssignContext, forceRegen: boolean): OpenApplyResult {
   const out = projectChange({ kind: "flush" }, opts, {
     assignments: p.applyList,
     ...(marksValue !== undefined ? { marksTreatment: marksValue } : {}),
-    skipMarkGuards: true,
-    skipIntendedCheck: true,
+    runAs: "assign",
     prepared: p.prepared,
-    flushed: true,
     ...(p.prepIr !== undefined ? { startIr: p.prepIr } : {}),
   });
   if (!out.ok) return out.result;
@@ -364,8 +358,8 @@ function runAssign(ctx: AssignContext, forceRegen: boolean): OpenApplyResult {
     const guards = projectChange({ kind: "flush" }, opts, {
       marksTreatment: marksValue,
       prepared: changed,
-      flushed: true,
       startIr: guardIr,
+      runAs: "marks",
     });
     if (!guards.ok) return guards.result;
     changed = { ...guards.projection.changed };
@@ -468,7 +462,7 @@ export function applyMarks(opts: OpenApplyOptions): OpenApplyResult {
   // Re-applying the same decision must leave the file as it is: the guards
   // strip and rebuild their own artifacts, and the projection puts them back
   // byte-identical, so a result equal to the file is "nothing to write".
-  const trial = projectChange(change, opts, { marksTreatment: value });
+  const trial = projectChange(change, opts, { marksTreatment: value, runAs: "marks" });
   if (trial.ok) {
     const paths = Object.keys(trial.projection.changed);
     if (
@@ -478,5 +472,5 @@ export function applyMarks(opts: OpenApplyOptions): OpenApplyResult {
       return { status: "unchanged" };
     }
   }
-  return applyRemoveOrIr(change, opts, { marksTreatment: value }, "Write mark guards", { kind: "marks" });
+  return applyRemoveOrIr(change, opts, { marksTreatment: value, runAs: "marks" }, "Write mark guards", { kind: "marks" });
 }

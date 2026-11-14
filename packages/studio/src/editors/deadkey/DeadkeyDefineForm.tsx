@@ -143,7 +143,13 @@ function parseIdText(text: string): number | null {
 export interface DeadkeyDefineFormProps {
   ir: KeyboardIR;
   /** Commit a successfully defined IR to the working copy. */
-  onCommitIr: (nextIr: KeyboardIR) => void;
+  /**
+   * Commit an IR edit and the ops that produced it. `false`: not written (a
+   * keyboard opened for update refused it), so the ops are not logged.
+   * `"pending"`: waiting for the author's agreement; the surface logs the ops
+   * itself once it is written. Anything else: written, and the editor logs them.
+   */
+  onCommitIr: (nextIr: KeyboardIR, ops: DeadkeyOperation[]) => boolean | "pending" | void;
   /** The trigger is taken — adopt the occupant's editor instead. */
   onAdoptExisting: (id: number) => void;
   /** A deadkey was defined — open its editor. */
@@ -172,9 +178,11 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
   // projectWorkingCopyVfs can replay the edit onto the projected VFS — the
   // working IR itself never reaches artifacts.
   const recordDeadkeyOp = useWorkingCopyStore((s) => s.commitDeadkeyOp);
-  const commitAndRecord = (next: KeyboardIR, op: DeadkeyOperation) => {
-    onCommitIr(next);
+  const commitAndRecord = (next: KeyboardIR, op: DeadkeyOperation): boolean => {
+    const written = onCommitIr(next, [op]);
+    if (written === false || written === "pending") return false;
     recordDeadkeyOp(op);
+    return true;
   };
 
   // Proposed double-tap accent: the trigger's literal character (suggestion
@@ -270,14 +278,14 @@ export function DeadkeyDefineForm({ ir, onCommitIr, onAdoptExisting, onDefined, 
     });
     const committed = commitDeadkeyResult(ir, result);
     if (committed.ok) {
-      commitAndRecord(committed.ir, {
+      const written = commitAndRecord(committed.ir, {
         kind: "define",
         triggerKey: resolvedVkey,
         id,
         accentChar,
         ...(name !== "" ? { authorName: name } : {}),
       });
-      onDefined(id);
+      if (written) onDefined(id);
       return;
     }
     for (const c of committed.conflicts) {

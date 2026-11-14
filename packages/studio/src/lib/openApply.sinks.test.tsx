@@ -17,7 +17,13 @@ import { decideGalleryValue, runGalleryApply } from "../steps/galleryHost.tsx";
 import { buildDecisionSummaryBlock } from "@keyboard-studio/engine";
 import { getDecisionSnapshot } from "../stores/decisionStore.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
-import deadkeysDefined from "../survey/questions/gallery/deadkeysDefined.ts";
+import deadkeysDefinedModule from "../survey/questions/gallery/deadkeysDefined.ts";
+
+// A sample decision module whose apply writes groups/stores/raw. It is the deadkeys module's
+// apply under another decision id: `deadkeys-defined` itself writes nothing on Open (its edits
+// are written by the editor), so the sink's consent and rollback paths are exercised with this.
+const SAMPLE = "sample-ir";
+const deadkeysDefined = { ...deadkeysDefinedModule, provides: [SAMPLE] } as unknown as typeof deadkeysDefinedModule;
 import { useWorkingCopyTransform } from "../hooks/useWorkingCopyTransform.ts";
 import { OpenApplyHost } from "../components/OpenApplyHost.tsx";
 import { buildGalleryHostDeps } from "./galleryHostDeps.ts";
@@ -190,7 +196,7 @@ describe("a declined or failed change is taken back out of the record", () => {
       decideGalleryValue(deadkeysDefined, value, { provenance: "asked" }, "deadkeys", buildGalleryHostDeps());
       useDecisionLogStore.getState().append({
         stepId: "deadkeys",
-        payload: { kind: "decision", decisionId: "deadkeys-defined", value: value as never, summary: "defines a deadkey" },
+        payload: { kind: "decision", decisionId: "sample-ir", value: value as never, summary: "defines a deadkey" },
         provenance: "asked",
       });
     });
@@ -203,10 +209,10 @@ describe("a declined or failed change is taken back out of the record", () => {
     mountHost();
     unplaceable();
     await decide(DEFINE);
-    expect(getDecisionSnapshot()["deadkeys-defined"]).toBeDefined(); // recorded while the dialog is open
+    expect(getDecisionSnapshot()["sample-ir"]).toBeDefined(); // recorded while the dialog is open
     await screen.findByTestId("reformat-consent-dialog");
     await act(async () => { screen.getByTestId("reformat-consent-keep").click(); });
-    await vi.waitFor(() => expect(getDecisionSnapshot()["deadkeys-defined"]).toBeUndefined());
+    await vi.waitFor(() => expect(getDecisionSnapshot()["sample-ir"]).toBeUndefined());
     expect(listed()).toBe(false);
     expect(useDecisionLogStore.getState().read().entries).toHaveLength(0);
     // pass 2 composes from the recorded decisions: nothing left to re-attempt
@@ -217,13 +223,13 @@ describe("a declined or failed change is taken back out of the record", () => {
   it("decline: an earlier answer is put back as it was", async () => {
     mountHost();
     runGalleryApply(deadkeysDefined, EARLIER, buildGalleryHostDeps()); // placed precisely
-    useDecisionStore.getState().record({ id: "deadkeys-defined", value: EARLIER, provenance: "asked" });
-    const before = getDecisionSnapshot()["deadkeys-defined"];
+    useDecisionStore.getState().record({ id: "sample-ir", value: EARLIER, provenance: "asked" });
+    const before = getDecisionSnapshot()["sample-ir"];
     unplaceable();
     await decide({ ops: [{ kind: "define", triggerKey: "o", id: 0x3001, accentChar: "̂" }] } as never);
     await screen.findByTestId("reformat-consent-dialog");
     await act(async () => { screen.getByTestId("reformat-consent-keep").click(); });
-    await vi.waitFor(() => expect(getDecisionSnapshot()["deadkeys-defined"]).toEqual(before));
+    await vi.waitFor(() => expect(getDecisionSnapshot()["sample-ir"]).toEqual(before));
   });
 
   it("failed: the record is put back too", async () => {
@@ -234,7 +240,7 @@ describe("a declined or failed change is taken back out of the record", () => {
       },
     });
     await decide(DEFINE);
-    await vi.waitFor(() => expect(getDecisionSnapshot()["deadkeys-defined"]).toBeUndefined());
+    await vi.waitFor(() => expect(getDecisionSnapshot()["sample-ir"]).toBeUndefined());
     expect(listed()).toBe(false);
   });
 
@@ -245,7 +251,7 @@ describe("a declined or failed change is taken back out of the record", () => {
     await screen.findByTestId("reformat-consent-dialog");
     await act(async () => { screen.getByTestId("reformat-consent-agree").click(); });
     await vi.waitFor(() => expect(fileText()).not.toBe(KMN));
-    expect(getDecisionSnapshot()["deadkeys-defined"]).toBeDefined();
+    expect(getDecisionSnapshot()["sample-ir"]).toBeDefined();
     expect(listed()).toBe(true);
   });
 
@@ -258,7 +264,7 @@ describe("a declined or failed change is taken back out of the record", () => {
     const edited = fileText().replace("+ [K_B] > 'b'", "+ [K_B] > 'b'\r\n+ [K_C] > 'c'");
     expect((await import("./openApply.ts")).applyOpenChange({ kind: "files", files: { [KMN_PATH]: edited }, label: "Edit" }).status).toBe("applied");
     await act(async () => { screen.getByTestId("reformat-consent-agree").click(); });
-    await vi.waitFor(() => expect(getDecisionSnapshot()["deadkeys-defined"]).toBeUndefined());
+    await vi.waitFor(() => expect(getDecisionSnapshot()["sample-ir"]).toBeUndefined());
     expect(fileText()).toBe(edited); // the later change is untouched, nothing was reverted
     expect(fileText()).toContain("[K_C]");
     expect((await screen.findByTestId("open-apply-notice")).textContent).toContain("could not be applied");
@@ -274,7 +280,7 @@ describe("a declined or failed change is taken back out of the record", () => {
     await act(async () => { screen.getByTestId("reformat-consent-agree").click(); });
     await vi.waitFor(() => expect(fileText()).toContain("dk(3001)"));
     expect(readVfsText(useWorkingCopyStore.getState().startVfs!, `source/${ID}.kps`)).toContain("two");
-    expect(getDecisionSnapshot()["deadkeys-defined"]).toBeDefined();
+    expect(getDecisionSnapshot()["sample-ir"]).toBeDefined();
   });
 
   it("a different rule in the same .kmn changed while a change waits: the waiting change is rejected, with the notice, and the later one stays", async () => {
@@ -286,7 +292,7 @@ describe("a declined or failed change is taken back out of the record", () => {
     const edited = fileText().replace("+ [K_A] > 'a'", "+ [K_A] > 'A'");
     expect((await import("./openApply.ts")).applyOpenChange({ kind: "files", files: { [KMN_PATH]: edited }, label: "Edit" }).status).toBe("applied");
     await act(async () => { screen.getByTestId("reformat-consent-agree").click(); });
-    await vi.waitFor(() => expect(getDecisionSnapshot()["deadkeys-defined"]).toBeUndefined());
+    await vi.waitFor(() => expect(getDecisionSnapshot()["sample-ir"]).toBeUndefined());
     expect(fileText()).toBe(edited);
     expect((await screen.findByTestId("open-apply-notice")).textContent).toContain("could not be applied");
   });
@@ -297,15 +303,15 @@ describe("a declined or failed change is taken back out of the record", () => {
     await decide(DEFINE);
     await screen.findByTestId("reformat-consent-dialog");
     const newer = { ops: [{ kind: "define", triggerKey: "o", id: 0x3005, accentChar: "̂" }] } as never;
-    useDecisionStore.getState().record({ id: "deadkeys-defined", value: newer, provenance: "asked" });
+    useDecisionStore.getState().record({ id: "sample-ir", value: newer, provenance: "asked" });
     useDecisionLogStore.getState().append({
       stepId: "deadkeys",
-      payload: { kind: "decision", decisionId: "deadkeys-defined", value: newer, summary: "newer answer" },
+      payload: { kind: "decision", decisionId: "sample-ir", value: newer, summary: "newer answer" },
       provenance: "asked",
     });
     await act(async () => { screen.getByTestId("reformat-consent-keep").click(); });
     await screen.findByTestId("open-apply-notice");
-    expect(getDecisionSnapshot()["deadkeys-defined"]?.value).toEqual(newer);
+    expect(getDecisionSnapshot()["sample-ir"]?.value).toEqual(newer);
     expect(JSON.stringify(useDecisionLogStore.getState().read().entries)).toContain("newer answer");
   });
 });
@@ -342,11 +348,11 @@ describe("writers of the working IR on Open", () => {
     expect(fileText()).not.toContain("K_B");
   });
 
-  it("a context-tolerance commit on Open holds the overlay only and leaves the working IR as the file's parse", () => {
+  it("a context-tolerance commit on Open is written to the files and holds no overlay (T086c)", () => {
     commitOverlay({ fingerprint: "f", acceptedSiteIds: [], overlay: { batches: [] } });
     const s = useWorkingCopyStore.getState();
     expect(s.ir).toBe(s.startIr);
-    expect(s.contextToleranceOverlay?.fingerprint).toBe("f");
+    expect(s.contextToleranceOverlay).toBeNull();
   });
 
   it("a header.copyright write on Open changes no file, is reported, and the attribution channel still lands", () => {
@@ -371,7 +377,7 @@ describe("writers of the working IR on Open", () => {
     sinks.gallery()({ ir: { groups } } as never, [irPath("groups")]);
     expect(fileText()).not.toContain("K_B");
     expect(fileText().match(/\[K_A\]/g)).toHaveLength(1); // the stray duplicate never reached the file
-    expect(useWorkingCopyStore.getState().deadkeyOverlay.ops).toHaveLength(1); // the overlay still replays it at output
+    expect(useWorkingCopyStore.getState().deadkeyOverlay.ops).toHaveLength(1); // the op log is a record; no projection step replays it
   });
 
   it("a stray difference is reported even while a deadkey overlay is held", () => {

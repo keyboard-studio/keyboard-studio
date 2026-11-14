@@ -583,6 +583,7 @@ export async function projectWorkingCopyForOutput(
       ...(isOpen
         ? {
             openMode: openModeProjection({
+              kind: "output",
               identity,
               startDisplayName: startKeyboard.displayName,
               ...(opts?.consentedReemit === true ? { consentedReemit: true } : {}),

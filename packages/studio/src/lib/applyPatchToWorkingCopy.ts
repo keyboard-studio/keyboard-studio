@@ -22,13 +22,16 @@
 import type { IRPath } from "@keyboard-studio/contracts";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { PatchOrigin, WorkingCopyPatch } from "../survey/types.ts";
-import type { OpenChange } from "./openApply/types.ts";
+import type { OpenApplyResult, OpenChange } from "./openApply/types.ts";
 import { scopeToWrites } from "./openApply/scopeToWrites.ts";
 import { captureDecisionRollback } from "./decisionJournal.ts";
 import { applyMutatePatch } from "../steps/mutateApply.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { isLiveOpen } from "./openMode.ts";
 import { applyThroughOpenSeam, handOverToOpenApplyHost } from "./openApplyNotifier.ts";
+
+/** The decision whose op log the deadkey editor has already written into the files on Open. */
+const DEADKEY_DECISION_ID = "deadkeys-defined";
 
 /**
  * The `.kmn` header is not part of the rule splice, so a header write in an
@@ -87,10 +90,20 @@ export function applyPatchToWorkingCopy(
   patch: WorkingCopyPatch,
   writes: readonly IRPath[],
   origin?: PatchOrigin,
-): void {
+): OpenApplyResult | undefined {
   const wc = useWorkingCopyStore.getState();
+  // The apply seam's outcome on Open (a hand-over to the host reads `needs-consent`
+  // or `failed`: the files are unchanged until the author agrees); undefined on Copy.
+  let openResult: OpenApplyResult | undefined;
   if (patch.ir !== undefined && wc.ir !== null) {
-    if (isLiveOpen(wc) && wc.startIr !== null) {
+    if (isLiveOpen(wc) && wc.startIr !== null && origin?.decisionIds.includes(DEADKEY_DECISION_ID) === true) {
+      // Open: the deadkey editor wrote each edit into the files when it was made
+      // (editors/deadkey/DeadkeySurface), so the `deadkeys-defined` decision's
+      // apply, which recomposes the same edits from the op log (when it is
+      // recorded, or when `carved-layout` is re-recorded), must change nothing: a
+      // second application would double an op that is not idempotent (`add-pair`).
+      // Whatever the log holds, the files are the truth.
+    } else if (isLiveOpen(wc) && wc.startIr !== null) {
       // Open: the patch is applied to the FILE's parse, not to `wc.ir`.
       const base = wc.startIr;
       const nextIr = applyMutatePatch(base, patch.ir, writes);
@@ -112,12 +125,17 @@ export function applyPatchToWorkingCopy(
         }
       };
       const result = applyThroughOpenSeam({ kind: "model", nextIr, writes, label });
+      openResult = result;
       if (result.status === "needs-consent" || result.status === "failed") {
         // The decision(s) behind this change go back to what they were if it is
         // not applied, so the record matches the files.
         const rollback = captureDecisionRollback(origin?.decisionIds ?? []);
-        const onNotApplied = rollback ?? (() => {});
-        if (!handOverToOpenApplyHost({ build, onNotApplied })) {
+        const rollbackDecisions = rollback ?? (() => {});
+        const onNotApplied = (): void => {
+          rollbackDecisions();
+          origin?.onNotApplied?.();
+        };
+        if (!handOverToOpenApplyHost({ build, onNotApplied, ...(origin?.onApplied !== undefined ? { onApplied: origin.onApplied } : {}) })) {
           devLog.warn(
             "[open-apply] a step's change was not written to the files: " +
               (result.status === "failed" ? result.reason : result.files.join(", ") + " needs the author's agreement"),
@@ -134,4 +152,5 @@ export function applyPatchToWorkingCopy(
   if (patch.helpDocs !== undefined) wc.setHelpDocs(patch.helpDocs);
   if (patch.historyEntryState !== undefined) wc.setHistoryEntryState(patch.historyEntryState);
   if (patch.docFixProposals !== undefined) wc.setDocFixProposals(patch.docFixProposals);
+  return openResult;
 }

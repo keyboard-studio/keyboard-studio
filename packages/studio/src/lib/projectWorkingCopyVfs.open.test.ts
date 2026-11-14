@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
+import { PROJECTION_STEPS } from "./projectionSteps.ts";
 import type { ProjectWorkingCopyVfsInput } from "./projectWorkingCopyVfs.ts";
 
 const ID = "tiny";
@@ -35,7 +36,7 @@ function run(opts: { stripSourceLine?: boolean; consent?: boolean }) {
     assignments: [],
     getPattern: () => undefined,
     identity: null,
-    openMode: { kps: { nameEdited: false }, ...(opts.consent === true ? { consentedReemit: true } : {}) },
+    openMode: { kps: { nameEdited: false }, steps: PROJECTION_STEPS.output, ...(opts.consent === true ? { consentedReemit: true } : {}) },
   };
   const result = projectWorkingCopyVfs(input);
   return { result, text: vfs.get(`source/${ID}.kmn`)!.content as string };

@@ -2585,6 +2585,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   // Deadkey lifecycle overlay (spec 083) — append-only within a session.
   // The Deadkeys step calls this as a sibling of its setWorkingIR commit.
+  // On Open the log is the `deadkeys-defined` decision's record only: the edit is
+  // already in the files, and no projection step replays the log.
   commitDeadkeyOp: (op) =>
     set((s) => ({
       deadkeyOverlay: { ops: [...s.deadkeyOverlay.ops, op] },

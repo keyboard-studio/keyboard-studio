@@ -22,6 +22,8 @@ import type { OpenApplyOptions, OpenApplyResult, OpenChange } from "./openApply/
 export interface HandOver {
   build: () => OpenChange | null;
   onNotApplied: () => void;
+  /** Runs once the handed-over change is in the files (after the author agreed). */
+  onApplied?: () => void;
 }
 
 type Notifier = (item: HandOver) => void;

@@ -230,6 +230,13 @@ export interface PatchOrigin {
    * decision record (spec 111 FR-009/FR-042), so the record matches the files.
    */
   decisionIds: readonly string[];
+  /**
+   * Open only: runs when the change was handed to the apply host and then
+   * written (the author agreed), so a record kept beside the files can follow.
+   */
+  onApplied?: () => void;
+  /** Open only: runs when a handed-over change was declined or failed. */
+  onNotApplied?: () => void;
 }
 
 export interface WorkingCopyPatch {

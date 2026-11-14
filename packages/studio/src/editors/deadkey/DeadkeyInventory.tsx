@@ -195,7 +195,7 @@ export interface DeadkeyInventoryProps {
   /** Open the per-deadkey editor for an inventory row. */
   onEdit: (info: DeadkeyInfo) => void;
   /** Commit a repaired IR (duplicate-id repair). */
-  onCommitRepair: (nextIr: KeyboardIR) => void;
+  onCommitRepair: (nextIr: KeyboardIR, ops: DeadkeyOperation[]) => boolean | "pending" | void;
 }
 
 export function DeadkeyInventory({ ir, onDefine, onEdit, onCommitRepair }: DeadkeyInventoryProps) {
@@ -212,8 +212,9 @@ export function DeadkeyInventory({ ir, onDefine, onEdit, onCommitRepair }: Deadk
   const duplicateCount = duplicateFindings.length;
   const repairDuplicates = () => {
     const repaired = withRepairedDuplicateTriggerIds(ir);
-    onCommitRepair(commitDeadkeyEdit(ir, repaired));
     const op: DeadkeyOperation = { kind: "repair-duplicate-ids" };
+    const written = onCommitRepair(commitDeadkeyEdit(ir, repaired), [op]);
+    if (written === false || written === "pending") return;
     recordDeadkeyOp(op);
   };
 

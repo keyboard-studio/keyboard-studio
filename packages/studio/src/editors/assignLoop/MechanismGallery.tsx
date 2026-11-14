@@ -126,6 +126,7 @@ import {
 } from "../../hooks/usePlacementInventory.ts";
 import { useLoanwordSet } from "../../hooks/useLoanwordSet.ts";
 import { useRemovalWarning } from "../../hooks/useRemovalWarning.ts";
+import { useRemovalActions } from "../carve/useRemovalActions.ts";
 import { RemovalWarningNotice } from "../../components/RemovalWarningNotice.tsx";
 import type { PlacementSeedEntry } from "../../survey/placementSeeds.ts";
 import {
@@ -1422,7 +1423,8 @@ export function MechanismGallery({
   // does not, on its own, subscribe this component to deletedItemIds.
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const isItemDeleted = useWorkingCopyStore((s) => s.isItemDeleted);
-  const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
+  // Open: a removal is written into the files when made (useRemovalActions); Copy keeps the overlay action.
+  const { cascadeDelete } = useRemovalActions();
 
   // One-time intro splash — read the seen flag on mount; mark it on "Get started".
   const mechIntroSeen = useWorkingCopyStore(

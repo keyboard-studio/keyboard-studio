@@ -21,6 +21,7 @@ import {
 import type { DecisionSet } from "../decisions/decisionTypes.ts";
 import { projectWorkingCopyForOutput } from "./serializeWorkingCopy.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
+import { PROJECTION_STEPS } from "./projectionSteps.ts";
 import { capsHandlingFromDecisions } from "./projectionInput.ts";
 import { createStudioReducerDeps } from "./studioReducerDeps.ts";
 import { applyOpenChange, undoLastOpenApply } from "./openApply.ts";
@@ -247,7 +248,7 @@ describe("caps and id rename on Open (T082c)", () => {
       assignments: [],
       getPattern: () => undefined,
       identity: null,
-      openMode: { kps: { nameEdited: false }, consentedReemit: true },
+      openMode: { kps: { nameEdited: false }, steps: PROJECTION_STEPS.output, consentedReemit: true },
       ...extra,
     });
     return { text, vfs, result };

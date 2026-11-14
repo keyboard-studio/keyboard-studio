@@ -99,7 +99,7 @@ describe("a change on Open carries the held overlays into the file", () => {
     await routesAgree();
   });
 
-  it("an applied context-tolerance fix is spliced in before the rule it was verified against", async () => {
+  it("a context-tolerance overlay left by an older draft is not carried (it is written when applied, never held)", async () => {
     const start = useWorkingCopyStore.getState().startIr!;
     const g = start.groups.find((x) => !x.readonly)!;
     const guard = byKey("K_G");
@@ -118,13 +118,9 @@ describe("a change on Open carries the held overlays into the file", () => {
     });
     const result = applyOpenChange({ kind: "remove", itemIds: [byKey("K_D").nodeId], chars: ["d"] });
     expect(result.status).toBe("applied");
-    const lines = ruleLines();
-    expect(lines.map((l) => l.slice(0, 9))).toEqual(
-      ["+ [K_A] >", "+ [K_A] >", "+ [K_G] >", "+ [K_C] >"],
-    );
-    expect(lines[1]).toContain("U+0079");
-    expect(useWorkingCopyStore.getState().contextToleranceOverlay).toBeNull();
-    await routesAgree();
+    // Nothing replays it: the file gets only the removal.
+    expect(ruleLines().map((l) => l.slice(0, 9))).toEqual(["+ [K_A] >", "+ [K_G] >", "+ [K_C] >"]);
+    expect(fileText()).not.toContain("U+0079");
   });
 
   it("a reinsert also carries them, and Restore does not erase them", () => {

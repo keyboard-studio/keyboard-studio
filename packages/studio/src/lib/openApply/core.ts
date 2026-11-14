@@ -34,6 +34,7 @@ import {
   type ProjectionState,
 } from "../projectionInput.ts";
 import { projectWorkingCopyVfs } from "../projectWorkingCopyVfs.ts";
+import { PROJECTION_STEPS, type ProjectionKind } from "../projectionSteps.ts";
 import { findTouchLayoutPath } from "../findTouchLayoutPath.ts";
 import { readVfsText } from "../vfsText.ts";
 import { resolveCarvedCombos } from "../carvedCombo.ts";
@@ -200,17 +201,12 @@ export interface Projection {
   carvedKmnIr: Record<string, KeyboardIR>;
   /** The IR each changed `.kmn` was meant to become (the last step that wrote it). */
   intendedKmnIr: Record<string, KeyboardIR>;
-  /** The change carried held overlays (additions, a tolerance fix, earlier carves) with it. */
+  /** The change carried held rules-step additions (touch key identity, until phase 16) with it. */
   carried: boolean;
 }
 
 /** What an `assign` or `marks` projection adds to the common run. */
 export interface ProjectExtra {
-  /**
-   * The held overlays were already carried into `prepared`/`startIr`: do not
-   * replay them (carves, tolerance fix) a second time in this run.
-   */
-  flushed?: boolean;
   /** Assignments to project (the only non-empty replay input). */
   assignments?: readonly MechanismAssignment[];
   /** The marks-treatment value: output form for the assignments, guards (step 2.6). */
@@ -219,26 +215,27 @@ export interface ProjectExtra {
   prepared?: Record<string, string | null>;
   /** The keyboard as `prepared` leaves it (the IR must describe the text the run starts from). */
   startIr?: KeyboardIR;
-  /** Leave the mark guards out of this run (they have their own apply). */
-  skipMarkGuards?: boolean;
-  /** The caller checks the `.kmn` itself (assignments add lines the carve IR does not hold). */
-  skipIntendedCheck?: boolean;
+  /**
+   * The apply kind this run is for; picks its row of `PROJECTION_STEPS`.
+   * Defaults to the change's own kind (`flush` for a flush).
+   */
+  runAs?: ProjectionKind;
 }
 
 /**
  * Project one change onto a clone of the starting-point files.
  *
- * Held overlays that the re-parse in `replaceStartingPointFiles` clears are
- * carried INTO the same run, so they are spliced into the file together with
- * the change instead of being dropped: rules-step additions (derived from `ir`
- * against `startIr`), the applied context-tolerance fix, and carves held by
- * overlay-writing callers (`deletedNodeIds`, `deletedItemIds`, `carveChars`).
+ * The one overlay still held on Open and carried INTO the same run, so the
+ * re-parse in `replaceStartingPointFiles` does not drop it, is the rules-step
+ * additions (derived from `ir` against `startIr`): the touch key-identity commit
+ * still writes them through `setWorkingIR` until the touch phase. Carves, the
+ * context-tolerance fix and the deadkey ops are written when applied and never
+ * held on Open, so there is nothing to carry for them.
  * Overlays the re-parse does NOT clear stay overlays and are left empty here:
- * deadkey ops, key-edit ops, disabled families, touch-key deletions, touch
- * keep-inert chars (the projection regenerates them from their own stores on
- * every preview and download). Marks guards are written by their own apply
- * (`marks`) and the output no longer regenerates them; an answered caps
- * decision is the one remaining decision-driven `.kmn` step at output.
+ * key-edit ops, disabled families, touch-key deletions, touch keep-inert chars
+ * (touch, phase 16). Marks guards are written by their own apply (`marks`) and
+ * the output no longer regenerates them; an answered caps decision is the one
+ * remaining decision-driven `.kmn` step at output.
  */
 export function projectChange(
   change:
@@ -256,6 +253,7 @@ export function projectChange(
   }
   const keyboardId = startKeyboard.id;
   const consented = opts.consentedReemit === true;
+  const runAs: ProjectionKind = extra.runAs ?? change.kind;
 
   const clone = createVirtualFS(startVfs.entries());
   for (const [path, text] of Object.entries(extra.prepared ?? {})) {
@@ -269,28 +267,21 @@ export function projectChange(
   const itemIds = removing ? [...change.itemIds, ...(change.disabledRuleIds ?? [])] : [];
   const workingIr =
     change.kind === "ir" ? change.nextIr : extra.startIr !== undefined ? startIr : (st.ir ?? startIr);
-  const carried =
-    hasRuleAdditions(deriveRuleAdditions(workingIr, startIr)) ||
-    (st.contextToleranceOverlay?.overlay.batches.length ?? 0) > 0 ||
-    st.deletedNodeIds.size > 0 ||
-    st.deletedItemIds.size > 0 ||
-    st.carveChars.size > 0;
+  const carried = hasRuleAdditions(deriveRuleAdditions(workingIr, startIr));
   const state: ProjectionState = {
     ir: workingIr,
     startIr,
-    deletedNodeIds: extra.flushed === true ? new Set() : new Set(st.deletedNodeIds),
-    deletedItemIds: new Set([...(extra.flushed === true ? [] : st.deletedItemIds), ...itemIds]),
-    carveChars: new Set([
-      ...(extra.flushed === true ? [] : st.carveChars),
-      ...(removing ? change.chars.map((c) => c.normalize("NFC")) : []),
-    ]),
+    // Nothing carved is held on Open: a removal is written when applied.
+    deletedNodeIds: new Set(),
+    deletedItemIds: new Set(itemIds),
+    carveChars: new Set(removing ? change.chars.map((c) => c.normalize("NFC")) : []),
     deletedTouchKeyIds: new Set(),
     disabledFamilyIds: new Set(),
     // A setting the carve reads (it decides whether a removed key is blocked).
     fallbackPolicy: st.fallbackPolicy,
     carveTouchKeepInert: [],
     deadkeyOverlay: { ops: [] },
-    contextToleranceOverlay: extra.flushed === true ? null : st.contextToleranceOverlay,
+    contextToleranceOverlay: null,
     touchLayoutJson: touchJson,
     customCss: null,
     authoredWelcomeHtm: null,
@@ -311,12 +302,11 @@ export function projectChange(
     capsHandling: undefined,
     openMode: {
       ...openModeProjection({
+        kind: runAs,
         identity: null,
         startDisplayName: null,
         ...(consented ? { consentedReemit: true } : {}),
       }),
-      applyOnly: true,
-      ...(extra.skipMarkGuards === true ? { skipMarkGuards: true } : {}),
     },
   });
   const disabled = removing ? (change.disabledRuleIds ?? []) : [];
@@ -334,7 +324,7 @@ export function projectChange(
   // keyboard behaves (rules match first to last), so it counts as "cannot be
   // placed precisely".
   const misplaced: string[] = [];
-  for (const [path, intended] of extra.skipIntendedCheck === true ? [] : Object.entries(result.intendedKmnIr ?? {})) {
+  for (const [path, intended] of PROJECTION_STEPS[runAs].has("intendedCheck") ? Object.entries(result.intendedKmnIr ?? {}) : []) {
     const text = changed[path];
     if (typeof text === "string" && !intendedMatchesText(intended, text, keyboardId)) {
       misplaced.push(path);

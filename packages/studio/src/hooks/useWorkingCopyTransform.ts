@@ -528,6 +528,7 @@ export function useWorkingCopyTransform(
       // compiled as the reformatted text the author would be asked to accept.
       const openMode = isOpenedWithDescriptor(instantiationMode, startVfs, keyboardId)
         ? openModeProjection({
+            kind: "output",
             identity: { displayName: identityDisplayName ?? undefined, languages: identityLanguages },
             startDisplayName: storeStartDisplayName,
             consentedReemit: true,

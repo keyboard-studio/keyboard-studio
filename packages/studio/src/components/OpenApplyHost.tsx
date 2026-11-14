@@ -110,6 +110,7 @@ export function OpenApplyHost({ children }: { children: ReactNode }) {
           // Built when it is applied, from the working copy as it stands then.
           const result = await applyBuilt(item.build);
           if (result.status === "declined" || result.status === "failed") item.onNotApplied();
+          else item.onApplied?.();
         })
         .catch(() => item.onNotApplied());
     });

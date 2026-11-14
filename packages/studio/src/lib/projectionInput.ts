@@ -45,6 +45,7 @@ import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.t
 import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
 import { welcomePagePath } from "./welcomeFolder.ts";
 import { isOpenMode, isOpenedWithDescriptor } from "./openMode.ts";
+import { PROJECTION_STEPS, type ProjectionKind } from "./projectionSteps.ts";
 
 /** The store fields the projection reads. `startIr` must already be set. */
 export type ProjectionState = Pick<
@@ -155,9 +156,12 @@ export function openModeProjection(args: {
   consentedReemit?: boolean;
   /** The projection feeds the preview: the re-emit warning does not claim agreement. */
   preview?: boolean;
+  /** What the run is for; picks its row of `PROJECTION_STEPS`. */
+  kind: ProjectionKind;
 }): NonNullable<ProjectWorkingCopyVfsInput["openMode"]> {
-  const { identity, startDisplayName, consentedReemit, preview } = args;
+  const { identity, startDisplayName, consentedReemit, preview, kind } = args;
   return {
+    steps: PROJECTION_STEPS[kind],
     kps: {
       nameEdited:
         startDisplayName !== null &&

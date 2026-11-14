@@ -16,10 +16,14 @@ import { useCallback, useState, type CSSProperties } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { KeyboardIR, DeadkeyInfo } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { isLiveOpen } from "../../lib/openMode.ts";
+import { applyPatchToWorkingCopy } from "../../lib/applyPatchToWorkingCopy.ts";
+import { DEADKEY_WRITES } from "../../steps/editorMutate.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { TEXT_MAIN, TEXT_DIM, FONT } from "../../lib/galleryTheme.ts";
 import { FullStepPage } from "../../components/FullStepPage.tsx";
 import { phaseHeading, leadParagraph } from "../../survey/surveyStyles.ts";
+import type { DeadkeyOperation } from "../../lib/deadkeyOps.ts";
 import { DeadkeyInventory } from "./DeadkeyInventory.tsx";
 import { DeadkeyDefineForm } from "./DeadkeyDefineForm.tsx";
 import { DeadkeyDetailEditor } from "./DeadkeyDetailEditor.tsx";
@@ -71,6 +75,7 @@ export function DeadkeySurface({ onComplete, onBack }: DeadkeySurfaceProps) {
   const ir = useWorkingCopyStore((s) => s.ir);
   const startIr = useWorkingCopyStore((s) => s.startIr);
   const setWorkingIR = useWorkingCopyStore((s) => s.setWorkingIR);
+  const live = useWorkingCopyStore((s) => isLiveOpen(s));
   const [mode, setMode] = useState<Mode>({ tab: "inventory" });
   const { t } = useLingui();
 
@@ -93,21 +98,47 @@ export function DeadkeySurface({ onComplete, onBack }: DeadkeySurfaceProps) {
     },
   });
 
-  const workingIr: KeyboardIR | null = ir ?? startIr ?? null;
+  // On Open the editors work from the file's own parse: every edit is written
+  // into the files when it is made, so `startIr` is always current.
+  const workingIr: KeyboardIR | null = (live ? (startIr ?? ir) : (ir ?? startIr)) ?? null;
 
   const onCommitIr = useCallback(
-    (nextIr: KeyboardIR) => {
-      // Lifecycle edits land in the working IR (s.ir) via the overlay-
+    (nextIr: KeyboardIR, ops: DeadkeyOperation[]): boolean | "pending" => {
+      // On Copy, lifecycle edits land in the working IR (s.ir) via the overlay-
       // preserving seam and are saved immediately (F-10). They reach
       // preview/download through the deadkey overlay, not the working IR:
       // each Deadkeys-step commit also appends its DeadkeyOperation to
       // s.deadkeyOverlay.ops, and projectWorkingCopyVfs replays that log at
       // step 1.8 (see ./deadkeyOps.ts and the useWorkingCopyTransform /
       // serializeWorkingCopy wiring). The working IR itself is never
-      // emitted into artifacts.
+      // emitted into artifacts. On Open the edit goes into the files instead
+      // (below); the op log is then only the record the `deadkeys-defined`
+      // decision is read from, and no projection step replays it
+      // (lib/projectionSteps).
+      if (live) {
+        // Open (spec 111 FR-041): the edit is written into the files now,
+        // through the apply seam, with an undo record. The op log is the
+        // `deadkeys-defined` decision's RECORD on Open (Article III: decisions
+        // are a record); nothing replays it, and a log entry is made only for
+        // an op that is in the files: now when written, on agreement when the
+        // author is asked first, never on a refusal or a decline.
+        const result = applyPatchToWorkingCopy(
+          { ir: { groups: nextIr.groups, stores: nextIr.stores, raw: nextIr.raw } },
+          DEADKEY_WRITES,
+          {
+            decisionIds: [],
+            onApplied: () => {
+              for (const op of ops) useWorkingCopyStore.getState().commitDeadkeyOp(op);
+            },
+          },
+        );
+        if (result?.status === "applied" || result?.status === "unchanged") return true;
+        return result?.status === "needs-consent" || result?.status === "failed" ? "pending" : false;
+      }
       setWorkingIR(nextIr);
+      return true;
     },
-    [setWorkingIR],
+    [live, setWorkingIR],
   );
 
   const openEdit = useCallback((info: DeadkeyInfo) => {
