@@ -1,8 +1,9 @@
 // Per-question module: il_language_region (identity-lite)
 //
-// CONDITIONAL question (spec 030 US3): shown only when the language picked at
-// il_language_english is region-ambiguous — i.e. its resolved langtags entry
-// has more than one regionVariant. SurveyRunner reaches it via IdentityLite's
+// CONDITIONAL question (spec 030 US3, spec 115 US3): shown when the language picked
+// at il_language_english is region-ambiguous (its resolved langtags entry has more
+// than one regionVariant) or the author asked for a region in the chooser's
+// Customize panel (ctx.ilRegionRequested), for any language. SurveyRunner reaches it via IdentityLite's
 // getNextOverride (il_language_english -> il_language_region); when the language
 // is unambiguous the static next (il_language_english -> il_language_autonym) is
 // used and this question never appears.
@@ -21,9 +22,13 @@ import type { QuestionModule } from "../../types.ts";
 export const definition = {
   id: "il_language_region",
   prompt: "Which region is your language from?",
+  // CONTENT REVIEW (Article VI): this help text and the option labels supplied by
+  // IdentityLite.getSeedOptions (the default-region mark, "Other region...") are
+  // survey text owned by the content team.
   help_text:
-    "This language is used in more than one place, and the local name or spelling " +
-    "can differ by region. Pick the region that matches your community — or skip " +
+    "A tag names a region only when it is not the language's usual one. The list " +
+    "starts with this language's default region; pick another place your community " +
+    "is in, or choose \"Other region…\" and type any two-letter country code. Skip " +
     "if you are unsure.",
   type: "autocomplete" as const,
   required: false,

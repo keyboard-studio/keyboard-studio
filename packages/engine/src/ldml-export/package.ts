@@ -5,10 +5,11 @@
 // random source is read, and entries are inserted in a fixed order.
 
 import { createVirtualFS } from "@keyboard-studio/contracts";
+import { minimalTagOf } from "../langtags/index.js";
 import { toZip } from "../output/zip.js";
 import { classifyDetailed } from "./classify/classify.js";
 import { isMnemonicLayout } from "./classify/header.js";
-import { lowerDocument, minimalLocale, normaliseVersion } from "./lower/document.js";
+import { lowerDocument, normaliseVersion } from "./lower/document.js";
 import { resolveLdmlProfile } from "./profiles/resolve.js";
 import { renderKpj } from "./project/kpj.js";
 import { placePackageDocs, placeRootTexts } from "./project/docs.js";
@@ -55,7 +56,7 @@ export async function buildLdmlExport(input: LdmlExportInput): Promise<LdmlExpor
   sourceFiles.set(`source/${id}.xml`, xml);
   sourceFiles.set(
     `source/${id}.kps`,
-    renderKps({ id, version, metadata: meta, languages: meta.languages.map(minimalLocale), members }),
+    renderKps({ id, version, metadata: meta, languages: meta.languages.map((t) => minimalTagOf(t) ?? t), members }),
   );
   for (const path of [...sourceFiles.keys()].sort()) files.set(path, sourceFiles.get(path) as string | Uint8Array);
   placeRootTexts(files, input.packageFiles);

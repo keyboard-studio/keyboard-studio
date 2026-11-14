@@ -59,7 +59,7 @@ test.describe("Open an existing keyboard (spec 111)", () => {
     // The criteria view stays reachable from the navigation bar at any time.
     // The walk's pipeline instantiates the working copy while Languages is showing;
     // the list fills from the keyboard's own descriptor once it exists.
-    await expect(page.locator("#open-languages-heading + p + ol li").first()).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator("#open-languages-heading + section ol li").first()).toBeVisible({ timeout: 60_000 });
     await page.evaluate(() => { window.location.hash = "criteria"; });
     await expect(page.getByTestId("criteria-page")).toBeVisible({ timeout: 60_000 });
 
@@ -82,7 +82,7 @@ test.describe("Open an existing keyboard (spec 111)", () => {
     });
     // The walk's pipeline instantiates the working copy while Languages is showing;
     // the list fills from the keyboard's own descriptor once it exists.
-    await expect(page.locator("#open-languages-heading + p + ol li").first()).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator("#open-languages-heading + section ol li").first()).toBeVisible({ timeout: 60_000 });
     await page.evaluate(() => { window.location.hash = "criteria"; });
     await expect(page.getByTestId("criteria-page")).toBeVisible({ timeout: 60_000 });
     const marks = page.locator('[data-testid^="criteria-open-mark-"]');
@@ -102,7 +102,7 @@ test.describe("Open an existing keyboard (spec 111)", () => {
     await expect(page.getByRole("heading", { name: /languages this keyboard supports/i })).toBeVisible({
       timeout: 60_000,
     });
-    await expect(page.locator("#open-languages-heading + p + ol li").first()).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator("#open-languages-heading + section ol li").first()).toBeVisible({ timeout: 60_000 });
 
     const pressed: string[] = [];
     for (let step = 0; step < 40 && !/#criteria/.test(page.url()); step += 1) {
@@ -133,7 +133,7 @@ test.describe("Open an existing keyboard (spec 111)", () => {
   test("a non-basic keyboard walks Languages, Letters, Mechanisms, OSK, Touch in that order (US8)", async ({ page }) => {
     test.setTimeout(300_000);
     await openKeyboard(page, NON_BASIC_ID);
-    await expect(page.locator("#open-languages-heading + p + ol li").first()).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator("#open-languages-heading + section ol li").first()).toBeVisible({ timeout: 60_000 });
 
     // Languages -> Letters, which a non-basic keyboard always walks.
     await continueWalk(page);

@@ -10,6 +10,15 @@ import type { IRPath } from "@keyboard-studio/contracts";
 /** The typed facts the spike tracks, by stable id. */
 export type DecisionId =
   | "language-name"
+  // Spec 115: why the picked language matched a dialect/variety name the author typed.
+  | "language-search-match"
+  // Spec 115 FR-045: the Glottolog code of a language with no ISO 639-3 code ("" when it has one).
+  | "language-glottocode"
+  // Spec 115 FR-007/FR-012: the confirmed dialect subtag, its source, and the
+  // dialect's Glottolog code ("" when there is no dialect).
+  | "language-dialect"
+  | "language-dialect-source"
+  | "dialect-glottocode"
   | "language-region"
   | "language-autonym"
   | "language-code"
@@ -286,6 +295,11 @@ export interface DecisionRendererProps<T = unknown> {
  */
 export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "language-name": [],
+  "language-search-match": [],
+  "language-glottocode": [],
+  "language-dialect": [],
+  "language-dialect-source": [],
+  "dialect-glottocode": [],
   "language-region": [],
   "language-autonym": [],
   "language-code": [],

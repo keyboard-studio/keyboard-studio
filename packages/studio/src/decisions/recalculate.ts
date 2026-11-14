@@ -38,6 +38,7 @@
 // `repropagate` took injected deps — the rule must not import editors.
 
 import type { QuestionModule } from "../survey/types.ts";
+import { answerFilledIds } from "../survey/questions/answerFilledIds.ts";
 import type { Decision, DecisionId, DecisionSet } from "./decisionTypes.ts";
 import { deepEqual } from "./deepEqual.ts";
 import { decisionDownstreamClosure } from "./downstreamClosure.ts";
@@ -410,6 +411,13 @@ export function recalculate(
       continue; // restored unchanged — no provenance processing this pass
     }
     if (mod === undefined) continue;
+
+    // Renderer-owned records (a module's rendererWrites) are the renderer's
+    // own facts, never a default's: the dialect module's lookupDefault
+    // returns the dialect subtag, which must never land on its source or
+    // glottocode records (spec 115 US2). Gating above still applies to
+    // them; only provenance processing is skipped.
+    if (!answerFilledIds(mod).includes(id)) continue;
 
     const newInputs = snapshotInputs(mod, working);
 

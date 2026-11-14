@@ -19,12 +19,12 @@ import {
 } from "./registry.ts";
 
 describe("questionRegistry", () => {
-  // 142 question modules, including the body-parity, trial, and publish gallery
+  // 143 question modules, including the body-parity, trial, and publish gallery
   // modules; track_choice is no longer registered.
-  // (re-verified 2026-11-07 -- update this count in the same change that adds
+  // (re-verified 2026-11-11 -- update this count in the same change that adds
   // or removes a questionRegistry entry.)
-  it("has exactly the verified inventory of 142 entries", () => {
-    expect(Object.keys(questionRegistry).length).toBe(142);
+  it("has exactly the verified inventory of 143 entries", () => {
+    expect(Object.keys(questionRegistry).length).toBe(143);
   });
 
   it("no entry has a 'default' key (namespace-import leak guard)", () => {

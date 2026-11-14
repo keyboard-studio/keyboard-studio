@@ -44,6 +44,7 @@ export {
   CHOOSE_START_STEP_ID,
 } from "./stepIds.ts";
 import { CHOOSE_START_STEP_ID } from "./stepIds.ts";
+import { answerFilledIds } from "../survey/questions/answerFilledIds.ts";
 
 // ---------------------------------------------------------------------------
 // Instantiation result — passed to the reducer when choose_base completes.
@@ -396,7 +397,9 @@ export function recordAnswersAsDecisions(
   const records: Decision[] = [];
   for (const answer of result.answers) {
     const mod = questionRegistry[answer.questionId];
-    if (mod === undefined || mod.provides === undefined || mod.provides.length === 0) continue;
+    if (mod === undefined) continue;
+    const filled = answerFilledIds(mod);
+    if (filled.length === 0) continue;
     const saved = deps.getSavedAnswer?.(stepId, answer.questionId);
     const mapped = answerProvenance(answer.value, saved?.proposal, deps.getStartKeyboardId?.());
     let inputs: Decision["inputs"];
@@ -408,7 +411,7 @@ export function recordAnswersAsDecisions(
       }
       if (Object.keys(snapshot).length > 0) inputs = snapshot;
     }
-    for (const id of mod.provides) {
+    for (const id of filled) {
       records.push({
         id,
         value: answer.value,

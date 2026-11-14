@@ -14,12 +14,11 @@
 // attribution, project_name: flows hosted by makeFlowStepComponent, completed
 // with the product's options records (completeFlowStep).
 
-import { loadLangtags } from "../../../lib/langtagsDefaults.ts";
 import { getDecisionSnapshot } from "../../../stores/decisionStore.ts";
 import { deriveSurveyContext } from "../../../decisions/identitySelectors.ts";
 import { flowSources, loadFlowSourceDef } from "../../../steps/flowSources.ts";
 import { createIdentityResolution } from "../../../survey/identityResolution.ts";
-import { languageResultsFor, resolveTypedLanguage } from "../../../survey/resolveTypedLanguage.ts";
+import { resolveTypedEntry } from "../../../survey/languageChooser/chooserSearch.ts";
 import { attributionOptions, projectNameOptions } from "../../../editors/adapters/flowStepOptionRecords.ts";
 import { completeFlow, completeFlowStep, type FlowChoices } from "./flowStep.ts";
 import type { StepDrivers } from "./types.ts";
@@ -31,8 +30,6 @@ export const identityDrivers: StepDrivers = {
   identity: async (ctx) => {
     const flow = loadFlowSourceDef(flowSources["identity_lite"]!);
     const resolution = createIdentityResolution();
-    // The name picker cannot offer a row before langtags is loaded.
-    const langtags = await loadLangtags();
 
     const c = ctx.case;
     const overrides: Record<string, string> = {
@@ -43,14 +40,10 @@ export const identityDrivers: StepDrivers = {
     };
     const choices: FlowChoices = {
       overrides,
-      typed: (question, text) => {
+      typed: async (question, text) => {
         // The language-name picker resolves what is typed to one entry (or none).
         if (question.options_source !== "@langtags_names" || typeof text !== "string") return;
-        const results = languageResultsFor(langtags, text);
-        resolution.onEntryResolved(
-          question.id,
-          resolveTypedLanguage(text, results, (code) => langtags.getLanguageDefaults(code)?.englishNames),
-        );
+        resolution.onEntryResolved(question.id, await resolveTypedEntry(text, { glottolog: true }));
       },
     };
 

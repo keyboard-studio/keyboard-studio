@@ -17,29 +17,30 @@ import { cleanup, waitFor, fireEvent, screen } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import type { LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 
-// "zz" is unambiguous by region (no regionVariants) and carries a recorded
+// "am" (Amharic: a real chooser entry whose langtags defaults are faked here) is unambiguous by region (no regionVariants) and carries a recorded
 // own-script name distinct from its English name — so a correct seed is visibly
 // different from the English fallback.
 const ZZ_DEFAULTS: LanguageDefaults = {
-  code: "zz",
-  iso639_3: "zzz",
+  code: "am",
+  iso639_3: "amh",
   defaultScript: "Latn",
   regions: [],
   autonym: "Ẑeta-lang",
-  englishName: "Zeta",
+  englishName: "Amharic",
   localNames: ["Ẑeta-lang"],
 };
 
 const SUMMARIES: LanguageSummary[] = [
-  { code: "zz", englishName: "Zeta", autonym: "Ẑeta-lang", hasRegionVariants: false },
+  { code: "am", englishName: "Amharic", autonym: "Ẑeta-lang", hasRegionVariants: false },
 ];
 
 // Both loadLangtags and getLoadedLangtags return the same fake module, so the
 // synchronous seed path (the fix) is exercised — getLoadedLangtags is non-null.
 const FAKE_MODULE = {
-  getLanguageDefaults: (code: string) => (code === "zz" ? ZZ_DEFAULTS : null),
+  getLanguageDefaults: (code: string) => (code === "am" ? ZZ_DEFAULTS : null),
   listLanguages: () => SUMMARIES,
   lookupByName: () => SUMMARIES,
+  allDialectTagsets: [] as const,
 };
 
 vi.mock("../lib/langtagsDefaults.ts", async (importOriginal) => {
@@ -59,13 +60,15 @@ describe("IdentityLite auto-advance seed race (PR #1050 regression)", () => {
   it("no-region language: auto-advance seeds Q2 with the recorded local name, not the English fallback", async () => {
     render(<IdentityLite onComplete={vi.fn()} />, { withStepNav: true });
     await waitFor(() => {
-      expect(screen.getByRole<HTMLInputElement>("combobox").placeholder).toMatch(/Type your language/);
+      expect(screen.getByRole<HTMLInputElement>("combobox").placeholder).toMatch(/Search by name/);
     });
 
     // Pick "Zeta" at Q1. hasRegionVariants:false → no region step → auto-advance
     // lands directly on Q2 (own-language name).
-    fireEvent.focus(screen.getByRole("combobox"));
-    const option = await screen.findByRole("option", { name: /\(zz\)/ });
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "Amharic" } });
+    // Spec 115: pin the PLAIN row (name ends with the code) — a dialect row
+    // for Amharic starts with "Amharic, " too and would match a bare prefix.
+    const option = await screen.findByRole("option", { name: /^Amharic, .*am$/ });
     fireEvent.mouseDown(option);
 
     await waitFor(() => {
@@ -79,18 +82,18 @@ describe("IdentityLite auto-advance seed race (PR #1050 regression)", () => {
       expect(screen.getByRole<HTMLInputElement>("combobox").value).toBe("Ẑeta-lang");
     });
     // And specifically NOT the English Q1 name (the old racy fallback).
-    expect(screen.getByRole<HTMLInputElement>("combobox").value).not.toBe("Zeta");
+    expect(screen.getByRole<HTMLInputElement>("combobox").value).not.toBe("Amharic");
   });
 
   it("Q3 code dropdown offers the resolved language's candidate code forms", async () => {
     render(<IdentityLite onComplete={vi.fn()} />, { withStepNav: true });
     await waitFor(() => {
-      expect(screen.getByRole<HTMLInputElement>("combobox").placeholder).toMatch(/Type your language/);
+      expect(screen.getByRole<HTMLInputElement>("combobox").placeholder).toMatch(/Search by name/);
     });
 
-    // Q1: pick Zeta → auto-advance to Q2 (no region variants).
-    fireEvent.focus(screen.getByRole("combobox"));
-    fireEvent.mouseDown(await screen.findByRole("option", { name: /\(zz\)/ }));
+    // Q1: pick Amharic → auto-advance to Q2 (no region variants).
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "Amharic" } });
+    fireEvent.mouseDown(await screen.findByRole("option", { name: /^Amharic, .*am$/ }));
     await waitFor(() => {
       expect(screen.getByText(/What is your language called in your own language\?/)).toBeTruthy();
     });
@@ -102,13 +105,16 @@ describe("IdentityLite auto-advance seed race (PR #1050 regression)", () => {
     });
 
     // Q3 is seeded with the ISO 639-3 code, and its dropdown offers BOTH plausible
-    // forms for the resolved language: "zzz" (ISO 639-3) and "zz" (BCP 47 subtag).
-    expect(screen.getByRole<HTMLInputElement>("combobox").value).toBe("zzz");
+    // forms for the resolved language: "amh" (ISO 639-3) and "am" (BCP 47 subtag).
+    // (Spec 115: the code is shown as a confirmation; "Change" reopens the checked entry.)
+    expect(screen.getByTestId("language-code-value").textContent).toBe("amh");
+    fireEvent.click(screen.getByRole("button", { name: "Change" }));
+    expect(screen.getByRole<HTMLInputElement>("combobox").value).toBe("amh");
     fireEvent.focus(screen.getByRole("combobox"));
     const codes = Array.from(document.querySelectorAll('[role="option"]')).map(
       (o) => o.getAttribute("data-value") ?? "",
     );
-    expect(codes).toContain("zzz");
-    expect(codes).toContain("zz");
+    expect(codes).toContain("amh");
+    expect(codes).toContain("am");
   });
 });

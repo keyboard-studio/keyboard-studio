@@ -78,13 +78,18 @@ export function deriveIdentityResult(decisions: DecisionSet): IdentityLiteResult
   // Normalize so the recorded region and the folded bcp47 subtag agree —
   // the same rule extractIdentityLite applies to the raw answer.
   const region = normalizeRegionSubtag(decisionString(decisions, "language-region"));
+  const dialectSubtag = decisionString(decisions, "language-dialect");
   return {
     autonym: decisionString(decisions, "language-autonym"),
     english: decisionString(decisions, "language-name"),
     languageSubtag,
     region,
     targetScriptRaw,
-    bcp47: buildTargetBcp47(languageSubtag, targetScriptRaw, region),
+    dialectSubtag,
+    dialectSource: decisionString(decisions, "language-dialect-source"),
+    languageGlottocode: decisionString(decisions, "language-glottocode"),
+    dialectGlottocode: decisionString(decisions, "dialect-glottocode"),
+    bcp47: buildTargetBcp47(languageSubtag, targetScriptRaw, region, dialectSubtag),
     supported: !UNSUPPORTED_SCRIPTS.has(targetScriptRaw),
     prefill: deriveScriptPrefill(targetScriptRaw),
     attribution: deriveAttribution(decisions),
@@ -174,6 +179,11 @@ const IDENTITY_QUESTIONS: ReadonlyArray<{
   { questionId: "il_language_autonym", decisionId: "language-autonym", answerType: "text" },
   { questionId: "il_language_code", decisionId: "language-code", answerType: "text" },
   { questionId: "il_target_script", decisionId: "target-script", answerType: "select" },
+  // Spec 115 US2: the dialect answer replays into the resume stack like the
+  // other identity answers, so a draft resumed after il_target_script lands
+  // on it (T053). Its source and glottocode are renderer-owned decisions
+  // (il_language_dialect's rendererWrites), not answers, so they stay out.
+  { questionId: "il_language_dialect", decisionId: "language-dialect", answerType: "text" },
 ];
 
 /**

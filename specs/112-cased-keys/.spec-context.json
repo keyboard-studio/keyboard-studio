@@ -923,5 +923,6 @@
       "rejected": "console-only (km-frontend P2)"
     }
   ],
-  "last_action": "review approved conditionally, fixes pushed d9605fd9; PR next"
+  "last_action": "review approved conditionally, fixes pushed d9605fd9; PR next",
+  "telemetryInstanceId": "8229d332-f3fa-499d-8106-a29ab080da08"
 }

@@ -22,6 +22,7 @@
     "fixtures:decision-points": "tsx --import ../../utilities/i18n-content-extract/registerMacroShim.ts scripts/genDecisionPoints.ts"
   },
   "dependencies": {
+    "@ethnolib/find-language": "0.4.4",
     "@keyboard-studio/contracts": "workspace:*",
     "@keyboard-studio/engine": "workspace:*",
     "@keyboard-studio/glottolog": "workspace:*",

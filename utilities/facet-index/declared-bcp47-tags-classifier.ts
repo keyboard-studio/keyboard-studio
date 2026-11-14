@@ -15,7 +15,7 @@
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 
-import { extractScriptSubtag } from "../../packages/engine/src/start-browser/kps-parser.js";
+import { scriptSubtagOf } from "@keyboard-studio/contracts";
 import { readKpsPackage } from "./kps-reader.js";
 import { deriveScriptContext, undeterminedFallback } from "./measurement.js";
 import { computeAnalyzedCoverage } from "./outcome.js";
@@ -42,7 +42,7 @@ function tagsCategorization(
   // is also a mismatch. Only evaluated on the content path (crossCheck).
   const claimedScripts = new Set<string>();
   for (const tag of sorted) {
-    const sub = extractScriptSubtag(tag);
+    const sub = scriptSubtagOf(tag);
     if (sub) claimedScripts.add(sub);
   }
   const mismatches: string[] = [];

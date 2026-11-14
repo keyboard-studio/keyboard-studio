@@ -284,6 +284,32 @@ describe("language-code answer with a script answer also present", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Spec 115 US2: the dialect answer is a fourth slot of the composed tag
+// ---------------------------------------------------------------------------
+
+describe("dialect answer whose subtag extends the composed tag", () => {
+  it("reports the tag with the dialect, not the bare subtag", async () => {
+    seedSession("oci", "Latn");
+    const code = answerEntry("d-code", "il_language_code", "oci");
+    const script = answerEntry("d-script", "il_target_script", "Latn");
+    const dialect = answerEntry("d-dialect", "il_language_dialect", "gascon");
+
+    const impact = await resolveImpactAsync(dialect, asyncDeps(recordOf([code, script, dialect])));
+
+    expect(impact).not.toBeNull();
+    expect(impact!.state).toBe("captured");
+    // Was `und` -> `gascon`: the raw answer substituted as the whole tag, which
+    // the shipped descriptor never declares while the code answer stands.
+    expect(addedText(impact)).toContain('<Language ID="oc-gascon">');
+    expect(addedText(impact)).not.toContain('<Language ID="gascon">');
+    // The alternative (dialect left blank) is the plain tag, not "no tag".
+    expect(removedText(impact)).toContain('<Language ID="oc">');
+    if (impact!.state !== "captured") return;
+    expect(impact!.sharedWith).toEqual(["d-code", "d-script"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Every other overlay field is unchanged: a whole value, substituted
 // ---------------------------------------------------------------------------
 

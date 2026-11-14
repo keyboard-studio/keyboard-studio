@@ -1,6 +1,6 @@
 # criteria.md triage summary
 
-> **Canonical per-band recompute.** The numbers below are recomputed directly from `criteria.json`. The total and per-band split (208; 40/124/34/10) is **descriptive and expected to grow**; tests enforce schema-validity of every row and the four-band partition invariant (sum equals total, no orphans), **not the literal cardinality**. Prose mentions elsewhere (spec.md §11, CLAUDE.md, README) cross-link here; update this file when the data changes.
+> **Canonical per-band recompute.** The numbers below are recomputed directly from `criteria.json`. The total and per-band split (211; 40/125/36/10) is **descriptive and expected to grow**; tests enforce schema-validity of every row and the four-band partition invariant (sum equals total, no orphans), **not the literal cardinality**. Prose mentions elsewhere (spec.md §11, CLAUDE.md, README) cross-link here; update this file when the data changes.
 
 This document records the triage outcome for all criteria drawn from `docs/criteria.md`, performed as part of Day-1 issue #6. Each criterion was assigned to one of four enforcement bands defined in spec.md Section 14, Decision D4: `scaffolder-bake` (enforced at scaffold time), `layer-c-enforce` (blocked by the lint engine), `yellow-survey` (surfaced as a plain-language survey question), and `red-checklist` (manual pre-submit checklist item). The result is encoded in `packages/contracts/data/criteria.json` as a `Criterion[]` array conforming to the interface in `packages/contracts/src/criteria.ts`, as described in spec.md Section 11's example triage table.
 
@@ -9,12 +9,12 @@ This document records the triage outcome for all criteria drawn from `docs/crite
 | Band | Count | % of total |
 |------|-------|-----------|
 | scaffolder-bake | 40 | 19% |
-| layer-c-enforce | 124 | 60% |
-| yellow-survey | 34 | 16% |
+| layer-c-enforce | 125 | 59% |
+| yellow-survey | 36 | 17% |
 | red-checklist | 10 | 5% |
-| **Total** | **208** | **100%** |
+| **Total** | **211** | **100%** |
 
-Recompute of 2026-11-06: refreshed again (206; 40/122/34/10 to 208; 40/124/34/10) for the two raw-Ctrl `layer-c-enforce` rows added by spec 114 (the raw-Ctrl finding and the sided-Ctrl advisory).
+Recompute of 2026-11-11: refreshed again (209; 40/125/34/10 to 211; 40/125/36/10) for the two yellow-survey rows `12.8-bcp47-tag-well-formed` and `12.9-bcp47-variant-prefix` added by spec 115; the 209 baseline already included criterion 18.13, added after the previous recompute.
 
 Recompute of 2026-11-05: the table above was refreshed from `criteria.json` (it still read 149; 40/67/32/10). Growth since the original triage is `layer-c-enforce` and `yellow-survey` rows added by later specs, most recently 7.28 and 18.16 (spec 112) and the touch upgrade rows `18.17-touch-modifier-keys-consistent` and `18.18-touch-symbols-layer-linked` (spec 111 T059b/T059c), each paired with a suggested fix on the Open path.
 

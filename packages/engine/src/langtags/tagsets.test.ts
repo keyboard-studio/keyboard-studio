@@ -72,6 +72,7 @@ describe.skipIf(!existsSync(DATA_FILE))("tagsets codegen determinism", () => {
       tags?: string[];
       regions?: string[];
       macrolang?: string;
+      windows?: string;
     }>;
     const expected = raw
       .filter((e) => e.tag && !e.tag.startsWith("_") && typeof e.full === "string")
@@ -81,8 +82,24 @@ describe.skipIf(!existsSync(DATA_FILE))("tagsets codegen determinism", () => {
         [...(e.tags ?? [])].sort().join(" "),
         [...(e.regions ?? [])].sort().join(" "),
         e.macrolang ?? "",
+        e.windows ?? "",
       ])
       .sort((a, b) => a[0]!.localeCompare(b[0]!));
     expect(tagsets).toEqual(expected);
+  });
+});
+
+describe("dialects codegen", () => {
+  it("emits one row per variant or -x- tagset, none folded into regionVariants", async () => {
+    const { dialects } = await import("./generated/dialects.js");
+    expect(dialects.length).toBe(229);
+    const rabinal = dialects.find((d) => d.tag === "acr-x-rabinal");
+    expect(rabinal).toMatchObject({
+      full: "acr-Latn-GT-x-rabinal",
+      language: "acr",
+      dialectSubtag: "x-rabinal",
+      windows: "acr-Latn-x-rabinal",
+    });
+    expect(dialects.find((d) => d.tag === "ca-valencia")?.dialectSubtag).toBe("valencia");
   });
 });
