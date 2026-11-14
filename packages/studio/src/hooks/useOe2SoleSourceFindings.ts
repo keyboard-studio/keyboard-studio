@@ -18,7 +18,7 @@ import { useLingui } from "@lingui/react/macro";
 import type { LintFinding } from "@keyboard-studio/contracts";
 import { findSessionOe2SoleSourceGlyphs } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { selectDesktopAssignments } from "../lib/unimplementedInventory.ts";
+import { useSessionAssignments } from "./useSessionAssignments.ts";
 import { getPatternByIdSync } from "../lib/services.ts";
 import { buildOe2SoleSourceFindings } from "../lint/oe2SoleSourceFindings.ts";
 
@@ -27,16 +27,16 @@ const EMPTY: LintFinding[] = [];
 export function useOe2SoleSourceFindings(): LintFinding[] {
   const { i18n } = useLingui();
   const workingIr = useWorkingCopyStore((s) => s.ir ?? s.startIr);
-  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
+  const sessionAssignments = useSessionAssignments();
 
   return useMemo(() => {
     if (workingIr === null) return EMPTY;
     const glyphs = findSessionOe2SoleSourceGlyphs(
       workingIr,
-      selectDesktopAssignments(phaseResults),
+      sessionAssignments,
       getPatternByIdSync,
     );
     if (glyphs.length === 0) return EMPTY;
     return buildOe2SoleSourceFindings(glyphs, i18n);
-  }, [workingIr, phaseResults, i18n]);
+  }, [workingIr, sessionAssignments, i18n]);
 }

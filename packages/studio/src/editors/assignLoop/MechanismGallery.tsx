@@ -80,6 +80,8 @@ import type {
 } from "@keyboard-studio/contracts";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useCommitAssignments } from "./useCommitAssignments.ts";
+import { useSessionAssignments } from "../../hooks/useSessionAssignments.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 import {
@@ -211,7 +213,6 @@ import {
 } from "./parts/RemovableChipRow.tsx";
 import {
   unimplementedDesktopChars,
-  selectDesktopAssignments,
   formatUncoveredCharsList,
 } from "../../lib/unimplementedInventory.ts";
 import { subtractMarked } from "../../lib/accountedForGate.ts";
@@ -1370,7 +1371,7 @@ export function MechanismGallery({
   const unlockDesktop = useWorkingCopyStore((s) => s.unlockDesktop);
   const markStale = useWorkingCopyStore((s) => s.markStale);
   const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
-  const recordAssignments = useWorkingCopyStore((s) => s.recordAssignments);
+  const recordAssignments = useCommitAssignments();
   // unflagCharForSequence is reused here purely for its assignment-stripping
   // side effect (it removes a char's whole recorded multi_char_sequence
   // assignment regardless of sequenceFlaggedChars membership — see the store
@@ -1385,7 +1386,6 @@ export function MechanismGallery({
   // Loanword-tier letters the author added: needed, but placed after the
   // alphabet's own letters (survey/collation.ts loanwordsLast).
   const loanwordSet = useLoanwordSet();
-  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const axes = useWorkingCopyStore(
     useShallow((s) => s.session.axes as Partial<DiscoveryAxisVector>),
   );
@@ -1486,10 +1486,7 @@ export function MechanismGallery({
   // This session's physical (desktop) assignments — feeds baseProducedSet
   // below (session-aware coverage) and mechanismAssignments further down.
   // Declared once, early, so both can share it.
-  const sessionAssignments = useMemo(
-    () => selectDesktopAssignments(phaseResults),
-    [phaseResults],
-  );
+  const sessionAssignments = useSessionAssignments();
 
   // BASE-DIRECT signal (a) of the 3-signal producer badge (charMechanisms.ts's
   // getProducerBadge) — the PRISTINE base-only produced set: no session
@@ -1530,8 +1527,8 @@ export function MechanismGallery({
   // Perf dedup (km-synthesis): this is the SAME round-trip useInventoryDiff()
   // already computes internally (identical startIr/sessionAssignments/
   // getPatternByIdSync inputs — sessionAssignments here is
-  // selectDesktopAssignments(phaseResults), same as useInventoryDiff.ts's own
-  // derivation) to produce its pre-augment set — reuse that hook's
+  // useSessionAssignments(), the selectSessionAssignments hook, same as
+  // useInventoryDiff.ts's own derivation) to produce its pre-augment set — reuse that hook's
   // `rawProducedSet` rather than re-running `buildSessionProducedSet` a
   // second time per render.
   const baseProducedSet = sharedRawProducedSet;
@@ -1569,8 +1566,9 @@ export function MechanismGallery({
     return placementWalkList(inventoryLettersToAdd, placementInventory, loanwordSet);
   }, [inventoryLettersToAdd, placementInventory, loanwordSet]);
 
-  // Read Phase C assignments directly (not the merged session.assignments view)
-  // so multiple methods per character are preserved.
+  // Read the session's assignments (selectSessionAssignments: Phase C on Copy,
+  // the applied list on Open), not the merged session.assignments view, so
+  // multiple methods per character are preserved.
   // (sessionAssignments itself is declared earlier, alongside baseProducedSet
   // above, so both can share the one derivation.)
 

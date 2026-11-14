@@ -22,7 +22,12 @@ export type InsertAnchor =
 export type KmnEdit =
   | { kind: "delete"; nodeId: string }
   | { kind: "replace"; nodeId: string; text: string }
-  | { kind: "insert"; anchor: InsertAnchor; text: string };
+  | { kind: "insert"; anchor: InsertAnchor; text: string }
+  // A whole new group: header line plus its rules, newline-joined in `text`.
+  // Anchored after the last surviving line of the file (the end of the last
+  // existing group), behind one blank line unless that line is blank. The group is never in the
+  // starting keyboard, so nothing else can anchor on it.
+  | { kind: "insert-group"; groupNodeId: string; text: string };
 
 export type SpliceKmnResult =
   | { ok: true; text: string }
@@ -105,11 +110,11 @@ function normaliseSharedLineEdits(
   }
 
   // Group non-insert edits by the start of their resolved span.
-  type NonInsertEdit = Exclude<KmnEdit, { kind: "insert" }>;
+  type NonInsertEdit = Exclude<KmnEdit, { kind: "insert" | "insert-group" }>;
   const bySpanStart = new Map<number, NonInsertEdit[]>();
   const out: KmnEdit[] = [];
   for (const edit of edits) {
-    if (edit.kind === "insert") {
+    if (edit.kind === "insert" || edit.kind === "insert-group") {
       out.push(edit);
       continue;
     }
@@ -189,9 +194,20 @@ export function diffIrToKmnEdits(startIr: KeyboardIR, ir: KeyboardIR): KmnEdit[]
     for (const r of g.rules) startRuleText.set(r.nodeId, emitRule(r, g.usingKeys));
   }
 
+  const startGroupIds = new Set(startIr.groups.map((g) => g.nodeId));
   const workIds = new Set<string>();
   for (const g of ir.groups) {
     workIds.add(g.nodeId);
+    if (!startGroupIds.has(g.nodeId)) {
+      // A group the text does not have: one insert carrying header + rules.
+      const header = g.usingKeys ? `group(${g.name}) using keys` : `group(${g.name})`;
+      const body = g.rules.map((r) => {
+        workIds.add(r.nodeId);
+        return emitRule(r, g.usingKeys);
+      });
+      edits.push({ kind: "insert-group", groupNodeId: g.nodeId, text: [header, ...body].join("\n") });
+      continue;
+    }
     let lastShared: string | undefined;
     for (const r of g.rules) {
       workIds.add(r.nodeId);
@@ -410,10 +426,36 @@ function keepCommentGap(orig: string, next: string, comment: string | undefined)
   return next.slice(0, -nextSuffix.length) + gap[0] + suffix;
 }
 
+/** The new store line re-quoted in the old line's quote style, when only the values changed. */
+function keepQuoteStyle(orig: string, next: string): string | undefined {
+  const o = tokenizeStore(orig);
+  const n = tokenizeStore(next);
+  if (o === undefined || n === undefined) return undefined;
+  if (o.head.toLowerCase() !== n.head.toLowerCase() || o.toks.length !== n.toks.length || n.toks.length === 0) return undefined;
+  let out = next.slice(0, n.toks[0]!.start);
+  for (let i = 0; i < n.toks.length; i++) {
+    const ot = o.toks[i]!;
+    const nt = n.toks[i]!;
+    let text = next.slice(nt.start, nt.end);
+    if (ot.quote !== "" && nt.quote !== "" && ot.quote !== nt.quote) {
+      const body = text.slice(1, -1);
+      if (body.includes(ot.quote)) return undefined;
+      text = `${ot.quote}${body}${ot.quote}`;
+    }
+    out += text + next.slice(nt.end, n.toks[i + 1]?.start ?? next.length);
+  }
+  if (out === next) return undefined;
+  const real = realStoreOf(out);
+  const intended = realStoreOf(next);
+  return real !== undefined && real === intended ? out : undefined;
+}
+
 function refineReplacement(info: NodeInfo, orig: string, next: string): string {
   if (info.kind === "store" && !next.includes("\n")) {
     const dropped = dropStoreItems(orig, next);
     if (dropped !== undefined) return dropped;
+    const requoted = keepQuoteStyle(orig, next);
+    if (requoted !== undefined) return keepCommentGap(orig, requoted, info.trailingComment);
   }
   if (info.kind === "rule" || info.kind === "store") {
     return keepCommentGap(orig, next, info.trailingComment);
@@ -455,7 +497,12 @@ export function spliceKmn(
   // `$keymanweb:` line) into a single edit per line before applying.
   const normalisedEdits = normaliseSharedLineEdits(startIr, edits, spanOf);
 
+  const groupInserts: string[] = [];
   for (const edit of normalisedEdits) {
+    if (edit.kind === "insert-group") {
+      groupInserts.push(edit.text);
+      continue;
+    }
     if (edit.kind === "insert") {
       let after: number | undefined;
       if (edit.anchor.after === "last-store") {
@@ -530,10 +577,39 @@ export function spliceKmn(
       }
     }
     if (edit.kind === "replace") {
-      const origText = lines.slice(span.start, span.end + 1).join("").replace(/\r?\n$/, "");
+      const origText = lines.slice(span.start, span.end + 1).join("").replace(/\r?\n$/, "").replace(/^\uFEFF/, "");
       replaceAt.set(span.start, refineReplacement(info, origText, edit.text));
       if (!/\n$/.test(lines[span.end] ?? "")) replaceNoEol.add(span.start);
     }
+  }
+
+  // New groups go after the last line that survives, behind one blank line
+  // unless that line is already blank (a group removed in the same call took
+  // its own lines, not the blank that separated it, so strip-then-reinsert
+  // of a trailing group is byte-identical). They follow any other insert on
+  // that same line.
+  if (groupInserts.length > 0) {
+    let last = -1;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (!removed.has(i) || replaceAt.has(i)) {
+        last = i;
+        break;
+      }
+    }
+    // Anything inserted after the last surviving line (a fragment anchored on a
+    // group whose last rule was deleted) must stay above the new group.
+    for (const k of insertAfter.keys()) if (k > last) last = k;
+    if (last === -1) last = lines.length - 1;
+    const list = insertAfter.get(last) ?? [];
+    const prior = list[list.length - 1];
+    const lastText = prior !== undefined ? prior : (replaceAt.get(last) ?? lines[last] ?? "");
+    let needBlank = lastText.trim() !== "";
+    for (const t of groupInserts) {
+      if (needBlank) list.push("");
+      list.push(t);
+      needBlank = true;
+    }
+    insertAfter.set(last, list);
   }
 
   const out: string[] = [];
@@ -551,7 +627,10 @@ export function spliceKmn(
     }
     for (const t of insertAfter.get(i) ?? []) push(normalise(t, true));
   }
-  return { ok: true, text: out.join("") };
+  const joined = out.join("");
+  // A leading BOM belongs to the file, not to whatever line sat first.
+  const bom = startText.startsWith("\uFEFF") && !joined.startsWith("\uFEFF");
+  return { ok: true, text: bom ? `\uFEFF${joined}` : joined };
 }
 
 /** diff + splice; caller decides what to do on ok:false (Open: ask, then emit). */
@@ -566,6 +645,16 @@ export function projectKmnText(
   for (const g of startIr.groups) {
     startOrder.set(g.nodeId, g.rules.map((r) => r.nodeId));
     for (const r of g.rules) startGroupOf.set(r.nodeId, g.nodeId);
+  }
+  // A new group is placed after the last line of the text, so it must come
+  // after every group the text already has; anything else is a reorder.
+  const startGroupIds = new Set(startIr.groups.map((g) => g.nodeId));
+  let sawNew = false;
+  for (const g of ir.groups) {
+    if (!startGroupIds.has(g.nodeId)) sawNew = true;
+    else if (sawNew) {
+      return { ok: false, reason: `group "${g.nodeId}" follows a new group`, nodeId: g.nodeId };
+    }
   }
   for (const g of ir.groups) {
     const common = g.rules.map((r) => r.nodeId).filter((id) => startGroupOf.has(id));

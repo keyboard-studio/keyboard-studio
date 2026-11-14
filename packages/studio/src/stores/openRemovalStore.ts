@@ -40,6 +40,12 @@ export interface OpenRemovalEntry {
   /** Carved-key labels for the review dialog, resolved before the removal. */
   combos: CarvedCombo[];
   rules: RemovedRuleRecord[];
+  /**
+   * Set when the removal is a disabled rule family (spec 082 FR-018): the
+   * family card shows it as disabled, and Enable puts it back. Such an entry
+   * carves no characters and has no review combos.
+   */
+  family?: { id: string; name: string; count: number };
   /** Text of each changed file before and just after the removal. */
   files: Record<string, { before: string; after: string }>;
 }

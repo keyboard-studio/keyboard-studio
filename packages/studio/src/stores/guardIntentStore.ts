@@ -55,6 +55,13 @@ interface GuardIntentState {
    */
   noteGuardNarrowed: (question: string, ruleId: string) => void;
   /**
+   * Open (spec 111 live files): the Narrow was written into the file, whose
+   * rule ids are re-read, so no rule id is kept for undo. The question is
+   * still never re-asked until the Narrow is undone.
+   */
+  noteQuestionNarrowed: (question: string) => void;
+  liftQuestionNarrowed: (question: string) => void;
+  /**
    * Pop the most recent Narrow record for undo; also lifts that question's
    * narrowed disposition so it may surface again. Returns undefined when the
    * stack is empty.
@@ -102,6 +109,14 @@ export const useGuardIntentStore: UseBoundStore<StoreApi<GuardIntentState>> =
       narrowedGuardQuestions: added(s.narrowedGuardQuestions, question),
       narrowUndoStack: [...s.narrowUndoStack, { ruleId, question }],
     })),
+  noteQuestionNarrowed: (question) =>
+    set((s) => ({ narrowedGuardQuestions: added(s.narrowedGuardQuestions, question) })),
+  liftQuestionNarrowed: (question) =>
+    set((s) => {
+      const next = new Set(s.narrowedGuardQuestions);
+      next.delete(question);
+      return { narrowedGuardQuestions: next };
+    }),
   popNarrowUndo: () => {
     const stack = useGuardIntentStore.getState().narrowUndoStack;
     const record = stack.at(-1);

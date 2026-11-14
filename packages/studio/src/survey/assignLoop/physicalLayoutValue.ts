@@ -11,8 +11,9 @@
 // renderer so the two surfaces never compute different values (the
 // currentCarvedLayoutValue precedent).
 
-import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import { selectDesktopAssignments } from "../../lib/unimplementedInventory.ts";
+import { selectSessionAssignments } from "../../lib/sessionAssignments.ts";
+import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 
 /** The physical-layout decision value (data-model.md). */
@@ -49,8 +50,10 @@ export interface PhysicalLayoutValue {
 export function physicalLayoutValueFromPhaseResults(
   phaseResults: Parameters<typeof selectDesktopAssignments>[0],
   displacedDeclined: readonly string[] = [],
+  /** Open: the applied session list, which `phaseResults` does not hold. */
+  sessionAssignments?: readonly MechanismAssignment[],
 ): PhysicalLayoutValue {
-  const assignments = [...selectDesktopAssignments(phaseResults)];
+  const assignments = [...(sessionAssignments ?? selectDesktopAssignments(phaseResults))];
   const targets = new Set(assignments.map((a) => a.target));
   const live = displacedDeclined
     .filter((key) => targets.has(key.slice(key.lastIndexOf("|") + 1)))
@@ -64,5 +67,5 @@ export function physicalLayoutValueFromPhaseResults(
 /** The physical-layout value from the live working copy. */
 export function currentPhysicalLayoutValue(): PhysicalLayoutValue {
   const s = useWorkingCopyStore.getState();
-  return physicalLayoutValueFromPhaseResults(s.phaseResults, s.displacedDeclined);
+  return physicalLayoutValueFromPhaseResults(s.phaseResults, s.displacedDeclined, selectSessionAssignments(s));
 }

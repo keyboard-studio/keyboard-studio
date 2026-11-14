@@ -19,6 +19,8 @@ import {
   familyForGuardStore,
 } from "./guardRuleSynthesis.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useApplyOnOpen } from "../OpenApplyHost.tsx";
+import { useIsLiveOpen } from "../../editors/carve/useRemovalActions.ts";
 import {
   missingGuardGroupKey,
   useGuardIntentStore,
@@ -90,8 +92,10 @@ export function MissingGuardCard({ group }: { group: MissingGuardGroup }) {
   const dismissMissingGroup = useGuardIntentStore((s) => s.dismissMissingGroup);
   const [outcome, setOutcome] = useState<AddAllOutcome | null>(null);
   const groupKey = missingGuardGroupKey(group);
+  const live = useIsLiveOpen();
+  const applyOnOpen = useApplyOnOpen();
 
-  const addAll = () => {
+  const addAll = async () => {
     const { ir, setWorkingIR } = useWorkingCopyStore.getState();
     if (ir === null) return;
     const rules = ir.groups.flatMap((g) => g.rules);
@@ -112,12 +116,19 @@ export function MissingGuardCard({ group }: { group: MissingGuardGroup }) {
       return;
     }
     const { groupIndex } = target;
-    setWorkingIR({
+    const nextIr = {
       ...ir,
       groups: ir.groups.map((g, i) =>
         i === groupIndex ? { ...g, rules: [...g.rules, ...synthesized] } : g,
       ),
-    });
+    };
+    if (live) {
+      // Open: the rules are written into the file when applied, not held.
+      const result = await applyOnOpen({ kind: "ir", nextIr });
+      if (result.status !== "applied") return;
+    } else {
+      setWorkingIR(nextIr);
+    }
     // Installing synthesized guard rules is the block-bundle install the
     // intent store tracks (gates re-analysis of the same group) — and it is
     // creating rules in the guard family, the second FR-020 intent signal.
@@ -157,7 +168,7 @@ export function MissingGuardCard({ group }: { group: MissingGuardGroup }) {
         <Button
           variant="primary"
           data-testid={`missing-guard-add-all-${groupKey}`}
-          onClick={addAll}
+          onClick={() => void addAll()}
         >
           <Trans id="rules.guard.missing.addAll">Add all</Trans>
         </Button>

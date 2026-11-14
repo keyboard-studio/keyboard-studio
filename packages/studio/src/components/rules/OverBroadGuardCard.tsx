@@ -18,7 +18,15 @@
 import { useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { OverBroadGuard } from "./guardAnalysis.ts";
-import { narrowOverBroadGuard, undoNarrow } from "./narrowGuard.ts";
+import {
+  narrowOverBroadGuard,
+  narrowOverBroadGuardOnOpen,
+  undoNarrow,
+  undoNarrowOnOpen,
+  type NarrowOutcome,
+} from "./narrowGuard.ts";
+import { useApplyOnOpen } from "../OpenApplyHost.tsx";
+import { useIsLiveOpen } from "../../editors/carve/useRemovalActions.ts";
 import { useGuardIntentStore } from "../../stores/guardIntentStore.ts";
 import { Button } from "../../ui/Button.tsx";
 import { rulesActions, rulesBody, rulesCode, rulesInsetCard, rulesNote } from "./rulesStyles.ts";
@@ -30,10 +38,17 @@ export function OverBroadGuardCard({ guard }: { guard: OverBroadGuard }) {
   const [narrowedRuleId, setNarrowedRuleId] = useState<string | null>(null);
   const [narrowStale, setNarrowStale] = useState(false);
   const [undone, setUndone] = useState(false);
+  const [openUndoId, setOpenUndoId] = useState<string | null>(null);
+  const live = useIsLiveOpen();
+  const applyOnOpen = useApplyOnOpen();
 
-  const narrow = () => {
-    const outcome = narrowOverBroadGuard(guard);
+  const narrow = async () => {
+    // Open: written into the file when applied; Copy: staged in the working IR.
+    const outcome: (NarrowOutcome & { undoId?: string }) | null = live
+      ? await narrowOverBroadGuardOnOpen(guard, applyOnOpen)
+      : narrowOverBroadGuard(guard);
     if (outcome !== null) {
+      setOpenUndoId(outcome.undoId ?? null);
       setNarrowedRuleId(outcome.ruleId);
       setNarrowStale(false);
       setUndone(false);
@@ -46,7 +61,11 @@ export function OverBroadGuardCard({ guard }: { guard: OverBroadGuard }) {
   };
 
   const undo = () => {
-    const undoneRuleId = undoNarrow();
+    const undoneRuleId = live
+      ? openUndoId !== null && undoNarrowOnOpen(openUndoId, guard.question)
+        ? guard.guardRuleId
+        : null
+      : undoNarrow();
     if (undoneRuleId !== null) {
       setNarrowedRuleId(null);
       setUndone(true);
@@ -82,7 +101,7 @@ export function OverBroadGuardCard({ guard }: { guard: OverBroadGuard }) {
           <Button
             style={secondaryButton}
             data-testid={`overbroad-guard-narrow-${guard.guardRuleId}`}
-            onClick={narrow}
+            onClick={() => void narrow()}
           >
             <Trans id="rules.guard.overbroad.narrow">Narrow this guard</Trans>
           </Button>

@@ -440,6 +440,12 @@ export interface ProjectWorkingCopyVfsInput {
      * and nothing the output stamps on is written into the author's files.
      */
     applyOnly?: boolean;
+    /**
+     * With `applyOnly`: leave step 2.6 (mark guards) out of this run. An
+     * assignment's apply writes only its own rules; the guards are written by
+     * their own apply, so the lines an assignment added stay its own.
+     */
+    skipMarkGuards?: boolean;
   };
 }
 
@@ -1245,7 +1251,7 @@ export function projectWorkingCopyVfs(
   // applyMarkGuards strips and rebuilds its own artifacts, so a starting
   // keyboard that already carries them is not doubled; the .kmn is only
   // re-emitted when the IR changed.
-  if (marksGuards !== null) {
+  if (marksGuards !== null && !(applyOnly && openMode?.skipMarkGuards === true)) {
     const kmnPathForGuards = `source/${keyboardId}.kmn`;
     const kmnTextForGuards = readVfsText(vfs, kmnPathForGuards);
     if (kmnTextForGuards !== undefined) {

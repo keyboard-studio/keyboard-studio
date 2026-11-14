@@ -32,7 +32,13 @@ export const mechanismInventory: readonly InventoryEntry[] = [
   },
   { fn: "derivePlacementInventory", module: "lib/placementInventory.ts", callers: ["hooks/usePlacementInventory.ts"] },
   { fn: "loanwordSetOf", module: "lib/placementInventory.ts", callers: ["hooks/useLoanwordSet.ts"] },
-  { fn: "selectDesktopAssignments", module: "lib/unimplementedInventory.ts", callers: [GALLERY] },
+  {
+    // The one "this session's assignments" selector; the UI reads it through
+    // hooks/useSessionAssignments.ts (and the decision recorder).
+    fn: "selectSessionAssignments",
+    module: "lib/sessionAssignments.ts",
+    callers: ["decisions/createStudioDecisionRecorder.ts"],
+  },
   { fn: "buildSlotOccupancy", module: "survey/slotOccupancy.ts", callers: [GALLERY] },
   { fn: "displacementActions", module: "survey/slotOccupancy.ts", callers: [GALLERY] },
   { fn: "preselectMethod", module: "editors/assignLoop/suggestionOrder.ts", callers: [GALLERY] },

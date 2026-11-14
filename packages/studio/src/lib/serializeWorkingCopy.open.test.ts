@@ -18,6 +18,8 @@ import type { FetchFn } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useOpenRemovalStore } from "../stores/openRemovalStore.ts";
+import { useOpenAssignStore, assignmentFingerprint } from "../stores/openAssignStore.ts";
+import { useOpenUndoStore } from "../stores/openUndoStore.ts";
 import { useWorkingCopyTransform } from "../hooks/useWorkingCopyTransform.ts";
 import { renderHook } from "@testing-library/react";
 import { applyOpenChange } from "./openApply.ts";
@@ -25,10 +27,28 @@ import { projectWorkingCopyForOutput } from "./serializeWorkingCopy.ts";
 import { readVfsText } from "./vfsText.ts";
 import { OPEN_SAMPLE_KEYBOARD_IDS, sampleKeyboardRelativePath } from "../test/openSampleKeyboards.ts";
 
-vi.mock("./services.ts", () => ({
-  getToZip: vi.fn(async () => vi.fn(async () => new Uint8Array())),
-  getPatternLibraryService: vi.fn(() => ({ getById: async () => undefined })),
-}));
+vi.mock("./services.ts", async () => {
+  const { makePattern } = await import("@keyboard-studio/contracts");
+  const swap = makePattern({
+    id: "simple_swap",
+    title: "simple_swap",
+    description: "simple_swap",
+    category: "desktop",
+    appliesTo: [],
+    questions: [{ id: "kmnRules", prompt: "kmnRules", answerType: "text" as const }],
+    kmnFragment: "{{kmnRules}}\n",
+    tests: [],
+    validatedForFamilies: [],
+    sourceKeyboards: [],
+    reviewedBy: "",
+    reviewDate: "2026-10-29",
+  });
+  return {
+    getToZip: vi.fn(async () => vi.fn(async () => new Uint8Array())),
+    getPatternLibraryService: vi.fn(() => ({ getById: async () => undefined })),
+    getPatternByIdSync: (id: string) => (id === "simple_swap" ? swap : undefined),
+  };
+});
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const KEYBOARDS_ROOT = resolve(HERE, "../../../../../keyboards");
@@ -353,5 +373,163 @@ describe.skipIf(!CORPUS_PRESENT)("Open: an applied removal over the corpus sampl
   it("reports the keyboards skipped for lack of a candidate", () => {
     if (skipped.length > 0) console.warn(`[WARN] open corpus removal skipped: ${skipped.join(", ")}`);
     expect(skipped.length).toBeLessThan(OPEN_SAMPLE_KEYBOARD_IDS.length);
+  });
+});
+
+describe.skipIf(!CORPUS_PRESENT)("Open: an applied assignment over the corpus sample set", () => {
+  /** Keyboards the assignment could not be tried on, each with its reason. */
+  const skippedWithReason: { id: string; reason: string }[] = [];
+  let applied = 0;
+  const withoutVersion = (t: string): string =>
+    t.split(/(?<=\n)/).filter((l) => !/&KEYBOARDVERSION|&VERSION/i.test(l)).join("");
+  const KEYS = [
+    "K_Q", "K_W", "K_E", "K_R", "K_T", "K_Y", "K_U", "K_I", "K_O", "K_P", "K_A", "K_S", "K_D", "K_F", "K_G",
+    "K_H", "K_J", "K_K", "K_L", "K_Z", "K_X", "K_C", "K_V", "K_B", "K_N", "K_M", "K_COLON", "K_COMMA",
+    "K_PERIOD", "K_SLASH", "K_BKQUOTE", "K_HYPHEN", "K_EQUAL", "K_LBRKT", "K_RBRKT", "K_BKSLASH", "K_QUOTE",
+  ];
+  const NEW_CHAR = "\uA7B5"; // a letter no sample keyboard types
+
+  /** Paths where two parsed JSON values differ, with the value after. */
+  function jsonDiffs(a: unknown, b: unknown, path = ""): { path: string; after: unknown }[] {
+    if (JSON.stringify(a) === JSON.stringify(b)) return [];
+    if (Array.isArray(a) && Array.isArray(b) && a.length === b.length) {
+      return a.flatMap((x, i) => jsonDiffs(x, b[i], `${path}[${i}]`));
+    }
+    if (a && b && typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b)) {
+      const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+      return [...keys].flatMap((k) =>
+        jsonDiffs((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], `${path}.${k}`),
+      );
+    }
+    return [{ path, after: b }];
+  }
+
+  for (const id of OPEN_SAMPLE_KEYBOARD_IDS) {
+    it(`${id}: an assignment adds only its rule and its key labels; every route agrees; unassign is byte-identical`, async () => {
+      if (!existsSync(folderOf(id))) return;
+      const { kmnText } = await openKeyboard(id);
+      const wc = useWorkingCopyStore.getState();
+      wc.setFallbackPolicy("pass-through");
+      wc.setAttribution({ authorName: "Corpus", copyrightHolder: "Corpus" });
+      useOpenRemovalStore.getState().clear();
+      useOpenUndoStore.getState().clear();
+      useOpenAssignStore.getState().clear();
+      const ir = useWorkingCopyStore.getState().startIr!;
+      const hasMain = ir.groups.some((g) => !g.readonly && g.name.toLowerCase() === "main" && g.usingKeys);
+      // The first (modifiers, key) no rule in the keyboard already answers.
+      const answered = new Set<string>();
+      for (const g of ir.groups) {
+        for (const r of g.rules) {
+          for (const c of JSON.stringify(r.context).matchAll(/"kind":"vkey","name":"(K_[A-Z0-9_]+)"(?:,"modifiers":\[([^\]]*)\])?/g)) {
+            // Caps state does not distinguish a keystroke (a claim on `[K_A]` shadows `[NCAPS K_A]`).
+            const mods = (c[2] ?? "").replace(/"/g, "").split(",").filter((m) => m !== "" && !/^N?CAPS$/.test(m)).sort();
+            answered.add(`${mods.join(" ")}|${c[1]}`);
+          }
+        }
+      }
+      const MODS = ["", "SHIFT", "RALT", "RALT SHIFT", "ALT", "CTRL", "CTRL ALT", "SHIFT ALT"];
+      let vkey: string | undefined;
+      let mods = "";
+      for (const m of MODS) {
+        const k = KEYS.find((x) => !answered.has(`${m.split(" ").filter(Boolean).sort().join(" ")}|${x}`));
+        if (k !== undefined) {
+          vkey = k;
+          mods = m;
+          break;
+        }
+      }
+      if (!hasMain || vkey === undefined) {
+        const reason = !hasMain ? "no `group(main) using keys` to merge into" : "every candidate key is already used";
+        skippedWithReason.push({ id, reason });
+        console.warn(`[WARN] ${id}: ${reason}; skipped`);
+        return;
+      }
+      const a = {
+        scope: "individual" as const,
+        target: NEW_CHAR,
+        modality: "physical" as const,
+        mechanisms: [{ patternId: "simple_swap", strategyId: "S-01" as const, slotValues: { kmnRules: `+ [${mods === "" ? "" : `${mods} `}${vkey}] > U+A7B5` } }],
+        source: "user" as const,
+      };
+      const startVfs = useWorkingCopyStore.getState().startVfs!;
+      const paths = startVfs.list().filter((p) => /\.(kmn|kvks|keyman-touch-layout)$/.test(p));
+      const beforeFiles = new Map(paths.map((p) => [p, readVfsText(startVfs, p)!] as const));
+
+      const result = applyOpenChange({ kind: "assign", add: [a], remove: [] });
+      expect(result.status, JSON.stringify(result)).toBe("applied");
+      const s = useWorkingCopyStore.getState();
+      const now = (p: string) => readVfsText(s.startVfs!, p)!;
+
+      // .kmn: nothing the keyboard had is lost; what is new is the rule and its separator line.
+      // Insertions only: the original lines are a subsequence of the new ones.
+      const orig = linesOf(kmnText).filter((l) => !/&KEYBOARDVERSION/i.test(l));
+      const nowLines = linesOf(now(`source/${id}.kmn`)).filter((l) => !/&KEYBOARDVERSION/i.test(l));
+      const added: string[] = [];
+      let at = 0;
+      for (const l of orig) {
+        while (at < nowLines.length && nowLines[at] !== l) added.push(nowLines[at++]!);
+        expect(at < nowLines.length, `${id}: line lost: ${l.trim()}`).toBe(true);
+        at += 1;
+      }
+      added.push(...nowLines.slice(at));
+      expect(added.filter((l) => l.trim() !== "").map((l) => l.trim())).toEqual([`+ [${mods === "" ? "" : `${mods} `}${vkey}] > U+A7B5`]);
+
+      for (const p of paths) {
+        if (p.endsWith(".kvks")) {
+          const d = diffLines(linesOf(beforeFiles.get(p)!), linesOf(now(p)));
+          for (const l of [...d.removed, ...d.added]) {
+            // A key added to a layer is appended before its closing tag, on that line.
+            expect(l.includes(vkey) || /^\s*<\/layer>/.test(l), `${id}: ${p}: ${l.trim()}`).toBe(true);
+          }
+        } else if (p.endsWith(".keyman-touch-layout")) {
+          // As TEXT: only label lines change (FR-010), even for a file that is
+          // not in the engine's canonical layout.
+          const t = diffLines(linesOf(beforeFiles.get(p)!), linesOf(now(p)));
+          const bare = (l: string) => l.replace(/\r?\n$/, "");
+          for (const l of t.added) {
+            const ok = l.includes(NEW_CHAR) || t.removed.some((r) => bare(r) + "," === bare(l));
+            expect(ok, `${id}: ${p}: unexpected added line ${l.trim()}`).toBe(true);
+          }
+          for (const l of t.removed) {
+            const ok = l.includes('"text"') || t.added.some((a) => bare(a) === bare(l) + ",");
+            expect(ok, `${id}: ${p}: unexpected removed line ${l.trim()}`).toBe(true);
+          }
+          const before = JSON.parse(beforeFiles.get(p)!);
+          for (const d of jsonDiffs(before, JSON.parse(now(p)))) {
+            expect(d.path.endsWith(".text"), `${id}: ${p} ${d.path}`).toBe(true);
+            expect(d.after).toBe(NEW_CHAR);
+          }
+        }
+      }
+
+      // Preview transform and download hold the same text as the working copy's files.
+      const { result: hook, unmount } = renderHook(() => useWorkingCopyTransform({ previewedStartId: id }));
+      const previewVfs = createVirtualFS(s.startVfs!.entries());
+      hook.current!(previewVfs, id);
+      const projected = await projectWorkingCopyForOutput();
+      for (const p of paths) {
+        expect(withoutVersion(readVfsText(previewVfs, p)!), `${id}: preview ${p}`).toBe(withoutVersion(now(p)));
+        expect(withoutVersion(readVfsText(projected!.vfs, p)!), `${id}: download ${p}`).toBe(withoutVersion(now(p)));
+      }
+      unmount();
+
+      // Unassign puts every file back byte-for-byte.
+      expect(applyOpenChange({ kind: "assign", add: [], remove: [assignmentFingerprint(a)] }).status).toBe("applied");
+      for (const p of paths) expect(readVfsText(useWorkingCopyStore.getState().startVfs!, p), `${id}: ${p}`).toBe(beforeFiles.get(p));
+      applied += 1;
+    }, 120_000);
+  }
+
+  it("says how many keyboards the assignment applied to, and why each other one was skipped", () => {
+    const present = OPEN_SAMPLE_KEYBOARD_IDS.filter((id) => existsSync(folderOf(id))).length;
+    console.warn(
+      `[INFO] open corpus assignment: applied to ${applied} of ${present}; skipped: ` +
+        (skippedWithReason.map((x) => `${x.id} (${x.reason})`).join("; ") || "none"),
+    );
+    expect(applied + skippedWithReason.length).toBe(present);
+    // Stated expectation: 19 of 20 apply; bj_naskapi_common has no `group(main)`
+    // for an assignment to merge into. Any further skip is a regression.
+    expect(skippedWithReason.length).toBeLessThanOrEqual(1);
+    expect(applied).toBeGreaterThanOrEqual(present - 1);
   });
 });

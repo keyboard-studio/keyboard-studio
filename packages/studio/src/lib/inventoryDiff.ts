@@ -15,11 +15,11 @@ import { buildSessionProducedSet } from "@keyboard-studio/engine";
 import { lowercaseFirst } from "./caseOrder.ts";
 import {
   inventoryCoverageGate,
-  selectDesktopAssignments,
   type InventoryCoverageGate,
   type InventoryCoverageInputs,
 } from "./unimplementedInventory.ts";
 import { getPatternByIdSync } from "./services.ts";
+import { selectSessionAssignments } from "./sessionAssignments.ts";
 
 export interface InventoryDiff {
   /**
@@ -166,9 +166,14 @@ export function deriveInventoryDiff(inputs: {
   startIr: KeyboardIR | null;
   inventory: readonly string[];
   phaseResults: readonly SurveyPhaseResult[];
+  /** The opened keyboard, so Open's applied assignments are read (see sessionAssignments.ts). */
+  startKeyboard?: { id: string } | null;
 }): InventoryDiff {
   const { startIr, inventory } = inputs;
-  const raw = rawSessionProducedSet(startIr, selectDesktopAssignments(inputs.phaseResults));
+  const raw = rawSessionProducedSet(
+    startIr,
+    selectSessionAssignments({ phaseResults: inputs.phaseResults, startKeyboard: inputs.startKeyboard ?? null }),
+  );
   return splitInventory(
     startIr,
     inventory,
@@ -211,15 +216,18 @@ export function coverageGateFrom(
 export function deriveInventoryCoverageGate(state: {
   startIr: KeyboardIR | null;
   phaseResults: readonly SurveyPhaseResult[];
+  startKeyboard?: { id: string } | null;
   touchLayoutJson: string | null;
   session: Omit<CoverageGateSlices, "touchLayoutJson">;
 }): InventoryCoverageGate {
+  const startKeyboard = state.startKeyboard ?? null;
   const diff = deriveInventoryDiff({
     startIr: state.startIr,
     inventory: state.session.confirmedInventory,
     phaseResults: state.phaseResults,
+    startKeyboard,
   });
-  return coverageGateFrom(selectDesktopAssignments(state.phaseResults), diff, {
+  return coverageGateFrom(selectSessionAssignments({ phaseResults: state.phaseResults, startKeyboard }), diff, {
     touchLayoutJson: state.touchLayoutJson,
     confirmedInventory: state.session.confirmedInventory,
     ...(state.session.alphabet !== undefined ? { alphabet: state.session.alphabet } : {}),

@@ -20,12 +20,12 @@
 import { useMemo } from "react";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useInventoryDiff } from "./useInventoryDiff.ts";
-import { selectDesktopAssignments, type InventoryCoverageGate } from "../lib/unimplementedInventory.ts";
+import type { InventoryCoverageGate } from "../lib/unimplementedInventory.ts";
+import { useSessionAssignments } from "./useSessionAssignments.ts";
 import { coverageGateFrom } from "../lib/inventoryDiff.ts";
 import { isOpenMode } from "../lib/openMode.ts";
 
 export function useInventoryCoverageGate(): InventoryCoverageGate {
-  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
   const confirmedInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
   // The marks-treatment credit inputs (see unimplementedInventory.ts's
@@ -41,10 +41,7 @@ export function useInventoryCoverageGate(): InventoryCoverageGate {
   // (shaped-bug fix, diacritic-implementability).
   const { lettersToAdd, producedSet } = useInventoryDiff();
 
-  const desktopAssignments = useMemo(
-    () => selectDesktopAssignments(phaseResults),
-    [phaseResults],
-  );
+  const desktopAssignments = useSessionAssignments();
 
   const openMode = isOpenMode(useWorkingCopyStore((s) => s.instantiationMode));
 
