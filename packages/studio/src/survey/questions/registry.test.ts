@@ -64,7 +64,6 @@ describe("flow membership (single source)", () => {
       reserveOnlyModules,
       galleryModules,
       layoutEditModules,
-      layoutEditModules,
     ];
     const total = groups.reduce((n, g) => n + g.length, 0);
     expect(total).toBe(Object.keys(questionRegistry).length);
