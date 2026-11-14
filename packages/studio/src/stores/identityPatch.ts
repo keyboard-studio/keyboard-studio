@@ -41,4 +41,17 @@ export type IdentityPatch = Partial<{
    * filename uses this id.
    */
   keyboardId: string;
+  /**
+   * Glottolog code of a language with no ISO 639-3 code (spec 115 FR-045),
+   * from the `language-glottocode` decision. Absent when the language has
+   * an ISO code.
+   */
+  languageGlottocode?: string;
+  /**
+   * Glottolog code of the chosen dialect (spec 115 FR-012), from the
+   * `dialect-glottocode` decision. Absent when the dialect is not from
+   * Glottolog. Kept separate from `languageGlottocode`: a dialect of a
+   * no-code language keeps both (Olmos: sech1236 and olmo1234).
+   */
+  dialectGlottocode?: string;
 }>;

@@ -169,6 +169,9 @@ Legend:
 ## 12. Language tagging (BCP47)
 
 - <span style="color:goldenrod">[ ] BCP47 tag is correct for the language/script.</span>
+- <span style="color:goldenrod">[ ] Every language tag is a well-formed BCP 47 tag (criterion 12.8; the Open-mode list and the survey both enforce it).</span>
+- <span style="color:goldenrod">[ ] A registered variant subtag is used only with a language or script its registry prefixes allow (criterion 12.9; e.g. `oc-gascon` is allowed, `ca-gascon` is not).</span>
+- <span style="color:goldenrod">[ ] If the tag is new or unusual, it is flagged for possible submission to langtags/Ethnologue (criterion 10.4).</span>
 - <span style="color:green">[ ] No ISO 639-5 (collective language) codes used.</span>
 - <span style="color:green">[ ] No numeric regional codes used unless explicitly contrastive (e.g. `nan-Latn-035` vs another `nan-Latn`).</span>
 - <span style="color:green">[ ] `001` is never used.</span>

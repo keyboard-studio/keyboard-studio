@@ -34,6 +34,25 @@ export interface LanguoidRecord {
   familyId?: Glottocode;
 }
 
+// --- generated dialect rows (spec 115) ---------------------------------------
+
+/** One row of the generated dialect table (`src/generated/dialects.ts`). */
+export interface GlottologDialectRow {
+  kind: "dialect" | "uncoded-language" | "uncoded-dialect";
+  name: string;
+  /** NFD, combining marks dropped, lowercased. */
+  folded: string;
+  glottocode: Glottocode;
+  /** "dialect": ISO 639-3 of its language. */
+  parentIso?: Iso639P3;
+  /** "uncoded-dialect": its language (which has no ISO code). */
+  parentGlottocode?: Glottocode;
+  /** "uncoded-dialect": the language's name. */
+  parentName?: string;
+  /** Own countries, else the language's. */
+  countries: string[];
+}
+
 // --- resolved public shape --------------------------------------------------
 
 /**

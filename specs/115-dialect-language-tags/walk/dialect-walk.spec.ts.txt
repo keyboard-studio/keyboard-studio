@@ -1,0 +1,894 @@
+// Spec 115 walk — quickstart §5, scripted with the Playwright CLI against
+// `pnpm dev` (T061).
+//
+// RUN: copy this file to packages/studio/e2e/ as
+//   spec-115-dialect-walk.spec.ts
+// then, from packages/studio (with a dev server on WALK_PORT, default 5273):
+//   WALK_PORT=5274 npx playwright test --config playwright.walk.config.ts
+// The walk writes its log and the downloaded .kps to
+//   specs/115-dialect-language-tags/walk/
+// (run.log, download.kps.txt). This file is archived there as
+// dialect-walk.spec.ts.txt; it is NOT a live e2e spec — the full walk is
+// several minutes long and belongs to the manual/CD set, not the PR filter
+// (docs/tooling.md, "Adding a walk").
+//
+// COVERAGE (quickstart §5):
+//   1. Copy path: Gascon -> oc-gascon, full drive to download; the .kps has
+//      exactly one <Language ID="oc-gascon">.
+//   2. Dialect proposals: Rabinal (acr-x-rabinal), Aranese (oc-aranes),
+//      Yabekolo (ewo-x-yabekolo, made from the name), Sursilvan (rm-sursilv);
+//      French gains no dialect screen.
+//   3. Region on demand: French + Customize Canada -> fr-CA; France -> fr.
+//   4. Dialect re-proposal: Gascon confirmed, language changed to Catalan —
+//      the dialect answer is flagged, not silently kept.
+//   5. Autosuggest kept (FR-038): Ewon / Ewondo-tab / Bafutt.
+//   6. Nothing matches (US6): bft, oc-gascon, made-up name as dialect,
+//      unlisted with/without code, Mansim, Olmos, dialect-typed-as-language
+//      (Gascon Occitan, Ewondo (Yabekolo), French Switzerland, Swiss French,
+//      Ewondo Mvog-Ada, Gascon + tab).
+//   7. Open path: sr-Latn-RS hint with "Use sr-Latn", sq-AL-gheg error.
+import { test, expect, type Page } from "playwright/test";
+import { unzipSync } from "fflate";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import {
+  seedReturningVisitor,
+  selectMenuOption,
+  surveyAdvance,
+  pickStartKeyboard,
+  confirmCopyTrack,
+  driveAttributionStep,
+  acceptProjectName,
+  confirmPrefill,
+  buildOneCharacterList,
+  driveMechanismsGallery,
+  navigateToPublish,
+  triggerDownload,
+  openExistingKeyboard,
+} from "./helpers/surveyFlow";
+
+const OUT = path.resolve(process.cwd(), "../../specs/115-dialect-language-tags/walk");
+const log = (s: string) =>
+  fs.appendFileSync(path.join(OUT, "run.log"), `${new Date().toISOString()} ${s}\n`);
+
+// ---------------------------------------------------------------------------
+// Drivers
+// ---------------------------------------------------------------------------
+
+async function startSurvey(page: Page): Promise<void> {
+  await seedReturningVisitor(page);
+  await page.goto("/?e2e=1");
+  await page.waitForSelector("#il_language_english", { timeout: 60_000 });
+}
+
+async function optionLabels(page: Page): Promise<string[]> {
+  const opts = page.getByRole("option");
+  const n = await opts.count();
+  const labels: string[] = [];
+  for (let i = 0; i < n; i++) {
+    labels.push((await opts.nth(i).getAttribute("aria-label")) ?? "");
+  }
+  return labels;
+}
+
+/**
+ * Pick the LANGUAGE row for `name` — the option whose accessible name is the
+ * language itself ("French, français, fr"), not a dialect/variety card
+ * ("French, français, fr, American Koine French: a dialect of French (fr) · …")
+ * or an uncoded Glottolog row. Scans the rendered options because a /^Name/
+ * regex also matches those cards.
+ */
+async function pickLanguageRow(page: Page, name: string): Promise<string> {
+  const opts = page.getByRole("option");
+  await expect(opts.first()).toBeVisible({ timeout: 60_000 });
+  for (let i = 0; i < 40; i++) {
+    const labels = await optionLabels(page);
+    const idx = labels.findIndex(
+      (l) =>
+        l.startsWith(`${name},`) &&
+        !/dialect of|variety of|also called|known to Glottolog/.test(l),
+    );
+    if (idx >= 0) {
+      const label = labels[idx]!;
+      log(`  pick language row: ${label}`);
+      await opts.nth(idx).click();
+      return label;
+    }
+    await page.waitForTimeout(1000);
+  }
+  throw new Error(
+    `no language row for ${name} among: ${JSON.stringify(await optionLabels(page))}`,
+  );
+}
+
+/** Click the first chooser option whose accessible name matches `re`. */
+async function pickOption(page: Page, re: RegExp): Promise<string> {
+  const opt = page.getByRole("option", { name: re }).first();
+  await expect(opt).toBeVisible({ timeout: 60_000 });
+  const label = (await opt.getAttribute("aria-label")) ?? "";
+  log(`  pick option: ${label}`);
+  await opt.click();
+  return label;
+}
+
+/**
+ * Click the dialect card for `name` ("{name}: a dialect of {language} …").
+ * Polls: the "{name} is a dialect: find its language" fallback row matches
+ * first while the Glottolog/langtags tiers stream in, and `.first()` would
+ * grab it instead of the card the quickstart specifies.
+ */
+async function pickDialectCard(page: Page, name: string): Promise<string> {
+  const opts = page.getByRole("option");
+  await expect(opts.first()).toBeVisible({ timeout: 60_000 });
+  for (let i = 0; i < 40; i++) {
+    const labels = await optionLabels(page);
+    const idx = labels.findIndex((l) => new RegExp(`${name}: a (dialect|variety) of`).test(l));
+    if (idx >= 0) {
+      const label = labels[idx]!;
+      log(`  pick dialect card: ${label}`);
+      await opts.nth(idx).click();
+      return label;
+    }
+    await page.waitForTimeout(1000);
+  }
+  throw new Error(
+    `no dialect card for ${name} among: ${JSON.stringify(await optionLabels(page))}`,
+  );
+}
+
+async function typeChooser(page: Page, text: string): Promise<void> {
+  await page.locator("#il_language_english").fill(text);
+}
+
+/**
+ * Drive Q1 (pick `pickRe` after typing `query`) through autonym, code and
+ * script, and return the dialect proposal's full tag — or null when no
+ * dialect question appears (the layout step renders instead).
+ */
+async function driveToDialect(
+  page: Page,
+  opts: {
+    query: string;
+    pick?: RegExp;
+    /** Pick the DIALECT card for this name (not the fallback row). */
+    pickDialect?: string;
+    /** Pick the LANGUAGE row for this name (not a dialect card). */
+    pickLanguage?: string;
+    autonym: string;
+    script?: string;
+  },
+): Promise<string | null> {
+  await typeChooser(page, opts.query);
+  if (opts.pickLanguage !== undefined) {
+    await pickLanguageRow(page, opts.pickLanguage);
+  } else if (opts.pickDialect !== undefined) {
+    await pickDialectCard(page, opts.pickDialect);
+  } else {
+    await pickOption(page, opts.pick!);
+  }
+  // The region question sits between English and autonym when the picked
+  // language is region-ambiguous (French): advance past it blank here — the
+  // region-on-demand test drives it explicitly.
+  await passRegionQuestion(page);
+  // Q2 autonym (free text is accepted).
+  await page.fill("#il_language_autonym", opts.autonym);
+  await page.press("#il_language_autonym", "Escape");
+  await surveyAdvance(page).click();
+  // Q3 code (confirmation of the chooser's result).
+  await waitForCodeQuestion(page);
+  const codeVal = page.getByTestId("language-code-value");
+  if (await codeVal.isVisible().catch(() => false)) {
+    log(`  code: ${await codeVal.innerText()}`);
+  }
+  await surveyAdvance(page).click();
+  // Q4 script.
+  await page.waitForSelector("#il_target_script", { timeout: 30_000 });
+  await selectMenuOption(page, page.locator("#il_target_script"), opts.script ?? "Latn");
+  await surveyAdvance(page).click();
+  // Dialect question or layout step — poll for whichever lands first.
+  const proposal = page.getByTestId("dialect-proposal-tag");
+  const layout = page.getByTestId("layout-step");
+  for (let i = 0; i < 30; i++) {
+    if (await proposal.isVisible().catch(() => false)) {
+      const tag = await proposal.innerText();
+      log(`  dialect proposal: ${tag}`);
+      return tag;
+    }
+    if (await layout.isVisible().catch(() => false)) {
+      log("  no dialect question (layout step)");
+      return null;
+    }
+    await page.waitForTimeout(1000);
+  }
+  throw new Error("neither dialect proposal nor layout step appeared after script");
+}
+
+/**
+ * The code question renders two ways: the picker (an input with
+ * id="il_language_code") or the confirmation (a <strong
+ * data-testid="language-code-value"> with a Change button, no input).
+ * Wait for either.
+ */
+async function waitForCodeQuestion(page: Page): Promise<void> {
+  await page
+    .locator('#il_language_code, [data-testid="language-code-value"]')
+    .first()
+    .waitFor({ state: "visible", timeout: 30_000 });
+}
+
+/**
+ * After a Q1 pick the next question is the region question (when the picked
+ * language is region-ambiguous) or the autonym. If the region question
+ * appears, pick `regionName` when given (the region the reading already
+ * implied) or advance blank (the language's default region).
+ */
+async function passRegionQuestion(page: Page, regionName?: string): Promise<void> {
+  for (let i = 0; i < 30; i++) {
+    if (await page.locator("#il_language_region").isVisible().catch(() => false)) {
+      if (regionName !== undefined) {
+        // The region question is a SelectMenu: open it, then pick by label
+        // (its options render only after the trigger is clicked).
+        const trigger = page.locator("#il_language_region");
+        await trigger.click();
+        const opt = page.locator('ul[role="listbox"] li', { hasText: regionName }).first();
+        await expect(opt).toBeVisible({ timeout: 10_000 });
+        log(`  region question: picked ${regionName}`);
+        await opt.click();
+      } else {
+        log("  region question shown; advancing blank (default region)");
+        await surveyAdvance(page).click();
+      }
+      break;
+    }
+    if (await page.locator("#il_language_autonym").isVisible().catch(() => false)) break;
+    await page.waitForTimeout(1000);
+  }
+  await page.waitForSelector("#il_language_autonym", { timeout: 30_000 });
+}
+
+/** The decisions the survey has recorded, read from localStorage. */
+async function decisions(page: Page): Promise<Record<string, unknown>> {
+  return page.evaluate(() => {
+    const out: Record<string, unknown> = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k === null) continue;
+      const v = localStorage.getItem(k) ?? "";
+      if (v.includes("language-") || v.includes("dialect") || v.includes("target-script")) {
+        out[k] = v.slice(0, 2000);
+      }
+    }
+    return out;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 1. Copy path: Gascon, full drive to download
+// ---------------------------------------------------------------------------
+
+test("spec 115 walk 1: Gascon copy path -> oc-gascon in the .kps", async ({ page }) => {
+  test.setTimeout(600_000);
+  log("walk 1: Gascon copy path");
+  await startSurvey(page);
+  await typeChooser(page, "Gascon");
+  const first = page.getByRole("option").first();
+  await expect(first).toBeVisible({ timeout: 20_000 });
+  const labels = await optionLabels(page);
+  log(`  options for Gascon: ${JSON.stringify(labels)}`);
+  const firstLabel = labels[0] ?? "";
+  expect(firstLabel).toMatch(/Occitan/);
+  expect(firstLabel).toMatch(/Gascon/);
+  expect(firstLabel).toMatch(/oc/);
+  await pickDialectCard(page, "Gascon");
+  // Occitan is region-ambiguous (ES/FR), so the region question appears here;
+  // advance blank for the default region, as driveToDialect does.
+  await passRegionQuestion(page);
+  const tag = await driveToDialectTail(page, "gascon");
+  expect(tag).toBe("oc-gascon");
+  await page.getByRole("button", { name: "Confirm", exact: true }).click();
+  log(`  dialect decisions after Gascon confirm: ${JSON.stringify(await dialectDecisions(page))}`);
+  await surveyAdvance(page).click();
+  // Layout step -> base picker -> copy track, exactly as driveIdentityLite ends.
+  await page.waitForSelector('[data-testid="layout-step"]', { timeout: 15_000 });
+  await page.getByTestId("layout-continue").click();
+  await expect(page.getByTestId("base-picker")).toBeVisible({ timeout: 90_000 });
+  await pickStartKeyboard(page, "basic_kbdus");
+  await confirmCopyTrack(page);
+  await driveAttributionStep(page, { authorName: "Walk Author" });
+  await acceptProjectName(page);
+  await confirmPrefill(page);
+  await buildOneCharacterList(page, "é");
+  await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId("carve-continue").click();
+  await expect(page.getByTestId("deadkeys-continue")).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId("deadkeys-continue").click();
+  await page.getByTestId("rules-continue").click();
+  await driveMechanismsGallery(page, {});
+  await navigateToPublish(page);
+  const download = await triggerDownload(page);
+  const dlPath = await download.path();
+  expect(dlPath).not.toBeNull();
+  const entries = Object.entries(unzipSync(new Uint8Array(fs.readFileSync(dlPath!))));
+  const kps = entries.find(([name]) => name.endsWith(".kps"));
+  expect(kps, "download zip must contain a .kps").toBeDefined();
+  const kpsText = new TextDecoder().decode(kps![1]);
+  fs.writeFileSync(path.join(OUT, "download.kps.txt"), kpsText);
+  const languages = [...kpsText.matchAll(/<Language ID="([^"]+)"/g)].map((m) => m[1]);
+  log(`  .kps languages: ${JSON.stringify(languages)}`);
+  expect(languages).toEqual(["oc-gascon"]);
+});
+
+/** driveToDialect without the Q1 pick (walk 1 picks with its own assertions). */
+async function driveToDialectTail(page: Page, autonym: string): Promise<string | null> {
+  // A region question can precede the autonym (region-ambiguous parent, or
+  // a region implied by the pick); pass it, then the autonym appears.
+  await passRegionQuestion(page);
+  await page.fill("#il_language_autonym", autonym);
+  await page.press("#il_language_autonym", "Escape");
+  await surveyAdvance(page).click();
+  await waitForCodeQuestion(page);
+  const codeVal = page.getByTestId("language-code-value");
+  if (await codeVal.isVisible().catch(() => false)) {
+    log(`  code: ${await codeVal.innerText()}`);
+  }
+  await surveyAdvance(page).click();
+  await page.waitForSelector("#il_target_script", { timeout: 30_000 });
+  await selectMenuOption(page, page.locator("#il_target_script"), "Latn");
+  await surveyAdvance(page).click();
+  const proposal = page.getByTestId("dialect-proposal-tag");
+  const layout = page.getByTestId("layout-step");
+  for (let i = 0; i < 30; i++) {
+    if (await proposal.isVisible().catch(() => false)) {
+      const tag = await proposal.innerText();
+      log(`  dialect proposal: ${tag}`);
+      return tag;
+    }
+    if (await layout.isVisible().catch(() => false)) {
+      log("  no dialect question (layout step)");
+      return null;
+    }
+    await page.waitForTimeout(1000);
+  }
+  throw new Error("neither dialect proposal nor layout step appeared after script");
+}
+
+// ---------------------------------------------------------------------------
+// 2. Dialect proposals (Rabinal, Aranese, Yabekolo, Sursilvan; French: none)
+// ---------------------------------------------------------------------------
+
+const PROPOSAL_CASES = [
+  { name: "Rabinal", query: "Rabinal", pickDialect: "Rabinal", autonym: "rabinal", tag: "acr-x-rabinal" },
+  { name: "Aranese", query: "Aranese", pickDialect: "Aranese", autonym: "aranes", tag: "oc-aranes" },
+  { name: "Yabekolo", query: "Yabekolo", pickDialect: "Yabekolo", autonym: "yabekolo", tag: "ewo-x-yabekolo" },
+  { name: "Sursilvan", query: "Sursilvan", pickDialect: "Sursilvan", autonym: "sursilvan", tag: "rm-sursilv" },
+] as const;
+
+for (const c of PROPOSAL_CASES) {
+  test(`spec 115 walk 2: ${c.name} proposes ${c.tag}`, async ({ page }) => {
+    test.setTimeout(400_000);
+    log(`walk 2: ${c.name}`);
+    await startSurvey(page);
+    const tag = await driveToDialect(page, {
+      query: c.query,
+      pickDialect: c.pickDialect,
+      autonym: c.autonym,
+    });
+    expect(tag).toBe(c.tag);
+    // The proposal line names its source ("Suggested from …"); log it.
+    const caption = page.getByText(/Suggested from/);
+    log(`  source caption: ${JSON.stringify((await caption.innerText().catch(() => "<none>")))}`);
+    await page.getByRole("button", { name: "Confirm", exact: true }).click();
+    await expect(page.getByTestId("dialect-proposal-tag")).toBeVisible();
+  });
+}
+
+test("spec 115 walk 2: Yabekolo edit to yabekolo-east is refused with a reason", async ({
+  page,
+}) => {
+  test.setTimeout(400_000);
+  log("walk 2: Yabekolo edit validation");
+  await startSurvey(page);
+  const tag = await driveToDialect(page, {
+    query: "Yabekolo",
+    pickDialect: "Yabekolo",
+    autonym: "yabekolo",
+  });
+  expect(tag).toBe("ewo-x-yabekolo");
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  const edit = page.getByLabel("Dialect subtag");
+  await edit.fill("yabekolo-east");
+  const note = page.getByRole("note");
+  await expect(note).toBeVisible({ timeout: 10_000 });
+  const noteText = (await note.innerText()) ?? "";
+  log(`  edit note: ${JSON.stringify(noteText)}`);
+  expect(noteText).toMatch(/5[–-]8/);
+  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+});
+
+test("spec 115 walk 2: French gains no dialect screen", async ({ page }) => {
+  test.setTimeout(400_000);
+  log("walk 2: French (no dialect screen)");
+  await startSurvey(page);
+  const tag = await driveToDialect(page, {
+    query: "French",
+    pickLanguage: "French",
+    autonym: "français",
+  });
+  expect(tag).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// 3. Region on demand (Customize)
+// ---------------------------------------------------------------------------
+
+async function driveFrenchWithRegion(
+  page: Page,
+  regionName: string,
+): Promise<Record<string, unknown>> {
+  await startSurvey(page);
+  await typeChooser(page, "French");
+  // Typing auto-resolves (no advance): the Customize disclosure appears once
+  // the language is chosen. Specify the region BEFORE picking — the pick
+  // auto-advances, so Customize would be gone after it. The open listbox
+  // covers the Customize button (its <mark> intercepts pointer events), so
+  // close it with Escape first — that only closes the popup, it keeps the
+  // typed text and the resolved language.
+  await page.press("#il_language_english", "Escape");
+  const customize = page.getByRole("button", { name: "Customize", exact: true });
+  await expect(customize).toBeVisible({ timeout: 30_000 });
+  await customize.click({ timeout: 30_000 });
+  const regionInput = page.getByLabel("Specify a region…");
+  await regionInput.fill(regionName);
+  // Escape closed the chooser listbox before Customize, and focus is now in
+  // the region field; click the chooser input to focus it, then ArrowDown to
+  // open its list (focus alone does not reopen it once closed), before
+  // picking the language row.
+  await page.click("#il_language_english");
+  await page.press("#il_language_english", "ArrowDown");
+  await pickLanguageRow(page, "French");
+  // The region question follows English once a region was requested. It is a
+  // SelectMenu: open it and pick by region code (Canada CA, France FR).
+  const regionCode = regionName === "Canada" ? "CA" : "FR";
+  await selectMenuOption(page, page.locator("#il_language_region"), regionCode);
+  await page.waitForSelector("#il_language_autonym", { timeout: 30_000 });
+  await page.fill("#il_language_autonym", "français");
+  await page.press("#il_language_autonym", "Escape");
+  await surveyAdvance(page).click();
+  await waitForCodeQuestion(page);
+  await surveyAdvance(page).click();
+  await page.waitForSelector("#il_target_script", { timeout: 30_000 });
+  await selectMenuOption(page, page.locator("#il_target_script"), "Latn");
+  await surveyAdvance(page).click();
+  await page.waitForSelector('[data-testid="layout-step"]', { timeout: 30_000 });
+  const store = await decisions(page);
+  log(`  decisions after ${regionName}: ${JSON.stringify(store)}`);
+  return store;
+}
+
+/** The composed language tag in the persisted draft. */
+async function draftLanguageTag(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const raw = localStorage.getItem("ks.draft.__pending__.v2");
+    if (raw === null) return null;
+    try {
+      const parsed = JSON.parse(raw) as { languageTag?: unknown };
+      return typeof parsed.languageTag === "string" ? parsed.languageTag : null;
+    } catch {
+      return null;
+    }
+  });
+}
+
+/** Poll the draft's language tag until it reads `expected` (the draft save is debounced). */
+async function waitForDraftTag(page: Page, expected: string): Promise<void> {
+  await expect
+    .poll(async () => draftLanguageTag(page), { timeout: 30_000 })
+    .toBe(expected);
+}
+
+test("spec 115 walk 3: region on demand — Canada gives fr-CA, France gives fr", async ({
+  page,
+}) => {
+  test.setTimeout(400_000);
+  log("walk 3: region on demand (Canada)");
+  await driveFrenchWithRegion(page, "Canada");
+  expect(await draftLanguageTag(page)).toBe("fr-CA");
+});
+
+test("spec 115 walk 3b: region on demand — France", async ({ page }) => {
+  test.setTimeout(400_000);
+  log("walk 3: region on demand (France)");
+  await driveFrenchWithRegion(page, "France");
+  // fr-FR minimizes to fr (minimalTagOf, pinned in engine tests) — the
+  // composed tag carries no region subtag for France.
+  expect(await draftLanguageTag(page)).toBe("fr");
+});
+
+// ---------------------------------------------------------------------------
+// 4. Dialect re-proposal on language change
+// ---------------------------------------------------------------------------
+
+/** The dialect-related decision records in the persisted draft (probe for walk 4). */
+async function dialectDecisions(page: Page): Promise<Record<string, unknown>> {
+  return page.evaluate(() => {
+    const raw = localStorage.getItem("ks.draft.__pending__.v2");
+    if (raw === null) return { probe: "no draft" };
+    try {
+      const parsed = JSON.parse(raw) as {
+        decisions?: Record<string, unknown>;
+        surveyAnswers?: Record<string, unknown>;
+      };
+      const decisions = parsed.decisions ?? {};
+      const surveyAnswers = parsed.surveyAnswers ?? {};
+      const out: Record<string, unknown> = { decisionKeys: Object.keys(decisions) };
+      for (const [k, v] of Object.entries(decisions)) {
+        if (k.includes("dialect") || k.includes("language-") || k.includes("target-script")) out[k] = v;
+      }
+      out.surveyAnswers = surveyAnswers;
+      return out;
+    } catch (e) {
+      return { probe: `parse error: ${String(e)}` };
+    }
+  });
+}
+
+test("spec 115 walk 4: changing Gascon to Catalan flags the dialect answer", async ({
+  page,
+}) => {
+  test.setTimeout(400_000);
+  log("walk 4: dialect re-proposal");
+  await startSurvey(page);
+  const tag = await driveToDialect(page, {
+    query: "Gascon",
+    pickDialect: "Gascon",
+    autonym: "gascon",
+  });
+  expect(tag).toBe("oc-gascon");
+  await page.getByRole("button", { name: "Confirm", exact: true }).click();
+  log(`  dialect decisions after Gascon confirm: ${JSON.stringify(await dialectDecisions(page))}`);
+  await surveyAdvance(page).click();
+  await page.waitForSelector('[data-testid="layout-step"]', { timeout: 15_000 });
+  // Back to the language question from the layout step: layout <- dialect
+  // <- script <- code <- autonym <- english (5 clicks).
+  const back = page.getByRole("button", { name: /^Back$/i });
+  for (let i = 0; i < 5; i++) {
+    await expect(back).toBeVisible({ timeout: 15_000 });
+    await back.click();
+    await page.waitForTimeout(500);
+  }
+  await page.waitForSelector("#il_language_english", { timeout: 15_000 });
+  await typeChooser(page, "Catalan");
+  await pickLanguageRow(page, "Catalan");
+  // Catalan is region-ambiguous (ES/FR): the region question follows the pick.
+  await passRegionQuestion(page);
+  // Advance back through autonym / code / script to the layout step.
+  await page.waitForSelector("#il_language_autonym", { timeout: 30_000 });
+  await page.fill("#il_language_autonym", "català");
+  await page.press("#il_language_autonym", "Escape");
+  await surveyAdvance(page).click();
+  await waitForCodeQuestion(page);
+  await surveyAdvance(page).click();
+  await page.waitForSelector("#il_target_script", { timeout: 30_000 });
+  await selectMenuOption(page, page.locator("#il_target_script"), "Latn");
+  // The stale gascon answer must be flagged, not silently kept: a footer
+  // notice names the step that needs reconfirming. Assert it HERE, still on
+  // the identity step — the notice clears on the navigation to layout.
+  const beforeStore = await decisions(page);
+  log(`  decisions at script step: ${JSON.stringify(beforeStore)}`);
+  log(`  dialect decisions at script step: ${JSON.stringify(await dialectDecisions(page))}`);
+  const bodyText = await page.locator("body").innerText();
+  log(`  body before layout: ${JSON.stringify(bodyText.slice(0, 1200))}`);
+  expect(bodyText).toMatch(/will need reconfirming/);
+  expect(bodyText).not.toMatch(/oc-gascon/);
+  await surveyAdvance(page).click();
+  await page.waitForSelector('[data-testid="layout-step"]', { timeout: 30_000 });
+  const store = await decisions(page);
+  log(`  decisions after change: ${JSON.stringify(store)}`);
+});
+
+// ---------------------------------------------------------------------------
+// 5. Autosuggest kept (FR-038)
+// ---------------------------------------------------------------------------
+
+test("spec 115 walk 5: autosuggest kept", async ({ page }) => {
+  test.setTimeout(400_000);
+  log("walk 5: autosuggest kept");
+  await startSurvey(page);
+  // Type "Ewon": suggestions appear as you type, with Ewondo's card content.
+  await typeChooser(page, "Ewon");
+  await expect(page.getByRole("option", { name: /Ewondo/ }).first()).toBeVisible({
+    timeout: 20_000,
+  });
+  const ewonLabels = await optionLabels(page);
+  log(`  options for Ewon: ${JSON.stringify(ewonLabels)}`);
+  expect(ewonLabels.some((l) => /Ewondo/.test(l))).toBe(true);
+  // Type "Ewondo" and tab away without clicking: it resolves (the entry
+  // seeds the next questions) — the author then continues with Next.
+  await typeChooser(page, "Ewondo");
+  await page.locator("#il_language_english").press("Tab");
+  await surveyAdvance(page).click();
+  await page.waitForSelector("#il_language_autonym", { timeout: 30_000 });
+  log("  Ewondo + Tab resolved; Next reached the autonym question");
+  const autonymVal = await page.locator("#il_language_autonym").inputValue();
+  log(`  proposed autonym: ${JSON.stringify(autonymVal)}`);
+  await page.fill("#il_language_autonym", autonymVal === "" ? "ewondo" : autonymVal);
+  await page.press("#il_language_autonym", "Escape");
+  await surveyAdvance(page).click();
+  await waitForCodeQuestion(page);
+  const codeVal = page.getByTestId("language-code-value");
+  await expect(codeVal).toBeVisible({ timeout: 10_000 });
+  expect(await codeVal.innerText()).toBe("ewo");
+  log("  resolved code: ewo");
+});
+
+// ---------------------------------------------------------------------------
+// 6. Nothing matches (US6)
+// ---------------------------------------------------------------------------
+
+test("spec 115 walk 6a: typed code bft proposes Balti", async ({ page }) => {
+  test.setTimeout(400_000);
+  log("walk 6a: bft -> Balti");
+  await startSurvey(page);
+  await typeChooser(page, "bft");
+  const row = page.getByRole("option", { name: /Balti/ }).first();
+  await expect(row).toBeVisible({ timeout: 20_000 });
+  const label = (await row.getAttribute("aria-label")) ?? "";
+  log(`  tag row: ${label}`);
+  expect(label).toMatch(/bft/);
+  await row.click();
+  // The pick lands on the autonym question, not the code question.
+  await page.waitForSelector("#il_language_autonym", { timeout: 30_000 });
+  await page.fill("#il_language_autonym", "balti");
+  await page.press("#il_language_autonym", "Escape");
+  await surveyAdvance(page).click();
+  await waitForCodeQuestion(page);
+  const codeVal = page.getByTestId("language-code-value");
+  await expect(codeVal).toBeVisible({ timeout: 10_000 });
+  expect(await codeVal.innerText()).toBe("bft");
+});
+
+test("spec 115 walk 6b: typed tag oc-gascon resolves to Occitan + Gascon", async ({
+  page,
+}) => {
+  test.setTimeout(400_000);
+  log("walk 6b: oc-gascon typed");
+  await startSurvey(page);
+  const tag = await driveToDialect(page, {
+    query: "oc-gascon",
+    pick: /Occitan, dialect: Gascon/,
+    autonym: "gascon",
+  });
+  expect(tag).toBe("oc-gascon");
+});
+
+test("spec 115 walk 6c: made-up name as a dialect of Occitan", async ({ page }) => {
+  test.setTimeout(400_000);
+  log("walk 6c: made-up name is a dialect");
+  await startSurvey(page);
+  await typeChooser(page, "Zorpian");
+  // Escape closes the suggestion listbox, which otherwise overlays the
+  // "Can't find it?" button and intercepts the click.
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Can't find it?" }).click();
+  await page
+    .getByRole("button", { name: /"Zorpian" is a dialect: find its language/ })
+    .click();
+  await expect(
+    page.getByText(/Which language is "Zorpian" a dialect of\?/),
+  ).toBeVisible({ timeout: 10_000 });
+  await typeChooser(page, "Occitan");
+  await pickLanguageRow(page, "Occitan");
+  const tag = await driveToDialectTail(page, "zorpian");
+  expect(tag).toBe("oc-x-zorpian");
+});
+
+test("spec 115 walk 6d: unlisted, no code -> qaa-x-… proposed", async ({ page }) => {
+  test.setTimeout(400_000);
+  log("walk 6d: unlisted, no code");
+  await startSurvey(page);
+  await typeChooser(page, "Mystery");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Can't find it?" }).click();
+  await page.getByRole("button", { name: "My language isn't listed", exact: true }).click();
+  const heading = page.getByText("My language isn't listed");
+  await expect(heading).toBeVisible({ timeout: 10_000 });
+  const panelText = await page.locator("body").innerText();
+  expect(panelText).toMatch(/qaa-x-mystery/);
+  log("  unlisted panel proposes qaa-x-mystery");
+  await page.getByRole("button", { name: "Use this language", exact: true }).click();
+  const tag = await driveToDialectTail(page, "mystery");
+  // Known limitation (Phase 7): uncoded qaa tags carry the script explicitly
+  // (qaa-Latn-x-…), where the quickstart shows qaa-x-….
+  expect(tag).toBe("qaa-Latn-x-mystery");
+});
+
+test("spec 115 walk 6e: unlisted with code zzz warns", async ({ page }) => {
+  test.setTimeout(400_000);
+  log("walk 6e: unlisted with code zzz");
+  await startSurvey(page);
+  await typeChooser(page, "Zedlang");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Can't find it?" }).click();
+  await page.getByRole("button", { name: "My language isn't listed", exact: true }).click();
+  await expect(page.getByText("My language isn't listed")).toBeVisible({ timeout: 10_000 });
+  await page.getByLabel("I know its code (optional)").fill("zzz");
+  // The page has several role="status" regions; match the code-check line by text.
+  const status = page.getByText(/not in the ISO 639-3 registry/);
+  await expect(status).toBeVisible({ timeout: 10_000 });
+  log(`  code status: ${await status.innerText()}`);
+  await page.getByRole("button", { name: "Use this language", exact: true }).click();
+  // The pick lands on the autonym question, not the code question.
+  await page.waitForSelector("#il_language_autonym", { timeout: 30_000 });
+  await page.fill("#il_language_autonym", "zedlang");
+  await page.press("#il_language_autonym", "Escape");
+  await surveyAdvance(page).click();
+  await waitForCodeQuestion(page);
+  const codeVal = page.getByTestId("language-code-value");
+  await expect(codeVal).toBeVisible({ timeout: 10_000 });
+  expect(await codeVal.innerText()).toBe("zzz");
+});
+
+test("spec 115 walk 6f: Mansim (uncoded, Glottolog) -> qaa-ID-x-mansim", async ({
+  page,
+}) => {
+  test.setTimeout(400_000);
+  log("walk 6f: Mansim");
+  await startSurvey(page);
+  await typeChooser(page, "Mansim");
+  await pickOption(page, /Mansim/);
+  const heading = page.getByText("My language isn't listed");
+  await expect(heading).toBeVisible({ timeout: 10_000 });
+  const bodyText = await page.locator("body").innerText();
+  expect(bodyText).toMatch(/Known to Glottolog/);
+  expect(bodyText).toMatch(/qaa-ID-x-mansim/);
+  // The panel names the country by its code (ID), not its name (Indonesia).
+  expect(bodyText).toMatch(/no ISO 639-3 code for it\. ID/);
+  const scriptNote = page.getByTestId("unlisted-script");
+  await expect(scriptNote).toBeVisible({ timeout: 10_000 });
+  log(`  script proposal: ${await scriptNote.innerText()}`);
+  expect(await scriptNote.innerText()).toMatch(/from related languages|closest relatives/);
+  await page.getByRole("button", { name: "Use this language", exact: true }).click();
+  const tag = await driveToDialectTail(page, "mansim");
+  // Script carried explicitly, as in 6d (known Phase 7 limitation).
+  expect(tag).toBe("qaa-Latn-ID-x-mansim");
+});
+
+test("spec 115 walk 6g: Olmos (uncoded) -> qaa-PE-x-sechuran-olmos", async ({ page }) => {
+  test.setTimeout(400_000);
+  log("walk 6g: Olmos");
+  await startSurvey(page);
+  await typeChooser(page, "Olmos");
+  await pickOption(page, /Olmos/);
+  await expect(page.getByText("My language isn't listed")).toBeVisible({ timeout: 10_000 });
+  const bodyText = await page.locator("body").innerText();
+  expect(bodyText).toMatch(/qaa-PE-x-sechuran-olmos/);
+  await page.getByRole("button", { name: "Use this language", exact: true }).click();
+  const tag = await driveToDialectTail(page, "olmos");
+  // Script carried explicitly, as in 6d (known Phase 7 limitation).
+  expect(tag).toBe("qaa-Latn-PE-x-sechuran-olmos");
+});
+
+test("spec 115 walk 6h: dialect typed as the language", async ({ page }) => {
+  test.setTimeout(400_000);
+  log("walk 6h: Gascon Occitan");
+  await startSurvey(page);
+  const tag = await driveToDialect(page, {
+    query: "Gascon Occitan",
+    pick: /Occitan, dialect: Gascon/,
+    autonym: "gascon",
+  });
+  expect(tag).toBe("oc-gascon");
+});
+
+test("spec 115 walk 6i: Ewondo (Yabekolo) -> ewo-x-yabekolo", async ({ page }) => {
+  test.setTimeout(400_000);
+  log("walk 6i: Ewondo (Yabekolo)");
+  await startSurvey(page);
+  const tag = await driveToDialect(page, {
+    query: "Ewondo (Yabekolo)",
+    pick: /Ewondo, dialect: Yabekolo/,
+    autonym: "yabekolo",
+  });
+  expect(tag).toBe("ewo-x-yabekolo");
+});
+
+test("spec 115 walk 6j: French Switzerland -> fr-CH", async ({ page }) => {
+  test.setTimeout(400_000);
+  log("walk 6j: French Switzerland");
+  await startSurvey(page);
+  await typeChooser(page, "French Switzerland");
+  await pickOption(page, /French, region: Switzerland/);
+  await passRegionQuestion(page, "Switzerland");
+  await page.fill("#il_language_autonym", "français");
+  await page.press("#il_language_autonym", "Escape");
+  await surveyAdvance(page).click();
+  await waitForCodeQuestion(page);
+  await surveyAdvance(page).click();
+  await page.waitForSelector("#il_target_script", { timeout: 30_000 });
+  await selectMenuOption(page, page.locator("#il_target_script"), "Latn");
+  await surveyAdvance(page).click();
+  await page.waitForSelector('[data-testid="layout-step"]', { timeout: 30_000 });
+  await waitForDraftTag(page, "fr-CH");
+});
+
+test("spec 115 walk 6k: Swiss French -> remainder chooser -> fr-CH", async ({ page }) => {
+  test.setTimeout(400_000);
+  log("walk 6k: Swiss French");
+  await startSurvey(page);
+  await typeChooser(page, "Swiss French");
+  await pickOption(page, /French, plus/);
+  await expect(page.getByText(/what is "Swiss"\?/)).toBeVisible({ timeout: 10_000 });
+  const place = page.locator("select").first();
+  await place.selectOption({ label: "Switzerland" });
+  await page.getByRole("button", { name: "Use this place", exact: true }).click();
+  await passRegionQuestion(page, "Switzerland");
+  await page.fill("#il_language_autonym", "français");
+  await page.press("#il_language_autonym", "Escape");
+  await surveyAdvance(page).click();
+  await waitForCodeQuestion(page);
+  await surveyAdvance(page).click();
+  await page.waitForSelector("#il_target_script", { timeout: 30_000 });
+  await selectMenuOption(page, page.locator("#il_target_script"), "Latn");
+  await surveyAdvance(page).click();
+  await page.waitForSelector('[data-testid="layout-step"]', { timeout: 30_000 });
+  await waitForDraftTag(page, "fr-CH");
+});
+
+test("spec 115 walk 6l: Ewondo Mvog-Ada -> remainder chooser -> ewo-x-mvogada", async ({
+  page,
+}) => {
+  test.setTimeout(400_000);
+  log("walk 6l: Ewondo Mvog-Ada");
+  await startSurvey(page);
+  await typeChooser(page, "Ewondo Mvog-Ada");
+  await pickOption(page, /Ewondo, plus/);
+  await expect(page.getByText(/what is "Mvog-Ada"\?/)).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: "It's a dialect name", exact: true }).click();
+  const tag = await driveToDialectTail(page, "mvogada");
+  expect(tag).toBe("ewo-x-mvogada");
+});
+
+test("spec 115 walk 6m: Gascon + Tab resolves to Occitan with the dialect", async ({
+  page,
+}) => {
+  test.setTimeout(400_000);
+  log("walk 6m: Gascon + Tab");
+  await startSurvey(page);
+  await typeChooser(page, "Gascon");
+  await page.locator("#il_language_english").press("Tab");
+  // Tab resolves the typed name (seeds), it does not advance: Next moves on.
+  await surveyAdvance(page).click();
+  // Occitan is region-ambiguous: the region question precedes the autonym.
+  await passRegionQuestion(page);
+  const tag = await driveToDialectTail(page, "gascon");
+  expect(tag).toBe("oc-gascon");
+});
+
+// ---------------------------------------------------------------------------
+// 7. Open path: language-list findings
+// ---------------------------------------------------------------------------
+
+test("spec 115 walk 7: Open list hint (sr-Latn-RS) and error (sq-AL-gheg)", async ({
+  page,
+}) => {
+  test.setTimeout(400_000);
+  log("walk 7: Open list findings");
+  await openExistingKeyboard(page, "basic_kbdus");
+  await expect(
+    page.getByRole("heading", { name: /languages this keyboard supports/i }),
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#open-languages-heading + section ol li').first()).toBeVisible({
+    timeout: 60_000,
+  });
+  const tagInput = page.getByLabel("Language tag (BCP 47)");
+  await tagInput.fill("sr-Latn-RS");
+  const useButton = page.getByRole("button", { name: "Use sr-Latn instead" });
+  await expect(useButton).toBeVisible({ timeout: 10_000 });
+  log("  hint offers Use sr-Latn");
+  await useButton.click();
+  await expect(tagInput).toHaveValue("sr-Latn");
+  await tagInput.fill("sq-AL-gheg");
+  const error = page.getByText("sq-AL-gheg is not a well-formed BCP 47 tag.");
+  await expect(error).toBeVisible({ timeout: 10_000 });
+  log("  error shown for sq-AL-gheg");
+});

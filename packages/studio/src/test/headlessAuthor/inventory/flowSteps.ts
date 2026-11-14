@@ -32,9 +32,7 @@ export const flowStepsInventory: readonly InventoryEntry[] = [
   { fn: "projectNameOptions", module: OPTION_RECORDS, callers: [FLOW_OPTIONS] },
   // --- Identity (IdentityLite and the name picker) ---
   { fn: "createIdentityResolution", module: "survey/identityResolution.ts", callers: ["survey/IdentityLite.tsx"] },
-  { fn: "resolveTypedLanguage", module: "survey/resolveTypedLanguage.ts", callers: ["survey/QuestionField.tsx"] },
-  { fn: "languageResultsFor", module: "survey/resolveTypedLanguage.ts", callers: ["survey/QuestionField.tsx"] },
-  { fn: "loadLangtags", module: "lib/langtagsDefaults.ts", callers: ["survey/QuestionField.tsx"] },
+  { fn: "resolveTypedEntry", module: "survey/languageChooser/chooserSearch.ts", callers: ["survey/languageChooser/LanguageChooser.tsx"] },
   { fn: "deriveSurveyContext", module: "decisions/identitySelectors.ts", callers: ["editors/adapters/panelAdapters.tsx"] },
   // --- Windows layout ---
   { fn: "proposeWindowsLayout", module: "lib/windowsLayouts.ts", callers: [LAYOUT_HOST, "survey/layout/LayoutStep.tsx"] },

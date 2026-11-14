@@ -6,10 +6,12 @@
 // allowed: Phase F's only required question is pf_welcome_paragraph, and a
 // blank picker just leaves that language out.
 
+import { isWellFormedBcp47 } from "@keyboard-studio/contracts";
 import type { ValidationResult } from "../types.ts";
 
-const BCP47_SHAPE = /^[a-z]{2,3}(-[a-z0-9]{1,8})*$/i;
 
+// A picked or typed language leads with a 2-3 letter ISO 639 subtag; a longer
+// registered-language shape (e.g. a spelled-out name) is rejected here.
 export function validateDocLanguageTag(
   value: string | string[] | undefined,
 ): ValidationResult {
@@ -17,7 +19,7 @@ export function validateDocLanguageTag(
   if (v.length === 0) {
     return { ok: true };
   }
-  if (!BCP47_SHAPE.test(v)) {
+  if (!isWellFormedBcp47(v) || !/^[a-z]{2,3}(-|$)/i.test(v)) {
     return {
       ok: false,
       code: "invalid_tag",

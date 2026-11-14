@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseKps, parseKpsLanguages, parseKpsFontRefs, parseKpsFiles, parseKpsPackageDetails } from "./kps-parser.js";
+import { parseKps, parseKpsLanguages, parseKpsFontRefs, parseKpsFiles, parseKpsPackageDetails, extractScriptSubtag } from "./kps-parser.js";
 
 const BASIC_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <Package>
@@ -460,5 +460,21 @@ describe("parseKpsLanguages", () => {
   });
   it("is empty without a Languages block", () => {
     expect(parseKpsLanguages("<Keyboard></Keyboard>")).toEqual([]);
+  });
+});
+
+describe("tags with private use and extensions survive Open (script reading)", () => {
+  const kps = `<Package><Info><Name value="K"/></Info><Keyboards><Keyboard><Languages>` +
+    `<Language ID="en-US-x-twain">English</Language><Language ID="fr-u-co-phonebk">French</Language>` +
+    `</Languages></Keyboard></Keyboards></Package>`;
+
+  it("reads no script from a subtag after -x- or -u-", () => {
+    expect(extractScriptSubtag("en-US-x-twain")).toBeNull();
+    expect(extractScriptSubtag("fr-u-co-phonebk")).toBeNull();
+    expect(extractScriptSubtag("lif-x-Deva")).toBeNull();
+  });
+
+  it("lists both tags unchanged", () => {
+    expect(parseKpsLanguages(kps).map((l) => l.tag)).toEqual(["en-US-x-twain", "fr-u-co-phonebk"]);
   });
 });

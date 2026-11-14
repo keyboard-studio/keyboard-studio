@@ -9,7 +9,7 @@ import type { Decision, DecisionId, DecisionSet } from "../decisions/decisionTyp
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { saveLayoutFamilyAnswer } from "./layoutFamily.ts";
-import { readmeFactsInputFrom, type ReadmeFactsSources } from "./readmeFactsInput.ts";
+import { markInputOrderFromDecisions, readmeFactsInputFrom, type ReadmeFactsSources } from "./readmeFactsInput.ts";
 
 const START = { id: "basic_kbdus", displayName: "US English", script: "Latn" };
 
@@ -98,6 +98,14 @@ describe("decisions", () => {
     expect(readmeFactsInputFrom(sources()).layoutFamily).toBe("azerty");
   });
 
+  it("narrows the mark-input-order decision to the two valid answers", () => {
+    expect(markInputOrderFromDecisions(decided({ "mark-input-order": "postfix" }))).toBe("postfix");
+    expect(markInputOrderFromDecisions(decided({ "mark-input-order": "prefix" }))).toBe("prefix");
+    expect(markInputOrderFromDecisions(decided({ "mark-input-order": "after-base" }))).toBeUndefined();
+    expect(markInputOrderFromDecisions(decided({ "mark-input-order": "   " }))).toBeUndefined();
+    expect(markInputOrderFromDecisions(decided({}))).toBeUndefined();
+  });
+
   it("passes the design rationale from the help-docs answers", () => {
     const helpDocs = { designRationale: "Mirrors the national standard." } as HelpDocsAnswers;
     expect(readmeFactsInputFrom(sources({ helpDocs })).designRationale).toBe("Mirrors the national standard.");
@@ -113,6 +121,12 @@ describe("working-copy fields", () => {
     expect(input.fallbackPolicy).toBe("swallow");
     expect(input.ir).toBeNull();
     expect(input.touchLayout).toBeNull();
+  });
+
+  it("passes the recorded output form through, and omits it when none was recorded", () => {
+    expect(readmeFactsInputFrom(sources({ outputForm: "base-plus-mark" })).outputForm).toBe("base-plus-mark");
+    expect(readmeFactsInputFrom(sources({ outputForm: "ready-made" })).outputForm).toBe("ready-made");
+    expect(readmeFactsInputFrom(sources())).not.toHaveProperty("outputForm");
   });
 
   it("takes the script and display name from the starting keyboard", () => {

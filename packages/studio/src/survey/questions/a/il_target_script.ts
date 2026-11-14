@@ -39,6 +39,14 @@ export const definition = {
   ],
   next: [
     { condition: "value == 'Ethi' or value == 'Hani' or value == 'Hang'", goto: "il_script_not_supported" },
+    // Spec 115 US2: the dialect question is reached only when the language
+    // was reached through a search match carrying a dialect (or the author
+    // typed one in the Customize panel). ctx.ilDialectRequested is never
+    // set on the resolveNext path — the live gate is
+    // IdentityLite.nextOverride — this rule exists so the flow graph and
+    // the resume walker can follow the branch (the ilRegionRequested
+    // precedent in il_language_english).
+    { condition: "ctx.ilDialectRequested == 'true'", goto: "il_language_dialect" },
     // #1901: NO default branch — a supported script ENDS the identity
     // flow here. Attribution capture (il_author_name → …) used to be this
     // edge's target (spec 064 US1); the author/copyright questions now
@@ -152,7 +160,9 @@ const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes
   // to a target-script option value at resolution time) as a lookup default.
   lookupDefault: (ctx) => {
     const script = ctx.identity?.targetScript;
-    return script !== undefined && script !== "" ? { value: script, source: "langtags" } : undefined;
+    return script !== undefined && script !== ""
+      ? { value: script, source: ctx.identity?.targetScriptSource ?? "langtags" }
+      : undefined;
   },
 };
 export default mod;

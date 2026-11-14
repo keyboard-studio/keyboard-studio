@@ -22,6 +22,18 @@ import {
 } from "./index.js";
 
 describe("getLanguageDefaults", () => {
+  it("R13 - languages with no bare tagset resolve via their shortest tagset", () => {
+    for (const code of ["zh", "isv", "con", "aux", "nul", "ocm", "prn", "sgn", "spx", "tpo", "txr", "xaq", "xcc", "xce", "xib"]) {
+      expect(getLanguageDefaults(code), code).not.toBeNull();
+    }
+    expect(getLanguageDefaults("zh")!.code).toBe("zh");
+  });
+
+  it("R13 - a language with a bare tagset is unchanged (ewo)", () => {
+    const ewo = getLanguageDefaults("ewo");
+    expect(ewo).not.toBeNull();
+    expect(ewo!.code).toBe("ewo");
+  });
   it("C1 — ha → Latn / NG", () => {
     const result = getLanguageDefaults("ha");
     expect(result).not.toBeNull();

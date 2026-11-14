@@ -1,46 +1,90 @@
 import { describe, it, expect } from "vitest";
-import type { LanguageSummary } from "@keyboard-studio/contracts";
+import { LanguageType, type ILanguage } from "@ethnolib/find-language";
 import { languageResultsFor, resolveTypedLanguage } from "./resolveTypedLanguage.ts";
+import type { ChooserLanguage } from "./languageChooser/dialectSearch.ts";
 
-const row = (code: string, englishName: string): LanguageSummary => ({ code, englishName }) as LanguageSummary;
+const row = (code: string, exonym: string, names: string[] = []): ILanguage => ({
+  iso639_3_code: code,
+  languageSubtag: code,
+  exonym,
+  regionNamesForDisplay: "",
+  regionNamesForSearch: [],
+  names,
+  scripts: [],
+  alternativeTags: [],
+  isMacrolanguage: false,
+  languageType: LanguageType.Living,
+});
 
-describe("resolveTypedLanguage", () => {
-  const none = (): undefined => undefined;
-
-  it("resolves a unique primary English-name match", () => {
+describe("resolveTypedLanguage over ILanguage", () => {
+  it("resolves a unique primary-name match", () => {
     const hit = row("bfd", "Bafut");
-    expect(resolveTypedLanguage("bafut", [hit, row("bfx", "Bafutish")], none)).toBe(hit);
+    expect(resolveTypedLanguage("bafut", [hit, row("bfx", "Bafutish")])).toBe(hit);
   });
 
   it("is ambiguous (null) when several entries share the primary name", () => {
-    expect(resolveTypedLanguage("Bafut", [row("a", "Bafut"), row("b", "Bafut")], none)).toBeNull();
+    expect(resolveTypedLanguage("Bafut", [row("a", "Bafut"), row("b", "Bafut")])).toBeNull();
+  });
+
+  it("several rows of ONE language (plain + dialect cards) resolve to the plain row", () => {
+    // The chooser lists French once per dialect card; every card shares the
+    // exonym "French". Those rows are one language, not several matches —
+    // otherwise typing "French" resolves, then un-resolves to null when the
+    // Glottolog tier streams in and the Customize panel unmounts (walk 3).
+    const plainFr = row("fr", "French");
+    const card = (name: string): ChooserLanguage =>
+      ({ ...row("fr", "French"), match: { name, relation: "dialect", source: "glottolog" } }) as ChooserLanguage;
+    expect(resolveTypedLanguage("French", [plainFr, card("American Koine French"), card("San Miguel Creole French")])).toBe(
+      plainFr,
+    );
+    // Order must not matter: the plain row wins even when a card comes first.
+    expect(resolveTypedLanguage("French", [card("American Koine French"), plainFr])).toBe(plainFr);
+    // Two DIFFERENT languages sharing the name stay ambiguous.
+    expect(resolveTypedLanguage("French", [plainFr, row("fra", "French")])).toBeNull();
   });
 
   it("falls back to a unique alias only when no primary name matches", () => {
-    const ghotuo = row("aaa", "Ghotuo");
-    const alt = (code: string): string[] | undefined => (code === "aaa" ? ["Otuo"] : undefined);
-    expect(resolveTypedLanguage("Otuo", [ghotuo, row("zzz", "Other")], alt)).toBe(ghotuo);
+    const ghotuo = row("aaa", "Ghotuo", ["Otuo"]);
+    expect(resolveTypedLanguage("Otuo", [ghotuo, row("zzz", "Other")])).toBe(ghotuo);
     // A primary match wins over an alias on a different entry.
     const primary = row("ppp", "Otuo");
-    expect(resolveTypedLanguage("Otuo", [ghotuo, primary], alt)).toBe(primary);
+    expect(resolveTypedLanguage("Otuo", [ghotuo, primary])).toBe(primary);
+  });
+
+  it("an alias shared by two entries stays ambiguous", () => {
+    expect(
+      resolveTypedLanguage("Shared", [row("a", "Alpha", ["Shared"]), row("b", "Beta", ["Shared"])]),
+    ).toBeNull();
   });
 
   it("resolves nothing for blank or unmatched text", () => {
-    expect(resolveTypedLanguage("  ", [row("a", "A")], none)).toBeNull();
-    expect(resolveTypedLanguage("zzz", [row("a", "A")], none)).toBeNull();
+    expect(resolveTypedLanguage("  ", [row("a", "A")])).toBeNull();
+    expect(resolveTypedLanguage("zzz", [row("a", "A")])).toBeNull();
   });
 
   it("treats NFC and NFD spellings as the same name", () => {
     const hit = row("yo", "Yorùbá");
-    expect(resolveTypedLanguage("Yorùbá".normalize("NFD"), [hit], none)).toBe(hit);
+    expect(resolveTypedLanguage("Yorùbá".normalize("NFD"), [hit])).toBe(hit);
+  });
+
+  it("ignores the chooser's match markers in names", () => {
+    const hit = row("ewo", "[Ewondo]");
+    expect(resolveTypedLanguage("Ewondo", [hit])).toBe(hit);
   });
 });
 
 describe("languageResultsFor", () => {
-  const mod = { lookupByName: (t: string): string[] => [`name:${t}`], listLanguages: (): string[] => ["all"] };
+  const seen: string[] = [];
+  const modifier = (rs: ILanguage[], q: string): ChooserLanguage[] => {
+    seen.push(q);
+    return rs;
+  };
 
-  it("looks up non-blank text and lists everything for blank text", () => {
-    expect(languageResultsFor(mod, "baf")).toEqual(["name:baf"]);
-    expect(languageResultsFor(mod, "  ")).toEqual(["all"]);
+  it("lists nothing for text under two characters and searches otherwise", () => {
+    expect(languageResultsFor(" e ", modifier)).toEqual([]);
+    expect(seen).toEqual([]);
+    const rs = languageResultsFor("Ewondo", modifier);
+    expect(rs.some((r) => r.languageSubtag === "ewo")).toBe(true);
+    expect(seen).toEqual(["Ewondo"]);
   });
 });

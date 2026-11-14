@@ -51,8 +51,10 @@ test.describe("browser Back mid-survey (F7)", () => {
   });
 
   test("physical Back button steps back one manifest step at a time", async ({ page }) => {
-    // Walk: identity -> choose_base -> track -> attribution (#1901) ->
-    // project_name -> characters.
+    // Walk: identity -> choose_base -> attribution (#1901) ->
+    // project_name -> characters. (No track step: track_choice was removed
+    // 2026-11-06, 77cefa97 — copy is the default, so there is no track
+    // history entry between choose_base and attribution.)
     await driveIdentityLite(page, {
       english: FIXTURE.english,
       autonym: FIXTURE.autonym,
@@ -106,15 +108,11 @@ test.describe("browser Back mid-survey (F7)", () => {
       timeout: 15_000,
     });
 
-    // A third physical Back: attribution -> track. The track radio choice
-    // reappears.
-    await page.goBack();
-    await expect(page.getByRole("radio", { name: /^Copy/i })).toBeVisible({ timeout: 15_000 });
-
-    // A fourth physical Back: track -> choose_base. The base picker
+    // A third physical Back: attribution -> choose_base. The base picker
     // reappears — proves the browser's own history stack (not just the
-    // in-app "<- Back" dispatch) drives the wizard back four full manifest
-    // steps in a row.
+    // in-app "<- Back" dispatch) drives the wizard back three full manifest
+    // steps in a row. (No track step in between: track_choice was removed
+    // 2026-11-06, 77cefa97 — copy is the default.)
     await page.goBack();
     await expect(page.getByTestId("base-picker")).toBeVisible({ timeout: 15_000 });
 

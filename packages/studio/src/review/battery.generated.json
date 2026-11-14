@@ -1,10 +1,10 @@
 {
- "generatedAt": "2026-11-08T07:50:33.818Z",
- "catalogSize": 209,
+ "generatedAt": "2026-11-11T00:35:11.495Z",
+ "catalogSize": 211,
  "byBand": {
   "layer-c-enforce": 125,
   "scaffolder-bake": 40,
-  "yellow-survey": 34,
+  "yellow-survey": 36,
   "red-checklist": 10
  },
  "implementedCount": 118,
@@ -1722,7 +1722,7 @@
    "id": "10.3-kps-tags-minimal",
    "band": "yellow-survey",
    "section": "10. Package metadata (`.kps`)",
-   "description": "Language tags are minimal — no unnecessary script/region subtags",
+   "description": "[content review] Language tags are minimal — no unnecessary script/region subtags, and no two tags share a minimal form",
    "hook": {
     "kind": "surveyQuestionId",
     "id": "lang-tags-minimal"
@@ -2665,6 +2665,26 @@
    "hook": {
     "kind": "surveyQuestionId",
     "id": "bcp47-tags-minimal-registered"
+   }
+  },
+  {
+   "id": "12.8-bcp47-tag-well-formed",
+   "band": "yellow-survey",
+   "section": "12. Language tagging (BCP47)",
+   "description": "[content review] Every language tag is a well-formed BCP 47 tag",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "bcp47-tag-well-formed"
+   }
+  },
+  {
+   "id": "12.9-bcp47-variant-prefix",
+   "band": "yellow-survey",
+   "section": "12. Language tagging (BCP47)",
+   "description": "[content review] A registered variant subtag is used only with a language or script its registry prefixes allow",
+   "hook": {
+    "kind": "surveyQuestionId",
+    "id": "bcp47-variant-prefix"
    }
   },
   {

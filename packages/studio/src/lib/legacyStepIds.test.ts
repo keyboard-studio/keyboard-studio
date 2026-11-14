@@ -95,7 +95,9 @@ describe("SC-005 inventory — every pre-091 step id resolves to its screen", ()
       // author/copyright trio; those decisions live on the attribution
       // screen now (asserted separately below) — the identity screen
       // holds only the language decisions.
-      identity: ["language-name", "language-region", "language-autonym", "language-code", "target-script"],
+      // Spec 115 US2: il_language_dialect provides language-dialect,
+      // language-dialect-source, dialect-glottocode.
+      identity: ["language-name", "language-region", "language-autonym", "language-code", "target-script", "language-dialect", "language-dialect-source", "dialect-glottocode"],
       layout: ["windows-layout"],
       choose_base: ["base-keyboard"],
       project_name: ["project-display-name", "project-keyboard-id"],

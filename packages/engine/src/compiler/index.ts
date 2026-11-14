@@ -295,10 +295,17 @@ export function mapKmnCompilerEvent(
  * The kmc-kmn JS pipeline orchestrates two kmcmp_compile passes
  * (target=0 then target=1) and runs the WriteCompiledKeyboard step to
  * emit the KMW .js — we don't reimplement that.
+ *
+ * `saveDebug` is kmc-kmn's own option and defaults to kmc-kmn's default (true):
+ * debug store names and source line numbers in the .kmx, a pretty-printed .js
+ * with `// Line N` comments. The live preview keeps that; anything that ships
+ * (the .kmp, the source zip's build/) passes `saveDebug: false` for a release
+ * build, which is what Keyman Developer produces.
  */
 export async function compile(
   fs: VirtualFS,
   keyboardId: string,
+  compileOpts: { saveDebug?: boolean } = {},
 ): Promise<CompileResult> {
   const t0 = Date.now();
   const wasReady = _compiler !== null;
@@ -390,6 +397,7 @@ export async function compile(
   const ok = await activeCompiler.init(callbacks, {
     compilerWarningsAsErrors: options.compilerWarningsAsErrors,
     warnDeprecatedCode: options.warnDeprecatedCode,
+    ...(compileOpts.saveDebug !== undefined ? { saveDebug: compileOpts.saveDebug } : {}),
   });
   if (!ok) {
     // Surface ANY diagnostics that kmc-kmn reported during init (e.g.

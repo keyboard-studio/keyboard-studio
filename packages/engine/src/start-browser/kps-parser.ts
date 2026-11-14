@@ -1,6 +1,6 @@
 // see spec.md §8 step 1 — .kps XML metadata extraction
 
-import type { KeymanPlatformTarget } from "@keyboard-studio/contracts";
+import { scriptSubtagOf, type KeymanPlatformTarget } from "@keyboard-studio/contracts";
 import { resolveLangtag } from "../langtags/tagsets.js";
 
 export interface KpsMetadata {
@@ -72,9 +72,7 @@ function dedup(arr: string[]): string[] {
  * form to distinguish "no declared script" from "declared Latin".
  */
 export function extractScriptSubtag(tag: string): string | null {
-  const seg = tag.split("-").find((p) => /^[A-Za-z]{4}$/.test(p));
-  if (seg === undefined) return null;
-  return seg.charAt(0).toUpperCase() + seg.slice(1).toLowerCase();
+  return scriptSubtagOf(tag) ?? null;
 }
 
 const VALID_TARGETS = new Set<string>([

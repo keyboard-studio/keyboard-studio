@@ -352,6 +352,14 @@ export interface QuestionModule {
    */
   provides?: DecisionId[];
 
+  /**
+   * The subset of `provides` this module's renderer records ITSELF (spec 115:
+   * `language-search-match`, the dialect hit behind a language pick). The answer
+   * value is never broadcast to these ids, extraction never seeds them, and a
+   * reload never turns their records back into the question's answer.
+   */
+  rendererWrites?: readonly DecisionId[];
+
   /** Decisions that must be resolved before this module can run. */
   requires?: readonly DecisionId[];
 

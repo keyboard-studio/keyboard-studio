@@ -25,21 +25,32 @@ import type { IdentityPatch } from "../stores/identityPatch.ts";
 export interface IdentityLanguageSource {
   bcp47: string;
   english: string;
+  /** Glottolog code of a language with no ISO code (spec 115 FR-045). */
+  languageGlottocode?: string;
+  /** Glottolog code of the chosen dialect (spec 115 FR-012). */
+  dialectGlottocode?: string;
 }
 
 /**
  * Trimmed `{ bcp47, languageName }` conditional-spread overlay for an
  * `IdentityPatch`: each field present only when its trimmed source is
  * non-empty. Returns `{}` (not undefined) when neither is — callers spread
- * it into a larger patch.
+ * it into a larger patch. The Glottolog codes ride the same rule: present
+ * only when non-empty, so a language with an ISO code writes no
+ * `languageGlottocode` and a keyboard with no dialect writes no
+ * `dialectGlottocode`.
  */
 export function identityLanguagePatch(
   result: IdentityLanguageSource | null,
 ): IdentityPatch {
   const bcp47 = result?.bcp47.trim() ?? "";
   const languageName = result?.english.trim() ?? "";
+  const languageGlottocode = result?.languageGlottocode?.trim() ?? "";
+  const dialectGlottocode = result?.dialectGlottocode?.trim() ?? "";
   return {
     ...(bcp47 !== "" ? { bcp47 } : {}),
     ...(languageName !== "" ? { languageName } : {}),
+    ...(languageGlottocode !== "" ? { languageGlottocode } : {}),
+    ...(dialectGlottocode !== "" ? { dialectGlottocode } : {}),
   };
 }

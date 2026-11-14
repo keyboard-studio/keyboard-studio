@@ -93,6 +93,17 @@ engine/studio import). See [specs/036-glottolog-catalog/](../specs/036-glottolog
 
 The React + Vite SPA (three-pane gallery / editor / preview; working-copy spine).
 
+Language search is EthnoLib's (spec 115): `@ethnolib/find-language` 0.4.4
+(exact pin) as a runtime dependency, behind the same lazy boundary as the
+language step. The `useLanguageChooser` hook is **vendored** from
+`@ethnolib/language-chooser-react-hook` 0.3.7 (MIT, with attribution) because
+the published hook package names a `.d.ts` it does not ship, and it inlines
+its own copy of find-language's data — importing both would ship the data
+twice. Upstream issues for the missing typings, the embedded data, and
+`createTag`'s private-use/variant handling are on sillsdev/EthnoLib
+(#157, #158, #159); the empty-query hang in `defaultSearchResultModifier`
+is #160.
+
 ## Not yet realised as written
 
 Spec targets that do **not** match the tree — check a package's actual exports before

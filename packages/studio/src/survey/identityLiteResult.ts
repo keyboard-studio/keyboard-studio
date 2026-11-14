@@ -46,6 +46,26 @@ export interface IdentityLiteResult {
   /** Raw `il_target_script` answer (e.g. "Latn", "romanization-Latn", "fonipa"). */
   targetScriptRaw: string;
   /**
+   * Confirmed dialect subtag (spec 115 US2), e.g. "gascon" or "x-rabinal".
+   * Empty string when no dialect was confirmed — a confirmed default.
+   */
+  dialectSubtag: string;
+  /**
+   * Where the dialect subtag came from: "registered-variant" | "langtags" |
+   * "from-name" | "typed". Empty string when there is no dialect.
+   */
+  dialectSource: string;
+  /**
+   * Glottolog code of a language with no ISO 639-3 code (spec 115 FR-045),
+   * e.g. "mans1260". Empty string when the language has an ISO code.
+   */
+  languageGlottocode: string;
+  /**
+   * Glottolog code of the chosen dialect (spec 115 FR-012), e.g. "gasc1240".
+   * Empty string when the dialect is not from Glottolog.
+   */
+  dialectGlottocode: string;
+  /**
    * Full BCP47 target tag combining language subtag + normalized script/variant,
    * e.g. "ha-Latn", "hi-Deva", "fr-Latn", "und-fonipa".
    * Empty string when `languageSubtag` was left blank — `suggestStarts()` falls

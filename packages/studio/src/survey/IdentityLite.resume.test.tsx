@@ -52,9 +52,22 @@ const COMPLETED_AMBIGUOUS: SurveyPhaseResult = {
   ],
 };
 
-// ---------------------------------------------------------------------------
-// toResumeAnswers — per-answerType flattening
-// ---------------------------------------------------------------------------
+// A completed run for a language reached through a dialect match (Gascon →
+// Occitan): the original walk routed through il_language_dialect via
+// getNextOverride. On resume, langtags is not yet loaded (getNextOverride
+// can't fire), so the dialect step is reconstructed purely from the recorded
+// answer (spec 115 US2) — the resume mounts on the dialect question, the
+// last question of the walk, and Finish keeps the dialect in the tag.
+const COMPLETED_GASCON: SurveyPhaseResult = {
+  phase: "A",
+  answers: [
+    { questionId: "il_language_autonym", answerType: "text", value: "Occitan" },
+    { questionId: "il_language_english", answerType: "text", value: "Occitan" },
+    { questionId: "il_language_code", answerType: "text", value: "oc" },
+    { questionId: "il_target_script", answerType: "select", value: "Latn" },
+    { questionId: "il_language_dialect", answerType: "text", value: "gascon" },
+  ],
+};
 
 describe("toResumeAnswers", () => {
   it("flattens a real identity-lite phase result to questionId → value", () => {
@@ -129,7 +142,8 @@ describe("IdentityLite — resume", () => {
     // from the last question (target script) lands on il_language_code with
     // its restored value; assert on the display value rather than the
     // input role.
-    expect(screen.getByDisplayValue("ha")).toBeTruthy();
+    // (Spec 115: the code is shown as a confirmation, not an input.)
+    expect(screen.getByTestId("language-code-value").textContent).toBe("ha");
   });
 
   it("Finish on a resumed flow re-completes with the same extracted identity", () => {
@@ -167,6 +181,23 @@ describe("IdentityLite — resume", () => {
     expect(
       screen.getByText("What is your language called in English?"),
     ).toBeTruthy();
+  });
+
+  it("resuming a dialect run mounts on the dialect question and keeps oc-gascon on Finish", () => {
+    const onComplete =
+      vi.fn<[SurveyPhaseResult, IdentityLiteResult], void>();
+    render(<IdentityLite onComplete={onComplete} resume={COMPLETED_GASCON} />, { withStepNav: true });
+    // The dialect question is the last question of the Gascon walk.
+    expect(screen.getByText("Which dialect is this keyboard for?")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("survey-advance"));
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    const [result, identity] = onComplete.mock.calls[0]!;
+    expect(result.answers.map((a) => a.questionId)).toContain("il_language_dialect");
+    // Through the composer, not a spelled-out tag (the region test above
+    // documents why): whether the canonical form elides the script subtag
+    // depends on the langtags chunk having loaded this session.
+    expect(identity.bcp47).toBe(buildTargetBcp47("oc", "Latn", "", "gascon"));
+    expect(identity.bcp47).toContain("gascon");
   });
 
   it("resuming a region-ambiguous run preserves the region on Finish (no drop)", () => {

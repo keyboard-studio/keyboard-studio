@@ -9,6 +9,7 @@ import {
   fillDocPhrase,
   type FallbackPolicy,
   type KeyboardIR,
+  type OutputForm,
   type TouchLayoutIR,
 } from "@keyboard-studio/contracts";
 import { getCategory, getName } from "@keyboard-studio/contracts/unicode";
@@ -46,6 +47,11 @@ export interface ReadmeFactsInput {
   useCase?: string;
   /** The `mark-input-order` answer. */
   markInputOrder?: string;
+  /**
+   * The recorded S4 whole-keyboard output-form answer (`session.marksOutputForm`).
+   * Undefined when the marks series was skipped and no decision was recorded.
+   */
+  outputForm?: OutputForm;
   fallbackPolicy: FallbackPolicy;
   /** The `touch-seed-source` answer. */
   touchSeedSource?: string;
@@ -201,7 +207,24 @@ function literalRows(ir: KeyboardIR, candidates: readonly Candidate[]): ReadmeTy
   return rows;
 }
 
-function compositionOf(extras: readonly string[]): ReadmeFacts["composition"] {
+/**
+ * The composition the README states. A recorded output-form answer wins:
+ * `base-plus-mark` sends every accented letter as base plus mark, so the
+ * docs say "decomposed"; `ready-made` sends single characters, so they say
+ * "precomposed" (pairs with no ready-made form still fall back to base
+ * plus mark automatically — that "mixed" case is not visible here, because
+ * whether any pair lacks a ready-made form is not persisted with the
+ * answer). The produced-set inference below is only the fallback for
+ * keyboards with no recorded answer — it cannot tell the two apart on its
+ * own, because buildProducedSet NFC-folds every base+mark run into its
+ * precomposed codepoint (frozen contract), so an NFD keyboard's produced
+ * set looks identical to an NFC keyboard's. It can only say "decomposed"
+ * when the keyboard emits lone combining marks, which a letter+mark
+ * keyboard never does.
+ */
+function compositionOf(extras: readonly string[], outputForm: OutputForm | undefined): ReadmeFacts["composition"] {
+  if (outputForm === "base-plus-mark") return "decomposed";
+  if (outputForm === "ready-made") return "precomposed";
   let combining = false;
   let precomposed = false;
   for (const ch of extras) {
@@ -275,7 +298,7 @@ export function buildReadmeFacts(input: ReadmeFactsInput): ReadmeFacts {
   const family = input.layoutFamily !== undefined ? LAYOUT_FAMILY_LABEL[input.layoutFamily] : undefined;
   const useCase = input.useCase !== undefined ? USE_CASE_PHRASE[input.useCase] : undefined;
   const fallbackDescription = input.fallbackDescription?.trim();
-  const composition = compositionOf(extras);
+  const composition = compositionOf(extras, input.outputForm);
   return {
     languages: input.languages.map((l, i) => ({
       name: l.name,

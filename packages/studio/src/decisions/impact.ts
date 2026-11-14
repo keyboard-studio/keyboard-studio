@@ -212,7 +212,7 @@ export interface ResolveImpactAsyncDeps extends ResolveImpactDeps, Counterfactua
 
 /**
  * The identity questions that compose one BCP47 tag, mapped to their slot in
- * {@link buildTargetBcp47}'s (language, script, region) signature.
+ * {@link buildTargetBcp47}'s (language, script, region, dialect) signature.
  *
  * A question that declares `field: "bcp47"` without a slot here reaches the tag
  * in some way this table does not model, so it keeps being varied by
@@ -224,10 +224,13 @@ export interface ResolveImpactAsyncDeps extends ResolveImpactDeps, Counterfactua
  * substitution — the very defect this resolver was fixed to stop. The guard
  * derives the expected key set from the registry's own `outputs` declarations.
  */
-export const BCP47_SLOTS: Record<string, "language" | "script" | "region" | undefined> = {
+export const BCP47_SLOTS: Record<string, "language" | "script" | "region" | "dialect" | undefined> = {
   il_language_code: "language",
   il_target_script: "script",
   il_language_region: "region",
+  // Spec 115 US2: the dialect answer contributes the dialect subtag
+  // (a registered variant or a private-use tail) to the composed tag.
+  il_language_dialect: "dialect",
 };
 
 /**
@@ -236,7 +239,7 @@ export const BCP47_SLOTS: Record<string, "language" | "script" | "region" | unde
  *
  * For a WHOLE-VALUE field both sides are the recorded answer and `undefined` —
  * unchanged. For the COMPOSED `bcp47` tag both sides are recomposed from the live
- * answers to the three contributing questions, varying only this entry's own
+ * answers to the four contributing questions, varying only this entry's own
  * slot, so each side is a tag the projection could actually write. A tag that
  * composes to nothing becomes `undefined`, which is how
  * `resolveIdentityCounterfactual` words "left blank".
@@ -251,7 +254,7 @@ function varyEntryContribution(
     entry.payload.kind === "survey-answer" ? BCP47_SLOTS[entry.payload.questionId] : undefined;
   if (field !== "bcp47" || ownSlot === undefined) return { recorded, alternative: undefined };
 
-  const slots = { language: "", script: "", region: "" };
+  const slots = { language: "", script: "", region: "", dialect: "" };
   for (const [questionId, live] of liveFieldAnswers(entry, record, field)) {
     const slot = BCP47_SLOTS[questionId];
     if (slot === undefined) continue;
@@ -261,7 +264,7 @@ function varyEntryContribution(
   const compose = (own: string): string | undefined => {
     const varied = { ...slots };
     varied[ownSlot] = own;
-    const tag = buildTargetBcp47(varied.language, varied.script, varied.region);
+    const tag = buildTargetBcp47(varied.language, varied.script, varied.region, varied.dialect);
     return tag === "" ? undefined : tag;
   };
   return { recorded: compose(recorded), alternative: compose("") };

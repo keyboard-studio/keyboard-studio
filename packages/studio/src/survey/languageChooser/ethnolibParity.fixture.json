@@ -1,0 +1,15 @@
+{
+  "unresolved": {
+    "emk": "Eastern Maninkakan: in EthnoLib's langtags snapshot (2026-07-29) but absent from the studio's pinned langtags (99b856b) under this code or its macrolanguage tag. Picking it leaves the identity step unseeded, as free text does; the author types the rest.",
+    "gno": "Northern Gondi: in EthnoLib's langtags snapshot (2026-07-29) but absent from the studio's pinned langtags (99b856b) under this code or its macrolanguage tag. Picking it leaves the identity step unseeded, as free text does; the author types the rest.",
+    "hea": "Northern Qiandong Miao: in EthnoLib's langtags snapshot (2026-07-29) but absent from the studio's pinned langtags (99b856b) under this code or its macrolanguage tag. Picking it leaves the identity step unseeded, as free text does; the author types the rest.",
+    "umu": "Munsee: in EthnoLib's langtags snapshot (2026-07-29) but absent from the studio's pinned langtags (99b856b) under this code or its macrolanguage tag. Picking it leaves the identity step unseeded, as free text does; the author types the rest."
+  },
+  "scriptDiffers": {
+    "zh": {
+      "ethnolib": "Hans",
+      "langtags": "Hant",
+      "reason": "Chinese: EthnoLib's single zh card lists Simplified (Hans) first; the pinned langtags default for zh is Hant (its shortest tagset). The studio seeds its own pinned default and the author confirms the script at the script question."
+    }
+  }
+}

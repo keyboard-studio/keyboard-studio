@@ -151,10 +151,10 @@ function checkParity(modules: readonly QuestionModule[]): void {
     .map((m) => candidateValues(m).length)
     .reduce((n, c) => n * c, 1);
   expect(all.length).toBeGreaterThanOrEqual(Math.min(total, 10));
-  const sizes = new Set<number>();
+  const sizes = new Set<string>();
   for (const answers of all) {
     const walked = walk(modules, answers);
-    sizes.add(walked.size);
+    sizes.add([...walked].sort().join(","));
     const visible = visibleByGates(modules, answers);
     const diff = {
       onlyWalked: [...walked].filter((x) => !visible.has(x)),
@@ -162,7 +162,11 @@ function checkParity(modules: readonly QuestionModule[]): void {
     };
     expect(diff, JSON.stringify([...answers])).toEqual({ onlyWalked: [], onlyVisible: [] });
   }
-  // Guard against a vacuous pass: a flow with gates must actually vary.
+  // Guard against a vacuous pass: a flow with gates must actually vary — and
+  // the variation is in the SETS, not their sizes. Two mutually exclusive
+  // branches of one module each (spec 115: the dialect branch and the
+  // not-supported branch off il_target_script) vary the set while leaving
+  // its size unchanged, which a size count reads as no variation at all.
   if (branching.length > 0) expect(sizes.size).toBeGreaterThan(1);
 }
 

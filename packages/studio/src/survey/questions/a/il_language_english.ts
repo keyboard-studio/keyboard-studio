@@ -44,6 +44,8 @@ export const definition = {
     // Taken at runtime by IdentityLite.getNextOverride when the picked language
     // is region-ambiguous; declared here for the flow graph.
     { condition: "ctx.ilRegionAmbiguous == 'true'", goto: "il_language_region" },
+    // Taken when the author specified a region in the chooser's Customize panel.
+    { condition: "ctx.ilRegionRequested == 'true'", goto: "il_language_region" },
     { default: true, goto: "il_language_autonym" },
   ],
 } satisfies import("../../types.ts").FlowQuestion;
@@ -97,7 +99,9 @@ const mod: QuestionModule = {
   outputs: [{ target: "package-descriptor", field: "languageName" }],
   specRef: "specs/030-langtags-identity-autocomplete",
   // Decision spike (km/decisions-spike): anchor of the dependency chain.
-  provides: ["language-name"],
+  provides: ["language-name", "language-search-match", "language-glottocode"],
+  // The chooser records the dialect match itself; the typed name must not fill it.
+  rendererWrites: ["language-search-match", "language-glottocode"],
   extract: extractLanguageName,
 };
 export default mod;
