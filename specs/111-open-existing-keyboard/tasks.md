@@ -253,12 +253,12 @@ T070-T077 (FR-035..FR-040) moved to [spec 114](../114-ctrl-and-letter-removal/sp
 - [x] T081 One Open-only apply function: compute the change on the model, splice it into the current text, replace the file and re-read the model; ask for reformat consent here (FR-009 amended).
 - [x] T082 Route the remove tool, Mechanisms assignments and rule additions through it on Open; applied changes then read as existing content.
 - [ ] T082a Route Layout-tab edits (spec 117) through the apply function on Open, keeping their decision as the record; Copy keeps the replay. Depends on the Layout tab having merged.
-- [ ] T082b The preview drops a file the working copy no longer holds (phase 14's overlay only adds and replaces); needed before any tool can remove a file.
+- [x] T082b The preview drops a file the working copy no longer holds (phase 14's overlay only adds and replaces); needed before any tool can remove a file. (Phase 15 S6: `removedPaths` on the undo store, derived from the log; the preview drops them, undo restores; tests in `projectionInput.openWorkingCopy.test.ts` and `projectionInput.parity.open.test.ts`.)
 - [x] T082c Trace whether the caps step and the id rename can re-emit the whole source on Open, and route them through the splice if so. (S3a: the caps step splices on Open and runs only for an answered decision; the id rename never runs on Open. Applying caps at the moment it is answered waits for the Layout tab, T082a.)
 - [x] T083 Stop replaying decisions after a code edit on Open; decisions remain as the record (trail, review notes, PR body).
 - [x] T084 Measure across the corpus sample how often a tool change cannot be spliced; report before converting more tools.
 - [x] T085 Apply the Article III wording from the spec amendment to `.specify/memory/constitution.md`, with the version bump (owner-approved only).
-- [ ] T086 Tests: SC-010 and SC-011 for the source file. (S3a: SC-011 done in `openApply.s3a.test.ts`; SC-010 remains.)
+- [x] T086 Tests: SC-010 and SC-011 for the source file. (S3a: SC-011 done in `openApply.s3a.test.ts`; SC-010 remains.) (Phase 15: SC-010 for removal, restore, code-view edit, assignment, marks guards, deadkey, context-tolerance fix and normalization step in `projectionInput.parity.open.test.ts`, `openApply.assign.test.ts`, `openApply.s2.test.tsx`, `openApply.s3b.test.tsx`; SC-011 in `openApply.s3a.test.ts`.)
 - [x] T086a (slice S2) Retire on Open the disabled-families overlay (`disabledFamilyIds`): disabling a family writes the file when applied, then the overlay and its replay are dropped for Open.
 - [x] T086b (slice S2) Retire on Open the marks-guards overlay: guard rules are written into the file when applied; no guard state is replayed at output.
 - [x] T086f (do before slice 3b, so 3b adds its steps to the table rather than new flags) Replace the projection's per-kind skip flags (`applyOnly`, `skipMarkGuards`, `skipIntendedCheck`) with one per-kind table of steps (`APPLY_STEPS`) before T087.
@@ -284,7 +284,7 @@ T070-T077 (FR-035..FR-040) moved to [spec 114](../114-ctrl-and-letter-removal/sp
 
 ## Phase 18: Undo, drafts, unapplied text (FR-045, FR-046, FR-049)
 
-- [ ] T093 Undo and "Discard changes and go back" restore file text on Open, including code-view edits (depth per open question 3).
+- [x] T093 Undo and "Discard changes and go back" restore file text on Open, including code-view edits (depth per open question 3). (Phase 15 S4: `OpenUndoButton` in the footer cluster; Discard restores the log as at arrival, `RevisionSnapshot.openUndo`; no redo exists in the studio, so none added; no undo shortcut exists, so none added; touch key edits keep the touch Undo until T087. Tests: `OpenUndoButton.test.tsx`.)
 - [ ] T094 Leaving a code view with unapplied text asks whether to apply or discard it.
 - [ ] T095 Open drafts save the current files and the record. No migration of drafts saved earlier (OWNER RULING 2026-11-13, FR-049 amended).
 

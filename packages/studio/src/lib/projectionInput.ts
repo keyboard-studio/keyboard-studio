@@ -181,19 +181,22 @@ export function openModeProjection(args: {
  * than from the keyboard as fetched. A no-op outside Open or without a
  * starting-point VFS (Copy is untouched).
  *
- * Overlay only (add / replace): a file only `vfs` holds is kept. Known limit:
- * a file the working copy no longer holds is therefore not removed from the
- * preview. Nothing removes a file from `startVfs` today; if something starts
- * to, this needs a deletion step.
+ * Add / replace, plus delete: a file only `vfs` holds (fetched, never in the
+ * working copy, e.g. a welcome image a draft left out) is kept, but a path in
+ * `removedPaths` (a file an applied change deleted) is dropped from `vfs`.
  */
 export function applyOpenWorkingCopyFiles(
   vfs: VirtualFS,
   instantiationMode: WorkingCopyState["instantiationMode"],
   startVfs: VirtualFS | null | undefined,
+  removedPaths: readonly string[] = [],
 ): void {
   if (!isOpenMode(instantiationMode) || startVfs === null || startVfs === undefined) return;
   for (const entry of startVfs.entries()) {
     vfs.set(entry.path, entry.content, entry.isBinary);
+  }
+  for (const path of removedPaths) {
+    if (startVfs.get(path) === undefined) vfs.delete(path);
   }
 }
 

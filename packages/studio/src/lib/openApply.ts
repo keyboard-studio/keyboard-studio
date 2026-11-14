@@ -20,7 +20,7 @@
 import { emitKmn, isKeyboardSource, parseKmn, projectKmnText } from "@keyboard-studio/engine";
 import { useWorkingCopyStore, type WorkingCopyState } from "../stores/workingCopyStore.ts";
 import type { RemovedRuleRecord } from "../stores/openRemovalStore.ts";
-import { useOpenUndoStore, type OpenUndoView } from "../stores/openUndoStore.ts";
+import { useOpenUndoStore, type OpenUndoRecord, type OpenUndoView } from "../stores/openUndoStore.ts";
 import { isLiveOpen } from "./openMode.ts";
 import { readVfsText } from "./vfsText.ts";
 import {
@@ -72,7 +72,7 @@ function applyFiles(change: Extract<OpenChange, { kind: "files" }>): OpenApplyRe
     }
   }
   const undoId = nextUndoId();
-  const record = recordUndo(undoId, change.label, keyboardId, beforeFrom(startVfs, {}), changed, { kind: "files" });
+  const record = recordUndo(undoId, change.label, keyboardId, beforeFrom(startVfs, {}), changed, { kind: "files" }, change.labelKey);
   const written = useWorkingCopyStore.getState().replaceStartingPointFiles(changed);
   if (!written.ok) return { status: "failed", reason: written.error };
   useOpenUndoStore.getState().push(record);
@@ -237,6 +237,7 @@ function applyReinsert(
           beforeFrom(startVfs, {}),
           flushAfter,
           { kind: "flush" },
+          "earlier-changes",
         )
       : undefined;
   const record = recordUndo(
@@ -305,29 +306,61 @@ function revertView(view: OpenUndoView): void {
  * `before` text back, but only while every file still holds the `after` the
  * change wrote. Otherwise nothing is written and the reason says why.
  */
-export function undoLastOpenApply(): { ok: true; id: string } | { ok: false; reason: string } {
+export type OpenUndoRefusalCode = "not-open" | "nothing" | "stale" | "changed-since" | "write-failed";
+
+export type OpenUndoResult =
+  | { ok: true; id: string }
+  | {
+      ok: false;
+      /** What the UI words in the author's language. */
+      code: OpenUndoRefusalCode;
+      /** Plain English detail, for logs and tests. */
+      reason: string;
+      /** Set with `changed-since`: the files that changed. */
+      changedSince?: string[];
+    };
+
+/** The step an undo would take back now: the latest record of the open keyboard. */
+export function lastUndoableRecord(): OpenUndoRecord | undefined {
+  const st = useWorkingCopyStore.getState();
+  if (!isLiveOpen(st)) return undefined;
+  const keyboardId = st.startKeyboard!.id;
+  return [...useOpenUndoStore.getState().records].reverse().find((r) => r.keyboardId === keyboardId);
+}
+
+/**
+ * `expectedId` is the record the caller showed the author; if the log has
+ * moved on, nothing is undone (`stale`), so the label never lies.
+ */
+export function undoLastOpenApply(expectedId?: string): OpenUndoResult {
   const st = useWorkingCopyStore.getState();
   if (!isLiveOpen(st)) {
-    return { ok: false, reason: "The working copy was not opened from an existing keyboard." };
+    return { ok: false, code: "not-open", reason: "The working copy was not opened from an existing keyboard." };
   }
-  const keyboardId = st.startKeyboard!.id;
-  const records = useOpenUndoStore.getState().records;
-  const last = [...records].reverse().find((r) => r.keyboardId === keyboardId);
-  if (last === undefined) return { ok: false, reason: "Nothing to undo." };
+  const last = lastUndoableRecord();
+  if (last === undefined) return { ok: false, code: "nothing", reason: "Nothing to undo." };
+  if (expectedId !== undefined && last.id !== expectedId) {
+    return { ok: false, code: "stale", reason: "The change to undo is no longer the latest." };
+  }
   const startVfs = st.startVfs!;
   const moved = Object.entries(last.files).filter(
     ([path, f]) => textOrNull(startVfs, path) !== f.after,
   );
   if (moved.length > 0) {
-    return { ok: false, reason: `${moved.map(([p]) => p).join(", ")} changed since; it cannot be undone.` };
+    return {
+      ok: false,
+      code: "changed-since",
+      reason: `${moved.map(([p]) => p).join(", ")} changed since; it cannot be undone.`,
+      changedSince: moved.map(([p]) => p),
+    };
   }
   const restore: Record<string, string | null> = {};
   for (const [path, f] of Object.entries(last.files)) restore[path] = f.before;
   try {
     const written = st.replaceStartingPointFiles(restore);
-    if (!written.ok) return { ok: false, reason: written.error };
+    if (!written.ok) return { ok: false, code: "write-failed", reason: written.error };
   } catch (err) {
-    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    return { ok: false, code: "write-failed", reason: err instanceof Error ? err.message : String(err) };
   }
   // The Removed list and the assignment session are derived from the log, so
   // taking the record out of it is the whole per-kind revert.

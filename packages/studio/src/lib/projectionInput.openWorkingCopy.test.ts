@@ -46,6 +46,21 @@ describe("applyOpenWorkingCopyFiles", () => {
     expect(vfs.get("source/new.txt")).toBeUndefined();
   });
 
+  it("drops a removed path the working copy no longer holds, keeping other fetched-only files", () => {
+    const vfs = target();
+    vfs.set("source/gone.txt", "was here", false);
+    const start = startVfs();
+    applyOpenWorkingCopyFiles(vfs, "adapt-existing", start, ["source/gone.txt"]);
+    expect(vfs.get("source/gone.txt")).toBeUndefined();
+    expect(vfs.get("source/only-fetched.txt")?.content).toBe("kept");
+  });
+
+  it("does not drop a removed path the working copy holds again", () => {
+    const vfs = target();
+    applyOpenWorkingCopyFiles(vfs, "adapt-existing", startVfs(), ["source/new.txt"]);
+    expect(vfs.get("source/new.txt")?.content).toBe("added");
+  });
+
   it("does nothing without a starting-point VFS", () => {
     const vfs = target();
     applyOpenWorkingCopyFiles(vfs, "adapt-existing", null);

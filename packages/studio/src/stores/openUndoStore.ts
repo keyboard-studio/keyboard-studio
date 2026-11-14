@@ -37,27 +37,60 @@ export type OpenUndoView =
   /** Any other precomputed or projected write (rule additions, `files`). */
   | { kind: "files" };
 
+/** Which known step a record is, so the UI can word it in the author's language. */
+export type OpenUndoLabelKey = "code-view" | "context-tolerance" | "earlier-changes" | "take-back";
+
 export interface OpenUndoRecord {
   id: string;
   keyboardId: string;
   /** Plain label for the (later) undo UI. */
   label: string;
+  /** Set for the steps the UI words itself; the rest show `label`. */
+  labelKey?: OpenUndoLabelKey;
   files: Record<string, OpenUndoFile>;
   view: OpenUndoView;
 }
 
+/**
+ * Paths an applied change deleted from the working copy and no undo has put
+ * back: the preview must drop them from the fetched files (FR-043). Derived
+ * from the log: a path is removed when the latest record that touched it left
+ * it absent.
+ */
+export function removedPathsOf(records: readonly OpenUndoRecord[]): string[] {
+  const absent = new Map<string, boolean>();
+  for (const r of records) {
+    for (const [path, f] of Object.entries(r.files)) absent.set(path, f.after === null);
+  }
+  return [...absent].filter(([, gone]) => gone).map(([path]) => path).sort();
+}
+
 interface OpenUndoState {
   records: OpenUndoRecord[];
+  /** `removedPathsOf(records)`, kept beside the log so a subscriber sees both change together. */
+  removedPaths: string[];
   push: (record: OpenUndoRecord) => void;
   drop: (ids: ReadonlySet<string>) => void;
+  replace: (records: readonly OpenUndoRecord[]) => void;
   clear: () => void;
 }
 
 export const useOpenUndoStore = create<OpenUndoState>((set) => ({
   records: [],
-  push: (record) => set((s) => ({ records: [...s.records, record] })),
-  drop: (ids) => set((s) => ({ records: s.records.filter((r) => !ids.has(r.id)) })),
-  clear: () => set({ records: [] }),
+  removedPaths: [],
+  push: (record) =>
+    set((s) => {
+      const records = [...s.records, record];
+      return { records, removedPaths: removedPathsOf(records) };
+    }),
+  drop: (ids) =>
+    set((s) => {
+      const records = s.records.filter((r) => !ids.has(r.id));
+      return { records, removedPaths: removedPathsOf(records) };
+    }),
+  /** Put the log back as it was (a revision's Discard). */
+  replace: (records) => set({ records: [...records], removedPaths: removedPathsOf(records) }),
+  clear: () => set({ records: [], removedPaths: [] }),
 }));
 
 /** Rebuild the two caches from the log. */

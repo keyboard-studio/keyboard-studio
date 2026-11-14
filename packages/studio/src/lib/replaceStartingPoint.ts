@@ -15,7 +15,7 @@ import {
 } from "../stores/workingCopyStore.ts";
 import { recalculateForStartingPointChangeFromStores } from "../decisions/rebuildWorkingCopy.ts";
 
-/** Plain label of the undo step a code-view Apply records on Open (not shown yet; the undo list is slice S4). */
+/** Plain label of the undo step a code-view Apply records on Open (the footer Undo names it, see OpenUndoButton). */
 export const CODE_VIEW_EDIT_LABEL = "Edit the keyboard source in the code view";
 
 export function replaceStartingPointAndReplay(

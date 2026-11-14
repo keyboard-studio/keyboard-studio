@@ -3,6 +3,7 @@
 
 import type { IRPath, KeyboardIR, MechanismAssignment } from "@keyboard-studio/contracts";
 import type { OpenRemovalEntry } from "../../stores/openRemovalStore.ts";
+import type { OpenUndoLabelKey } from "../../stores/openUndoStore.ts";
 
 /** A change the author applies to the opened keyboard. */
 export type OpenChange =
@@ -68,6 +69,8 @@ export type OpenChange =
       files: Record<string, string | null>;
       /** Plain label recorded on the undo step. */
       label: string;
+      /** Marks a step the undo UI words itself. */
+      labelKey?: OpenUndoLabelKey;
     };
 
 export type OpenApplyResult =

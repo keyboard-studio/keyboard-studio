@@ -30,7 +30,7 @@ import {
 } from "./persistWorkingCopy.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useGuardIntentStore } from "../stores/guardIntentStore.ts";
-import { clearOpenSession } from "../stores/openUndoStore.ts";
+import { clearOpenSession, useOpenUndoStore, type OpenUndoRecord } from "../stores/openUndoStore.ts";
 import { useTestingStore, mergeTestingRecords } from "../stores/testingStore.ts";
 import type { WorkingCopyData } from "../stores/workingCopyStore.ts";
 import {
@@ -1737,17 +1737,26 @@ export interface RevisionSnapshot {
   decisions: DecisionSet;
   surveyAnswers: SurveyAnswerSnapshot;
   decisionRecord: NonNullable<DurableDraft["decisionRecord"]>;
+  /**
+   * The Open undo log on arrival (spec 111 FR-045). Discard restores the file
+   * text and puts the log back to exactly this: its depth at arrival, and the
+   * same steps even if some were undone meanwhile, so no step can be undone onto
+   * text it no longer matches. In memory only; not in the draft.
+   */
+  openUndo: OpenUndoRecord[];
 }
 
 export function captureRevisionSnapshot(): RevisionSnapshot {
   // Cloned so a later in-place mutation of a live object can never reach the
   // snapshot it is meant to roll back to.
-  return structuredClone({
+  const cloned = structuredClone({
     workingCopy: snapshotWorkingCopyData(),
     decisions: getDecisionSnapshot(),
     surveyAnswers: getSurveyAnswerSnapshot(),
     decisionRecord: snapshotDecisionRecord(),
   });
+  // The records are immutable once pushed: copy the array, keep them by reference.
+  return { ...cloned, openUndo: [...useOpenUndoStore.getState().records] };
 }
 
 /**
@@ -1758,7 +1767,9 @@ export function captureRevisionSnapshot(): RevisionSnapshot {
 export function restoreRevisionSnapshot(snapshot: RevisionSnapshot): void {
   const workingCopyState = prepareWorkingCopySnapshot(snapshot.workingCopy);
   useWorkingCopyStore.setState(workingCopyState);
-  clearOpenSession();
+  // Not `clearOpenSession`: the steps from before the revision stay undoable.
+  // The caches (Removed list, assignment session) are rebuilt from the log.
+  useOpenUndoStore.getState().replace(snapshot.openUndo);
   useGuardIntentStore.setState({
     keptGuardRuleIds: new Set(snapshot.workingCopy.keptGuardRuleIds ?? []),
     dismissedMissingGroups: new Set(snapshot.workingCopy.dismissedMissingGroups ?? []),

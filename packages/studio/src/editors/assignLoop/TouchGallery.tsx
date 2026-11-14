@@ -159,6 +159,7 @@ import {
 } from "../../lib/touchKeyIdentity.ts";
 import { TouchKeyIdentityList } from "../../components/TouchKeyIdentityList.tsx";
 import { resolveStartTouchJson } from "../../lib/resolveStartTouchJson.ts";
+import { isLiveOpen } from "../../lib/openMode.ts";
 import { TOUCH_STEP_ID } from "../../steps/stepIds.ts";
 import { useCharWalkPosition } from "../../hooks/useCharWalkPosition.ts";
 import { cursorCharIn } from "../../lib/stepWalk.ts";
@@ -298,6 +299,8 @@ import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
 import { PublishStepNav } from "../../hooks/usePublishStepNav.ts";
+import type { StepNavSpec } from "../../stores/stepNavStore.ts";
+import { visuallyHidden } from "../../survey/surveyStyles.ts";
 import { usePositionalCharNav, nearestSurvivingChar, indexOfChar } from "./usePositionalCharNav.ts";
 import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
@@ -1771,6 +1774,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // re-implemented here.
   const undoStack = useWorkingCopyStore((s) => s.undoStack);
   const undoDelete = useWorkingCopyStore((s) => s.undoDelete);
+  const liveOpen = useWorkingCopyStore((s) => isLiveOpen(s));
 
   // Shared id linking the mode tablist's tabs (`aria-controls`) to whichever
   // pane content is currently mounted — only one of characterModeContent/
@@ -4438,6 +4442,41 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         });
     }
   }, [undoTargetDescription, t]);
+
+  // On an opened keyboard the footer's one Undo (OpenUndoButton) undoes the last
+  // APPLIED change; this one stays only while touch edits (still an overlay, not
+  // applied to the file yet) hold undo entries, and says so by name and by a
+  // description mounted below.
+  const touchUndoHintId = useId();
+  const touchUndoSlot: Pick<StepNavSpec, "secondary"> =
+    liveOpen && undoStack.length === 0
+      ? {}
+      : {
+          secondary: {
+            label: liveOpen
+              ? t({ id: "editor.assignLoop.touch.undoTouchEdit.label", message: "Undo touch edit" })
+              : t({ id: "editor.assignLoop.touch.undo.label", message: "Undo" }),
+            onClick: undoDelete,
+            testId: "touch-undo-button",
+            ariaLabel: liveOpen
+              ? t({
+                  id: "editor.assignLoop.touch.undoTouchEdit.ariaLabel",
+                  message: `Undo touch edit: ${{ what: undoAffordanceLabel }}`,
+                })
+              : undoAffordanceLabel,
+            ...(liveOpen ? { ariaDescribedBy: touchUndoHintId } : {}),
+            disabled: undoStack.length === 0,
+          },
+        };
+  const touchUndoHint = liveOpen ? (
+    <span id={touchUndoHintId} style={visuallyHidden}>
+      {t({
+        id: "editor.assignLoop.touch.undoTouchEdit.hint",
+        message:
+          "Undoes touch edits that are not yet applied. The Undo button in the footer undoes the last applied change.",
+      })}
+    </span>
+  ) : null;
 
   // T013/T014 — `handleSwitchTouchEditorMode` (the ONE mode-switch call site,
   // T074) is declared further below, after `currentChar`/`setCurrentChar`
@@ -7583,6 +7622,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       }}
     >
       {/* Back and Continue live in the footer (spec 081). */}
+      {touchUndoHint}
       <PublishStepNav
         spec={{
           back: {
@@ -7594,13 +7634,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               message: "Back to mechanisms",
             }),
           },
-          secondary: {
-            label: t({ id: "editor.assignLoop.touch.undo.label", message: "Undo" }),
-            onClick: undoDelete,
-            testId: "touch-undo-button",
-            ariaLabel: undoAffordanceLabel,
-            disabled: undoStack.length === 0,
-          },
+          ...touchUndoSlot,
           forward: {
             label: t({
               id: "editor.assignLoop.touch.keyMode.continueButton",
@@ -7846,6 +7880,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       <Suspense fallback={null}>
         {/* Back/Undo/Continue live in the footer (spec 081) — the code tab
             publishes the same nav as the key tab. */}
+        {touchUndoHint}
         <PublishStepNav
           spec={{
             back: {
@@ -7857,13 +7892,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                 message: "Back to mechanisms",
               }),
             },
-            secondary: {
-              label: t({ id: "editor.assignLoop.touch.undo.label", message: "Undo" }),
-              onClick: undoDelete,
-              testId: "touch-undo-button",
-              ariaLabel: undoAffordanceLabel,
-              disabled: undoStack.length === 0,
-            },
+            ...touchUndoSlot,
             forward: {
               label: t({
                 id: "editor.assignLoop.touch.keyMode.continueButton",

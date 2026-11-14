@@ -76,6 +76,7 @@ import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { KeyEditOperation } from "@keyboard-studio/engine";
 import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useOpenUndoStore } from "../stores/openUndoStore.ts";
 import { projectWorkingCopyVfs } from "../lib/projectWorkingCopyVfs.ts";
 import {
   applyOpenWorkingCopyFiles,
@@ -250,6 +251,8 @@ export function useWorkingCopyTransform(
   // only on an Open walk over a flat-convention base, as in the download.
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  // Files an applied Open change deleted (T082b): the preview drops them too.
+  const removedPathsKey = useOpenUndoStore((s) => s.removedPaths.join("\n"));
   const startWelcomeConvention = useWorkingCopyStore((s) => s.startWelcomeConvention);
 
   // P1 fix (bug F4 footgun): omitting previewedStartId is legitimate for
@@ -522,7 +525,12 @@ export function useWorkingCopyTransform(
       // restore, where the fetch returns the pristine keyboard) and on every
       // re-apply. Overlay, not replace: a file only the fetch holds is kept.
       // Copy is untouched.
-      applyOpenWorkingCopyFiles(vfs, instantiationMode, startVfs);
+      applyOpenWorkingCopyFiles(
+        vfs,
+        instantiationMode,
+        startVfs,
+        removedPathsKey === "" ? [] : removedPathsKey.split("\n"),
+      );
       // The same Open options the download passes (splice, in-place descriptor).
       // `consentedReemit` is preview-only: a change the splice cannot place is
       // compiled as the reformatted text the author would be asked to accept.
@@ -638,6 +646,7 @@ export function useWorkingCopyTransform(
     authoredHelpPhp,
     instantiationMode,
     startVfs,
+    removedPathsKey,
     startWelcomeConvention,
   ]);
 }

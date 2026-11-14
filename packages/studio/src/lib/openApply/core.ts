@@ -23,6 +23,7 @@ import {
 } from "../../stores/openRemovalStore.ts";
 import {
   useOpenUndoStore,
+  type OpenUndoLabelKey,
   type OpenUndoRecord,
   type OpenUndoView,
 } from "../../stores/openUndoStore.ts";
@@ -63,13 +64,14 @@ export function recordUndo(
   beforeOf: (path: string) => string | null,
   changed: Record<string, string | null>,
   view: OpenUndoView,
+  labelKey?: OpenUndoLabelKey,
 ): OpenUndoRecord {
   const files: OpenUndoRecord["files"] = {};
   for (const [path, after] of Object.entries(changed)) {
     const before = beforeOf(path);
     if (before !== after) files[path] = { before, after };
   }
-  return { id, keyboardId, label, files, view };
+  return { id, keyboardId, label, ...(labelKey !== undefined ? { labelKey } : {}), files, view };
 }
 
 /** The text a path had in `vfs`, unless `overrides` (an earlier step's result) says otherwise. */
@@ -387,6 +389,7 @@ export function applyRemoveOrIr(
         beforeFrom(startVfs, {}),
         flushAfter,
         { kind: "flush" },
+        "earlier-changes",
       );
     }
   }

@@ -347,6 +347,7 @@ export function KmnCodePane() {
           kind: "files",
           files: { [openPath]: current },
           label: CODE_VIEW_EDIT_LABEL,
+          labelKey: "code-view",
         }).then((result) => {
           if (result.status === "applied") {
             setApplyError(null);

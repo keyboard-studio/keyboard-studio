@@ -23,6 +23,9 @@ vi.mock("../../stores/workingCopyStore.ts", () => ({
     sel({ ir: mockIR }),
 }));
 
+// The footer's Undo reaches the whole apply seam, which this test's engine mock cannot serve.
+vi.mock("../../components/OpenUndoButton.tsx", () => ({ OpenUndoButton: () => null }));
+
 // Mock the engine module — only the functions OskEditor uses.
 vi.mock("@keyboard-studio/engine", () => ({
   generateKvksFromIR: () => ({

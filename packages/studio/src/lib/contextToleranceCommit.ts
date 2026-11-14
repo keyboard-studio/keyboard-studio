@@ -60,6 +60,9 @@ export function repointBegin(text: string, from: string, to: string): string | u
   return lines.join("");
 }
 
+/** Plain label of the undo step a context-tolerance fix records on Open. */
+export const CONTEXT_TOLERANCE_FIX_LABEL = "Apply a context-tolerance fix";
+
 /**
  * The `files` change that writes a fix with a normalization step, built from the
  * files as they stand now (null when it cannot be placed). The step adds a group
@@ -79,7 +82,7 @@ function buildStepChange(overlay: ContextToleranceOverlay): OpenChange | null {
   if (!spliced.ok) return null;
   const text = repointBegin(spliced.text, batch.originalEntry, batch.groupName);
   if (text === undefined) return null;
-  return { kind: "files", files: { [path]: text }, label: "Apply a context-tolerance fix" };
+  return { kind: "files", files: { [path]: text }, label: CONTEXT_TOLERANCE_FIX_LABEL, labelKey: "context-tolerance" };
 }
 
 /**

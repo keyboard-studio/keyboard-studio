@@ -402,13 +402,14 @@ function runAssign(ctx: AssignContext, forceRegen: boolean): OpenApplyResult {
     beforeFrom(startVfs, ctx.flushChanged),
     changed,
     { kind: "assign", before: sess, after },
+    ctx.gone.length > 0 && ctx.added.length === 0 ? "take-back" : undefined,
   );
   // Held overlays go in as their own step (undoing the assignment keeps them);
   // everything is verified by now, so the one store update cannot be followed
   // by a refusal.
   const flushRecord =
     Object.keys(ctx.flushChanged).length > 0
-      ? recordUndo(nextUndoId(), EARLIER_CHANGES_LABEL, keyboardId, beforeFrom(startVfs, {}), ctx.flushChanged, { kind: "flush" })
+      ? recordUndo(nextUndoId(), EARLIER_CHANGES_LABEL, keyboardId, beforeFrom(startVfs, {}), ctx.flushChanged, { kind: "flush" }, "earlier-changes")
       : undefined;
   if (changedPaths.length > 0) {
     const written = useWorkingCopyStore.getState().replaceStartingPointFiles(changed);
