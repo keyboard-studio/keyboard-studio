@@ -59,6 +59,18 @@ if (!Array.isArray(raw)) {
  * Script subtag: 4 letters, Title-Case.
  * Region subtag: 2 uppercase letters or 3 digits.
  */
+/**
+ * The dialect part of a `full` tag: everything after lang[-Script][-Region],
+ * e.g. "x-rabinal" or "valencia". Empty string when the tagset has none.
+ */
+function dialectSubtagOf(full) {
+  const parts = full.split('-').slice(1);
+  let i = 0;
+  if (i < parts.length && /^[A-Z][a-z]{3}$/.test(parts[i])) i++;
+  if (i < parts.length && (/^[A-Z]{2}$/.test(parts[i]) || /^\d{3}$/.test(parts[i]))) i++;
+  return parts.slice(i).join('-');
+}
+
 function parseFull(full) {
   const parts = full.split('-');
   let script;
@@ -109,6 +121,8 @@ let aliasCollisions = 0;
 const regionVariantsByBare = new Map();
 for (const entry of raw) {
   if (!entry.tag || entry.tag.startsWith('_') || !entry.region) continue;
+  // Variant and -x- tagsets are dialects (generated/dialects.ts), not regions.
+  if (typeof entry.full === 'string' && dialectSubtagOf(entry.full) !== '') continue;
   const bare = entry.tag.split('-')[0].toLowerCase();
   const arr = regionVariantsByBare.get(bare) ?? [];
   if (arr.some((v) => v.region === entry.region)) continue; // dedupe by region
@@ -126,6 +140,14 @@ for (const arr of regionVariantsByBare.values()) {
   arr.sort((a, b) => a.region.localeCompare(b.region));
 }
 
+const representativeByLang = new Map();
+for (const entry of raw) {
+  if (!entry.tag || entry.tag.startsWith('_')) continue;
+  const lang = entry.tag.split('-')[0].toLowerCase();
+  const cur = representativeByLang.get(lang);
+  if (!cur || entry.tag.length < cur.tag.length) representativeByLang.set(lang, entry);
+}
+
 for (const entry of raw) {
   // Skip underscore-prefixed header records (_version, _globalvar, _phonvar, etc.)
   if (!entry.tag || entry.tag.startsWith('_')) {
@@ -133,11 +155,10 @@ for (const entry of raw) {
     continue;
   }
 
-  // Only process bare language subtags (no '-' in tag).
-  // Macrolanguages without a bare-subtag tagset (e.g. "zh") are intentionally
-  // absent from the generated index — they are represented upstream only via
-  // individual variety codes (e.g. "cmn", "yue"), never as a single bare entry.
-  if (entry.tag.includes('-')) continue;
+  // One representative tagset per language subtag: the shortest `tag`. Languages
+  // with no bare tagset (e.g. zh -> zh-CN, zh-TW) are represented by their
+  // shortest regional/script tagset rather than dropped.
+  if (representativeByLang.get(entry.tag.split('-')[0].toLowerCase()) !== entry) continue;
 
   const { full, iso639_3, iso639_3extra, localname, name, regions, names, localnames, regionname } = entry;
 
@@ -158,11 +179,11 @@ for (const entry of raw) {
 
   // Attach region variants only when the subtag is region-ambiguous (>1 distinct
   // region) — that is the region-disambiguation trigger (spec 030 US3 / FR-014).
-  const variants = regionVariantsByBare.get(entry.tag.toLowerCase()) ?? [];
+  const variants = regionVariantsByBare.get(entry.tag.split('-')[0].toLowerCase()) ?? [];
   const isRegionAmbiguous = variants.length > 1;
 
   const record = {
-    code: entry.tag.toLowerCase(),
+    code: entry.tag.split('-')[0].toLowerCase(),
     ...(iso639_3 !== undefined ? { iso639_3: iso639_3.toLowerCase() } : {}),
     ...(defaultScript !== undefined ? { defaultScript } : {}),
     ...(defaultRegion !== undefined ? { defaultRegion } : {}),
@@ -174,7 +195,7 @@ for (const entry of raw) {
     ...(isRegionAmbiguous ? { regionVariants: variants } : {}),
   };
 
-  const tagKey = entry.tag.toLowerCase();
+  const tagKey = entry.tag.split('-')[0].toLowerCase();
   index.set(tagKey, record);
 
   // Also index under iso639_3 and each iso639_3extra (lowercased)
@@ -329,6 +350,7 @@ const tagsetRows = raw
     (Array.isArray(e.tags) ? [...e.tags].sort() : []).join(' '),
     (Array.isArray(e.regions) ? [...e.regions].sort() : []).join(' '),
     typeof e.macrolang === 'string' ? e.macrolang : '',
+    typeof e.windows === 'string' ? e.windows : '',
   ])
   .sort((a, b) => a[0].localeCompare(b[0]));
 
@@ -341,9 +363,9 @@ const tagsetsContent = `\
 // rows:    ${tagsetRows.length}
 //
 // [tag, full, equivalent tags (space-joined), extra regions (space-joined),
-//  macrolanguage ('' for none)].
+//  macrolanguage ('' for none), windows tag ('' for none)].
 
-export const tagsets: readonly (readonly [string, string, string, string, string])[] = [
+export const tagsets: readonly (readonly [string, string, string, string, string, string])[] = [
 ${tagsetRows.map((r) => `  ${JSON.stringify(r)},`).join('\n')}
 ];
 `;
@@ -356,4 +378,50 @@ if (existingTagsets === tagsetsContent) {
 } else {
   writeFileSync(TAGSETS_FILE, tagsetsContent, 'utf8');
   console.log(`[OK] Generated ${TAGSETS_FILE} (${Buffer.byteLength(tagsetsContent, 'utf8')} bytes, ${tagsetRows.length} rows)`);
+}
+
+// ------------------------------------------------------------ dialects ------
+//
+// One row per langtags variant or -x- tagset: a tagset whose `full` tag carries
+// anything after lang[-Script][-Region] (spec 115 R3). Sorted by tag.
+
+const dialectRows = raw
+  .filter((e) => e.tag && !e.tag.startsWith('_') && typeof e.full === 'string' && dialectSubtagOf(e.full) !== '')
+  .map((e) => ({
+    tag: e.tag,
+    full: e.full,
+    language: e.tag.split('-')[0].toLowerCase(),
+    dialectSubtag: dialectSubtagOf(e.full),
+    names: dedupeNames([e.name, ...(Array.isArray(e.names) ? e.names : [])]),
+    localNames: dedupeNames([e.localname, ...(Array.isArray(e.localnames) ? e.localnames : [])]),
+    variants: Array.isArray(e.variants) ? [...e.variants] : [],
+    windows: typeof e.windows === 'string' ? e.windows : '',
+  }))
+  .sort((a, b) => a.tag.localeCompare(b.tag));
+
+const dialectsContent = `// generated — do not edit
+// source:  scripts/codegen-langtags.mjs
+// data:    packages/engine/data/langtags/langtags.json
+// commit:  ${cfg.commit}
+// fetched: ${cfg.source}
+// rows:    ${dialectRows.length}
+//
+// One row per langtags variant or -x- tagset. DialectTagset is defined in
+// @keyboard-studio/contracts.
+
+import type { DialectTagset } from "@keyboard-studio/contracts";
+
+export const dialects: readonly DialectTagset[] = [
+${dialectRows.map((r) => `  ${JSON.stringify(r)},`).join('\n')}
+];
+`;
+
+const DIALECTS_FILE = join(OUT_DIR, 'dialects.ts');
+let existingDialects = '';
+try { existingDialects = readFileSync(DIALECTS_FILE, 'utf8'); } catch { /* new */ }
+if (existingDialects === dialectsContent) {
+  console.log(`[OK] Unchanged ${DIALECTS_FILE}`);
+} else {
+  writeFileSync(DIALECTS_FILE, dialectsContent, 'utf8');
+  console.log(`[OK] Generated ${DIALECTS_FILE} (${Buffer.byteLength(dialectsContent, 'utf8')} bytes, ${dialectRows.length} rows)`);
 }

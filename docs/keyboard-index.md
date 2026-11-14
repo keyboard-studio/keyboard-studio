@@ -49,6 +49,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Simplified Chinese | `cs_pinyin` | `zh` | SIL International | `../keyboards/release/c/cs_pinyin` |
 | Common Devanagari | `common_devanagari` | `hi` | © 2021 WIn Publishing Trust | `../keyboards/release/c/common_devanagari` |
 | Dega | `dega` | `rad`, `kpm`, `cmo`, `jra`, `bdq` | Y Phič Hđơ̆k | `../keyboards/release/d/dega` |
+| Dzardzongke | `dzardzongke` | `tbq-Latn-NP` | Kitty Liu | `../keyboards/release/d/dzardzongke` |
 | Easy Chakma | `easy_chakma` | `ccp` | Bivuti Chakma | `../keyboards/release/e/easy_chakma` |
 | Thuɔŋjäŋ | `el_dinka` | `din-Latn`, `dip-Latn`, `diw-Latn`, `dib-Latn`, `dks-Latn`, `dik-Latn` | © 2015-2018 Enabling Languages | `../keyboards/release/el/el_dinka` |
 | Naija NFD | `el_naija` | `abn-Latn`, `bky-Latn`, `bwr-Latn`, `deg-Latn`, `igb-Latn`, `bin-Latn`, `efi-Latn`, `eka-Latn`, `ekp-Latn`, `elm-Latn`, `enn-Latn`, `ish-Latn`, `gbr-Latn`, `aaa-Latn`, `gkn-Latn` … (+37 more) | Andrew Cunningham and Chinedu Uchechukwu | `../keyboards/release/el/el_naija` |
@@ -56,6 +57,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Pasifika | `el_pasifika` | `mi-Latn`, `rar-Latn`, `fj`, `haw-Latn`, `niu`, `sm`, `ty-Latn`, `to` | © 2018 Enabling Languages | `../keyboards/release/el/el_pasifika` |
 | Övdalsk | `elfdalian` | `ovd` | Craig Cornelius | `../keyboards/experimental/e/elfdalian` |
 | தமிழ்99 \| Tamil99 | `ekwtamil99uni` | `ta` | Mugunth, Umar, K. Sethu | `../keyboards/release/e/ekwtamil99uni` |
+| Enga | `enga` | `enq-Latn` | Stanley Stanis Kaka | `../keyboards/release/e/enga` |
 | Enggano | `enggano` | `eno` | Mary Dalrymple | `../keyboards/release/e/enggano` |
 | Esperanto Plus | `eo_plus` | `eo` | Andrea Vaccari | `../keyboards/release/e/eo_plus` |
 | EUJMO | `esperanto_sava_eujao` | `eo-Shaw` | Kreis Johannes Ĝenberĝ | `../keyboards/release/e/esperanto_sava_eujao` |
@@ -88,7 +90,14 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Odia/Oriya Phonetic (ITRANS) | `itrans_odia` | `or`, `bdv`, `bfw`, `dso`, `gbj`, `gdb`, `hoc-Orya`, `jun`, `kff-Orya`, `kxv-Orya`, `kyw-Orya`, `pci-Orya`, `peg`, `sat-Orya`, `spv`, `srb-Orya` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_odia` |
 | Ibọnọ Chwerty | `ibono_chwerty` | `ibn` | Rogers Katelem Edeh | `../keyboards/release/i/ibono_chwerty` |
 | Imperial Aramaic | `imperial_aramaic` | `arc`, `amw-Armi` | Lorna Evans | `../keyboards/release/i/imperial_aramaic` |
+| Ŋenuvǝ | `koalibrere` | `kib` | Kamma Organization for Devolopment Initiatives | `../keyboards/release/k/koalibrere` |
+| Korean Phonetic | `korean_phonetic` | `ko` | © SIL International | `../keyboards/release/k/korean_phonetic` |
 | Korean RR | `korean_rr` | `ko` | © 2010-2023 SIL International | `../keyboards/release/k/korean_rr` |
+| Maltese | `maltese` | `mt` | Gyula Zsigri | `../keyboards/release/m/maltese` |
+| northern sierra miwok | `northern_sierra_miwok` | `nsq` | Shingle Springs Band of Miwok Indians | `../keyboards/release/n/northern_sierra_miwok` |
+| Pau Cin Hau | `pau_cin_hau` | `ctd` | Copyright © SIL International | `../keyboards/release/p/pau_cin_hau` |
+| Persian Phonetic | `persian_phonetic` | `pes-Arab`, `fa` | © SIL Global | `../keyboards/release/p/persian_phonetic` |
+| Postmodern English US DualStroke | `postmodern_english_us_dualstroke` | `en-QP` | The Postmodern English Project | `../keyboards/release/p/postmodern_english_us_dualstroke` |
 | Arabic Phonetic (SIL) | `sil_arabic_phonetic` | `ar`, `arq-Arab`, `abv-Arab`, `shu-Arab`, `acy-Arab`, `avl-Arab`, `arz-Arab`, `afb-Arab`, `acw-Arab`, `ayl-Arab`, `acm-Arab`, `ary-Arab`, `ars-Arab`, `apc-Arab`, `ayp-Arab` … (+8 more) | Marc Durdin and Tamara Duff | `../keyboards/release/sil/sil_arabic_phonetic` |
 | Indígenas Bolivianos | `sil_bolivia` | `ay`, `aro`, `cav`, `cao`, `cap`, `cax`, `ese`, `gnw`, `gn`, `gui`, `gyr`, `ign`, `qu-BO`, `qul`, `srq` … (+2 more) | (c) 2022 SIL International | `../keyboards/release/sil/sil_bolivia` |
 | Bunong ឞូន៝ង (SIL) | `sil_bunong` | `cmo-Khmr` | © SIL Global | `../keyboards/release/sil/sil_bunong` |
@@ -121,6 +130,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Hebrew (SIL) | `sil_hebrew` | `hbo` | © SIL Global | `../keyboards/release/sil/sil_hebrew` |
 | IPA (SIL) | `sil_ipa` | `und-Latn` | Martin Hosken, Lorna Evans | `../keyboards/release/sil/sil_ipa` |
 | Khmer (SIL) | `sil_khmer` | `km`, `brb`, `cmo-Khmr`, `jra-Khmr`, `kdt-Khmr`, `krr`, `krv`, `kxm-Khmr`, `tpu` | D. Kanjahn | `../keyboards/release/sil/sil_khmer` |
+| MADHURÂH (SIL) | `sil_madurese` | `mad` | Copyright © SIL Global | `../keyboards/release/sil/sil_madurese` |
 | Myanmar3 (SIL) | `sil_myanmar_my3` | `my` | © SIL Global | `../keyboards/release/sil/sil_myanmar_my3` |
 | Nigeria Dot (SIL) | `sil_nigeria_dot` | `anc`, `ann`, `atg`, `bom`, `bzw`, `enn`, `gkn`, `ig`, `igb`, `ige`, `ikw`, `jbu`, `yaz` | Heidi Rosendall | `../keyboards/release/sil/sil_nigeria_dot` |
 | Nigeria Underline (SIL) | `sil_nigeria_underline` | `ank`, `bys`, `iri`, `kad`, `kaj`, `kcg`, `kdl`, `ldb`, `lnu`, `tiv` | Heidi Rosendall | `../keyboards/release/sil/sil_nigeria_underline` |
@@ -129,21 +139,27 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Telugu Winscript (NLCI) | `nlci_telugu_winscript` | `te` | Binila Sanki, SG NLCI | `../keyboards/release/nlci/nlci_telugu_winscript` |
 | Philippines (SIL) | `sil_philippines` | `tl`, `abc-Latn`, `abp-Latn`, `abx-Latn`, `agn-Latn`, `agt-Latn`, `agy-Latn`, `akl-Latn`, `alj-Latn`, `apf-Latn`, `atd-Latn`, `att-Latn`, `bcl-Latn`, `bgs-Latn`, `bhk-Latn` … (+110 more) | Kåre J. Strømme | `../keyboards/release/sil/sil_philippines` |
 | Senegal Bayot AZERTY | `sil_senegal_bda_azerty` | `bda` | SIL Senegal | `../keyboards/release/sil/sil_senegal_bda_azerty` |
+| Sgaw Karen | `sil_sgaw_karen` | `ksw` | © SIL Global | `../keyboards/release/sil/sil_sgaw_karen` |
 | Tchad | `sil_tchad` | `shu-Latn`, `sjg`, `bmi`, `bva`, `bjv`, `bxv`, `bes`, `bid`, `btf`, `bvo`, `glc`, `bvf`, `bub`, `bdm`, `bso` … (+115 more) | Jeff Heath | `../keyboards/release/sil/sil_tchad` |
 | Tchad QWERTY | `sil_tchad_qwerty` | `amj`, `sjg`, `bmi`, `bva`, `bjv`, `bxv`, `bes`, `bid`, `btf`, `bvo`, `glc`, `bvf`, `bub`, `bdm`, `bso` … (+116 more) | Jeff Heath & Roger Nadoumngar | `../keyboards/release/sil/sil_tchad_qwerty` |
 | Uganda-Tanzania Bantu (SIL) | `sil_uganda_tanzania` | `sw`, `lg-Latn`, `swh-Latn`, `asa-Latn`, `bdp-Latn`, `bez-Latn`, `bou-Latn`, `cgg-Latn`, `cwa-Latn`, `cwe-Latn`, `dhs-Latn`, `dne-Latn`, `doe-Latn`, `fip-Latn`, `gmx-Latn` … (+96 more) | 2004-2020 SIL International | `../keyboards/release/sil/sil_uganda_tanzania` |
+| Wayuu (SIL) | `sil_wayuu` | `guc` | © SIL Global | `../keyboards/release/sil/sil_wayuu` |
 | SIL Yi | `sil_yi` | `ii` | Andy Eatough, Dennis Walters, David Rowe | `../keyboards/release/sil/sil_yi` |
 | Yorùbá with Dot | `sil_yoruba_dot` | `yo-Latn` | P. Baehr | `../keyboards/release/sil/sil_yoruba_dot` |
 | Yorùbá 8 | `sil_yoruba8` | `yo-Latn` | P. Baehr | `../keyboards/release/sil/sil_yoruba8` |
 | Sorani Behdini (Qwerty) | `sorani_behdini_arab_qwerty` | `ku-Arab`, `kmr-Arab`, `ku-Arab-TR`, `ckb` | © SIL Global | `../keyboards/release/s/sorani_behdini_arab_qwerty` |
 | Swanalekha Malayalam | `swanalekha_malayalam` | `ml` | Ramesh Kunnappully | `../keyboards/release/s/swanalekha_malayalam` |
+| sxava_eo | `sxava_eo` | `eo` | © 2023 Veotri | `../keyboards/release/s/sxava_eo` |
+| Taiwan Austronesian | `taiwan_austronesian` | `ami-Latn-001` | cathaylab | `../keyboards/release/t/taiwan_austronesian` |
 | Takri | `takri` | `xnr-Takr` | (c) manik | `../keyboards/release/t/takri` |
 | Tamil 99 | `tamil99` | `ta` | Muthu Nedumaran | `../keyboards/release/tamil/tamil99` |
 | த99-விரிவு \| ta99 Extended | `thamizha_tamil99_ext` | `ta` | Umar(csd_one@yahoo.com), Mugunth (mugunth@gmail.com) and K. Sethu (skhome@gmail.com) | `../keyboards/release/t/thamizha_tamil99_ext` |
 | சுரதா-பாமுனி \| Suratha Bamini | `thamizha_bamini` | `ta` | © thamizha.com and SIL Global | `../keyboards/release/t/thamizha_bamini` |
 | புதிய தட்டெழுதி \| New Typewriter | `thamizha_new_typewriter` | `ta` | Mugunth (mugunth@gmail.com), Umar (csd_one@yahoo.com) and K. Sethu (skhome@gmail.com) | `../keyboards/release/t/thamizha_new_typewriter` |
+| Thai Kedmanee (Mattix) | `thai_kedmanee_mattix` | `th` | Samuel A. Mattix | `../keyboards/release/t/thai_kedmanee_mattix` |
 | Todhri | `todhri` | `sq-Todr`, `als-Todr` | © SIL Global | `../keyboards/release/t/todhri` |
 | Triqui Itunyoso | `triqui_itunyoso` | `trq` | Kayla Shames | `../keyboards/release/t/triqui_itunyoso` |
+| Toto | `txo_toto` | `txo` | Toby Anderson | `../keyboards/release/t/txo_toto` |
 | Turkmen Cyrillic | `turkmen_cyrl` | `tk-Cyrl` | © 2002-2020 David Gray | `../keyboards/release/t/turkmen_cyrl` |
 | Unifon | `unifon` | `en` | SIL International | `../keyboards/experimental/u/unifon` |
 | Vietnamese Telex | `vietnamese_telex` | `vi` | Mike Vo | `../keyboards/release/v/vietnamese_telex` |

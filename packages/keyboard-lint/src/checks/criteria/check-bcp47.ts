@@ -15,7 +15,7 @@
 // variants are 5+ or digit-led alphanumeric), so the same scan
 // position applies.
 
-import { ISO_639_5_COLLECTIVE_CODES } from "@keyboard-studio/contracts";
+import { ISO_639_5_COLLECTIVE_CODES, regionSubtagOf } from "@keyboard-studio/contracts";
 import {
   checkFailed,
   checkPassed,
@@ -96,22 +96,10 @@ export function checkNumericRegionContrastive(
 
 /** True when a BCP47 tag uses region subtag 001. */
 export function tagUsesRegion001(tag: string): boolean {
-  const subtags = tag.split("-");
-  return subtags.slice(1).some((s) => s === "001");
+  return regionSubtagOf(tag) === "001";
 }
 
-/** The tag's region subtag (alpha-2 or 3-digit M.49), when present. */
-export function regionSubtagOf(tag: string): string | undefined {
-  const subtags = tag.split("-");
-  for (const s of subtags.slice(1)) {
-    if (/^[A-Za-z]{2}$/.test(s) || /^[0-9]{3}$/.test(s)) return s;
-    // A 4-alpha script subtag precedes the region; keep scanning.
-    if (/^[A-Za-z]{4}$/.test(s)) continue;
-    // Anything else (variants, extensions) means no region precedes it.
-    return undefined;
-  }
-  return undefined;
-}
+export { regionSubtagOf };
 
 /** True when a BCP47 tag uses a 3-digit M.49 region subtag. */
 export function tagUsesNumericRegion(tag: string): boolean {

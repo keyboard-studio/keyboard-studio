@@ -59,6 +59,7 @@ import {
 } from "../stores/surveyAnswerStore.ts";
 import { DEFAULT_PHASE_B_FONT, isPhaseBFontValue } from "../survey/surveyStyles.ts";
 import { deriveProjectLabel } from "./projectLabel.ts";
+import { answerFilledIds } from "../survey/questions/answerFilledIds.ts";
 import {
   applyDecisionRecordSnapshot,
   snapshotDecisionRecord,
@@ -1325,7 +1326,7 @@ export function migrateDraftEnvelope(raw: unknown): MigrateDraftResult | null {
         const mod = questionRegistry[questionId];
         const provides =
           mod !== undefined && mod.provides !== undefined && mod.provides.length > 0
-            ? mod.provides
+            ? answerFilledIds(mod)
             : RETIRED_QUESTION_DECISIONS[questionId];
         if (provides !== undefined && provides.length > 0) {
           const mapped = answerProvenance(answer.value, answer.proposal, baseSourceName);
@@ -1443,7 +1444,7 @@ export function filterSurveyAnswersForDraft(snapshot: SurveyAnswerSnapshot): Sur
 function questionIdByDecisionId(): Map<string, string> {
   const map = new Map<string, string>();
   for (const [questionId, mod] of Object.entries(questionRegistry)) {
-    for (const id of mod.provides ?? []) {
+    for (const id of answerFilledIds(mod)) {
       if (!map.has(id)) map.set(id, questionId);
     }
   }

@@ -12,7 +12,7 @@
 //   defaultsFor(code)      — look up a language code; returns null if unknown.
 //   scriptToTargetOption() — map ISO-15924 → il_target_script option value.
 
-import type { LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
+import type { DialectTagset, LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 import { regionCodeToName } from "./iso3166Names.ts";
 
 // ---------------------------------------------------------------------------
@@ -26,6 +26,26 @@ type LangtagsModule = {
   getLanguageDefaults: (subtag: string) => LanguageDefaults | null;
   listLanguages: () => readonly LanguageSummary[];
   lookupByName: (query: string) => readonly LanguageSummary[];
+  /** Every langtags variant and `-x-` tagset (spec 115): the dialect search's langtags source. */
+  allDialectTagsets: readonly DialectTagset[];
+  /** The IANA language-subtag registry lookup (spec 115 FR-028); undefined when unregistered. */
+  registeredLanguage: (subtag: string) => { subtag: string; description: string; scope?: string; macrolanguage?: string } | undefined;
+  /** The minimal tag for a language choice against the pinned langtags (spec 115 R2). */
+  minimalTag: (choice: {
+    language: string;
+    script?: string;
+    region?: string;
+    variants?: string[];
+    privateUse?: string[];
+  }) => string;
+  /** The raw IANA variant registry (spec 115 R5). */
+  allRegisteredVariants: readonly { subtag: string; descriptions: readonly string[]; prefixes: readonly string[]; deprecated: boolean }[];
+  /** The IANA variant registry, prefix-aware (spec 115 R5, T047). */
+  variantEntry: (subtag: string) => { subtag: string; descriptions: readonly string[]; prefixes: readonly string[]; deprecated: boolean } | undefined;
+  variantsFor: (tag: string) => readonly { subtag: string; descriptions: readonly string[]; prefixes: readonly string[]; deprecated: boolean }[];
+  variantAllowed: (tag: string, variant: string) => boolean;
+  /** The langtags dialect tagsets of one language (spec 115 R3, T047). */
+  dialectTagsetsFor: (language: string) => readonly DialectTagset[];
 };
 
 let _modulePromise: Promise<LangtagsModule> | null = null;

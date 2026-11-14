@@ -103,6 +103,13 @@ export interface DefineDeadkeyOptions {
    */
   triggerKey: string;
   /**
+   * Modifier names for a modifier-layer trigger (e.g. `["RALT"]` makes the
+   * trigger `[RALT K_QUOTE]`). Omitted or empty means the default layer.
+   * `[K_QUOTE]` and `[RALT K_QUOTE]` are distinct triggers: neither occupies
+   * the other.
+   */
+  triggerModifiers?: readonly string[];
+  /**
    * Numeric id. Defaults to `allocateDeadkeyId(ir)` — auto-unique, never
    * re-minting grandfathered codepoint-derived legacy ids.
    */
@@ -145,4 +152,14 @@ export interface RetargetDeadkeyOptions {
   id: number;
   /** New trigger key as a vkey name. */
   newTriggerKey: string;
+  /** Modifier names for a modifier-layer trigger; omitted or empty = default layer. */
+  newTriggerModifiers?: readonly string[];
+}
+
+/** Options for {@link setDeadkeyDisplay}. */
+export interface SetDeadkeyDisplayOptions {
+  /** Numeric id of the deadkey. */
+  id: number;
+  /** Display character(s); `undefined` clears the stored display. */
+  display: string | undefined;
 }

@@ -182,6 +182,8 @@ function reviewerContextBody(
     case "10.4-kps-unusual-tag-flagged":
     case "12.1-bcp47-tag-correct":
     case "12.5-script-mismatch-flagged":
+    case "12.8-bcp47-tag-well-formed":
+    case "12.9-bcp47-variant-prefix":
       return [
         ...sourceContextLines(criterionId, input.reviewerSource),
         ...languageTagContextLines(criterionId, input.reviewerSource?.languageTags),

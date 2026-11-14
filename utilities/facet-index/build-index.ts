@@ -18,7 +18,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parse } from "../../packages/engine/src/codec/index.js";
-import { parseKps, extractScriptSubtag } from "../../packages/engine/src/start-browser/kps-parser.js";
+import { scriptSubtagOf } from "@keyboard-studio/contracts";
+import { parseKps } from "../../packages/engine/src/start-browser/kps-parser.js";
 import { recognizePatterns } from "../../packages/engine/src/recognizer/index.js";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
 
@@ -125,8 +126,8 @@ function scriptFallback(kb: ScannedKeyboard, def: FacetDefinition): Categorizati
  */
 function extractDeclaredScript(bcp47Tags: string[]): string | null {
   for (const tag of bcp47Tags) {
-    const script = extractScriptSubtag(tag);
-    if (script !== null) return script;
+    const script = scriptSubtagOf(tag);
+    if (script !== undefined) return script;
   }
   return null;
 }

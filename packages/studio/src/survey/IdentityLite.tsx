@@ -8,12 +8,14 @@ import { useMemo, useState, useCallback } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
 import { createIdentityResolution } from "./identityResolution.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { surveyPageColumn, phaseHeading, leadParagraph } from "./surveyStyles.ts";
 import type { SurveyContext, FlowOption } from "./types.ts";
 import { deriveScriptPrefill } from "../lib/scriptAxes.ts";
 import type { IdentityLiteResult } from "./identityLiteResult.ts";
 import { getLoadedLangtags } from "../lib/langtagsDefaults.ts";
+import { regionCodeToName } from "../lib/iso3166Names.ts";
 import { buildTargetBcp47, normalizeRegionSubtag } from "./targetBcp47.ts";
 import { answerString } from "./answerString.ts";
 import { normalizeForCompare } from "../lib/normalizeForCompare.ts";
@@ -50,7 +52,15 @@ export function extractIdentityLite(result: SurveyPhaseResult): IdentityLiteResu
     languageSubtag,
     region,
     targetScriptRaw,
-    bcp47: buildTargetBcp47(languageSubtag, targetScriptRaw, region),
+    dialectSubtag: answerString(result, "il_language_dialect"),
+    // The phase result carries the dialect answer, not its source or the
+    // Glottolog codes — those live in the decisions, and the
+    // decision-derived result (decisions/identitySelectors.ts) is
+    // authoritative for them.
+    dialectSource: "",
+    languageGlottocode: "",
+    dialectGlottocode: "",
+    bcp47: buildTargetBcp47(languageSubtag, targetScriptRaw, region, answerString(result, "il_language_dialect")),
     supported: !UNSUPPORTED_SCRIPTS.has(targetScriptRaw),
     prefill: deriveScriptPrefill(targetScriptRaw),
     // #1901: the author/copyright questions moved to the post-track
@@ -194,12 +204,32 @@ export function IdentityLite({
         return opts.length > 0 ? opts : undefined;
       }
       if (questionId === "il_language_region") {
-        // The resolved entry's region variants (spec 030 US3): value = region
-        // code (folded into BCP47), label = region name.
-        const variants = resolution.resolvedEntry()?.regionVariants;
-        if (variants !== undefined && variants.length > 0) {
-          return variants.map((v) => ({ value: v.region, label: v.regionName ?? v.region }));
+        // The language's default region first (marked), then its other langtags
+        // regions, then "Other region..." (spec 115 R9). Value = region code
+        // (folded into the tag only when it is not the default); label = name.
+        // CONTENT REVIEW (Article VI): the labels are survey text owned by the content team.
+        const d = resolution.resolvedEntry();
+        const labels = new Map<string, string>();
+        for (const v of d?.regionVariants ?? []) labels.set(v.region, v.regionName ?? v.region);
+        const ordered: string[] = [];
+        for (const code of [d?.defaultRegion, ...(d?.regionVariants ?? []).map((v) => v.region), ...(d?.regions ?? [])]) {
+          if (code !== undefined && code !== "" && !ordered.includes(code)) ordered.push(code);
         }
+        const opts: FlowOption[] = ordered.map((code, i) => {
+          const name = labels.get(code) ?? regionCodeToName(code) ?? code;
+          return {
+            value: code,
+            label:
+              i === 0 && code === d?.defaultRegion
+                ? t({ id: "survey.identityLite.regionOption.default", message: `${{ name }} (default)` })
+                : name,
+          };
+        });
+        opts.push({
+          value: "",
+          label: t({ id: "survey.identityLite.regionOption.other", message: "Other region… (type its country code)" }),
+        });
+        return opts;
       }
       if (questionId === "il_language_code") {
         // Possible code matches FOR THE RESOLVED LANGUAGE (spec 030 US4): the two
@@ -232,6 +262,48 @@ export function IdentityLite({
             message: `${{ code: d.code }} — BCP 47 language subtag`,
           }),
         );
+        return opts.length > 0 ? opts : undefined;
+      }
+      if (questionId === "il_language_dialect") {
+        // The list for the no-proposal state (spec 115 US2): the language's
+        // registered variants (by description) and langtags tagset dialects
+        // (by name), each as its subtag. Undefined until langtags loads or
+        // no language resolved — the field then falls back to its name box.
+        // The tag the variants are checked against carries the raw
+        // target-script answer normalised the way buildTargetBcp47 does
+        // ("fonipa" is a variant, "romanization-Latn" is Latn).
+        const mod = getLoadedLangtags();
+        if (mod === null) return undefined;
+        // A partial module (a test mock predating the dialect surface)
+        // offers no list — the field falls back to its name box.
+        if (typeof mod.variantsFor !== "function" || typeof mod.dialectTagsetsFor !== "function") {
+          return undefined;
+        }
+        const decisions = useDecisionStore.getState().decisions;
+        const stringOf = (id: "language-code" | "target-script" | "language-region"): string => {
+          const v = decisions[id]?.value;
+          return typeof v === "string" ? v : "";
+        };
+        const code = stringOf("language-code") !== "" ? stringOf("language-code") : (resolution.resolvedEntry()?.code ?? "");
+        if (code === "") return undefined;
+        const scriptRaw = stringOf("target-script");
+        // eslint-disable-next-line lingui/no-unlocalized-strings -- target-script option values: technical identifiers, never author copy.
+        const scriptPart =
+          scriptRaw === "fonipa" ? "fonipa" : scriptRaw === "romanization-Latn" ? "Latn" : scriptRaw === "other" ? "" : scriptRaw;
+        const region = stringOf("language-region");
+        const tag = [code, scriptPart, region].filter((p) => p !== "").join("-");
+        const seen = new Set<string>();
+        const opts: FlowOption[] = [];
+        for (const v of mod.variantsFor(tag)) {
+          if (seen.has(v.subtag)) continue;
+          seen.add(v.subtag);
+          opts.push({ value: v.subtag, label: v.descriptions[0] ?? v.subtag });
+        }
+        for (const ts of mod.dialectTagsetsFor(code)) {
+          if (seen.has(ts.dialectSubtag)) continue;
+          seen.add(ts.dialectSubtag);
+          opts.push({ value: ts.dialectSubtag, label: ts.names[0] ?? ts.dialectSubtag });
+        }
         return opts.length > 0 ? opts : undefined;
       }
       return undefined;

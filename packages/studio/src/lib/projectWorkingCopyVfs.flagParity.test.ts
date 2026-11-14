@@ -180,7 +180,8 @@ const SCENARIOS: readonly Scenario[] = [
   {
     name: "no edits (no re-emit)",
     effect: (out) => {
-      expect(out.kmn).toBe("c stub\n");
+      // No re-emit: the only change is the always-on store(&TARGETS) 'any' (step 3.1).
+      expect(out.kmn).toBe("store(&TARGETS) 'any'\nc stub\n");
       expect(out.touch).toBeUndefined();
     },
   },
@@ -323,7 +324,8 @@ describe("projectWorkingCopyVfs — seam projection output (single path, spec 08
 
     // The path warns (entry-group gate) and leaves the fetched stub untouched.
     expect(res.warnings.some((w) => w.includes("entry group"))).toBe(true);
-    expect(vfs.get("source/kb.kmn")?.content).toBe("c stub\n"); // never re-emitted
+    // never re-emitted: only the always-on store(&TARGETS) 'any' line (step 3.1) differs from the stub
+    expect(vfs.get("source/kb.kmn")?.content).toBe("store(&TARGETS) 'any'\nc stub\n");
   });
 });
 

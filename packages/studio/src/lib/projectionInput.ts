@@ -26,6 +26,7 @@
 
 import type {
   KeyboardIR,
+  KmnEditsValue,
   MechanismAssignment,
   PackageFontSet,
   Pattern,
@@ -82,10 +83,17 @@ export interface ProjectionExtras {
   /** The recorded marks-treatment value, or undefined when none is recorded. */
   marksTreatment: MarksTreatmentValue | undefined;
   /**
+   * The recorded `kmn-edits` value (spec 117), or undefined when none is recorded. Required for
+   * the same reason as `marksTreatment`: the preview and the download must both pass it.
+   */
+  kmnEdits: KmnEditsValue | undefined;
+  /**
    * The recorded caps-handling decision for step 2.8 (spec 112), already
    * gated through {@link capsHandlingFromDecisions}; undefined when not asked.
    */
   capsHandling: CapsHandlingValue | undefined;
+  /** Observer of the `.kmn` after each late rule-writing step; see ProjectWorkingCopyVfsInput.kmnStageTap. */
+  kmnStageTap?: NonNullable<ProjectWorkingCopyVfsInput["kmnStageTap"]>;
   baseDisplayName?: string;
   startKeyboardId?: string;
   welcomeFolderFiles?: readonly string[];
@@ -99,6 +107,11 @@ export interface ProjectionExtras {
   };
   /** The CSS step's in-progress text, ahead of the commit that writes the store (undefined = use the store's). */
   liveCssOverride?: string | null;
+}
+
+/** The `kmn-edits` value out of a decision set (undefined when none is recorded). */
+export function selectKmnEdits(decisions: DecisionSet): KmnEditsValue | undefined {
+  return decisions["kmn-edits"]?.value as KmnEditsValue | undefined;
 }
 
 /**
@@ -204,7 +217,7 @@ export function projectionInputFromState(
   state: ProjectionState,
   extras: ProjectionExtras,
 ): ProjectWorkingCopyVfsInput {
-  const { liveLayoutOverride, liveCssOverride, marksTreatment, capsHandling, ...callSite } = extras;
+  const { liveLayoutOverride, liveCssOverride, marksTreatment, kmnEdits, capsHandling, ...callSite } = extras;
   // spec 082 FR-018: disabled families' member rules are removed outright.
   // They join the deletion set and are exempt from the fallback-policy
   // expansion, which would otherwise carve them instead.
@@ -247,5 +260,6 @@ export function projectionInputFromState(
     contextToleranceOverlay: state.contextToleranceOverlay?.overlay ?? null,
     capsHandling: capsHandling ?? null,
     ruleAdditions: deriveRuleAdditions(state.ir, state.startIr),
+    ...(kmnEdits !== undefined ? { kmnEdits } : {}),
   };
 }

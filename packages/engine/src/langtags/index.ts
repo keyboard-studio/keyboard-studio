@@ -131,3 +131,25 @@ export {
   isRegionSubtag,
 } from "./tagsets.js";
 export type { LangtagResolution } from "./tagsets.js";
+
+// Spec 115: every langtags variant and `-x-` tagset, for the studio's dialect
+// search. `dialectTagsetsFor(language)` (with the registry-aware filters) is a
+// later task; this is the raw generated data, exported as-is.
+export { dialects as allDialectTagsets } from "./generated/dialects.js";
+
+// Spec 115 R12: registered language subtags (IANA), for the typed-code check.
+export { registeredLanguage } from "./registry.js";
+export type { RegisteredLanguage } from "./generated/registeredLanguages.js";
+
+// Spec 115 R5: the IANA variant registry, prefix-aware (the dialect question).
+export { variantEntry, variantsFor, variantAllowed } from "./variants.js";
+export type { VariantEntry } from "@keyboard-studio/contracts";
+export { registeredVariants as allRegisteredVariants } from "./generated/variants.js";
+export type { RegisteredVariant } from "./generated/variants.js";
+
+// Spec 115 R3: the langtags dialect tagsets of one language.
+export { dialectTagsetsFor } from "./dialects.js";
+
+// Spec 115 R2: minimal tag against the pinned langtags (FR-014 to FR-018).
+export { minimalTag, minimalTagOf } from "./minimalTag.js";
+export type { TagChoice } from "./minimalTag.js";

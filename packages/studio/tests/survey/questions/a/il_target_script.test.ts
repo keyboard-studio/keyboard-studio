@@ -48,7 +48,10 @@ describe("il_target_script — options and routing", () => {
   // default-branch into attribution capture; the author/copyright
   // questions moved to the post-track attribution flow, because what they
   // propose depends on the track.) The gated path still terminates on the
-  // notice (see the branch above).
+  // notice (see the branch above). Spec 115 US2 adds a second CONDITIONAL
+  // branch (ctx.ilDialectRequested -> il_language_dialect); it is not a
+  // default — a supported script with no dialect request still terminates
+  // the flow here.
   it("has no default branch — a supported script terminates the flow (#1901)", () => {
     const rules = definition.next as Array<{
       condition?: string;
@@ -57,8 +60,10 @@ describe("il_target_script — options and routing", () => {
     }>;
     const fallthrough = rules.find((r) => "default" in r);
     expect(fallthrough).toBeUndefined();
-    expect(rules).toHaveLength(1);
+    expect(rules).toHaveLength(2);
     expect(rules[0]?.goto).toBe("il_script_not_supported");
+    expect(rules[1]?.goto).toBe("il_language_dialect");
+    expect(rules[1]?.condition).toContain("ctx.ilDialectRequested");
   });
 });
 

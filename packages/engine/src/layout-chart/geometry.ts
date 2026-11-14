@@ -105,6 +105,149 @@ export const DESKTOP_GEOMETRY: readonly DesktopGeometryKey[] = [
 /** Widest row extent (in key-width units) across {@link DESKTOP_GEOMETRY} — every row sums to this. */
 export const DESKTOP_GEOMETRY_WIDTH = 15;
 
+// ---------------------------------------------------------------------------
+// Hardware form tables (shared with the LDML export)
+// ---------------------------------------------------------------------------
+
+/** The predefined hardware forms the LDML export targets. */
+export type LdmlForm = "us" | "iso" | "jis" | "abnt2";
+
+export interface KeyCell {
+  readonly vkey: string;
+  /** Scan code, as two uppercase hex digits (the spelling in scanCodes-implied.xml). */
+  readonly scan: string;
+}
+
+const c = (vkey: string, scan: string): KeyCell => ({ vkey, scan });
+
+const NUMBER_ROW: readonly KeyCell[] = [
+  c("K_BKQUOTE", "29"), c("K_1", "02"), c("K_2", "03"), c("K_3", "04"), c("K_4", "05"),
+  c("K_5", "06"), c("K_6", "07"), c("K_7", "08"), c("K_8", "09"), c("K_9", "0A"),
+  c("K_0", "0B"), c("K_HYPHEN", "0C"), c("K_EQUAL", "0D"),
+];
+const TOP_LETTERS: readonly KeyCell[] = [
+  c("K_Q", "10"), c("K_W", "11"), c("K_E", "12"), c("K_R", "13"), c("K_T", "14"),
+  c("K_Y", "15"), c("K_U", "16"), c("K_I", "17"), c("K_O", "18"), c("K_P", "19"),
+  c("K_LBRKT", "1A"), c("K_RBRKT", "1B"),
+];
+const HOME_LETTERS: readonly KeyCell[] = [
+  c("K_A", "1E"), c("K_S", "1F"), c("K_D", "20"), c("K_F", "21"), c("K_G", "22"),
+  c("K_H", "23"), c("K_J", "24"), c("K_K", "25"), c("K_L", "26"), c("K_COLON", "27"),
+  c("K_QUOTE", "28"),
+];
+const BOTTOM_LETTERS: readonly KeyCell[] = [
+  c("K_Z", "2C"), c("K_X", "2D"), c("K_C", "2E"), c("K_V", "2F"), c("K_B", "30"),
+  c("K_N", "31"), c("K_M", "32"), c("K_COMMA", "33"), c("K_PERIOD", "34"), c("K_SLASH", "35"),
+];
+const BACKSLASH = c("K_BKSLASH", "2B");
+const SPACE_ROW: readonly KeyCell[] = [c("K_SPACE", "39")];
+
+export const FORM_ROWS: Readonly<Record<LdmlForm, readonly (readonly KeyCell[])[]>> = {
+  us: [NUMBER_ROW, [...TOP_LETTERS, BACKSLASH], HOME_LETTERS, BOTTOM_LETTERS, SPACE_ROW],
+  iso: [
+    NUMBER_ROW,
+    TOP_LETTERS,
+    [...HOME_LETTERS, BACKSLASH],
+    [c("K_oE2", "56"), ...BOTTOM_LETTERS],
+    SPACE_ROW,
+  ],
+  abnt2: [
+    NUMBER_ROW,
+    TOP_LETTERS,
+    [...HOME_LETTERS, BACKSLASH],
+    [c("K_oE2", "56"), ...BOTTOM_LETTERS, c("K_oC1", "73")],
+    SPACE_ROW,
+  ],
+  jis: [
+    [...NUMBER_ROW, c("K_oE0", "7D")],
+    TOP_LETTERS,
+    [...HOME_LETTERS, BACKSLASH],
+    [...BOTTOM_LETTERS, c("K_oE1", "73")],
+    SPACE_ROW,
+  ],
+};
+
+/**
+ * Keys that exist only on some forms. A rule on one of these, exported to a form
+ * without the key, has no position there.
+ */
+export const FORM_ONLY_KEYS: Readonly<Record<string, readonly LdmlForm[]>> = {
+  K_oE2: ["iso", "abnt2"],
+  K_oC1: ["abnt2"],
+  K_oE0: ["jis"],
+  K_oE1: ["jis"],
+};
+
+const FRAME_KEY_PATTERN =
+  /^K_(F([1-9]|1\d|2[0-4])|NP[A-Z0-9_]*|NUMLOCK|SCROLL|PAUSE|LEFT|RIGHT|UP|DOWN|HOME|END|PGUP|PGDN|INS|DEL|ENTER|TAB|ESC)$/;
+
+/** True for a key outside the layout block (TR35 non-goal; mapping row 2.5). */
+export function isFrameKey(vkey: string): boolean {
+  return FRAME_KEY_PATTERN.test(vkey);
+}
+
+// ---------------------------------------------------------------------------
+// ISO desktop grid (Layout tab)
+// ---------------------------------------------------------------------------
+
+/** One key on the ISO desktop grid — a {@link DesktopGeometryKey} that also says whether the key sits outside the editable layout block. */
+export interface DesktopIsoGeometryKey extends DesktopGeometryKey {
+  /** True for keys that are not part of the layout block (Backspace, Tab, Enter, Caps, Shift, arrows): drawn, but never edited as layout cells. */
+  readonly frame: boolean;
+}
+
+/** Row index of the space row in {@link DESKTOP_ISO_GEOMETRY}. */
+export const DESKTOP_ISO_ROW_SPACE = 4;
+export const DESKTOP_ISO_ROW_COUNT = 5;
+
+const ISO_LAYOUT_BLOCK_VKEYS: ReadonlySet<string> = new Set(
+  FORM_ROWS.iso.flatMap((row) => row.map((cell) => cell.vkey)),
+);
+
+/** Lay one row out left to right from `[id, width]` pairs. */
+function isoRow(row: number, keys: readonly (readonly [string, number])[]): DesktopIsoGeometryKey[] {
+  let x = 0;
+  return keys.map(([id, width]) => {
+    const key: DesktopIsoGeometryKey = {
+      id,
+      row,
+      x,
+      width,
+      frame: isFrameKey(id) || !ISO_LAYOUT_BLOCK_VKEYS.has(id),
+    };
+    x += width;
+    return key;
+  });
+}
+
+/**
+ * The ISO desktop grid: the same five physical rows as the `iso` hardware form
+ * (number, top, home, bottom with `K_oE2`, space). ISO Enter is drawn on the top
+ * row at the right edge (as a single-row cell; the real key is two rows tall), and
+ * the home row's final slot is the ISO `K_BKSLASH` key, so the home row ends at
+ * 13.75. The number, top, and bottom rows span {@link DESKTOP_GEOMETRY_WIDTH}.
+ */
+export const DESKTOP_ISO_GEOMETRY: readonly DesktopIsoGeometryKey[] = [
+  ...isoRow(DESKTOP_ROW_NUMBER, [
+    ["K_BKQUOTE", 1], ["K_1", 1], ["K_2", 1], ["K_3", 1], ["K_4", 1], ["K_5", 1], ["K_6", 1],
+    ["K_7", 1], ["K_8", 1], ["K_9", 1], ["K_0", 1], ["K_HYPHEN", 1], ["K_EQUAL", 1], ["K_BKSP", 2],
+  ]),
+  ...isoRow(DESKTOP_ROW_TOP, [
+    ["K_TAB", 1.5], ["K_Q", 1], ["K_W", 1], ["K_E", 1], ["K_R", 1], ["K_T", 1], ["K_Y", 1],
+    ["K_U", 1], ["K_I", 1], ["K_O", 1], ["K_P", 1], ["K_LBRKT", 1], ["K_RBRKT", 1], ["K_ENTER", 1.5],
+  ]),
+  ...isoRow(DESKTOP_ROW_HOME, [
+    ["K_CAPS", 1.75], ["K_A", 1], ["K_S", 1], ["K_D", 1], ["K_F", 1], ["K_G", 1], ["K_H", 1],
+    ["K_J", 1], ["K_K", 1], ["K_L", 1], ["K_COLON", 1], ["K_QUOTE", 1], ["K_BKSLASH", 1],
+  ]),
+  ...isoRow(DESKTOP_ROW_BOTTOM, [
+    ["K_SHIFT", 1.25], ["K_oE2", 1], ["K_Z", 1], ["K_X", 1], ["K_C", 1], ["K_V", 1], ["K_B", 1],
+    ["K_N", 1], ["K_M", 1], ["K_COMMA", 1], ["K_PERIOD", 1], ["K_SLASH", 1], ["K_RSHIFT", 2.75],
+  ]),
+  // The modifier keys either side of the spacebar are not modelled; the bar sits at its physical offset.
+  { id: "K_SPACE", row: DESKTOP_ISO_ROW_SPACE, x: 3.75, width: 6.25, frame: false },
+];
+
 /**
  * ISO variant of {@link DESKTOP_GEOMETRY}: the bottom row gains the 102nd key
  * (`K_oE2`) between Left Shift and `K_Z`, and Left Shift narrows to make room.

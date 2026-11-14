@@ -90,6 +90,16 @@ starting point ──▶ extraction (spec 092) ──▶ proposals ──▶ aut
   as above. It is what renders and what output projects from — never what is
   stored directly (see Persistence). On Open the working copy is the current
   file text and its parse (spec 111).
+- **KMN edits (spec 117).** Every Layout-tab or Code-tab edit to the `.kmn` is one entry in the
+  `kmn-edits` decision (`KmnEditsValue`, `packages/contracts/src/kmnEdits.ts`), the single record of
+  KMN edits; entries replay in order and later entries win. The projection replays the log in two
+  places, each only when it has entries (`replayKmnEdits`: parse, replay, emit): the Layout-tab
+  entries at step 2.2, after the deadkey ops and assignments and before the generating steps (mark
+  guards 2.6, context tolerance 2.7, caps handling 2.8), and the Code-tab (`code-apply`) entries at
+  step 2.9, after the generating steps and before identity, so a code edit is applied after every
+  Layout-tab edit and an edit to a generated rule stays in the build. The working IR is never
+  mutated by the replay.
+  → `packages/engine/src/{layout-ops,kmn-diff,layout-attribution}/`, `lib/projectWorkingCopyVfs.ts`
 - **Step host.** Every step renders through one generic host — no per-step
   `switch` in the shell. `StepHost` resolves the manifest entry, renders its
   component in the declared layout's chrome, and runs the single completion

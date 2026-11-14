@@ -60,6 +60,8 @@ const iID = lcol('ID');
 const iName = lcol('Name');
 const iIso = lcol('ISO639P3code');
 const iLevel = lcol('Level');
+const iCountries = lcol('Countries');
+const iLangId = lcol('Language_ID');
 
 // glottocode -> { name, level, iso }
 const meta = new Map();
@@ -71,6 +73,8 @@ for (let r = 1; r < langRows.length; r++) {
     name: (row[iName] ?? '').trim(),
     level: (row[iLevel] ?? '').trim().toLowerCase(),
     iso: (row[iIso] ?? '').trim().toLowerCase(),
+    countries: (row[iCountries] ?? '').split(';').map((c) => c.trim()).filter(Boolean),
+    languageId: (row[iLangId] ?? '').trim(),
   });
 }
 
@@ -151,6 +155,48 @@ for (const [id, m] of meta) {
   }
 }
 
+
+// ------------------------------------------------- dialect rows (spec 115) ----
+// Three kinds: "dialect" (parent language has an ISO code), "uncoded-language"
+// (a language with no ISO code) and "uncoded-dialect" (a dialect of such a
+// language). Countries come from the row itself, else from its parent.
+
+/** NFD, drop combining marks, lowercase. */
+function fold(name) {
+  return name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+}
+
+const dialectRows = [];
+for (const [id, m] of meta) {
+  if (m.level === 'dialect') {
+    const parent = meta.get(m.languageId);
+    if (!parent) continue;
+    const countries = m.countries.length > 0 ? m.countries : parent.countries;
+    if (parent.iso) {
+      dialectRows.push({ kind: 'dialect', name: m.name, folded: fold(m.name), glottocode: id, parentIso: parent.iso, countries });
+    } else {
+      dialectRows.push({ kind: 'uncoded-dialect', name: m.name, folded: fold(m.name), glottocode: id, parentGlottocode: m.languageId, parentName: parent.name, countries });
+    }
+  } else if (m.level === 'language' && !m.iso) {
+    dialectRows.push({ kind: 'uncoded-language', name: m.name, folded: fold(m.name), glottocode: id, countries: m.countries });
+  }
+}
+dialectRows.sort((a, b) => a.glottocode.localeCompare(b.glottocode));
+const kindCount = (k) => dialectRows.filter((r) => r.kind === k).length;
+const DIALECTS_FILE = join(OUT_DIR, 'dialects.ts');
+const dialectsContent = `// generated — do not edit
+// source:  scripts/codegen-glottolog.mjs
+// data:    packages/glottolog/data/glottolog/languages.csv
+// commit:  ${cfg.commit}
+// counts:  ${kindCount('dialect')} dialect, ${kindCount('uncoded-language')} uncoded-language, ${kindCount('uncoded-dialect')} uncoded-dialect
+
+import type { GlottologDialectRow } from "../types.js";
+
+export const dialectRows: readonly GlottologDialectRow[] = [
+${dialectRows.map((r) => '  ' + JSON.stringify(r) + ',').join(String.fromCharCode(10))}
+];
+`;
+
 // ------------------------------------------------------------------- emit ----
 
 function serializeRecord(rec) {
@@ -222,6 +268,20 @@ if (existing === content) {
 } else {
   writeFileSync(OUT_FILE, content, 'utf8');
   console.log(`[OK] Generated ${OUT_FILE} (${Buffer.byteLength(content, 'utf8')} bytes)`);
+}
+
+let existingDialects = '';
+try {
+  existingDialects = readFileSync(DIALECTS_FILE, 'utf8');
+} catch {
+  /* file does not exist yet */
+}
+console.log(`[OK] ${dialectRows.length} dialect rows (${kindCount('dialect')} dialect, ${kindCount('uncoded-language')} uncoded-language, ${kindCount('uncoded-dialect')} uncoded-dialect)`);
+if (existingDialects === dialectsContent) {
+  console.log(`[OK] Unchanged ${DIALECTS_FILE}`);
+} else {
+  writeFileSync(DIALECTS_FILE, dialectsContent, 'utf8');
+  console.log(`[OK] Generated ${DIALECTS_FILE} (${Buffer.byteLength(dialectsContent, 'utf8')} bytes)`);
 }
 
 // --- helpers ----------------------------------------------------------------

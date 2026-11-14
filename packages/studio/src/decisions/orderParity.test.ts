@@ -24,6 +24,7 @@ const LEGACY_IDENTITY_LITE_ORDER: readonly string[] = [
   "il_language_autonym",
   "il_language_code",
   "il_target_script",
+  "il_language_dialect",
   "il_script_not_supported",
 ];
 

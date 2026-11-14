@@ -304,6 +304,8 @@ export function projectChange(
     identity: null,
     marksTreatment: extra.marksTreatment,
     capsHandling: undefined,
+    // An apply run replays no kmn-edits entries (no `layoutEdits`/`codeEdits` in any apply row).
+    kmnEdits: undefined,
     openMode: {
       ...openModeProjection({
         kind: runAs,

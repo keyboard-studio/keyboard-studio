@@ -26,6 +26,11 @@ export interface RulesDemoArtifact {
   jsBlobUrl: string | null;
   /** The keyboard id the artifact was compiled for. */
   keyboardId: string | null;
+  /**
+   * The .kmn text the compiler was fed (the projection of the working copy, not the text the
+   * working IR was parsed from); the `// Line N` comments in the `.js` refer to this text.
+   */
+  compiledKmn: string | null;
   /** WASM-oracle diagnostics from the compile that produced this artifact. */
   diagnostics: readonly CompilerDiagnostic[];
   /** Compile-pipeline step that failed ("fetch" | "vfs" | "compile"). */
@@ -38,6 +43,7 @@ const IDLE_ARTIFACT: RulesDemoArtifact = {
   status: "idle",
   jsBlobUrl: null,
   keyboardId: null,
+  compiledKmn: null,
   diagnostics: [],
   errorStep: null,
   errorMessage: null,
@@ -69,11 +75,13 @@ export function makeReadyRulesDemoArtifact(
   jsBlobUrl: string,
   keyboardId: string,
   diagnostics: readonly CompilerDiagnostic[] = [],
+  compiledKmn: string | null = null,
 ): RulesDemoArtifact {
   return {
     status: "ready",
     jsBlobUrl,
     keyboardId,
+    compiledKmn,
     diagnostics,
     errorStep: null,
     errorMessage: null,
@@ -90,6 +98,7 @@ export function makeErrorRulesDemoArtifact(
     status: "error",
     jsBlobUrl: null,
     keyboardId: null,
+    compiledKmn: null,
     diagnostics,
     errorStep,
     errorMessage,

@@ -1,6 +1,7 @@
 
 store(dk_bases)  'aeiouAEIOU'
 store(dk_output) 'áéíóúÁÉÍÓÚ'
+store(&TARGETS) 'any'
 begin Unicode > use(main)
 
 group(main) using keys

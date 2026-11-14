@@ -270,7 +270,8 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
   it("no deletions: both paths leave .kmn content unchanged for fragment-bearing IR", async () => {
     const keyboardId = basicKbdus.id;
     const ir = buildFragmentBearingIR();
-    const baseContent = "c fragment-bearing stub\n";
+    // Already says 'any': the projection always writes it, so this stays byte-identical.
+    const baseContent = "store(&TARGETS) 'any'\nc fragment-bearing stub\n";
     const vfs = createVirtualFS([
       { path: `source/${keyboardId}.kmn`, content: baseContent, isBinary: false },
     ]);

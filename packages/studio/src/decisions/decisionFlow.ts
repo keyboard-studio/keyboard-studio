@@ -10,6 +10,7 @@ import type { QuestionModule } from "../survey/types.ts";
 import type { Decision, DecisionSet } from "./decisionTypes.ts";
 import type { ExtractContext } from "./extractContext.ts";
 import { effectiveGatedBy, orderDecisions } from "./orderDecisions.ts";
+import { answerFilledIds } from "../survey/questions/answerFilledIds.ts";
 
 export interface DecisionFlowInput {
   modules: readonly QuestionModule[];
@@ -53,8 +54,8 @@ export function runDecisionFlow(input: DecisionFlowInput): DecisionSet {
       }
       if (!pass) continue;
     }
-    const provided = m.provides;
-    if (provided === undefined || provided.length === 0) continue;
+    const provided = answerFilledIds(m);
+    if (provided.length === 0) continue;
 
     // Extract, then validate: an extracted value the question itself would
     // reject is treated as absent — fall through to asked/default rather

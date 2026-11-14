@@ -18,6 +18,7 @@ import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 
 const spies = vi.hoisted(() => ({
   compile: vi.fn(),
+  compileCall: vi.fn(),
   buildKmp: vi.fn(),
   validateWithOracle: vi.fn(),
   projected: { current: null as VirtualFS | null },
@@ -36,11 +37,14 @@ vi.mock("./services.ts", async (importOriginal) => {
     ...actual,
     getCompile: async () => {
       spies.compile();
-      return async () => ({
-        success: true,
-        diagnostics: [],
-        artifacts: [{ filename: "ldml_fixture.kmx", data: new Uint8Array([1, 2, 3]) }],
-      });
+      return async (...args: unknown[]) => {
+        spies.compileCall(...args);
+        return {
+          success: true,
+          diagnostics: [],
+          artifacts: [{ filename: "ldml_fixture.kmx", data: new Uint8Array([1, 2, 3]) }],
+        };
+      };
     },
     getCompileLdml: async () => {
       spies.compileLdml();
@@ -199,20 +203,40 @@ describe("buildLdmlExportForDownload", () => {
     await expect(buildLdmlExportForDownload("46")).resolves.toBeDefined();
   });
 
-  it("passes the touch layout through only when &TARGETS includes a touch or web target (row 4.6)", async () => {
-    const xmlOf = async (kmn: string): Promise<string> => {
-      instantiate(kmn, TOUCH_JSON);
+  // Row 4.6's rule itself (touch form only for a touch or web target) is pinned on
+  // the function's direct input in the targetsIncludeTouch table above. Through the
+  // projection it can no longer be reached: the projection always writes
+  // store(&TARGETS) 'any' (product owner ruling 2026-11-07), so the exporter
+  // reads 'any' whatever the starting point declared.
+  it("always exports the touch form, because the projected .kmn says 'any' whatever the start declared (row 4.6)", async () => {
+    for (const declared of ["'any'", "'windows macosx linux'", "'windows web'"]) {
+      instantiate(KMN.replace("'any'", declared), TOUCH_JSON);
       const r = await buildLdmlExportForDownload("46");
-      return strFromU8(unzipSync(r.bytes)["source/ldml_fixture_ldml.xml"]!);
-    };
-    expect(await xmlOf(KMN)).toContain('formId="touch"');
-    expect(await xmlOf(KMN.replace("'any'", "'windows macosx linux'"))).not.toContain('formId="touch"');
-    expect(await xmlOf(KMN.replace("'any'", "'windows web'"))).toContain('formId="touch"');
+      expect(strFromU8(unzipSync(r.bytes)["source/ldml_fixture_ldml.xml"]!), `declared ${declared}`).toContain('formId="touch"');
+      const projectedKmn = spies.projected.current!.get("source/ldml_fixture.kmn")?.content as string;
+      expect(projectedKmn, `declared ${declared}`).toContain("store(&TARGETS) 'any'");
+      expect(projectedKmn, `declared ${declared}`).not.toMatch(/store\(&TARGETS\) '(?!any')/);
+    }
   });
 
   it("throws an OutputBundleError with the ANSI-only reason for a begin ANSI keyboard", async () => {
     instantiate(KMN.replace("begin Unicode", "begin ANSI"));
     await expect(buildLdmlExportForDownload("46")).rejects.toThrow(/ANSI-only/);
+  });
+});
+
+describe("the shipped binaries are a release build", () => {
+  // kmc-kmn defaults saveDebug to true; a package must match what Keyman
+  // Developer builds from the same source, so the output compile turns it off.
+  it.each([
+    ["the .kmp", () => buildKmpForDownload()],
+    ["the source .zip", () => buildSourceZipForDownload()],
+  ])("%s compiles with saveDebug: false", async (_label, download) => {
+    instantiate();
+    spies.compileCall.mockClear();
+    await download();
+    expect(spies.compileCall).toHaveBeenCalledTimes(1);
+    expect(spies.compileCall.mock.calls[0]![2]).toEqual({ saveDebug: false });
   });
 });
 

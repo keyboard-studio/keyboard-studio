@@ -372,8 +372,12 @@ export {
   DESKTOP_GEOMETRY,
   DESKTOP_GEOMETRY_ISO,
   DESKTOP_GEOMETRY_WIDTH,
+  DESKTOP_ISO_GEOMETRY,
+  DESKTOP_ISO_ROW_COUNT,
+  DESKTOP_ISO_ROW_SPACE,
 } from "./layout-chart/index.js";
 export type {
+  DesktopIsoGeometryKey,
   KeyLegibilityKind,
   KeyLegibilityResult,
   ScriptCoverageRange,
@@ -479,7 +483,7 @@ export { detectMarkInputOrderFromImport } from "./strategy-selector/import-mark-
 export { deriveRemapPosture } from "./strategy-selector/derive-remap-posture.js";
 
 // Issue #248 — Sprint-1 identity stub mutator (deleted at Sprint-2 start per #238).
-export { applyIdentityStubMutation } from "./stub-mutator/index.js";
+export { applyIdentityStubMutation, applyTargetsAnyMutation } from "./stub-mutator/index.js";
 
 // Issue #141 — character discovery service (Phase B).
 // Public surface: factory + injectable types only.
@@ -1203,6 +1207,7 @@ export {
   renameDeadkey,
   deleteDeadkey,
   retargetDeadkey,
+  setDeadkeyDisplay,
 } from "./deadkey-lifecycle/index.js";
 export type {
   DeadkeyConflict,
@@ -1212,6 +1217,7 @@ export type {
   DeleteDeadkeyOptions,
   RenameDeadkeyOptions,
   RetargetDeadkeyOptions,
+  SetDeadkeyDisplayOptions,
 } from "./deadkey-lifecycle/index.js";
 export { encodeIco, encodeIconSet, scaleRgba, ICO_SIZES } from "./icon/icoEncoder.js";
 export type { RgbaImage } from "./icon/icoEncoder.js";
@@ -1264,6 +1270,50 @@ export type {
   KeymanMessage,
 } from "./ldml-export/index.js";
 export type { ClassifyOptions, ProfileRow, ProfileRowStatus, ReportContext, RowDelta, TargetProfile } from "./ldml-export/index.js";
+
+// Spec 117 (Layout tab): per-key attribution and the kmn-edits operations.
+export {
+  attributeLayer,
+  classifyRule,
+  findShadowedRules,
+  isContextReachable,
+  isMnemonic,
+  listContexts,
+  listLayers,
+  parseBracketKey,
+  verifyCells,
+} from "./layout-attribution/index.js";
+export type {
+  CellStep,
+  FanoutTable,
+  FiredRuleCheck,
+  KeyCellAttribution,
+  KeyRef,
+  ReadOnlyReason,
+  RowAttribution,
+  RowShape,
+  RuleClassification,
+} from "./layout-attribution/index.js";
+export {
+  applyLayoutOp,
+  clearKeyLive,
+  invertEffect,
+  normaliseKmnEdits,
+  replayKmnEdits,
+  sameRuleIdentity,
+  supersededChangeIndexes,
+} from "./layout-ops/index.js";
+export type {
+  ApplyLayoutOpResult,
+  KmnEditEffect,
+  ReplayMiss,
+  ReplayResult,
+  ReplayScope,
+} from "./layout-ops/index.js";
+
+// Spec 117 US8: the Code tab's structural IR diff (contracts/code-edits.md).
+export { applyIRChanges, diffIR, findOwners, invertChanges } from "./kmn-diff/index.js";
+export type { ApplyIRChangesResult } from "./kmn-diff/index.js";
 
 // Spec 109 FR-040: the shared enumerator of unhandled key positions (also used by spec 108's fill).
 export { enumerateUnhandledPositions } from "./base-fallback/unhandledPositions.js";

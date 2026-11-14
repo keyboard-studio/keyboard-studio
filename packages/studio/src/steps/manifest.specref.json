@@ -109,6 +109,9 @@
   "il_language_code": [
     "specs/030-langtags-identity-autocomplete"
   ],
+  "il_language_dialect": [
+    "specs/115-dialect-language-tags"
+  ],
   "pb_text_sample": [
     "specs/050-text-sample-prefill"
   ],

@@ -35,6 +35,7 @@
 // The prompt asks the ONE question only the author can answer: "do your
 // typists expect a character on this key?"
 
+import { regionSubtagOf as contractsRegionSubtagOf } from "@keyboard-studio/contracts";
 import type { BaseLayoutId as ReferenceBaseLayoutId } from "../../lib/referenceBaseLayouts.ts";
 
 export type BaseLayoutId = "us" | "intl" | "azerty" | "qwertz" | "uk" | "blocked";
@@ -320,14 +321,7 @@ const REGION_TO_BASE_LAYOUTS: Readonly<Record<string, readonly BaseLayoutId[]>> 
 
 /** Extract the BCP47 region subtag (`en-US` → `US`, `ha-Latn` → null). */
 export function regionSubtagOf(bcp47: string): string | null {
-  const subtags = bcp47.split("-");
-  for (let i = 1; i < subtags.length; i++) {
-    const s = subtags[i]!;
-    if (/^[A-Za-z]{2}$/.test(s) || /^[0-9]{3}$/.test(s)) {
-      return s.toUpperCase();
-    }
-  }
-  return null;
+  return contractsRegionSubtagOf(bcp47) ?? null;
 }
 
 /**

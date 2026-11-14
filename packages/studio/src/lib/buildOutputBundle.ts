@@ -116,9 +116,12 @@ export async function buildOutputBundle(opts?: ProjectForOutputOptions): Promise
   // FR-001): a member completed only here never reached the pull-request path,
   // which projects the same tree without coming through this function.
 
-  // Compile the PROJECTED copy under its FINAL id.
+  // Compile the PROJECTED copy under its FINAL id, as a RELEASE build: kmc-kmn
+  // defaults to saveDebug, which ships store names, line numbers and a
+  // pretty-printed .js. A shipped package must match what Keyman Developer
+  // builds from the same source.
   const compile = await getCompile();
-  const result = await compile(vfs, keyboardId);
+  const result = await compile(vfs, keyboardId, { saveDebug: false });
   const compileDiagnostics = result.diagnostics;
 
   const pick = (ext: string): Uint8Array | undefined =>

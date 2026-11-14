@@ -10,6 +10,15 @@ import type { IRPath } from "@keyboard-studio/contracts";
 /** The typed facts the spike tracks, by stable id. */
 export type DecisionId =
   | "language-name"
+  // Spec 115: why the picked language matched a dialect/variety name the author typed.
+  | "language-search-match"
+  // Spec 115 FR-045: the Glottolog code of a language with no ISO 639-3 code ("" when it has one).
+  | "language-glottocode"
+  // Spec 115 FR-007/FR-012: the confirmed dialect subtag, its source, and the
+  // dialect's Glottolog code ("" when there is no dialect).
+  | "language-dialect"
+  | "language-dialect-source"
+  | "dialect-glottocode"
   | "language-region"
   | "language-autonym"
   | "language-code"
@@ -167,6 +176,9 @@ export type DecisionId =
   | "custom-css"
   | "help-docs"
   | "welcome-htm"
+  // Spec 117: the Layout tab's replayable edit log. Recorded at each confirm (edit time),
+  // not at a step completion; registered outside the wizard's gallery modules.
+  | "kmn-edits"
   | "icon"
   | "trial"
   | "publish";
@@ -286,6 +298,11 @@ export interface DecisionRendererProps<T = unknown> {
  */
 export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "language-name": [],
+  "language-search-match": [],
+  "language-glottocode": [],
+  "language-dialect": [],
+  "language-dialect-source": [],
+  "dialect-glottocode": [],
   "language-region": [],
   "language-autonym": [],
   "language-code": [],
@@ -449,6 +466,10 @@ export const decisionIRPaths: Record<DecisionId, readonly IRPath[]> = {
   "custom-css": [],
   "help-docs": [],
   "welcome-htm": [],
+  // spec 117: the module's apply replays the Layout-tab edit log over the groups array
+  // (LAYOUT_WRITES; an array is one patch leaf, so the declared path is the whole array). A
+  // Code-tab entry (US8) also reaches stores, raw fragments, and the header (CODE_WRITES).
+  "kmn-edits": [["groups"], ["stores"], ["comments"], ["raw"], ["header"]],
   "icon": [],
   "trial": [],
   "publish": [],

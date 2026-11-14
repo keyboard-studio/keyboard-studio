@@ -14,7 +14,8 @@ earlier "contracts only" status.
 The locked Day-1 shared contract: TS types, the seven service interfaces + mocks, fixtures, the
 criteria catalog at `packages/contracts/data/criteria.json`, and the runtime **zod schemas**
 (`src/schemas.ts`) that mirror the locked `Pattern`/`Criterion` types. The dependency root —
-everything else builds to it.
+everything else builds to it. Spec 117 adds `layoutOps.ts` (`LayoutOperation` and its layer,
+context and output types) and `kmnEdits.ts` (`KmnEdit`, `KmnEditsValue`, `CodeEdit`, `IRChange`).
 
 The criteria catalog currently holds 149 rows (133 repo-hygiene + 12 §18 DISCUS design-heuristic
 at Day-1 lock, plus post-lock adjustments). That is a **descriptive count, not a locked
@@ -29,7 +30,11 @@ The real engine. Subsystems under `packages/engine/src/`: `codec` (.kmn ↔ Keyb
 `pattern-library`, `strategy-selector`, `character-discovery`, `inventory`, `loader`,
 `base-browser`, `stub-mutator`, `langtags` (SIL langtags slim-index lookup; exposed as
 `@keyboard-studio/engine/langtags`), `layout-chart` (deterministic SVG layout charts per
-platform/layer, spec 080), and `decision-audit`.
+platform/layer, spec 080), `decision-audit`, and the Layout-tab modules (spec 117):
+`layout-attribution` (per-key attribution of a desktop layout: `attributeLayer`, `classifyRule`,
+`listLayers`, `listContexts`, `verifyCells`), `layout-ops` (pure IR-to-IR `applyLayoutOp`, and
+`replayKmnEdits` for the `kmn-edits` log), and `kmn-diff` (`diffIR`, `applyIRChanges`,
+`findOwners`, `invertChanges` for the Code tab's Apply).
 
 `codec/ng/` is **vendored** upstream code: Keyman's next-generation `.kmn` lexer and parser
 (MIT), pinned to one upstream commit. Don't edit it in place. Its source commit, file list and
@@ -87,6 +92,17 @@ engine/studio import). See [specs/036-glottolog-catalog/](../specs/036-glottolog
 ### `@keyboard-studio/studio`
 
 The React + Vite SPA (three-pane gallery / editor / preview; working-copy spine).
+
+Language search is EthnoLib's (spec 115): `@ethnolib/find-language` 0.4.4
+(exact pin) as a runtime dependency, behind the same lazy boundary as the
+language step. The `useLanguageChooser` hook is **vendored** from
+`@ethnolib/language-chooser-react-hook` 0.3.7 (MIT, with attribution) because
+the published hook package names a `.d.ts` it does not ship, and it inlines
+its own copy of find-language's data — importing both would ship the data
+twice. Upstream issues for the missing typings, the embedded data, and
+`createTag`'s private-use/variant handling are on sillsdev/EthnoLib
+(#157, #158, #159); the empty-query hang in `defaultSearchResultModifier`
+is #160.
 
 ## Not yet realised as written
 

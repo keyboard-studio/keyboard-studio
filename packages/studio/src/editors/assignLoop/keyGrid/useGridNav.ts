@@ -127,7 +127,25 @@
 
 import { useCallback } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { KeyGridCellViewModel, KeyGridRowViewModel, KeyGridViewModel } from "./keyGridViewModel.ts";
+/**
+ * The structural minimum this module reads from a cell: identity plus the
+ * raw `padPct`/`widthPct` geometry. `KeyGridCellViewModel` satisfies it, and
+ * so does any other grid (e.g. the desktop layout grid) that carries the
+ * same fields, so this hook is not tied to the touch view model.
+ */
+export interface GridNavCell {
+  readonly address: string;
+  readonly padPct: number;
+  readonly widthPct: number;
+}
+
+export interface GridNavRow<C extends GridNavCell = GridNavCell> {
+  readonly keys: readonly C[];
+}
+
+export interface GridNavViewModel<C extends GridNavCell = GridNavCell> {
+  readonly rows: readonly GridNavRow<C>[];
+}
 
 // ---------------------------------------------------------------------------
 // Position lookup
@@ -142,10 +160,10 @@ export interface GridCellPosition {
  * (rowIndex, colIndex) of the cell whose `address` matches, or `null` when
  * `address` is `null` or not present anywhere in `viewModel` (a stale
  * selection — the same "unresolvable is an ordinary outcome, not a crash"
- * convention `keyGridViewModel.ts`'s own `buildKeyGridViewModel` uses).
+ * convention `keyGridViewModel.ts`'s own `buildGridNavViewModel` uses).
  */
 export function findCellPosition(
-  viewModel: KeyGridViewModel,
+  viewModel: GridNavViewModel,
   address: string | null,
 ): GridCellPosition | null {
   if (address === null) return null;
@@ -199,7 +217,7 @@ interface CellSpan {
  * converted to a rendered percent. See this module's doc comment for why raw
  * units are safe to compare across rows directly.
  */
-function computeRowSpans(row: KeyGridRowViewModel): readonly CellSpan[] {
+function computeRowSpans(row: GridNavRow): readonly CellSpan[] {
   let cursor = 0;
   return row.keys.map((key) => {
     const start = cursor + key.padPct;
@@ -216,7 +234,7 @@ function computeRowSpans(row: KeyGridRowViewModel): readonly CellSpan[] {
  * `centre` is before the first span, the last column if it's after the last
  * span. Returns -1 only when `row` has no keys at all.
  */
-function findColumnByCentre(row: KeyGridRowViewModel, centre: number): number {
+function findColumnByCentre(row: GridNavRow, centre: number): number {
   const spans = computeRowSpans(row);
   if (spans.length === 0) return -1;
   for (let i = 0; i < spans.length; i++) {
@@ -233,7 +251,9 @@ function findColumnByCentre(row: KeyGridRowViewModel, centre: number): number {
 // ---------------------------------------------------------------------------
 
 /** First row in `viewModel` that actually has a key, or `undefined` if every row is empty (or there are no rows). */
-function firstNonEmptyRow(viewModel: KeyGridViewModel): { rowIndex: number; row: KeyGridRowViewModel } | undefined {
+function firstNonEmptyRow<C extends GridNavCell>(
+  viewModel: GridNavViewModel<C>,
+): { rowIndex: number; row: GridNavRow<C> } | undefined {
   for (let rowIndex = 0; rowIndex < viewModel.rows.length; rowIndex++) {
     const row = viewModel.rows[rowIndex];
     if (row !== undefined && row.keys.length > 0) return { rowIndex, row };
@@ -242,7 +262,9 @@ function firstNonEmptyRow(viewModel: KeyGridViewModel): { rowIndex: number; row:
 }
 
 /** Last row in `viewModel` that actually has a key, scanning from the end — the mirror of {@link firstNonEmptyRow}. */
-function lastNonEmptyRow(viewModel: KeyGridViewModel): { rowIndex: number; row: KeyGridRowViewModel } | undefined {
+function lastNonEmptyRow<C extends GridNavCell>(
+  viewModel: GridNavViewModel<C>,
+): { rowIndex: number; row: GridNavRow<C> } | undefined {
   for (let rowIndex = viewModel.rows.length - 1; rowIndex >= 0; rowIndex--) {
     const row = viewModel.rows[rowIndex];
     if (row !== undefined && row.keys.length > 0) return { rowIndex, row };
@@ -251,12 +273,12 @@ function lastNonEmptyRow(viewModel: KeyGridViewModel): { rowIndex: number; row: 
 }
 
 /** The layer's very first cell (Ctrl+Home), or `undefined` when the whole grid is empty. */
-export function firstCellOfLayer(viewModel: KeyGridViewModel): KeyGridCellViewModel | undefined {
+export function firstCellOfLayer<C extends GridNavCell>(viewModel: GridNavViewModel<C>): C | undefined {
   return firstNonEmptyRow(viewModel)?.row.keys[0];
 }
 
 /** The layer's very last cell (Ctrl+End), or `undefined` when the whole grid is empty. */
-export function lastCellOfLayer(viewModel: KeyGridViewModel): KeyGridCellViewModel | undefined {
+export function lastCellOfLayer<C extends GridNavCell>(viewModel: GridNavViewModel<C>): C | undefined {
   const found = lastNonEmptyRow(viewModel);
   if (found === undefined) return undefined;
   return found.row.keys[found.row.keys.length - 1];
@@ -272,11 +294,11 @@ export function lastCellOfLayer(viewModel: KeyGridViewModel): KeyGridCellViewMod
  * seam", for why this is visual/array-order rather than logical today.
  * `undefined` at either end of the row: no wrap to the next/previous row.
  */
-export function stepWithinRow(
-  viewModel: KeyGridViewModel,
+export function stepWithinRow<C extends GridNavCell>(
+  viewModel: GridNavViewModel<C>,
   position: GridCellPosition,
   delta: 1 | -1,
-): KeyGridCellViewModel | undefined {
+): C | undefined {
   const row = viewModel.rows[position.rowIndex];
   if (row === undefined) return undefined;
   const nextCol = position.colIndex + delta;
@@ -290,11 +312,11 @@ export function stepWithinRow(
  * wrap between rows (and, since this hook only ever sees one layer, no wrap
  * between layers either — FR-020d).
  */
-export function stepVertical(
-  viewModel: KeyGridViewModel,
+export function stepVertical<C extends GridNavCell>(
+  viewModel: GridNavViewModel<C>,
   position: GridCellPosition,
   delta: 1 | -1,
-): KeyGridCellViewModel | undefined {
+): C | undefined {
   const currentRow = viewModel.rows[position.rowIndex];
   if (currentRow === undefined) return undefined;
   const targetRowIndex = position.rowIndex + delta;
@@ -311,18 +333,18 @@ export function stepVertical(
 }
 
 /** Home within the row (FR-020b). `undefined` only if the row itself has no keys. */
-export function firstCellOfRow(
-  viewModel: KeyGridViewModel,
+export function firstCellOfRow<C extends GridNavCell>(
+  viewModel: GridNavViewModel<C>,
   rowIndex: number,
-): KeyGridCellViewModel | undefined {
+): C | undefined {
   return viewModel.rows[rowIndex]?.keys[0];
 }
 
 /** End within the row (FR-020b). `undefined` only if the row itself has no keys. */
-export function lastCellOfRow(
-  viewModel: KeyGridViewModel,
+export function lastCellOfRow<C extends GridNavCell>(
+  viewModel: GridNavViewModel<C>,
   rowIndex: number,
-): KeyGridCellViewModel | undefined {
+): C | undefined {
   const row = viewModel.rows[rowIndex];
   if (row === undefined || row.keys.length === 0) return undefined;
   return row.keys[row.keys.length - 1];
@@ -346,11 +368,11 @@ export function lastCellOfRow(
  * tabbable-fallback cell (mirroring KeyGrid's `hasSelectedVisible`
  * convention) rather than leaving nothing selected after a layer switch.
  */
-export function resolveLayerSwitchCell(
-  previousViewModel: KeyGridViewModel,
+export function resolveLayerSwitchCell<C extends GridNavCell>(
+  previousViewModel: GridNavViewModel<C>,
   previousSelectedAddress: string | null,
-  nextViewModel: KeyGridViewModel,
-): KeyGridCellViewModel | undefined {
+  nextViewModel: GridNavViewModel<C>,
+): C | undefined {
   const position = findCellPosition(previousViewModel, previousSelectedAddress);
   if (position === null) return firstCellOfLayer(nextViewModel);
 
@@ -408,7 +430,7 @@ export function resolveLayerSwitchCell(
  * behind `KeyGrid.tsx`'s own gate does not apply here.
  */
 export type GridFocusRestorationTarget =
-  | { readonly kind: "cell"; readonly cell: KeyGridCellViewModel }
+  | { readonly kind: "cell"; readonly cell: GridNavCell }
   | { readonly kind: "row"; readonly rowIndex: number }
   | { readonly kind: "container" };
 
@@ -437,9 +459,9 @@ export type GridFocusRestorationTarget =
  * one of the three tiers above, never "nothing".
  */
 export function resolveFocusAfterRemoval(
-  previousViewModel: KeyGridViewModel,
+  previousViewModel: GridNavViewModel,
   removedAddress: string,
-  nextViewModel: KeyGridViewModel,
+  nextViewModel: GridNavViewModel,
 ): GridFocusRestorationTarget {
   const position = findCellPosition(previousViewModel, removedAddress);
   if (position === null) {
@@ -525,7 +547,7 @@ function queryCellElement(
  */
 export function applyFocusRestorationTarget(
   containerElement: HTMLElement | null,
-  nextViewModel: KeyGridViewModel,
+  nextViewModel: GridNavViewModel,
   target: GridFocusRestorationTarget,
 ): boolean {
   if (containerElement === null) return false;
@@ -562,11 +584,11 @@ export function applyFocusRestorationTarget(
 
 const RECOGNIZED_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"]);
 
-export interface UseGridNavOptions {
+export interface UseGridNavOptions<C extends GridNavCell = GridNavCell> {
   /** The one (platform, layer) view model this hook navigates within — never wraps outside it (FR-020d). */
-  viewModel: KeyGridViewModel;
+  viewModel: GridNavViewModel<C>;
   /** Selection change, called with the computed next cell — the SAME callback a click uses (KeyGrid's `onSelectCell`). */
-  onSelectCell: (cell: KeyGridCellViewModel) => void;
+  onSelectCell: (cell: C) => void;
 }
 
 export interface UseGridNavResult {
@@ -582,14 +604,17 @@ export interface UseGridNavResult {
  * and the RTL/layer-switch/focus-restoration seams this hook exposes as
  * separate pure functions rather than folding into the returned handler).
  */
-export function useGridNav({ viewModel, onSelectCell }: UseGridNavOptions): UseGridNavResult {
+export function useGridNav<C extends GridNavCell>({
+  viewModel,
+  onSelectCell,
+}: UseGridNavOptions<C>): UseGridNavResult {
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
       if (!RECOGNIZED_KEYS.has(event.key)) return;
       const position = readFocusedCellPosition(event);
       if (position === null) return;
 
-      let next: KeyGridCellViewModel | undefined;
+      let next: C | undefined;
       switch (event.key) {
         case "ArrowLeft":
           next = stepWithinRow(viewModel, position, -1);

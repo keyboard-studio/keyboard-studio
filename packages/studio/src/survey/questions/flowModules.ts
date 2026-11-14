@@ -18,6 +18,7 @@ import il_language_region from "./a/il_language_region.ts";
 import il_language_autonym from "./a/il_language_autonym.ts";
 import il_language_code from "./a/il_language_code.ts";
 import il_target_script from "./a/il_target_script.ts";
+import il_language_dialect from "./a/il_language_dialect.ts";
 import il_script_not_supported from "./a/il_script_not_supported.ts";
 import il_author_name from "./a/il_author_name.ts";
 import il_author_email from "./a/il_author_email.ts";
@@ -146,6 +147,12 @@ export const flowModules = {
     il_language_autonym,
     il_language_code,
     il_target_script,
+    // Spec 115 US2: the dialect question, gated on a search match carrying
+    // a dialect (or the Customize dialect field) — see
+    // IdentityLite.nextOverride. It sits after the script question, before
+    // the script-not-supported notice, so the derived order is
+    // …, il_target_script, il_language_dialect, il_script_not_supported.
+    il_language_dialect,
     il_script_not_supported,
   ],
 

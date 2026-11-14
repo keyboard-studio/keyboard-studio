@@ -71,7 +71,7 @@ import type {
   ReviewContext,
   VirtualFS,
 } from "@keyboard-studio/contracts";
-import { CLDR_TERRITORY_CURRENCY } from "@keyboard-studio/contracts";
+import { CLDR_TERRITORY_CURRENCY, regionSubtagOf } from "@keyboard-studio/contracts";
 import {
   parseKmn,
   parseKps,
@@ -93,15 +93,7 @@ import { packagedFontBinaries } from "./packagedFontBinaries.ts";
  * keyboard-lint's check-bcp47 regionSubtagOf — the assembly needs it
  * to name §18.7's missing CLDR data before any check runs).
  */
-function regionSubtagOfTag(tag: string): string | undefined {
-  const subtags = tag.split("-");
-  for (const s of subtags.slice(1)) {
-    if (/^[A-Za-z]{2}$/.test(s) || /^[0-9]{3}$/.test(s)) return s;
-    if (/^[A-Za-z]{4}$/.test(s)) continue;
-    return undefined;
-  }
-  return undefined;
-}
+const regionSubtagOfTag = regionSubtagOf;
 
 /**
  * Font files a .kps lists from OUTSIDE the keyboard folder

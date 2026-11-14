@@ -70,13 +70,10 @@ describe("il_language_english extraction: regional and script tags (langtags loa
     expect(name(tag)).toBe(name(bare));
   });
 
-  it("zh-Hant: the shipped langtags index has no bare 'zh' row, so the author is asked (documented fallback, not a mis-resolution)", () => {
-    // The strip is correct (pinned above); the gap is dataset coverage of the
-    // macrolanguage code. If a future langtags pin adds a zh row this flips,
-    // and the expectation should become /Chinese/.
+  it("zh-Hant resolves to Chinese now that the langtags index keys on the language subtag", () => {
     const ctx = buildExtractContext(null, catalogWith(["zh-Hant"]));
-    expect(ctx.resolveLanguageName?.("zh")).toBeUndefined();
-    expect(extractLanguageName(ctx)).toBeUndefined();
+    expect(ctx.resolveLanguageName?.("zh")).toMatch(/Chinese/);
+    expect(extractLanguageName(ctx)).toMatch(/Chinese/);
   });
 
   it("an unknown language subtag yields undefined, not the raw tag", () => {

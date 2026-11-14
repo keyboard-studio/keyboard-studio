@@ -145,7 +145,9 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     // before any answer; spec 110 adds the copied keyboard it was based on.
     expect(readVfsText(projected!.vfs, "README.md")).toBe(
       `# ${basicKbdus.displayName}\n\nBased on ${basicKbdus.displayName}.\n\n` +
-        `## Design notes\n\n- Started from ${basicKbdus.displayName}.\n\n## Links\n- Online help: https://help.keyman.com/keyboard/${keyboardId}\n- Keyman keyboards page: https://keyman.com/keyboards/${keyboardId}\n`,
+        `## Design notes\n\n- Started from ${basicKbdus.displayName}.\n\n## Links\n- Online help: https://help.keyman.com/keyboard/${keyboardId}\n- Keyman keyboards page: https://keyman.com/keyboards/${keyboardId}\n` +
+        // The projection always writes store(&TARGETS) 'any', so the readme lists it (step 3.1).
+        `\n## Supported Platforms\n- any\n`,
     );
     // spec 079 FR-013: the placeholder page still references the generated
     // layout charts (a net-new keyboard has no base images), so the pre-076

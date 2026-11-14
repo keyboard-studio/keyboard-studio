@@ -249,12 +249,21 @@ or merely confirmed).
 | Job | Questions | Targets | Gates Phase B? | Derivable from base? |
 |---|---|---|---|---|
 | **Routing** (build-critical) | `primary_script`, `writing_direction`, `layout_family`, `script_family` | A2 script class, `routing_group`, RTL flag, template pipeline | **Yes** | **Largely yes** — script subtag + IR shape (see line 197) |
-| **Identity / package metadata** | `language_name_autonym`, `language_name_english`, `iso_code`, `region`, `author_display_name`, `author_contact_email`, `pa_copyright_holder` | `.kps`, `welcome.htm`, KeyboardIdentity/Provenance | No | BCP47 tag gives partial iso/region |
+| **Identity / package metadata** | `language_name_autonym`, `language_name_english`, `iso_code`, `language-dialect`, `region`, `author_display_name`, `author_contact_email`, `pa_copyright_holder` | `.kps`, `welcome.htm`, KeyboardIdentity/Provenance | No | BCP47 tag gives partial iso/region |
 | **Provenance** (16 Qs) | `provenance_*` | KeyboardProvenance only — "none of it affects how the keyboard is built" | No | No (but fully optional) |
 | **Notices** | `desktop_first_notice`, `pa_primary_target`, `script_not_supported_stub` | informational; CJK/Ethiopic/Hangul dead-end gate | gate only | n/a |
 
 Only the **Routing** row unblocks Phase B. The other ~25 questions are
 order-independent relative to the character work.
+
+Identity-lite (spec 115) asks the language through one EthnoLib chooser, not
+free text: the author types or picks a name, code, country, or full tag, and
+the code is confirmed, never typed into a bare code field. The dialect
+question (`language-dialect`) is routed only when the search match carries a
+dialect (or the author used the Customize dialect field) — never merely
+because the language has registered variants. The region question is routed
+for region-ambiguous languages, and otherwise only when the author asks for a
+region in Customize (region on demand).
 
 ### Phase B targets the discovery axes + the inventory
 

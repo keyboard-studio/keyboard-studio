@@ -321,7 +321,11 @@ export function DemoPane(props: DemoPaneProps = {}) {
     () => (jsBytes !== null ? new TextDecoder().decode(jsBytes) : null),
     [jsBytes],
   );
-  const resolveRule = useMemo(() => buildFiredRuleResolver(ir, jsSource), [ir, jsSource]);
+  const compiledKmn = artifact.compiledKmn;
+  const resolveRule = useMemo(
+    () => buildFiredRuleResolver(ir, jsSource, compiledKmn),
+    [ir, jsSource, compiledKmn],
+  );
 
   // --- Pattern titles for ownedByPattern rules (cached; humanized id while loading) ---
   const [titleVersion, setTitleVersion] = useState(0);

@@ -18,7 +18,7 @@
 // serializeWorkingCopy returns null so the caller can show a "nothing to download"
 // state.
 
-import type { Pattern, MechanismAssignment, VirtualFS } from "@keyboard-studio/contracts";
+import type { CodeEdit, KmnEditsValue, Pattern, MechanismAssignment, VirtualFS } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { OUTPUT_FORM_SEAM_PATTERN_IDS } from "@keyboard-studio/engine";
@@ -26,12 +26,13 @@ import { getToZip, getPatternLibraryService } from "./services.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
 import { capsHandlingFromDecisions, openModeProjection, projectionInputFromState } from "./projectionInput.ts";
+import { selectKmnEdits } from "./projectionInput.ts";
 import { getMarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
 import { resolveOutputKeyboardId } from "./outputKeyboardId.ts";
 import { buildDocContent, parseTouchLayoutOrNull } from "./docContent.ts";
 import { buildReadmeFacts } from "./readmeFacts.ts";
-import { readmeFactsInputFrom } from "./readmeFactsInput.ts";
+import { markInputOrderFromDecisions, readmeFactsInputFrom } from "./readmeFactsInput.ts";
 import { getDecisionSnapshot } from "../stores/decisionStore.ts";
 import {
   resolvePublishVersion,
@@ -175,6 +176,16 @@ export interface ProjectForOutputOptions {
    * the same across the first build and across days. Never downloaded.
    */
   stableForFingerprint?: true;
+  /**
+   * A Code-tab entry not recorded yet, replayed after the recorded `kmn-edits` at projection step
+   * 2.2 as if it had been. The Code tab's candidate compile uses it, so the text it compiles is
+   * what the real replay builds. A pure input: nothing is recorded.
+   */
+  candidateKmnEdit?: CodeEdit;
+}
+
+function withCandidateEdit(value: KmnEditsValue | undefined, candidate: CodeEdit | undefined): KmnEditsValue | undefined {
+  return candidate === undefined ? value : { entries: [...(value?.entries ?? []), candidate] };
 }
 
 /** The HISTORY fallback date and LICENSE year stable mode pins (research R7). */
@@ -573,6 +584,7 @@ export async function projectWorkingCopyForOutput(
       getPattern: (id) => patternCache.get(id),
       identity: identityForProjection,
       marksTreatment: getMarksTreatmentValue(),
+      kmnEdits: withCandidateEdit(selectKmnEdits(getDecisionSnapshot()), opts?.candidateKmnEdit),
       capsHandling: capsHandlingFromDecisions(getDecisionSnapshot(), { askedOnly: isOpen }),
       welcomeFolderFiles,
       ...(state.startPackageFonts !== null ? { packageFonts: state.startPackageFonts } : {}),
@@ -682,10 +694,16 @@ export async function projectWorkingCopyForOutput(
   //     buildDocContent call useDocsPreview makes). The inherited prose
   //     is the start keyboard's welcome/help text, which exists on Track 2
   //     only; it decides whether the typing guide is already covered.
+  //     The recorded mark-input-order answer, so the "How This Keyboard
+  //     Works" section states the order the author chose instead of
+  //     sniffing the produced set (which NFC-folds and cannot see
+  //     letter-then-mark).
+  const markInputOrder = markInputOrderFromDecisions(getDecisionSnapshot());
   const docContent = buildDocContent({
     ir: shipped.ir,
     touchLayout: parseTouchLayoutOrNull(shipped.touchLayoutJson),
     inheritedProse: inheritedWelcomeHtmText ?? inheritedHelpPhpText,
+    ...(markInputOrder !== undefined ? { markInputOrder } : {}),
   });
   // Issue 1908: the author's ACCEPTED documentation-fix proposals become
   // render fixes here exactly as in useDocsPreview — adapt track only; the
@@ -719,6 +737,7 @@ export async function projectWorkingCopyForOutput(
         ...(identityForProjection.bcp47 !== undefined ? { primaryBcp47: identityForProjection.bcp47 } : {}),
         ...(identity?.languageName !== undefined ? { languageName: identity.languageName } : {}),
         carveChars: state.carveChars,
+        ...(state.session.marksOutputForm !== undefined ? { outputForm: state.session.marksOutputForm } : {}),
         fallbackPolicy: state.fallbackPolicy,
         helpDocs,
         startVfs,

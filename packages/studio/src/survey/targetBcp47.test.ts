@@ -53,16 +53,18 @@ describe("with langtags resolved — the default script is elided", () => {
     expect(buildTargetBcp47("xyz-made-up", "Latn")).toBe("xyz-made-up-Latn");
   });
 
-  it("elides the script while still folding in the region", () => {
-    // Region elision is a separate question and deliberately not done here.
-    expect(buildTargetBcp47("ewo", "Latn", "CM")).toBe("ewo-CM");
-    expect(buildTargetBcp47("ewo", "Arab", "CM")).toBe("ewo-Arab-CM");
+  it("elides the script and a default region, folding in any other region", () => {
+    // CM is Ewondo's default region, so minimalTag omits it (spec 115 FR-014).
+    expect(buildTargetBcp47("ewo", "Latn", "CM")).toBe("ewo");
+    expect(buildTargetBcp47("ewo", "Arab", "CM")).toBe("ewo-Arab");
+    expect(buildTargetBcp47("ewo", "Latn", "GA")).toBe("ewo-GA");
   });
 
   it("leaves the romanization and fonipa forms alone", () => {
     // Both bypass the script position on their own terms (see the composer's
     // rules); neither is in scope for the suppress-script rule.
-    expect(buildTargetBcp47("ewo", "romanization-Latn")).toBe("ewo-Latn");
+    // romanization-Latn maps to the Latn script part, which is Ewondo's default and so dropped.
+    expect(buildTargetBcp47("ewo", "romanization-Latn")).toBe("ewo");
     expect(buildTargetBcp47("ewo", "fonipa")).toBe("ewo-fonipa");
   });
 
@@ -81,7 +83,9 @@ describe("with langtags resolved — the language subtag is canonicalized", () =
   it("maps a 3-letter code with a registered 2-letter form to the 2-letter subtag", () => {
     expect(buildTargetBcp47("hau", "Latn")).toBe("ha");
     expect(buildTargetBcp47("hau", "Arab")).toBe("ha-Arab");
-    expect(buildTargetBcp47("hau", "Arab", "NG")).toBe("ha-Arab-NG");
+    // NG is the default region of the ha-Arab tagset, so it is omitted.
+    expect(buildTargetBcp47("hau", "Arab", "NG")).toBe("ha-Arab");
+    expect(buildTargetBcp47("hau", "Arab", "GH")).toBe("ha-Arab-GH");
     expect(buildTargetBcp47("ara", "Arab")).toBe("ar");
     expect(buildTargetBcp47("hau", "fonipa")).toBe("ha-fonipa");
   });
@@ -94,5 +98,25 @@ describe("with langtags resolved — the language subtag is canonicalized", () =
   it("passes an unmatched free-text code through unchanged", () => {
     expect(canonicalLanguageSubtag("zzzq")).toBe("zzzq");
     expect(buildTargetBcp47("zzzq", "Latn")).toBe("zzzq-Latn");
+  });
+});
+
+describe("with langtags resolved: buildTargetBcp47 delegates to minimalTag (spec 115 FR-014 to FR-018)", () => {
+  beforeAll(async () => {
+    await loadLangtags();
+  });
+
+  it("omits a region equal to the tagset default and keeps any other", () => {
+    expect(buildTargetBcp47("sr", "Latn", "RS")).toBe("sr-Latn");
+    expect(buildTargetBcp47("fr", "Latn", "CA")).toBe("fr-CA");
+    expect(buildTargetBcp47("bfd", "Latn", "CM")).toBe("bfd");
+  });
+
+  it("takes the dialect subtag as a variant or private use", async () => {
+    const mod = await loadLangtags();
+    expect(buildTargetBcp47("ca", "Latn", "ES", "valencia")).toBe(mod.minimalTag({ language: "ca", script: "Latn", region: "ES", variants: ["valencia"] }));
+    expect(buildTargetBcp47("ca", "Latn", "ES", "valencia")).toBe("ca-valencia");
+    expect(buildTargetBcp47("ca", "Latn", "AD", "valencia")).toBe("ca-AD-valencia");
+    expect(buildTargetBcp47("acr", "Latn", "", "x-rabinal")).toBe("acr-x-rabinal");
   });
 });

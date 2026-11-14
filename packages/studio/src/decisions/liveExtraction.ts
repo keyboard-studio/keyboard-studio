@@ -26,6 +26,7 @@ import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import { authoringTrackProviderModule } from "../survey/questions/authoringTrackProvider.ts";
+import { answerFilledIds } from "../survey/questions/answerFilledIds.ts";
 import type { Decision, DecisionId, DecisionSet } from "./decisionTypes.ts";
 import { deepEqual } from "./deepEqual.ts";
 import type { ExtractContext } from "./extractContext.ts";
@@ -141,8 +142,8 @@ export function runLiveExtraction(deps: LiveExtractionDeps): LiveExtractionResul
   // seed now and simply never render if the author closes the gate.
   const active = filterGated(orderDecisions(modules), store.decisions);
   for (const m of active) {
-    const provided = m.provides;
-    if (provided === undefined || provided.length === 0) continue;
+    const provided = answerFilledIds(m);
+    if (provided.length === 0) continue;
 
     // Declared seeding disposition (spec 092): false = this module's value
     // must not seed or be offered at all under the current decisions

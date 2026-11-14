@@ -344,3 +344,47 @@ describe("compile() — kmcmplib severity and line decode", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Release vs debug build. kmc-kmn defaults saveDebug to true, which ships store
+// names, a TSS_DEBUG_LINE store per group and source line numbers in the .kmx,
+// and a pretty-printed .js with `// Line N` comments. The output path (the .kmp
+// and the source zip's build/) passes saveDebug: false so a shipped package
+// matches what Keyman Developer builds; the live preview keeps the default.
+// ---------------------------------------------------------------------------
+describe("compile() — saveDebug", () => {
+  const kmn =
+    "store(&VERSION) '14.0'\n" +
+    "store(&NAME) 'Debug probe'\n" +
+    "store(&TARGETS) 'any'\n" +
+    "begin Unicode > use(main)\n" +
+    "group(main) using keys\n" +
+    "'a' + 'a' > 'ä'\n" +
+    "+ [K_Q] > 'q'\n";
+  const build = (opts?: { saveDebug?: boolean }) =>
+    compile(createVirtualFS([{ path: "source/dbg.kmn", content: kmn, isBinary: false }]), "dbg", opts);
+
+  async function debugMarkers(result: CompileResult): Promise<{ debugLineStores: number; jsLineComments: boolean }> {
+    const { KmxFileReader, KMX } = await import("@keymanapp/common-types");
+    const kmx = result.artifacts.find((a) => a.filename.endsWith(".kmx"))?.data;
+    const js = result.artifacts.find((a) => a.filename.endsWith(".js"))?.data;
+    expect(kmx).toBeDefined();
+    expect(js).toBeDefined();
+    const kb = new KmxFileReader().read(kmx!);
+    return {
+      debugLineStores: kb.stores.filter((s) => s.dwSystemID === KMX.KMXFile.TSS_DEBUG_LINE).length,
+      jsLineComments: /\/\/ Line \d+/.test(new TextDecoder().decode(js!)),
+    };
+  }
+
+  it("saveDebug: false produces a release .kmx and .js", async () => {
+    const markers = await debugMarkers(await build({ saveDebug: false }));
+    expect(markers).toEqual({ debugLineStores: 0, jsLineComments: false });
+  }, 30_000);
+
+  it("the default (the live preview) still carries debug data", async () => {
+    const markers = await debugMarkers(await build());
+    expect(markers.debugLineStores).toBeGreaterThan(0);
+    expect(markers.jsLineComments).toBe(true);
+  }, 30_000);
+});

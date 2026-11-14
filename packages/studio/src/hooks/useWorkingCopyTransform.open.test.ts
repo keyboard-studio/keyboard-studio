@@ -225,6 +225,7 @@ describe("useWorkingCopyTransform on Copy", () => {
     });
     const out = preview();
     expect(text(out, "source/kb.kvks")).toBe(KVKS);
-    expect(text(out, KMN_PATH)).toBe(KMN);
+    // Copy forces `store(&TARGETS) 'any'` on every produced keyboard (step 3.1, from main); Open never does.
+    expect(text(out, KMN_PATH)).toBe(KMN.replace("begin Unicode", "store(&TARGETS) 'any'\nbegin Unicode"));
   });
 });

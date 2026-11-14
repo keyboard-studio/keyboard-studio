@@ -10,12 +10,8 @@
 import { defineConfig, mergeConfig } from "vitest/config";
 import baseConfig from "./vitest.config.ts";
 
-export default mergeConfig(
-  baseConfig,
-  defineConfig({
-    test: {
-      include: ["src/**/*.measure.{ts,tsx}"],
-      testTimeout: 900_000,
-    },
-  }),
-);
+const merged = mergeConfig(baseConfig, defineConfig({ test: { testTimeout: 900_000 } }));
+
+// mergeConfig concatenates arrays, so an `include` passed through it would ADD the measure files
+// to the base suite's and run all of them, timing the harness under the suite's load. Assign it.
+export default { ...merged, test: { ...merged.test, include: ["src/**/*.measure.{ts,tsx}"] } };

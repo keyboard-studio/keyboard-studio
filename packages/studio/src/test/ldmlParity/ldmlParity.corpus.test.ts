@@ -141,6 +141,7 @@ async function previewProjection(): Promise<{ vfs: VirtualFS; keyboardId: string
         getPattern: (id) => patterns.get(id),
         identity: displayName !== undefined && displayName !== "" ? { displayName } : null,
         marksTreatment: getMarksTreatmentValue(),
+        kmnEdits: undefined,
         capsHandling: capsHandlingFromDecisions(getDecisionSnapshot()),
         baseDisplayName: startKeyboard.displayName,
       },

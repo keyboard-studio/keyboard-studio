@@ -144,7 +144,9 @@ function attach(page: Page, scenario: string, level: string, probe: string): Har
           .catch(() => false),
         basePicker: await vis(() => p.getByTestId("base-picker")),
         baseConfirm: await vis(() => p.getByTestId("base-confirm")),
-        trackCopy: await vis(() => p.getByRole("radio", { name: /^Copy/i })),
+        // No track step: track_choice was removed 2026-11-06 (77cefa97) —
+        // copy is the default, so base confirm lands on attribution.
+        authorName: await vis(() => p.locator("#il_author_name")),
         prefillConfirm: await vis(() => p.getByTestId("prefill-continue")),
         phaseBIntro: await vis(() => p.getByTestId("charlist-continue")),
         carveGallery: await vis(() => p.getByTestId("carve-gallery")),
@@ -309,8 +311,10 @@ async function buildToLevel(page: Page, level: Level, h: Harness): Promise<void>
   if (level === "L2-base-previewed") return;
 
   await confirmStart(page, h);
-  await expect(page.getByRole("radio", { name: /^Copy/i })).toBeVisible({ timeout: 30_000 });
-  h.note("base confirmed; at track step");
+  // No track step: track_choice was removed 2026-11-06 (77cefa97) — copy is
+  // the default, so base confirm lands on attribution.
+  await expect(page.locator("#il_author_name")).toBeVisible({ timeout: 30_000 });
+  h.note("base confirmed; at attribution (no track step)");
   if (level === "L3-base-confirmed") return;
 
   await confirmCopyTrack(page);

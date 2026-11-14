@@ -3,7 +3,8 @@
 // their own (order, coverage, thresholds, suppression).
 
 import { describe, expect, it } from "vitest";
-import { DOC_FORMS, buildProducedSet } from "@keyboard-studio/contracts";
+import { DOC_FORMS, buildProducedSet, type MarkInputOrder } from "@keyboard-studio/contracts";
+import { parseKmn } from "@keyboard-studio/engine";
 import { buildDocContent, TYPING_GUIDE_SUMMARY_THRESHOLD } from "./docContent.ts";
 import {
   COMBINING_FIXTURE,
@@ -18,8 +19,26 @@ import {
   type DocFixture,
 } from "./docContent.fixtures.ts";
 
-const build = (f: DocFixture, inheritedProse: string | null = null) =>
-  buildDocContent({ ir: f.ir, touchLayout: f.touchLayout, inheritedProse });
+const build = (f: DocFixture, inheritedProse: string | null = null, markInputOrder?: MarkInputOrder) =>
+  buildDocContent({
+    ir: f.ir,
+    touchLayout: f.touchLayout,
+    inheritedProse,
+    ...(markInputOrder !== undefined ? { markInputOrder } : {}),
+  });
+
+/** Postfix mark key: type the letter, then the mark key adds its mark. */
+const NFD_POSTFIX_IR = parseKmn(
+  [
+    "store(&NAME) 'nfdpost'",
+    "begin Unicode > use(main)",
+    "group(main) using keys",
+    "+ 'a' + [K_BKQUOTE] > 'a' U+0300",
+    "+ 'e' + [K_BKQUOTE] > 'e' U+0301",
+    "",
+  ].join("\n"),
+  "nfdpost",
+).ir;
 
 /** Rows of the typing guide's table, as the code points of their first cell. */
 function guideRowChars(html: string): number[] {
@@ -131,6 +150,33 @@ describe("mechanisms", () => {
   it("does not take right-Alt or a deadkey for repeat-to-cycle", () => {
     const html = build(DEADKEY_RIGHT_ALT_FIXTURE).slots.mechanisms;
     expect(html).not.toContain("pressed again");
+  });
+
+  // The combiningOrder paragraph follows the recorded mark-input-order
+  // answer, not the produced-set sniff: an NFD keyboard never emits a lone
+  // mark, so the sniff hides the paragraph exactly when letter-then-mark
+  // is the required order — and shows it for lone-mark outputs that need
+  // no letter first (Bafut, 2026-11-11).
+  it("states letter-then-mark for a postfix keyboard whose outputs are base+mark", () => {
+    const mechanisms = buildDocContent({
+      ir: NFD_POSTFIX_IR,
+      touchLayout: null,
+      inheritedProse: null,
+      markInputOrder: "postfix",
+    }).slots.mechanisms;
+    expect(mechanisms).toContain("after the letter");
+    expect(mechanismParagraphs(mechanisms)).toEqual([p.combiningOrder]);
+  });
+
+  it("omits letter-then-mark for a prefix keyboard even when it emits lone marks", () => {
+    expect(build(COMBINING_FIXTURE, null, "prefix").slots.mechanisms).not.toContain("after the letter");
+  });
+
+  it("falls back to the produced-set sniff when no input order was recorded", () => {
+    expect(build(COMBINING_FIXTURE).slots.mechanisms).toContain("after the letter");
+    expect(
+      buildDocContent({ ir: NFD_POSTFIX_IR, touchLayout: null, inheritedProse: null }).slots.mechanisms,
+    ).not.toContain("after the letter");
   });
 });
 

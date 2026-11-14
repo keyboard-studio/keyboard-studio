@@ -12,7 +12,13 @@
 // The `deadkeys` step (the deadkey op log replayed onto the .kmn) is in NO Open
 // row: the deadkey editor writes each edit into the files when it is made, so
 // only Copy replays the log. `tolerance` is in no Open row either: the fix is
-// written when applied (lib/contextToleranceCommit).
+// written when applied (lib/contextToleranceCommit). `codeEdits` (the Code-tab
+// `code-apply` entries) is in NO Open row either: on Open the Code tab writes the
+// file directly through the apply seam and records no `code-apply` entry.
+// `layoutEdits` is in the Open `output` row only as a TEMPORARY replay of one
+// decision (the Layout-tab `kmn-edits` entries, spliced through `writeKmn`) so a
+// Layout-tab edit made on Open is not lost; the task that routes Layout-tab edits
+// through the apply seam on Open (T082a) removes it.
 //
 // A step listed for a kind may still have nothing to do (an empty overlay); a
 // step left out never runs for that kind.
@@ -29,10 +35,12 @@ export type ProjectionStep =
   | "keyEdits" // 1.7: key-edit overlay (touch layout and its rename rules)
   | "deadkeys" // 1.8: deadkey lifecycle overlay
   | "assignments" // 2: mechanism assignments
+  | "layoutEdits" // 2.2: the Layout-tab entries of the `kmn-edits` log (spec 117)
   | "layerPropagation" // 2.5: desktop layer combos onto the touch layout
   | "markGuards" // 2.6: the marks decision's guard rules
   | "tolerance" // 2.7: the accepted context-tolerance fix
   | "caps" // 2.8: the answered caps-handling decision
+  | "codeEdits" // 2.9: the Code-tab (`code-apply`) entries of the `kmn-edits` log (spec 117)
   | "identity" // 3: &NAME / version into the .kmn
   | "keycapLabels" // 3.5: keycap labels on the .kvks / touch layout
   | "descriptor" // 3.6: the package descriptor
@@ -87,6 +95,8 @@ export const PROJECTION_STEPS: Readonly<Record<ProjectionKind, ReadonlySet<Proje
     "touchDeletions",
     "keyEdits",
     "assignments",
+    // TEMPORARY (T082a removes it): Layout-tab edits replayed on Open until they go through the apply seam.
+    "layoutEdits",
     "layerPropagation",
     "caps",
     "identity",

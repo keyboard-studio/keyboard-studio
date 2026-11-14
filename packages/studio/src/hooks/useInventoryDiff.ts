@@ -96,16 +96,21 @@
 // reaches it."
 
 import { useMemo } from "react";
+import type { KmnEdit, KmnEditsValue } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSessionAssignments } from "./useSessionAssignments.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import {
   baseProducedSetForWalk as computeBaseProducedSetForWalk,
   orphanedProducedSet,
   rawSessionProducedSet,
   sessionProducedSet,
   splitInventory,
+  withCodeEdits,
   type InventoryDiff,
 } from "../lib/inventoryDiff.ts";
+
+const NO_EDITS: readonly KmnEdit[] = [];
 
 // The pure pieces live in lib/inventoryDiff.ts (spec 107 FR-040); this hook
 // memoizes each one separately over its own store slices.
@@ -125,7 +130,13 @@ export type { InventoryDiff };
  * — the caller sees no diff and the gallery works as before instantiation.
  */
 export function useInventoryDiff(): InventoryDiff {
-  const startIr = useWorkingCopyStore((s) => s.startIr);
+  const rawStartIr = useWorkingCopyStore((s) => s.startIr);
+  // The Code tab's recorded edits change what the keyboard types (spec 117 ruling 10), so the
+  // produced sets read the starting rules as those edits leave them; `startIr` below is that view.
+  const kmnEntries = useDecisionStore(
+    (s) => (s.decisions["kmn-edits"]?.value as KmnEditsValue | undefined)?.entries ?? NO_EDITS,
+  );
+  const startIr = useMemo(() => withCodeEdits(rawStartIr, kmnEntries), [rawStartIr, kmnEntries]);
   const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
 
   // This session's physical (desktop) assignments — the same selector

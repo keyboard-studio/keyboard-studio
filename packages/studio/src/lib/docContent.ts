@@ -23,12 +23,14 @@ import {
   type DocMechanismId,
   type IRRule,
   type KeyboardIR,
+  type MarkInputOrder,
   type TouchKeyIR,
   type TouchLayoutIR,
 } from "@keyboard-studio/contracts";
 import { getCategory, getName } from "@keyboard-studio/contracts/unicode";
 import { escapeDocHtml, parseTouchLayout, type GeneratedDocSlots } from "@keyboard-studio/engine";
-import { charProducers, displayChar, ruleModifier } from "./irToCarveNodes.ts";
+import { charProducerCandidates, charProducers, displayChar, ruleModifier } from "./irToCarveNodes.ts";
+import type { CharProducerCandidates } from "./irToCarveNodes.ts";
 
 export interface DocContentInput {
   /** The working-copy IR. */
@@ -37,6 +39,11 @@ export interface DocContentInput {
   touchLayout: TouchLayoutIR | null;
   /** Track 2 welcome/help prose; `null` on Track 1. */
   inheritedProse: string | null;
+  /**
+   * The recorded `mark-input-order` answer. Undefined when no answer was
+   * recorded — the mechanisms below fall back to the produced-set sniff.
+   */
+  markInputOrder?: MarkInputOrder;
 }
 
 export interface DocContent {
@@ -122,11 +129,16 @@ interface GuideRow {
 }
 
 /** The fewest-step way to type `ch`. A producer with only a trigger floor counts as one step; ties go to the joined label in code-point order. */
-function shortestKeys(ir: KeyboardIR, ch: string): string {
-  const parts = shortestKeySteps(ir, ch);
+function shortestKeys(ir: KeyboardIR, ch: string, candidates: CharProducerCandidates): string {
+  const parts = shortestKeySteps(ir, ch, candidates);
   return parts === undefined ? "" : parts.map((p) => `<kbd>${escapeDocHtml(p)}</kbd>`).join(" then ");
 }
 
+/**
+ * {@link shortestKeys} as plain keystroke labels ("AltGr + n"), or undefined when no faithful path exists. Shared with the
+ * README facts. Pass `candidates` (one `charProducerCandidates(ir)`) when asking about many characters.
+ */
+export function shortestKeySteps(ir: KeyboardIR, ch: string, candidates?: CharProducerCandidates): string[] | undefined {
 const producedSetCache = new WeakMap<KeyboardIR, ReadonlySet<string>>();
 
 function producedSetOf(ir: KeyboardIR): ReadonlySet<string> {
@@ -151,10 +163,8 @@ function stepIsTypeable(ir: KeyboardIR, step: string): boolean {
   return producedSetOf(ir).has(ch.normalize("NFC"));
 }
 
-/** {@link shortestKeys} as plain keystroke labels ("AltGr + n"), or undefined when no faithful path exists. Shared with the README facts. */
-export function shortestKeySteps(ir: KeyboardIR, ch: string): string[] | undefined {
   let best: { steps: number; label: string; parts: string[] } | undefined;
-  for (const producer of charProducers(ir, ch)) {
+  for (const producer of charProducers(ir, ch, candidates)) {
     const parts = producer.steps.length > 0 ? producer.steps : producer.triggerFloor !== undefined ? [producer.triggerFloor] : [];
     if (parts.length === 0 || !parts.every((p) => stepIsTypeable(ir, p))) continue;
     const label = parts.join(" ");
@@ -170,9 +180,10 @@ export function shortestKeySteps(ir: KeyboardIR, ch: string): string[] | undefin
 }
 
 function guideRows(ir: KeyboardIR): GuideRow[] {
+  const candidates = charProducerCandidates(ir);
   return producedChars(ir)
     .filter((ch) => !isBaseCharacter(ch))
-    .map((ch) => ({ ch, keys: shortestKeys(ir, ch) }));
+    .map((ch) => ({ ch, keys: shortestKeys(ir, ch, candidates) }));
 }
 
 function renderGuideTable(rows: readonly GuideRow[]): string {
@@ -236,16 +247,38 @@ function hasRepeatToCycle(rules: readonly IRRule[]): boolean {
   });
 }
 
-function detectMechanisms(ir: KeyboardIR, produced: readonly string[]): Set<DocMechanismId> {
+/**
+ * Which mechanism paragraphs the keyboard needs. `combiningOrder` follows
+ * the RECORDED mark-input-order answer, never the produced set on its own:
+ * `postfix` means marks are typed after their letter, so the paragraph is
+ * shown; `prefix` means the mark comes first, so it is hidden. The
+ * produced-set sniff below is only the fallback for keyboards with no
+ * recorded answer — it cannot tell the two apart, because
+ * buildProducedSet NFC-folds every base+mark run into its precomposed
+ * codepoint (frozen contract): a letter+mark keyboard never emits a lone
+ * combining mark, so the sniff hides the paragraph exactly when
+ * letter-then-mark is the required order, and shows it for lone-mark
+ * outputs that need no letter first.
+ */
+function detectMechanisms(
+  ir: KeyboardIR,
+  produced: readonly string[],
+  markInputOrder: MarkInputOrder | undefined,
+): Set<DocMechanismId> {
   const rules = allRules(ir);
   const found = new Set<DocMechanismId>();
   if (rules.some((r) => ruleContextElements(r).some((el) => el.kind === "deadkey"))) found.add("deadkeys");
   if (rules.some((r) => ruleModifier(r) === "ralt")) found.add("rightAlt");
   if (hasRepeatToCycle(rules)) found.add("repeatToCycle");
-  if (produced.some((ch) => {
-    const cat = getCategory(ch.codePointAt(0)!);
-    return cat === "Mn" || cat === "Mc";
-  })) found.add("combiningOrder");
+  if (markInputOrder === "postfix") found.add("combiningOrder");
+  else if (
+    markInputOrder === undefined &&
+    produced.some((ch) => {
+      const cat = getCategory(ch.codePointAt(0)!);
+      return cat === "Mn" || cat === "Mc";
+    })
+  )
+    found.add("combiningOrder");
   return found;
 }
 
@@ -419,7 +452,7 @@ export function buildDocContent(input: DocContentInput): DocContent {
   return {
     slots: {
       typingGuide,
-      mechanisms: renderMechanisms(detectMechanisms(ir, produced)),
+      mechanisms: renderMechanisms(detectMechanisms(ir, produced, input.markInputOrder)),
       layoutPictures: "",
       touchNotes: renderTouchNotes(touchLayout),
       characterInventory: renderInventory(produced),

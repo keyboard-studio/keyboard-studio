@@ -10,7 +10,7 @@ import { takeBaseline } from "../criteria/openRatchet.ts";
 import { openIssuesOf } from "../criteria/openIssues.ts";
 import { openBaselineInventory } from "../criteria/openBaselineInventory.ts";
 import { deriveOpenHelpGaps } from "../lib/openHelpGaps.ts";
-import type { StartKeyboard, VirtualFS, KeyboardIR, LintFinding, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, PackageFontSet, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
+import type { CodeEdit, StartKeyboard, VirtualFS, KeyboardIR, LintFinding, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, PackageFontSet, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import type { ParseResult, RoundTripDeps, StartDocCssText } from "@keyboard-studio/engine";
 import { loadDemoSimulate } from "../components/rules/demoSimulation.ts";
@@ -360,6 +360,11 @@ export interface ScaffoldSpec {
 export type VfsTransform = (
   vfs: VirtualFS,
   keyboardId: string,
+  /**
+   * A Code-tab entry that is not recorded yet, replayed after the recorded `kmn-edits` as if it had
+   * been (the Code tab predicts the build with it). Only the Code tab passes it.
+   */
+  candidateKmnEdit?: CodeEdit,
 ) => {
   warnings: string[];
   /**

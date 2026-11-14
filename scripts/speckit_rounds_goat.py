@@ -66,7 +66,11 @@ GOAT_LIGHT_RE = re.compile(r"i18n|catalog|\bcop(y|ies)\b|rename|\bdocs?\b|golden
 # phase, by phase-heading keywords. Checked in order; first match wins.
 # Unclassified implement phases go to km-programmer, the generalist code
 # implementer. plan/tasks rounds are not agent-routed.
+# km-programmer is checked FIRST: code words (parser, codec, engine) must beat
+# softer words a code phase heading can also carry -- "Comments survive the new
+# parser" is codec work, not docs, and km-doc has no Bash to do it.
 GOAT_AGENT_MAP = [
+    ("km-programmer", re.compile(r"engine|compil|\bIR\b|deriv|migrat|\bguards?\b|kernel|parser|typecheck|codec|\blint\b", re.IGNORECASE)),
     ("km-testing", re.compile(r"e2e|playwright|smoke|fixture|vitest", re.IGNORECASE)),
     ("km-verification", re.compile(r"\bverif", re.IGNORECASE)),
     ("km-doc", re.compile(r"i18n|\bdocs?\b|readme|changelog|\bcop(y|ies)\b|\bcomments?\b|catalog|message|architect", re.IGNORECASE)),
@@ -77,7 +81,6 @@ GOAT_AGENT_MAP = [
     ("km-qc", re.compile(r"\bqc\b|review|audit", re.IGNORECASE)),
     ("km-simplify", re.compile(r"simplif|refactor|dead code|dedup", re.IGNORECASE)),
     ("km-domain", re.compile(r"linguist|orthograph|\bscript\b", re.IGNORECASE)),
-    ("km-programmer", re.compile(r"engine|compil|\bIR\b|deriv|migrat|\bguards?\b|kernel|parser|typecheck|codec|\blint\b", re.IGNORECASE)),
 ]
 
 
@@ -273,8 +276,10 @@ def main():
 
         prompt = f"Invoke the speckit-round skill with argument: {feature_dir.as_posix()}"
         if agent:
-            prompt += (f" Route this phase through the {agent} agent (.claude/agents/{agent}.md): "
-                       f"dispatch the phase's work per that agent definition.")
+            prompt += (f" Prefer the {agent} agent (.claude/agents/{agent}.md) for this phase's work. "
+                       f"This is a keyword guess from the phase heading, not a constraint: if the phase "
+                       f"needs tools or edits that agent lacks (Bash, source edits, tests, commit), "
+                       f"dispatch km-programmer for those tasks instead. Do not end BLOCKED over routing.")
         label = f"{step}" + (f" / {phase}" if phase else "")
         agent_tag = f"agent: {agent}, " if agent else ""
         if args.dry_run:

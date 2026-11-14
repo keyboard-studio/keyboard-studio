@@ -63,9 +63,17 @@ describe("useDocumentationFindings", () => {
   it("recomputes only when an input changes (same reference across an unrelated rerender)", () => {
     const ir = makeTestIR([]);
     ir.header.version = "1.0";
-    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs: vfs(), ir });
+    // The readme preview always lists 'any' (the projection writes
+    // store(&TARGETS) 'any'), so a start .kmn declaring 'windows' keeps one
+    // finding (README targets mismatch) alive; with 'any' there would be none
+    // and both results would be the shared EMPTY array.
+    const windowsOnly = createVirtualFS([
+      { path: `source/${basicKbdus.id}.kmn`, content: KMN.replace("store(&TARGETS) 'any'", "store(&TARGETS) 'windows'"), isBinary: false },
+    ]);
+    useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs: windowsOnly, ir });
     const { result, rerender } = renderHook(() => useDocumentationFindings());
     const first = result.current;
+    expect(first.length).toBeGreaterThan(0);
     rerender();
     expect(result.current).toBe(first);
     useWorkingCopyStore.getState().setHelpDocs({ description: "A keyboard for testing.", usageTips: [] });
