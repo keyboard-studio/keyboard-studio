@@ -1,6 +1,16 @@
 {
-  "description": "Known disagreements between kmc-package's checkForDuplicatedOrNonMinimalLanguages (CLDR Intl.Locale.minimize) and the studio's isWellFormedBcp47 + minimalTagOf (pinned langtags), over every .kps <Language ID> in ../keyboards. One record per (kind, tag) per keyboard, carrying BOTH sides' verdicts ('none' when a side found nothing). The parity test fails on any disagreement not listed here, any listed disagreement that no longer occurs, and any listed disagreement whose kmc/studio verdict changed. Populated from the first run (spec 115 T060); each entry carries the reason. Two systematic divergences: CLDR minimize applies language aliases and drops likely subtags (and can invent a likely region, e.g. ku-Arab -> ku-IQ, or resolve und -> en), while minimalTagOf never renames a language for CLDR's sake, folds only to langtags' canonical code, drops only the tagset's own defaults, and returns the tagset's registered tag (which can name a default region, e.g. ku-Arab -> ku-Arab-TR). Validity agrees everywhere: no `invalid` disagreement in the corpus.",
+  "description": "Known disagreements between kmc-package's checkForDuplicatedOrNonMinimalLanguages (CLDR Intl.Locale.minimize) and the studio's isWellFormedBcp47 + minimalTagOf (pinned langtags), over every .kps <Language ID> in ../keyboards. One record per (kind, tag) per keyboard, carrying BOTH sides' verdicts ('none' when a side found nothing). The parity test fails on any disagreement not listed here, any listed disagreement that no longer occurs, and any listed disagreement whose kmc/studio verdict changed. Populated from the first run (spec 115 T060) and re-captured under the pinned Node on 2026-11-14 (see below); each entry carries the reason. Two systematic divergences: CLDR minimize applies language aliases and drops likely subtags (e.g. kgy-Deva -> kgy, mnk -> man, or resolve und -> en), while minimalTagOf never renames a language for CLDR's sake, folds only to langtags' canonical code, drops only the tagset's own defaults, and returns the tagset's registered tag (which can name a default region, e.g. ku-Arab -> ku-Arab-TR). Validity agrees everywhere: no `invalid` disagreement in the corpus. The kmc side is Intl.Locale.minimize, so its verdicts follow the host Node's ICU/CLDR: the first capture was made under Node 24, whose ICU answers ku-Arab -> ku-IQ and dek -> sqm, while the pinned Node (.nvmrc, 22.19.0) answers ku-Arab -> ku-Arab and dek -> dek — the 2026-11-14 re-capture under 22.19.0 corrected the ku, dek, arv, bsq, kgy and mnk rows. Always re-capture under the pinned Node.",
   "disagreements": [
+    {
+      "key": "a/arbore/source/arbore.kps|arbore|non-minimal|arv-Latn",
+      "file": "a/arbore/source/arbore.kps",
+      "keyboard": "arbore",
+      "kind": "non-minimal",
+      "tag": "arv-Latn",
+      "kmc": "none",
+      "studio": "non-minimal, should be arv",
+      "reason": "langtags strips Latn as arv's default script (its tagset's full form is arv-Latn-ET); the pinned Node's CLDR has no likely-subtags entry for arv at all (maximize('arv') is 'arv'), so minimize leaves arv-Latn alone."
+    },
     {
       "key": "b/baybayin/source/baybayin.kps|baybayin|non-minimal|tl-Tglg",
       "file": "b/baybayin/source/baybayin.kps",
@@ -27,9 +37,9 @@
       "keyboard": "behdini_arab",
       "kind": "non-minimal",
       "tag": "kmr-Arab",
-      "kmc": "non-minimal, should be ku-IQ",
+      "kmc": "non-minimal, should be ku-Arab",
       "studio": "non-minimal, should be ku-Arab-TR",
-      "reason": "CLDR minimize applies the alias kmr -> ku and drops the likely script Arab, keeping the likely region IQ (kmr-Arab -> ku-IQ); langtags folds kmr to its canonical code ku and returns its registered tag ku-Arab-TR. Both rename the language; they disagree on script and region."
+      "reason": "CLDR minimize applies the alias kmr -> ku but keeps the script Arab: ku's likely script is Latn (ku -> ku-Latn-TR), so dropping Arab would change the maximized form (ku-Arab -> ku-Arab-IQ), and minimize never invents a region (kmr-Arab -> ku-Arab); langtags folds kmr to its canonical code ku and returns its registered tag ku-Arab-TR. Both rename the language; they disagree on script and region."
     },
     {
       "key": "b/behdini_arab/source/behdini_arab.kps|behdini_arab|non-minimal|ku-Arab",
@@ -37,9 +47,9 @@
       "keyboard": "behdini_arab",
       "kind": "non-minimal",
       "tag": "ku-Arab",
-      "kmc": "non-minimal, should be ku-IQ",
+      "kmc": "none",
       "studio": "non-minimal, should be ku-Arab-TR",
-      "reason": "CLDR minimize drops the likely script Arab and keeps the likely region IQ (ku-Arab -> ku-IQ); langtags returns its registered tag ku-Arab-TR, which names its default region. CLDR never returns a region the tag did not carry; langtags never drops a registered tag's default region."
+      "reason": "CLDR minimize leaves ku-Arab alone: Arab is not ku's likely script (Latn is — ku -> ku-Latn-TR), so the script is not redundant, and minimize never invents a region; langtags returns its registered tag ku-Arab-TR, which names its default region. CLDR never returns a region the tag did not carry; langtags never drops a registered tag's default region."
     },
     {
       "key": "b/behdini_arab/source/behdini_arab.kps|behdini_arab|duplicate|ku-Arab",
@@ -47,9 +57,9 @@
       "keyboard": "behdini_arab",
       "kind": "duplicate",
       "tag": "ku-Arab",
-      "kmc": "duplicate of kmr-Arab (ku-IQ)",
+      "kmc": "duplicate of kmr-Arab (ku-Arab)",
       "studio": "duplicate of kmr-Arab (ku-Arab-TR)",
-      "reason": "Both sides agree ku-Arab and kmr-Arab collapse to one minimal tag, but disagree on the minimal form: CLDR says ku-IQ, langtags says ku-Arab-TR (the same divergence as the non-minimal finding for these tags)."
+      "reason": "Both sides agree ku-Arab and kmr-Arab collapse to one minimal tag, but disagree on the minimal form: CLDR says ku-Arab, langtags says ku-Arab-TR (the same divergence as the non-minimal finding for these tags)."
     },
     {
       "key": "b/behdini_arab/source/behdini_arab.kps|behdini_arab|duplicate|ku-Arab-TR",
@@ -322,6 +332,16 @@
       "reason": "CLDR minimize resolves the undefined language `und` to its likely language `en` (und-Latn -> en); the studio leaves `und` alone."
     },
     {
+      "key": "l/libtralo/source/libtralo.kps|libtralo|non-minimal|bsq-Latn",
+      "file": "l/libtralo/source/libtralo.kps",
+      "keyboard": "libtralo",
+      "kind": "non-minimal",
+      "tag": "bsq-Latn",
+      "kmc": "none",
+      "studio": "non-minimal, should be bsq",
+      "reason": "langtags strips Latn as bsq's default script (its tagset's full form is bsq-Latn-LR); CLDR's likely script for bsq is Bass, not Latn (bsq -> bsq-Bass-LR), so minimize keeps the explicit Latn."
+    },
+    {
       "key": "m/malar_braille/source/malar_braille.kps|malar_braille|non-minimal|arb-Brai",
       "file": "m/malar_braille/source/malar_braille.kps",
       "keyboard": "malar_braille",
@@ -447,9 +467,9 @@
       "keyboard": "sorani_behdini_arab_qwerty",
       "kind": "non-minimal",
       "tag": "ku-Arab",
-      "kmc": "non-minimal, should be ku-IQ",
+      "kmc": "none",
       "studio": "non-minimal, should be ku-Arab-TR",
-      "reason": "CLDR minimize drops the likely script Arab and keeps the likely region IQ (ku-Arab -> ku-IQ); langtags returns its registered tag ku-Arab-TR, which names its default region. CLDR never returns a region the tag did not carry; langtags never drops a registered tag's default region."
+      "reason": "CLDR minimize leaves ku-Arab alone: Arab is not ku's likely script (Latn is — ku -> ku-Latn-TR), so the script is not redundant, and minimize never invents a region; langtags returns its registered tag ku-Arab-TR, which names its default region. CLDR never returns a region the tag did not carry; langtags never drops a registered tag's default region."
     },
     {
       "key": "s/sorani_behdini_arab_qwerty/source/sorani_behdini_arab_qwerty.kps|sorani_behdini_arab_qwerty|non-minimal|kmr-Arab",
@@ -457,9 +477,9 @@
       "keyboard": "sorani_behdini_arab_qwerty",
       "kind": "non-minimal",
       "tag": "kmr-Arab",
-      "kmc": "non-minimal, should be ku-IQ",
+      "kmc": "non-minimal, should be ku-Arab",
       "studio": "non-minimal, should be ku-Arab-TR",
-      "reason": "CLDR minimize applies the alias kmr -> ku and drops the likely script Arab, keeping the likely region IQ (kmr-Arab -> ku-IQ); langtags folds kmr to its canonical code ku and returns its registered tag ku-Arab-TR. Both rename the language; they disagree on script and region."
+      "reason": "CLDR minimize applies the alias kmr -> ku but keeps the script Arab: ku's likely script is Latn (ku -> ku-Latn-TR), so dropping Arab would change the maximized form (ku-Arab -> ku-Arab-IQ), and minimize never invents a region (kmr-Arab -> ku-Arab); langtags folds kmr to its canonical code ku and returns its registered tag ku-Arab-TR. Both rename the language; they disagree on script and region."
     },
     {
       "key": "s/sorani_behdini_arab_qwerty/source/sorani_behdini_arab_qwerty.kps|sorani_behdini_arab_qwerty|duplicate|kmr-Arab",
@@ -467,9 +487,9 @@
       "keyboard": "sorani_behdini_arab_qwerty",
       "kind": "duplicate",
       "tag": "kmr-Arab",
-      "kmc": "duplicate of ku-Arab (ku-IQ)",
+      "kmc": "duplicate of ku-Arab (ku-Arab)",
       "studio": "duplicate of ku-Arab (ku-Arab-TR)",
-      "reason": "Both sides agree kmr-Arab and ku-Arab collapse to one minimal tag, but disagree on the minimal form: CLDR says ku-IQ, langtags says ku-Arab-TR (the same divergence as the non-minimal finding for these tags)."
+      "reason": "Both sides agree kmr-Arab and ku-Arab collapse to one minimal tag, but disagree on the minimal form: CLDR says ku-Arab, langtags says ku-Arab-TR (the same divergence as the non-minimal finding for these tags)."
     },
     {
       "key": "s/sorani_behdini_arab_qwerty/source/sorani_behdini_arab_qwerty.kps|sorani_behdini_arab_qwerty|duplicate|ku-Arab-TR",
@@ -502,16 +522,6 @@
       "reason": "CLDR minimize collapses ajp-Arab and apc-Arab to the same minimal tag apc; the studio keeps them distinct (its minimal forms differ)."
     },
     {
-      "key": "sil/sil_cameroon_azerty/source/sil_cameroon_azerty.kps|sil_cameroon_azerty|non-minimal|dek",
-      "file": "sil/sil_cameroon_azerty/source/sil_cameroon_azerty.kps",
-      "keyboard": "sil_cameroon_azerty",
-      "kind": "non-minimal",
-      "tag": "dek",
-      "kmc": "non-minimal, should be sqm",
-      "studio": "none",
-      "reason": "CLDR minimize applies the language alias dek -> sqm (dek -> sqm); langtags keeps the author's code - minimalTagOf never renames a language."
-    },
-    {
       "key": "sil/sil_cameroon_azerty/source/sil_cameroon_azerty.kps|sil_cameroon_azerty|non-minimal|cug",
       "file": "sil/sil_cameroon_azerty/source/sil_cameroon_azerty.kps",
       "keyboard": "sil_cameroon_azerty",
@@ -520,16 +530,6 @@
       "kmc": "none",
       "studio": "non-minimal, should be cnq",
       "reason": "langtags folds cug to its canonical code cnq (cug -> cnq); CLDR minimize leaves the code alone."
-    },
-    {
-      "key": "sil/sil_cameroon_qwerty/source/sil_cameroon_qwerty.kps|sil_cameroon_qwerty|non-minimal|dek",
-      "file": "sil/sil_cameroon_qwerty/source/sil_cameroon_qwerty.kps",
-      "keyboard": "sil_cameroon_qwerty",
-      "kind": "non-minimal",
-      "tag": "dek",
-      "kmc": "non-minimal, should be sqm",
-      "studio": "none",
-      "reason": "CLDR minimize applies the language alias dek -> sqm (dek -> sqm); langtags keeps the author's code - minimalTagOf never renames a language."
     },
     {
       "key": "sil/sil_cameroon_qwerty/source/sil_cameroon_qwerty.kps|sil_cameroon_qwerty|non-minimal|cug",
@@ -550,6 +550,26 @@
       "kmc": "none",
       "studio": "non-minimal, should be yuk-419",
       "reason": "langtags drops Latn as the language's default (yuk-Latn-419 -> yuk-419); CLDR minimize keeps it - it is not a CLDR likely subtag."
+    },
+    {
+      "key": "sil/sil_devanagari_romanized/source/sil_devanagari_romanized.kps|sil_devanagari_romanized|non-minimal|kgy-Deva",
+      "file": "sil/sil_devanagari_romanized/source/sil_devanagari_romanized.kps",
+      "keyboard": "sil_devanagari_romanized",
+      "kind": "non-minimal",
+      "tag": "kgy-Deva",
+      "kmc": "non-minimal, should be kgy",
+      "studio": "none",
+      "reason": "CLDR minimize drops Deva as kgy's likely script (kgy-Deva -> kgy; maximize('kgy') is kgy-Deva-NP); langtags keeps kgy-Deva — it is a registered tagset in its own right (full form kgy-Deva-NP), so minimalTagOf returns it unchanged."
+    },
+    {
+      "key": "sil/sil_devanagari_typewriter/source/sil_devanagari_typewriter.kps|sil_devanagari_typewriter|non-minimal|kgy-Deva",
+      "file": "sil/sil_devanagari_typewriter/source/sil_devanagari_typewriter.kps",
+      "keyboard": "sil_devanagari_typewriter",
+      "kind": "non-minimal",
+      "tag": "kgy-Deva",
+      "kmc": "non-minimal, should be kgy",
+      "studio": "none",
+      "reason": "CLDR minimize drops Deva as kgy's likely script (kgy-Deva -> kgy; maximize('kgy') is kgy-Deva-NP); langtags keeps kgy-Deva — it is a registered tagset in its own right (full form kgy-Deva-NP), so minimalTagOf returns it unchanged."
     },
     {
       "key": "sil/sil_euro_latin/source/sil_euro_latin.kps|sil_euro_latin|non-minimal|sh",
@@ -680,6 +700,26 @@
       "kmc": "duplicate of emk-Nkoo (man-Nkoo)",
       "studio": "none",
       "reason": "CLDR minimize collapses man-Nkoo and emk-Nkoo to the same minimal tag man-Nkoo; the studio keeps them distinct (its minimal forms differ)."
+    },
+    {
+      "key": "sil/sil_pan_africa_mnemonic/source/sil_pan_africa_mnemonic.kps|sil_pan_africa_mnemonic|non-minimal|mnk",
+      "file": "sil/sil_pan_africa_mnemonic/source/sil_pan_africa_mnemonic.kps",
+      "keyboard": "sil_pan_africa_mnemonic",
+      "kind": "non-minimal",
+      "tag": "mnk",
+      "kmc": "non-minimal, should be man",
+      "studio": "none",
+      "reason": "CLDR minimize applies the language alias mnk -> man (mnk -> man); langtags keeps the author's code - minimalTagOf never renames a language."
+    },
+    {
+      "key": "sil/sil_pan_africa_positional/source/sil_pan_africa_positional.kps|sil_pan_africa_positional|non-minimal|mnk",
+      "file": "sil/sil_pan_africa_positional/source/sil_pan_africa_positional.kps",
+      "keyboard": "sil_pan_africa_positional",
+      "kind": "non-minimal",
+      "tag": "mnk",
+      "kmc": "non-minimal, should be man",
+      "studio": "none",
+      "reason": "CLDR minimize applies the language alias mnk -> man (mnk -> man); langtags keeps the author's code - minimalTagOf never renames a language."
     },
     {
       "key": "sil/sil_philippines/source/sil_philippines.kps|sil_philippines|non-minimal|tl",

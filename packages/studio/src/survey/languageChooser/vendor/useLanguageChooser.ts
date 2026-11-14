@@ -12,7 +12,8 @@
 // Local changes (nothing else differs from upstream): this header; the unused
 // `ILanguageChooser` cast kept as the return type; `useEffect` dependency lists
 // are intentionally partial (as upstream), so the hook-deps rule is switched off
-// for this file.
+// for this file; the search effect cancels its callback on cleanup, so a late
+// search round never sets state after unmount (main CI, run 43578870313).
 /* eslint-disable react-hooks/exhaustive-deps, @typescript-eslint/ban-ts-comment */
 // @ts-nocheck -- upstream is compiled without `exactOptionalPropertyTypes` and
 // `verbatimModuleSyntax`; this file is kept byte-for-byte upstream rather than
@@ -130,9 +131,24 @@ export const useLanguageChooser = (
     if (!searchString || searchString.length < 2) {
       return;
     }
+    // The search runs in several rounds and can outlive the component: a
+    // late round must not touch state after unmount. Without this guard it
+    // calls setLanguageResults on the unmounted component, which under a
+    // torn-down test environment throws `window is not defined` and fails
+    // the whole suite as an unhandled error (main CI, run 43578870313).
+    // Returning false also aborts the search early instead of letting it
+    // run to completion for a component that is already gone.
+    let cancelled = false;
+    const appendIfAlive = (
+      additionalSearchResults: ILanguage[],
+      forSearchString: string,
+    ) => (cancelled ? false : appendResults(additionalSearchResults, forSearchString));
     (async () => {
-      await asyncSearchForLanguage(searchString, appendResults);
+      await asyncSearchForLanguage(searchString, appendIfAlive);
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [searchString]);
 
   // For reopening to a specific selection
