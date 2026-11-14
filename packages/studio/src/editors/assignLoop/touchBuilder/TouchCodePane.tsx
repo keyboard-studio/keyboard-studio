@@ -33,7 +33,8 @@ import {
   type TouchLayoutIR,
 } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../../stores/workingCopyStore.ts";
-import { isOpenMode } from "../../../lib/openMode.ts";
+import { isLiveOpen, isOpenMode } from "../../../lib/openMode.ts";
+import { useApplyOnOpen } from "../../../components/OpenApplyHost.tsx";
 import { readVfsText } from "../../../lib/vfsText.ts";
 import {
   lintTouchLayoutText,
@@ -72,6 +73,8 @@ export function TouchCodePane({ layout }: { layout: TouchLayoutIR | null }) {
   const mode = useWorkingCopyStore((s) => s.instantiationMode);
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  const liveOpen = useWorkingCopyStore((s) => isLiveOpen(s));
+  const applyOnOpen = useApplyOnOpen();
   // Open mode (spec 111 FR-009, research R7): the pane shows the file's own
   // text and Apply replaces the file, bypassing the structural-edit refusal --
   // the author is editing the real file, not composing key operations.
@@ -267,6 +270,24 @@ export function TouchCodePane({ layout }: { layout: TouchLayoutIR | null }) {
     if (openText !== undefined && openPath !== null) {
       // Open: a formatting-only change is still a change to the file.
       if (current === canonical) return;
+      if (liveOpen) {
+        // Live files: the text is written through the apply seam (the author is
+        // asked first when it needs a reformat; one undo record).
+        void applyOnOpen({
+          kind: "files",
+          files: { [openPath]: current },
+          label: "Touch code view edit",
+          labelKey: "code-view",
+        }).then((applied) => {
+          if (applied.status === "applied" || applied.status === "unchanged") {
+            justAppliedRef.current = true;
+            setApplyError(null);
+          } else if (applied.status === "failed") {
+            setApplyError(applied.reason);
+          }
+        });
+        return;
+      }
       const result = useWorkingCopyStore.getState().replaceStartingPointFromText(openPath, current);
       if (!result.ok) {
         setApplyError(result.error);

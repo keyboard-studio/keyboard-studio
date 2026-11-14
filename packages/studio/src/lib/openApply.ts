@@ -291,10 +291,21 @@ function revertView(view: OpenUndoView): void {
     case "restore": // its entries return to the Removed list with its record
     case "assign": // the session is the previous assign record's `after`
     case "marks":
-    case "touch":
     case "flush":
     case "files":
       return;
+    case "touch": {
+      // The key-edit overlay holds a RECORD of each applied op: take back the ones
+      // this step recorded (the file text itself is restored by the caller).
+      if (view.edit.type !== "ops") return;
+      const taken = view.edit.ops;
+      const same = (a: { seq: number; kind: string; address: string }, b: { seq: number; kind: string; address: string }) =>
+        a.seq === b.seq && a.kind === b.kind && a.address === b.address;
+      useWorkingCopyStore.setState((st) => ({
+        keyEditOverlay: { ops: st.keyEditOverlay.ops.filter((o) => !taken.some((t) => same(o, t))) },
+      }));
+      return;
+    }
   }
 }
 

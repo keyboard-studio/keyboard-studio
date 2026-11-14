@@ -101,6 +101,12 @@ export interface TouchBuilderPaneProps {
     options?: { readonly offerFamilyApply?: boolean },
   ) => boolean;
   /**
+   * Wraps a loop of sequential `commitOp` calls that is ONE author action, so a
+   * keyboard opened for update writes it as one change (one undo record).
+   * Omitted: the loop just runs.
+   */
+  readonly groupCommits?: (run: () => void) => void;
+  /**
    * The keyboard's font as a blob URL + CSS family (from the artifact
    * stage). Injected as a FontFace so keycaps render in the real typeface
    * instead of the UI font.
@@ -211,6 +217,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     selectedKeyAddresses,
     onSelectKeys,
     commitOp,
+    groupCommits,
     fontFaceUrl,
     fontFaceFamily,
     trayLetter,
@@ -220,6 +227,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     panelDropHover,
     dropHoverAddress,
   } = props;
+  const groupAction = (run: () => void): void => (groupCommits !== undefined ? groupCommits(run) : run());
 
   // Load the keyboard's font into the document so keycaps render in the real
   // typeface. TIKE rendered keycaps in the platform's configured font; the
@@ -321,9 +329,11 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
             mintBuilderKeyId(layout),
           );
     if (plan.ops.length === 0) return;
-    for (const op of plan.ops) {
-      if (!commitOp(op)) break;
-    }
+    groupAction(() => {
+      for (const op of plan.ops) {
+        if (!commitOp(op)) break;
+      }
+    });
     if (source.type === "subkey") {
       // A cross-kind move leaves the moved entry under a different kind (and
       // possibly a fresh id) — the subkey selection would dangle, so clear
@@ -365,9 +375,11 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     const { letter, address, key } = placement;
     const plan = buildPlacementOps(address, key, letter, choice, mintBuilderKeyId(layout));
     // One undo batch via sequential commits (slice-spec §4).
-    for (const op of plan.ops) {
-      if (!commitOp(op)) break;
-    }
+    groupAction(() => {
+      for (const op of plan.ops) {
+        if (!commitOp(op)) break;
+      }
+    });
     if (plan.displacedBackToTray !== null) {
       const back = plan.displacedBackToTray;
       onTrayReturnsChange((prev) => (prev.includes(back) ? prev : [...prev, back]));
@@ -668,9 +680,11 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     }
     const ops = buildTemplateApplyOps(layout, template);
     // One undo batch via sequential `commitKeyEdit` calls (slice-spec §4).
-    for (const op of ops) {
-      commitOp(op);
-    }
+    groupAction(() => {
+      for (const op of ops) {
+        commitOp(op);
+      }
+    });
     setTemplateOpen(false);
   };
 
@@ -700,9 +714,11 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
   // the author can retry.
   const handleBulkSet = (fields: BulkKeyEditFields): void => {
     const ops = buildBulkKeyEditOps(selectedEntriesOnLayer, fields);
-    for (const op of ops) {
-      if (!commitOp(op, { offerFamilyApply: false })) break;
-    }
+    groupAction(() => {
+      for (const op of ops) {
+        if (!commitOp(op, { offerFamilyApply: false })) break;
+      }
+    });
   };
 
   // Right-edge position of the selected key (#2596 item 4): the running

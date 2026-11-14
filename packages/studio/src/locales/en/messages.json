@@ -1353,6 +1353,8 @@
   "editor.assignLoop.touch.multitap.layerSlotAriaLabel": "Touch layer {n} for multitap",
   "editor.assignLoop.touch.multitap.removeLayerAriaLabel": "Remove touch layer {n} for multitap",
   "editor.assignLoop.touch.noInventory": "No characters in inventory yet. Complete the Survey (Phase B) to confirm which characters your keyboard must produce.",
+  "editor.assignLoop.touch.open.undoLabel": "touch layout edit",
+  "editor.assignLoop.touch.open.unreadable": "This keyboard's touch layout file cannot be read, so the key grid is read-only. Fix the file in the Code tab, then come back.",
   "editor.assignLoop.touch.orphanedKeyEdits": "{0, plural, one {# key edit no longer matches any key on this layout, so it will not be applied. Your other edits are unaffected. Press Continue again to move on.} other {# key edits no longer match any key on this layout, so they will not be applied. Your other edits are unaffected. Press Continue again to move on.}}",
   "editor.assignLoop.touch.previewHeading": "Touch preview",
   "editor.assignLoop.touch.previewWarnings": "Preview warnings:",

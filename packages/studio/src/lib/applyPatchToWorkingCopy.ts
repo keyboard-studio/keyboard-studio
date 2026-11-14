@@ -19,6 +19,7 @@
 // Open), but the files are unchanged until the author agrees; the notice says
 // so. With no host mounted the change is reported through `devLog.warn`.
 
+import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
 import type { IRPath } from "@keyboard-studio/contracts";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { PatchOrigin, WorkingCopyPatch } from "../survey/types.ts";
@@ -70,6 +71,10 @@ function carryHeaderEdits(
  */
 function reportStrayWorkingIr(wc: ReturnType<typeof useWorkingCopyStore.getState>): void {
   if (wc.ir === null || wc.startIr === null || wc.ir === wc.startIr) return;
+  // Expected, not stray: an opened keyboard with no touch file keeps the touch editor's
+  // build-at-output path (writes the working model) until the touch file is generated on
+  // Open as one agreed change.
+  if (wc.startVfs !== null && findTouchLayoutPath(wc.startVfs) === undefined && wc.ir.touchLayout !== undefined) return;
   const view = (ir: NonNullable<typeof wc.ir>): string => JSON.stringify([ir.groups, ir.stores, ir.raw]);
   if (view(wc.ir) !== view(wc.startIr)) {
     devLog.error("[open-apply] the working IR and the file's parse disagree before an apply; a writer bypassed the apply seam");
