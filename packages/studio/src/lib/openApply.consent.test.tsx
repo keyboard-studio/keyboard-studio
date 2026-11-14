@@ -1,7 +1,6 @@
 // An assignment is verified before ANYTHING is written (spec 111 live files):
-// a refusal or a declined consent leaves the files, the held overlays and the
-// undo log exactly as they were, and held overlays go in with the assignment
-// as their own step only once it has been accepted.
+// a refusal or a declined consent leaves the files and the undo log exactly as
+// they were. Nothing is held on Open, so an assignment writes only itself.
 //
 // No fixture makes the engine ask for a reformat of the guard group any more
 // (it now places a new group precisely), so the guard-consent test wraps
@@ -121,7 +120,7 @@ describe("a held overlay is not written ahead of an assignment that is not appli
     expect(after.ir).not.toBe(after.startIr); // the exception is still held
   });
 
-  it("a declined consent leaves them as they were too, and consent writes the overlay and the assignment together", () => {
+  it("a declined consent leaves the files as they were too, and consent writes the assignment and its guards (not a rule addition left in the working IR)", () => {
     holdNarrowException();
     recordMarksTreatmentValue(MARKS);
     control.forceGuardReformat = true;
@@ -135,10 +134,10 @@ describe("a held overlay is not written ahead of an assignment that is not appli
     const done = applyOpenChange({ kind: "assign", add: [swap("+ [K_E] > U+025B")], remove: [] }, { consentedReemit: true });
     expect(done.status).toBe("applied");
     expect(text()).toContain("U+025B");
-    expect(text()).toContain("U+007A"); // the held exception
+    expect(text()).not.toContain("U+007A"); // nothing held is flushed with it
     expect(text()).toContain(`group(${MARKS_GUARD_GROUP})`);
-    // the held overlay is its own step; assignment plus guards are ONE record
-    expect(useOpenUndoStore.getState().records.map((r) => r.view.kind)).toEqual(["flush", "assign"]);
+    // assignment plus guards are ONE record, and no "earlier changes" step precedes it
+    expect(useOpenUndoStore.getState().records.map((r) => r.view.kind)).toEqual(["assign"]);
     expect(useWorkingCopyStore.getState().ir).toBe(useWorkingCopyStore.getState().startIr);
   });
 

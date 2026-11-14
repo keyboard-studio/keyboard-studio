@@ -163,6 +163,8 @@ import { resolveStartTouchJson } from "../../lib/resolveStartTouchJson.ts";
 import { isLiveOpen } from "../../lib/openMode.ts";
 import { findTouchLayoutPath } from "../../lib/findTouchLayoutPath.ts";
 import { readVfsText } from "../../lib/vfsText.ts";
+import { useApplyOnOpen } from "../../components/OpenApplyHost.tsx";
+import { buildTouchReseedChange } from "../../lib/openApply/touchReseed.ts";
 import { commitTouchEditOnOpen, commitTouchOpOnOpen, groupTouchCommitsOnOpen, installRulesOnOpen } from "./touchOpenCommit.ts";
 import { useOpenUndoStore, type TouchKeyRestoreEntry } from "../../stores/openUndoStore.ts";
 import { pendingTouchDeletions, putKeysBack } from "../../lib/openApply/touchRestore.ts";
@@ -2141,17 +2143,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // Open (spec 111 FR-041/FR-044): the touch FILE is the layout the key grid, the
   // builder and the Code tab show. Edits are written into it (touchOpenCommit), so
   // nothing is replayed over it; the overlay is a record only. A keyboard opened
-  // without a touch file keeps the derived layout and the overlay path.
+  // without a touch file has no layout here: the step offers to create one
+  // (FR-017, one agreed and undoable change) and edits nothing until it exists.
   const fileTouch = useMemo<{ layout: TouchLayoutIR | null; unreadable: boolean }>(() => {
     if (!liveOpen || startVfs === null) return { layout: null, unreadable: false };
     const path = findTouchLayoutPath(startVfs);
     const text = path === undefined ? undefined : readVfsText(startVfs, path);
-    // No touch file (owner ruling 2026-11-14, interim): an opened keyboard without
-    // a touch file keeps the existing path, where the editor builds a layout that is
-    // emitted at output, until T087b makes generating the touch file on Open one
-    // agreed, undoable change that creates the file. This is the one place the touch
-    // editor writes the working model on Open; nothing is routed through the seam
-    // for it now.
     if (text === undefined) return { layout: null, unreadable: false };
     try {
       return { layout: parseTouchLayout(text), unreadable: false };
@@ -2165,12 +2162,19 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const fileTouchLayout = fileTouch.layout;
   const openTouch = fileTouchLayout !== null;
   const openTouchUnreadable = fileTouch.unreadable;
+  // Open with no touch file at all (FR-017): nothing to edit until the author agrees
+  // to create one. An unreadable file is not "missing": it is never replaced here.
+  const openNoTouch = liveOpen && startVfs !== null && !openTouch && !openTouchUnreadable;
+  const applyOnOpen = useApplyOnOpen();
 
   const touchLayoutResult = useMemo(() => {
     const appliedEdits = [...charTouch.values()].filter((a) =>
       a.mechanisms.some((m) => m.patternId !== "touch_inherited"),
     );
     if (startIr === null) return { json: null, warnings: [] };
+    // Open without a readable touch file: nothing is derived (the file is created
+    // only by the agreed reseed/create change, never emitted at output).
+    if (liveOpen && !openTouch) return { json: null, warnings: [] };
     if (openTouch) {
       // Open: the preview starts from the touch FILE (which already holds every
       // key-grid edit) and lays only the in-progress character assignments over it.
@@ -2229,7 +2233,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // not stable; the key is). baseIr is a stable snapshot post-lockDesktop.
     // baseVfs is stable after instantiation but included for correctness.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startIr, touchKey, startVfs, mods, resolvedSeedSource, deletedTouchKeyIds, openTouch]);
+  }, [startIr, touchKey, startVfs, mods, resolvedSeedSource, deletedTouchKeyIds, openTouch, liveOpen]);
 
   const touchLayoutJson = touchLayoutResult.json;
   // Diagnostic messages for touch assignments the engine could not apply
@@ -2262,7 +2266,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // replayed onto it (a letter placed on the desktop reaches touch only as a
     // suggestion, never as a key) and no seed source re-derives it.
     if (fileTouchLayout !== null) return fileTouchLayout;
-    if (startIr === null) return null;
+    if (liveOpen || startIr === null) return null;
     try {
       const baseTouchJson =
         resolvedSeedSource === "reseed-from-desktop"
@@ -2280,7 +2284,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       );
       return null;
     }
-  }, [startIr, startVfs, mods, resolvedSeedSource, fileTouchLayout]);
+  }, [startIr, startVfs, mods, resolvedSeedSource, fileTouchLayout, liveOpen]);
 
   // Open: the methods the session log holds as deleted (restorable), and the file's
   // layout with them put back (for naming them only; never written).
@@ -2368,6 +2372,24 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     id: "editor.assignLoop.touch.open.undoLabel",
     message: "touch layout edit",
   });
+  // "Reseed touch from desktop" on Open (owner ruling 2026-11-14): the layout Copy
+  // builds, written as ONE agreed change that replaces the touch file (or creates
+  // it when there is none). The host asks first, with what will change; a decline
+  // leaves everything as it was. The label names the undo step.
+  const reseedUndoLabel = openNoTouch
+    ? t({ id: "editor.assignLoop.touch.open.createUndoLabel", message: "created the touch layout" })
+    : t({ id: "editor.assignLoop.touch.open.reseedUndoLabel", message: "reseeded the touch layout from the desktop keys" });
+  const [reseedFailed, setReseedFailed] = useState(false);
+  const handleReseedOnOpen = useCallback(() => {
+    setReseedFailed(false);
+    const built = buildTouchReseedChange(reseedUndoLabel);
+    if (!built.ok) {
+      devLog.error("[TouchGallery] the touch layout could not be built from the desktop keys:", built.reason);
+      setReseedFailed(true);
+      return;
+    }
+    void applyOnOpen(built.change);
+  }, [applyOnOpen, reseedUndoLabel]);
   const groupOnOpen = useCallback(
     (run: () => void): void => {
       if (openTouch) groupTouchCommitsOnOpen(run, openTouchLabel);
@@ -8473,6 +8495,45 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         </span>
       </div>
 
+      {/* Open (owner ruling 2026-11-14): reseeding the touch layout from the desktop
+          keys stays available but is not the step's lead. It sits behind a native
+          disclosure (keyboard-reachable, labelled by its summary), and using it asks
+          the author first and can be undone from the footer. */}
+      {openTouch && (
+        <details
+          data-testid="touch-open-more"
+          style={{ flex: "0 0 auto", fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
+        >
+          <summary className="ks-focus-ring" style={{ cursor: "pointer" }}>
+            {t({ id: "editor.assignLoop.touch.open.moreOptions", message: "More touch options" })}
+          </summary>
+          <p style={{ margin: "6px 0" }}>
+            {t({
+              id: "editor.assignLoop.touch.open.reseedHint",
+              message:
+                "Make a new touch layout from your desktop keys, replacing this one. You are shown what will change and asked first, and you can undo it.",
+            })}
+          </p>
+          <button
+            type="button"
+            className="ks-focus-ring"
+            data-testid="touch-open-reseed"
+            onClick={handleReseedOnOpen}
+            style={ghostBtn}
+          >
+            {t({ id: "editor.assignLoop.touch.open.reseedButton", message: "Reseed touch from desktop" })}
+          </button>
+          {reseedFailed && (
+            <p role="alert" data-testid="touch-open-reseed-failed" style={{ margin: "6px 0" }}>
+              {t({
+                id: "editor.assignLoop.touch.open.reseedFailed",
+                message: "The touch layout could not be made from the desktop keys. Your files are unchanged.",
+              })}
+            </p>
+          )}
+        </details>
+      )}
+
       {touchEditorMode === "character" ? (
         <>
           {totalChars > 0 && (
@@ -8594,6 +8655,79 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     id: "editor.assignLoop.touch.previewHeading",
     message: "Touch preview",
   });
+
+  // Open, no touch file (FR-017): generation is offered as the way forward, and it
+  // is the only thing this step does until the file exists. Continue without it
+  // ships the keyboard as it was opened (desktop only); nothing is held for later.
+  if (openNoTouch) {
+    return (
+      <AssignLoopShell
+        headingText={t({
+          id: "editor.assignLoop.touchGalleryHeading",
+          message: "Touch Gallery",
+        })}
+        modalityLabel={t({
+          id: "editor.assignLoop.modality.touch",
+          message: "Touch",
+        })}
+        modalityLabelPlacement="inline"
+        leftContent={
+          <div
+            data-testid="touch-open-no-file"
+            style={{ display: "flex", flexDirection: "column", gap: 12, padding: isNarrow ? "24px 0" : "24px 20px" }}
+          >
+            <PublishStepNav
+              spec={{
+                back: {
+                  label: t({ id: "editor.assignLoop.touch.keyMode.backButton", message: "Back" }),
+                  onClick: onBack,
+                  testId: "touch-key-mode-back",
+                  ariaLabel: t({
+                    id: "editor.assignLoop.touch.keyMode.backAriaLabel",
+                    message: "Back to mechanisms",
+                  }),
+                },
+                forward: {
+                  label: t({
+                    id: "editor.assignLoop.touch.keyMode.continueButton",
+                    message: "Continue",
+                  }),
+                  onClick: () => onComplete([]),
+                  testId: "touch-key-mode-continue",
+                },
+              }}
+            />
+            <p style={{ margin: 0, fontFamily: FONT, color: TEXT_MAIN }}>
+              {t({
+                id: "editor.assignLoop.touch.open.noFile",
+                message:
+                  "This keyboard has no touch layout. You can create one from your desktop keys, which adds a phone and tablet layout. You are shown what it will contain and asked first, and you can undo it. Or continue without one, and the keyboard stays desktop only.",
+              })}
+            </p>
+            <div>
+              <button
+                type="button"
+                className="ks-focus-ring"
+                data-testid="touch-open-create"
+                onClick={handleReseedOnOpen}
+                style={ghostBtn}
+              >
+                {t({ id: "editor.assignLoop.touch.open.createButton", message: "Create a touch layout" })}
+              </button>
+            </div>
+            {reseedFailed && (
+              <p role="alert" data-testid="touch-open-reseed-failed" style={{ margin: 0 }}>
+                {t({
+                  id: "editor.assignLoop.touch.open.reseedFailed",
+                  message: "The touch layout could not be made from the desktop keys. Your files are unchanged.",
+                })}
+              </p>
+            )}
+          </div>
+        }
+      />
+    );
+  }
 
   return (
     <>

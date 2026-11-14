@@ -135,14 +135,12 @@ import {
   resetIdentity,
   renameFilesInVfs,
   parseSlotId,
-  propagateDesktopLayersToTouch,
   collectLayerCombosInUse,
   applyIdentityToKps,
   applyContextToleranceOverlay,
   applyMarkGuards,
   replayKmnEdits,
   replaceCapsRules,
-  syncTouchCapsLayerRaw,
   writeCasedKeysStore,
   removeCasedKeysStore,
   removedTouchKeyRuleIds,
@@ -158,6 +156,7 @@ import {
 } from "../steps/editorMutate.ts";
 
 import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
+import { surfaceLayerCombos, syncCapsLayer } from "./touchLayoutText.ts";
 import { readVfsText } from "./vfsText.ts";
 import { markAttachmentsFromWorklist } from "./markAttachments.ts";
 import { formViolations, outputFormWarning } from "./outputFormUniformity.ts";
@@ -1308,7 +1307,7 @@ export function projectWorkingCopyVfs(
             kmnEntryForPropagation.content,
             keyboardId,
           ).ir;
-          const propagateResult = propagateDesktopLayersToTouch(
+          const propagateResult = surfaceLayerCombos(
             touchEntry.content,
             freshIr,
             physicalAssignments,
@@ -1451,10 +1450,8 @@ export function projectWorkingCopyVfs(
             touchEntryForCaps !== undefined &&
             typeof touchEntryForCaps.content === "string"
           ) {
-            const synced = syncTouchCapsLayerRaw(touchEntryForCaps.content, {
-              ...(bcp47 !== undefined ? { bcp47 } : {}),
-            });
-            if (synced.changed) vfs.set(touchPathForCaps, synced.json, false);
+            const synced = syncCapsLayer(touchEntryForCaps.content, bcp47);
+            if (synced !== touchEntryForCaps.content) vfs.set(touchPathForCaps, synced, false);
           }
         }
       } catch (err: unknown) {

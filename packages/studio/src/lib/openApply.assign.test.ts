@@ -416,7 +416,7 @@ describe("applyOpenChange assign", () => {
     expect(useOpenAssignStore.getState().session).toBeNull();
   });
 
-  it("holds nothing as an overlay: held rule additions are written first, as their own step", () => {
+  it("holds nothing as an overlay: a rule addition left in the working IR is not written with an assignment (no flush)", () => {
     open("\n");
     const start = useWorkingCopyStore.getState().startIr!;
     const next = structuredClone(start);
@@ -427,7 +427,7 @@ describe("applyOpenChange assign", () => {
     useWorkingCopyStore.getState().setWorkingIR(next);
     const a = swap("ɛ", "+ [K_E] > U+025B");
     expect(applyOpenChange({ kind: "assign", add: [a], remove: [] }).status).toBe("applied");
-    expect(files().kmn).toContain("U+007A");
+    expect(files().kmn).not.toContain("U+007A");
     expect(files().kmn).toContain("U+025B");
     expectReplayEmpty();
   });

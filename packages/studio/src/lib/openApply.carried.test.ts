@@ -1,16 +1,14 @@
-// Changes the author already applied in their own tools and only held for the
-// output (rules-step additions, an applied context-tolerance fix) belong in the
-// file the moment any change is applied on Open (spec 111 FR-041, live files).
-// The change carries them into the same splice; the re-parse then clears them.
+// Nothing is held on Open (spec 111 FR-041, live files; T086g, T086h): every change
+// is written when applied, so a change writes only itself. The flush that used to
+// write held rules-step additions ahead of another change is gone, and neither the
+// output nor another change derives rule additions from the working IR.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderHook } from "@testing-library/react";
 import { createVirtualFS, type IRRule, type StartKeyboard } from "@keyboard-studio/contracts";
 import { emitRule, parseKmn } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useOpenRemovalStore } from "../stores/openRemovalStore.ts";
-import { useWorkingCopyTransform } from "../hooks/useWorkingCopyTransform.ts";
-import { projectWorkingCopyForOutput } from "./serializeWorkingCopy.ts";
+import { useOpenUndoStore } from "../stores/openUndoStore.ts";
 import { applyOpenChange, undoLastOpenApply } from "./openApply.ts";
 import { readVfsText } from "./vfsText.ts";
 
@@ -54,8 +52,6 @@ const byKey = (k: string): IRRule =>
   rules().find((r) => r.context.some((c) => c.kind === "vkey" && c.name === k))!;
 const fileText = (): string => readVfsText(useWorkingCopyStore.getState().startVfs!, KMN_PATH)!;
 const ruleLines = (): string[] => fileText().split("\r\n").filter((l) => l.startsWith("+"));
-const withoutVersion = (s: string): string =>
-  s.split(/(?<=\n)/).filter((l) => !/&KEYBOARDVERSION|&VERSION/i.test(l)).join("");
 
 function extra(template: IRRule, nodeId: string, out: string, marked: boolean): IRRule {
   const r = { ...structuredClone(template), nodeId, output: [{ kind: "char" as const, value: out }] };
@@ -63,22 +59,10 @@ function extra(template: IRRule, nodeId: string, out: string, marked: boolean): 
   return marked ? { ...r, rulesStepAdded: true as const } : r;
 }
 
-async function routesAgree(): Promise<void> {
-  const s = useWorkingCopyStore.getState();
-  const { result } = renderHook(() => useWorkingCopyTransform({ previewedStartId: ID }));
-  const previewVfs = createVirtualFS(s.startVfs!.entries());
-  result.current!(previewVfs, ID);
-  const preview = readVfsText(previewVfs, KMN_PATH)!;
-  const projected = await projectWorkingCopyForOutput();
-  const download = [...projected!.vfs.entries()].find((e) => e.path === KMN_PATH)!.content as string;
-  expect(withoutVersion(preview)).toBe(withoutVersion(fileText()));
-  expect(withoutVersion(download)).toBe(withoutVersion(fileText()));
-}
-
-describe("a change on Open carries the held overlays into the file", () => {
+describe("a change on Open writes only itself", () => {
   beforeEach(open);
 
-  it("a Narrow exception held from the rules step lands before its guard, with an unrelated remove", async () => {
+  it("a remove writes only the removal; a rule addition left in the working IR is not written with it (no flush)", async () => {
     const start = useWorkingCopyStore.getState().startIr!;
     const next = structuredClone(start);
     const group = next.groups.find((g) => !g.readonly)!;
@@ -87,16 +71,10 @@ describe("a change on Open carries the held overlays into the file", () => {
 
     const result = applyOpenChange({ kind: "remove", itemIds: [byKey("K_D").nodeId], chars: ["d"] });
     expect(result.status).toBe("applied");
-    const lines = ruleLines();
-    expect(lines).toHaveLength(4);
-    expect(lines[0]).toContain("[K_A]");
-    expect(lines[1]).toContain("U+007A"); // the exception, before its guard
-    expect(lines[2]).toContain("[K_G]");
-    expect(lines[3]).toContain("[K_C]");
-    expect(fileText()).not.toContain("[K_D]");
-    const s = useWorkingCopyStore.getState();
-    expect(s.ir).toBe(s.startIr);
-    await routesAgree();
+    expect(ruleLines().map((l) => l.slice(0, 9))).toEqual(["+ [K_A] >", "+ [K_G] >", "+ [K_C] >"]);
+    expect(fileText()).not.toContain("U+007A");
+    // One applied change, one undo record: no "earlier changes" step is logged ahead of it.
+    expect(useOpenUndoStore.getState().records).toHaveLength(1);
   });
 
   it("a context-tolerance overlay left by an older draft is not carried (it is written when applied, never held)", async () => {
@@ -123,7 +101,7 @@ describe("a change on Open carries the held overlays into the file", () => {
     expect(fileText()).not.toContain("U+0079");
   });
 
-  it("a reinsert also carries them, and Restore does not erase them", () => {
+  it("a reinsert (Restore) writes only the restore", () => {
     open();
     expect(applyOpenChange({ kind: "remove", itemIds: [byKey("K_D").nodeId], chars: ["d"] }).status).toBe("applied");
     const start = useWorkingCopyStore.getState().startIr!;
@@ -134,9 +112,9 @@ describe("a change on Open carries the held overlays into the file", () => {
     const entries = useOpenRemovalStore.getState().entries;
     expect(applyOpenChange({ kind: "reinsert", entries: [...entries] }).status).toBe("applied");
     const lines = ruleLines();
-    expect(lines).toHaveLength(5);
-    expect(lines[1]).toContain("U+007A");
-    expect(lines[4]).toContain("[K_D]");
+    expect(lines).toHaveLength(4);
+    expect(fileText()).not.toContain("U+007A");
+    expect(lines[3]).toContain("[K_D]");
   });
 });
 
@@ -170,43 +148,20 @@ describe("reinsert that cannot be placed precisely asks first", () => {
   });
 });
 
-describe("undo keeps the held overlays the change carried (FR-045)", () => {
+describe("undo takes back exactly the change (FR-045)", () => {
   beforeEach(open);
 
-  function holdNarrow(): void {
-    const next = structuredClone(useWorkingCopyStore.getState().startIr!);
-    const group = next.groups.find((g) => !g.readonly)!;
-    group.rules.splice(1, 0, extra(group.rules[0]!, "narrow#1", "z", true));
-    useWorkingCopyStore.getState().setWorkingIR(next);
-  }
-
-  it("undoing the remove leaves the exception in the file and the key back; undoing again removes it", () => {
+  it("undoing a remove returns to the original text in one step; Restore then its undo round-trips", () => {
     const original = fileText();
-    holdNarrow();
     expect(applyOpenChange({ kind: "remove", itemIds: [byKey("K_D").nodeId], chars: ["d"] }).status).toBe("applied");
+    const removed = fileText();
+    const entries = [...useOpenRemovalStore.getState().entries];
+    expect(applyOpenChange({ kind: "reinsert", entries }).status).toBe("applied");
     expect(undoLastOpenApply().ok).toBe(true);
-    const lines = ruleLines();
-    expect(lines).toHaveLength(5);
-    expect(lines[1]).toContain("U+007A");
-    expect(lines[4]).toContain("[K_D]");
+    expect(fileText()).toBe(removed);
+    expect(useOpenRemovalStore.getState().entries.map((e) => e.id)).toEqual(entries.map((e) => e.id));
     expect(undoLastOpenApply().ok).toBe(true);
     expect(fileText()).toBe(original);
     expect(undoLastOpenApply().ok).toBe(false);
-  });
-
-  it("a restore carrying held overlays: undo returns to the text with them, and the removal is listed again", () => {
-    applyOpenChange({ kind: "remove", itemIds: [byKey("K_D").nodeId], chars: ["d"] });
-    const removed = fileText();
-    holdNarrow();
-    const entries = [...useOpenRemovalStore.getState().entries];
-    expect(applyOpenChange({ kind: "reinsert", entries }).status).toBe("applied");
-    expect(useOpenRemovalStore.getState().entries).toHaveLength(0);
-    expect(undoLastOpenApply().ok).toBe(true);
-    expect(ruleLines()).toHaveLength(4);
-    expect(ruleLines()[1]).toContain("U+007A");
-    expect(fileText()).not.toContain("[K_D]");
-    expect(useOpenRemovalStore.getState().entries.map((e) => e.id)).toEqual(entries.map((e) => e.id));
-    expect(undoLastOpenApply().ok).toBe(true);
-    expect(fileText()).toBe(removed);
   });
 });

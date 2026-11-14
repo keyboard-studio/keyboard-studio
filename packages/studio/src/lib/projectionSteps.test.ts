@@ -1,5 +1,5 @@
 // The Open output rows (spec 111 phase 16 S4): what the output still runs on a keyboard
-// opened for update, with and without a touch file.
+// opened for update, with or without a touch file (one row).
 
 import { describe, expect, it } from "vitest";
 import { PROJECTION_STEPS, type ProjectionStep } from "./projectionSteps.ts";
@@ -18,22 +18,13 @@ describe("PROJECTION_STEPS output on Open", () => {
     }
   });
 
-  it("without a touch file keeps the touch steps and the rule additions until the touch file can be generated", () => {
-    const row = PROJECTION_STEPS.outputNoTouchFile;
-    for (const kept of ["touchInject", "touchDeletions", "keyEdits", "layerPropagation", "ruleAdditions"] as const) {
-      expect(row.has(kept), kept).toBe(true);
-    }
-    // It differs from the touch-file row by exactly those steps.
-    expect(sorted(new Set([...row].filter((s) => !PROJECTION_STEPS.output.has(s))))).toEqual(
-      (["touchInject", "touchDeletions", "keyEdits", "layerPropagation", "ruleAdditions"] as ProjectionStep[]).sort(),
-    );
+  it("there is one output row: a keyboard with no touch file runs no touch step either", () => {
+    expect(Object.keys(PROJECTION_STEPS)).not.toContain("outputNoTouchFile");
+    expect(Object.keys(PROJECTION_STEPS)).not.toContain("flush");
   });
 
-  it("openModeProjection picks the row from whether the keyboard has a touch file", () => {
+  it("openModeProjection picks the row from the kind alone", () => {
     expect(openModeProjection({ ...none, kind: "output" }).steps).toBe(PROJECTION_STEPS.output);
-    expect(openModeProjection({ ...none, kind: "output", noTouchFile: false }).steps).toBe(PROJECTION_STEPS.output);
-    expect(openModeProjection({ ...none, kind: "output", noTouchFile: true }).steps).toBe(PROJECTION_STEPS.outputNoTouchFile);
-    // An apply kind is never redirected.
-    expect(openModeProjection({ ...none, kind: "ir", noTouchFile: true }).steps).toBe(PROJECTION_STEPS.ir);
+    expect(openModeProjection({ ...none, kind: "ir" }).steps).toBe(PROJECTION_STEPS.ir);
   });
 });

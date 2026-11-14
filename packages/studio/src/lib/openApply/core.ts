@@ -41,7 +41,6 @@ import { PROJECTION_STEPS, type ProjectionKind } from "../projectionSteps.ts";
 import { findTouchLayoutPath } from "../findTouchLayoutPath.ts";
 import { readVfsText } from "../vfsText.ts";
 import { resolveCarvedCombos } from "../carvedCombo.ts";
-import { deriveRuleAdditions, hasRuleAdditions } from "../../survey/rules/ruleAdditions.ts";
 
 import type { OpenApplyOptions, OpenApplyResult, OpenChange } from "./types.ts";
 
@@ -51,9 +50,6 @@ let undoSeq = 0;
 export const nextUndoId = (): string => `open-undo-${(undoSeq += 1)}`;
 
 export const textOrNull = (vfs: VirtualFS, path: string): string | null => readVfsText(vfs, path) ?? null;
-
-/** Label of the step that writes overlays held from earlier steps into the file. */
-export const EARLIER_CHANGES_LABEL = "Earlier changes written to the file";
 
 /**
  * Build one undo step. `beforeOf` gives a path's text as it was before the
@@ -205,8 +201,6 @@ export interface Projection {
   carvedKmnIr: Record<string, KeyboardIR>;
   /** The IR each changed `.kmn` was meant to become (the last step that wrote it). */
   intendedKmnIr: Record<string, KeyboardIR>;
-  /** The change carried held rules-step additions (touch key identity, until phase 16) with it. */
-  carried: boolean;
 }
 
 /** What an `assign` or `marks` projection adds to the common run. */
@@ -229,25 +223,19 @@ export interface ProjectExtra {
 /**
  * Project one change onto a clone of the starting-point files.
  *
- * The one overlay still held on Open and carried INTO the same run, so the
- * re-parse in `replaceStartingPointFiles` does not drop it, is the rules-step
- * additions (derived from `ir` against `startIr`). With a touch file nothing holds
- * them: the touch commits send the key-identity rules through the seam
- * (`touchOpenCommit`). Only an opened keyboard with NO touch file still writes them
- * through `setWorkingIR` (the touch editor's build-at-output path), so the carry and
- * the flush stay for exactly that case until T087b. Carves, the
- * context-tolerance fix and the deadkey ops are written when applied and never
- * held on Open, so there is nothing to carry for them.
- * Key-edit ops, touch-key deletions and touch keep-inert chars are written into the
- * touch file when applied (phase 16) and are left empty here. Marks guards are written by their own apply (`marks`) and
- * the output no longer regenerates them; an answered caps decision is the one
+ * Nothing is held on Open: carves, the context-tolerance fix, the deadkey ops,
+ * the touch edits (key-edit ops, deletions, keep-inert chars, key-identity rule
+ * additions) and the marks guards are all written into the files when applied, and
+ * a touch file is created only by the agreed reseed. So the run carries no held
+ * overlay and the output derives none. An answered caps decision is the one
  * remaining decision-driven `.kmn` step at output.
  */
 export function projectChange(
   change:
     | { kind: "remove"; itemIds: string[]; chars: string[]; disabledRuleIds?: string[] }
-    | { kind: "flush" }
-    | { kind: "ir"; nextIr: KeyboardIR },
+    | { kind: "ir"; nextIr: KeyboardIR }
+    | { kind: "assign" }
+    | { kind: "marks" },
   opts: OpenApplyOptions,
   extra: ProjectExtra = {},
 ): { ok: true; projection: Projection } | { ok: false; result: OpenApplyResult } {
@@ -273,7 +261,6 @@ export function projectChange(
   const itemIds = removing ? [...change.itemIds, ...(change.disabledRuleIds ?? [])] : [];
   const workingIr =
     change.kind === "ir" ? change.nextIr : extra.startIr !== undefined ? startIr : (st.ir ?? startIr);
-  const carried = hasRuleAdditions(deriveRuleAdditions(workingIr, startIr));
   const state: ProjectionState = {
     ir: workingIr,
     startIr,
@@ -352,7 +339,6 @@ export function projectChange(
       changed,
       carvedKmnIr: result.carvedKmnIr ?? {},
       intendedKmnIr: result.intendedKmnIr ?? {},
-      carried,
     },
   };
 }
@@ -366,7 +352,7 @@ export function applyRemoveOrIr(
 ): OpenApplyResult {
   const out = projectChange(change, opts, extra);
   if (!out.ok) return out.result;
-  const { changed, carvedKmnIr, carried } = out.projection;
+  const { changed, carvedKmnIr } = out.projection;
   const changedPaths = Object.keys(changed);
   if (changedPaths.length === 0) return { status: "unchanged" };
 
@@ -376,30 +362,7 @@ export function applyRemoveOrIr(
   const keyboardId = st.startKeyboard!.id;
   const kmnPath = `source/${keyboardId}.kmn`;
 
-  // Overlays held from earlier steps are written first as their OWN undo step,
-  // so undoing this change returns to the text with them in it (they are the
-  // author's earlier work, not part of this change). Both steps land in one
-  // store update below. Consent for the held part is asked for by this same
-  // call, once: nothing is written until it is given.
-  let flushAfter: Record<string, string | null> = {};
-  let flushRecord: OpenUndoRecord | undefined;
-  if (carried) {
-    const flush = projectChange({ kind: "flush" }, opts);
-    if (!flush.ok) return flush.result;
-    flushAfter = flush.projection.changed;
-    if (Object.keys(flushAfter).length > 0) {
-      flushRecord = recordUndo(
-        nextUndoId(),
-        EARLIER_CHANGES_LABEL,
-        keyboardId,
-        beforeFrom(startVfs, {}),
-        flushAfter,
-        { kind: "flush" },
-        "earlier-changes",
-      );
-    }
-  }
-  const baseOf = beforeFrom(startVfs, flushAfter);
+  const baseOf = beforeFrom(startVfs, {});
 
   // Record what Restore needs while the old IR and text are still in hand.
   let entry: OpenRemovalEntry | undefined;
@@ -407,8 +370,6 @@ export function applyRemoveOrIr(
     const startKmn = readVfsText(startVfs, kmnPath);
     const carvedKmn = carvedKmnIr[kmnPath];
     const files: OpenRemovalEntry["files"] = {};
-    // "Before" is the text with the held overlays already written, so
-    // restoring it keeps them.
     for (const path of changedPaths) {
       const before = baseOf(path);
       const after = changed[path];
@@ -440,13 +401,9 @@ export function applyRemoveOrIr(
   );
   const written = useWorkingCopyStore.getState().replaceStartingPointFiles(changed);
   if (!written.ok) return { status: "failed", reason: written.error };
-  if (flushRecord !== undefined) useOpenUndoStore.getState().push(flushRecord);
   // A removal is always logged: the Removed list is derived from the log.
   if (entry !== undefined || Object.keys(record.files).length > 0) useOpenUndoStore.getState().push(record);
-  // When the change was entirely what the held overlays carried, the flush step
-  // IS the change and holds its undo record.
-  const recorded = Object.keys(record.files).length > 0 ? undoId : (flushRecord?.id ?? undoId);
-  return { status: "applied", changedPaths, undoId: recorded };
+  return { status: "applied", changedPaths, undoId };
 }
 
 

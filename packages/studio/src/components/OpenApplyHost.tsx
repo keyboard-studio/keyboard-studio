@@ -69,7 +69,7 @@ export function OpenApplyHost({ children }: { children: ReactNode }) {
           const change = typeof source === "function" ? source() : source;
           if (change === null) return { status: "failed", reason: "The change no longer applies to the keyboard." } as OpenApplyResult;
           const r = applyOpenChange(change, { consentedReemit });
-          if (r.status === "needs-consent") throw new ReformatConsentRequiredError(r.files);
+          if (r.status === "needs-consent") throw new ReformatConsentRequiredError(r.files, r.touchReplacement);
           return r;
         });
         if (result === undefined) {

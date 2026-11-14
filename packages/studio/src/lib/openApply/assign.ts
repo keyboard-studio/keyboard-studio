@@ -12,7 +12,6 @@
 //             the guards that must see the new rules;
 //   verify  : only lines the assignments added appear (a store the keyboard
 //             already has is never overwritten), then record and write.
-// Held overlays are written into the files first as their own step.
 
 import type { KeyboardIR, MechanismAssignment } from "@keyboard-studio/contracts";
 import { deriveFacets, isKeyboardSource, parseKmn, recognizePatterns } from "@keyboard-studio/engine";
@@ -25,12 +24,10 @@ import {
 } from "../../stores/openAssignStore.ts";
 import { useOpenUndoStore } from "../../stores/openUndoStore.ts";
 import { getMarksTreatmentValue } from "../../survey/marks/marksValue.ts";
-import { deriveRuleAdditions, hasRuleAdditions } from "../../survey/rules/ruleAdditions.ts";
 import { marksGuardsFromValue } from "../projectionInput.ts";
 import { readVfsText } from "../vfsText.ts";
 import {
   applyRemoveOrIr,
-  EARLIER_CHANGES_LABEL,
   beforeFrom,
   intendedMatchesText,
   nextUndoId,
@@ -124,23 +121,12 @@ function irFor(text: string, keyboardId: string, touchLayout: KeyboardIR["touchL
 
 // -- context ------------------------------------------------------------------
 
-/** Overlays the next apply would have to carry into the files first. */
-function holdsOverlays(st: WorkingCopyState): boolean {
-  const startIr = st.startIr;
-  if (startIr === null) return false;
-  return (
-    hasRuleAdditions(deriveRuleAdditions(st.ir ?? startIr, startIr))
-  );
-}
-
 interface AssignContext {
   st: WorkingCopyState;
   keyboardId: string;
   kmnPath: string;
-  /** The `.kmn` as the file will hold it before this change: the store's text with held overlays written. */
+  /** The `.kmn` as the file holds it before this change. */
   curKmn: string;
-  /** Held overlays written ahead of this change (nothing is in the store yet). */
-  flushChanged: Record<string, string | null>;
   sess: OpenAssignSession | null;
   curList: readonly MechanismAssignment[];
   gone: MechanismAssignment[];
@@ -162,21 +148,20 @@ interface Prepared {
 
 // -- stage 1: prepare ---------------------------------------------------------
 
-/** A file's text as this run sees it: the store's, unless the held overlays change it. */
-const textOf = (ctx: AssignContext, path: string): string | null =>
-  path in ctx.flushChanged ? ctx.flushChanged[path]! : textOrNull(ctx.st.startVfs!, path);
+/** A file's text as this run sees it: the store's. */
+const textOf = (ctx: AssignContext, path: string): string | null => textOrNull(ctx.st.startVfs!, path);
 
 function prepare(ctx: AssignContext, forceRegen: boolean): { ok: true; value: Prepared } | { ok: false; result: OpenApplyResult } {
   const { st, keyboardId, kmnPath, curKmn, sess } = ctx;
   const regen = ctx.gone.length > 0 || forceRegen;
-  let prepared: Record<string, string | null> = { ...ctx.flushChanged };
+  let prepared: Record<string, string | null> = {};
   let slow = false;
   if (regen) {
     if (sess === null) return { ok: false, result: { status: "failed", reason: "There is nothing to take back." } };
     const labelPaths = Object.keys(sess.lastAfter).filter((p) => p !== kmnPath);
     const unchanged = Object.entries(sess.lastAfter).every(([p, t]) => textOf(ctx, p) === t);
     if (sess.fast && unchanged) {
-      prepared = { ...ctx.flushChanged, ...sess.base };
+      prepared = { ...sess.base };
     } else {
       slow = true;
       if (
@@ -343,10 +328,9 @@ function runAssign(ctx: AssignContext, forceRegen: boolean): OpenApplyResult {
 
   // Stage 2a: the assignments (guards are a second run, below).
   const marksValue = getMarksTreatmentValue();
-  const out = projectChange({ kind: "flush" }, opts, {
+  const out = projectChange({ kind: "assign" }, opts, {
     assignments: p.applyList,
     ...(marksValue !== undefined ? { marksTreatment: marksValue } : {}),
-    runAs: "assign",
     prepared: p.prepared,
     ...(p.prepIr !== undefined ? { startIr: p.prepIr } : {}),
   });
@@ -362,11 +346,10 @@ function runAssign(ctx: AssignContext, forceRegen: boolean): OpenApplyResult {
   if (marksValue !== undefined && marksGuardsFromValue(marksValue) !== null) {
     const guardIr = irFor(finalKmn, keyboardId, st.startIr!.touchLayout);
     if (guardIr === undefined) return { status: "failed", reason: `${kmnPath} is not a keyboard source.` };
-    const guards = projectChange({ kind: "flush" }, opts, {
+    const guards = projectChange({ kind: "marks" }, opts, {
       marksTreatment: marksValue,
       prepared: changed,
       startIr: guardIr,
-      runAs: "marks",
     });
     if (!guards.ok) return guards.result;
     changed = { ...guards.projection.changed };
@@ -406,23 +389,15 @@ function runAssign(ctx: AssignContext, forceRegen: boolean): OpenApplyResult {
     undoId,
     ctx.gone.length > 0 && ctx.added.length === 0 ? "Take back assignment" : "Assign characters",
     keyboardId,
-    beforeFrom(startVfs, ctx.flushChanged),
+    beforeFrom(startVfs, {}),
     changed,
     { kind: "assign", before: sess, after },
     ctx.gone.length > 0 && ctx.added.length === 0 ? "take-back" : undefined,
   );
-  // Held overlays go in as their own step (undoing the assignment keeps them);
-  // everything is verified by now, so the one store update cannot be followed
-  // by a refusal.
-  const flushRecord =
-    Object.keys(ctx.flushChanged).length > 0
-      ? recordUndo(nextUndoId(), EARLIER_CHANGES_LABEL, keyboardId, beforeFrom(startVfs, {}), ctx.flushChanged, { kind: "flush" }, "earlier-changes")
-      : undefined;
   if (changedPaths.length > 0) {
     const written = useWorkingCopyStore.getState().replaceStartingPointFiles(changed);
     if (!written.ok) return { status: "failed", reason: written.error };
   }
-  if (flushRecord !== undefined && Object.keys(flushRecord.files).length > 0) useOpenUndoStore.getState().push(flushRecord);
   // Always logged: the session list is derived from the log.
   useOpenUndoStore.getState().push(record);
   return { status: "applied", changedPaths, undoId };
@@ -430,22 +405,12 @@ function runAssign(ctx: AssignContext, forceRegen: boolean): OpenApplyResult {
 
 export function applyAssign(change: Extract<OpenChange, { kind: "assign" }>, opts: OpenApplyOptions): OpenApplyResult {
   const st = useWorkingCopyStore.getState();
-  // Held overlays are carried INTO this run (projected, not yet written), so
-  // the starting text is the whole truth and nothing is written until the
-  // assignment itself has been verified: a refusal or a declined consent
-  // leaves the files and the undo log exactly as they were.
-  let flushChanged: Record<string, string | null> = {};
-  if (holdsOverlays(st)) {
-    const flush = projectChange({ kind: "flush" }, opts);
-    if (!flush.ok) return flush.result;
-    flushChanged = flush.projection.changed;
-  }
   if (st.startVfs === null || st.startKeyboard === null || st.startIr === null) {
     return { status: "failed", reason: "No keyboard is open." };
   }
   const keyboardId = st.startKeyboard.id;
   const kmnPath = `source/${keyboardId}.kmn`;
-  const curKmn = (flushChanged[kmnPath] as string | undefined) ?? readVfsText(st.startVfs, kmnPath);
+  const curKmn = readVfsText(st.startVfs, kmnPath);
   if (curKmn === undefined) return { status: "failed", reason: `${kmnPath} is missing.` };
 
   const sessionNow = useOpenAssignStore.getState().session;
@@ -457,7 +422,7 @@ export function applyAssign(change: Extract<OpenChange, { kind: "assign" }>, opt
   const survivorKeys = new Set(survivors.map(assignmentFingerprint));
   const added = change.add.filter((a) => a.modality === "physical" && !survivorKeys.has(assignmentFingerprint(a)));
   if (gone.length === 0 && added.length === 0) return { status: "unchanged" };
-  return runAssign({ st, keyboardId, kmnPath, curKmn, flushChanged, sess, curList, gone, survivors, added, opts }, false);
+  return runAssign({ st, keyboardId, kmnPath, curKmn, sess, curList, gone, survivors, added, opts }, false);
 }
 
 /** The recorded marks decision's guard rules, written into the file. */

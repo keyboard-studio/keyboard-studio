@@ -88,9 +88,37 @@ export type OpenChange =
       files: Record<string, string | null>;
       /** Plain label recorded on the undo step. */
       label: string;
+      /**
+       * Set when the author is asked before the files are written (FR-009), as for
+       * replacing or creating the touch layout: without consent the apply writes
+       * nothing and answers `needs-consent` with this summary for the dialog.
+       */
+      askFirst?: TouchReplacementSummary;
       /** Marks a step the undo UI words itself. */
       labelKey?: OpenUndoLabelKey;
     };
+
+/** What replacing (or creating) the touch layout file changes, shown to the author before they agree. */
+export interface TouchReplacementSummary {
+  /** The touch layout file. */
+  path: string;
+  /** The keyboard has no touch file: the change creates it. */
+  creating: boolean;
+  /** Layer ids the new layout has and the file does not. */
+  layersAdded: string[];
+  /** Layer ids the file has and the new layout does not. */
+  layersRemoved: string[];
+  keysBefore: number;
+  keysAfter: number;
+  /** The existing file (or the built one) cannot be read, so the key counts mean nothing. */
+  unreadable: boolean;
+  /** Rules that name a touch key the file has now and the new layout lacks (they stop applying). */
+  orphanedRules: number;
+  /** Touch placements still in progress whose host key the new layout lacks. */
+  orphanedDrafts: number;
+  /** Other files the same change writes (the `.kmn` store, the `.kps` entry). */
+  alsoWrites: string[];
+}
 
 /** What a `touch` change does to the layout. */
 export type TouchEdit =
@@ -108,7 +136,7 @@ export type OpenApplyResult =
       /** A restore left these files as they are because they changed since the removal. */
       notRestored?: string[];
     }
-  | { status: "needs-consent"; files: string[] }
+  | { status: "needs-consent"; files: string[]; /** Set for a touch layout replacement or creation (asked first, not a reformat). */ touchReplacement?: TouchReplacementSummary }
   | { status: "unchanged" }
   /** The author was asked and said no; nothing was written. (Set by the host.) */
   | { status: "declined" }

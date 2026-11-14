@@ -25,7 +25,8 @@ import { OUTPUT_FORM_SEAM_PATTERN_IDS } from "@keyboard-studio/engine";
 import { getToZip, getPatternLibraryService } from "./services.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
-import { capsHandlingFromDecisions, openModeProjection, projectionInputFromState, startHasTouchFile } from "./projectionInput.ts";
+import { conformTouchText } from "./touchLayoutText.ts";
+import { capsHandlingFromDecisions, openModeProjection, projectionInputFromState } from "./projectionInput.ts";
 import { selectKmnEdits } from "./projectionInput.ts";
 import { getMarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
@@ -50,7 +51,6 @@ import {
   parseKvks,
   parseTouchLayout,
   ensurePackageFiles,
-  conformTouchLayoutToKeymanSchema,
 } from "@keyboard-studio/engine";
 import type { HelpDocsRenderInput } from "@keyboard-studio/engine";
 import type { KeyboardIR, KvksIR, LayoutChartFile, TouchLayoutIR } from "@keyboard-studio/contracts";
@@ -598,7 +598,6 @@ export async function projectWorkingCopyForOutput(
         ? {
             openMode: openModeProjection({
               kind: "output",
-              noTouchFile: !startHasTouchFile(startVfs),
               identity,
               startDisplayName: startKeyboard.displayName,
               ...(opts?.consentedReemit === true ? { consentedReemit: true } : {}),
@@ -942,7 +941,7 @@ export async function projectWorkingCopyForOutput(
     if (!path.endsWith(".keyman-touch-layout")) continue;
     const text = readVfsText(clonedVfs, path);
     if (text === undefined) continue;
-    const { json, removed } = conformTouchLayoutToKeymanSchema(text);
+    const { json, removed } = conformTouchText(text);
     if (removed.length > 0) clonedVfs.set(path, json, false);
   }
 

@@ -102,20 +102,20 @@ afterEach(() => cleanup());
 describe("the per-kind step table (T086f)", () => {
   it("lists the guards only for the marks run, and never for the output on Open", () => {
     expect(PROJECTION_STEPS.marks.has("markGuards")).toBe(true);
-    for (const kind of ["remove", "ir", "flush", "assign", "output"] as const) {
+    for (const kind of ["remove", "ir", "assign", "output"] as const) {
       expect(PROJECTION_STEPS[kind].has("markGuards")).toBe(false);
     }
   });
 
   it("an assign run has no intended-text check; the other projecting apply runs do", () => {
     expect(PROJECTION_STEPS.assign.has("intendedCheck")).toBe(false);
-    for (const kind of ["remove", "ir", "flush", "marks"] as const) {
+    for (const kind of ["remove", "ir", "marks"] as const) {
       expect(PROJECTION_STEPS[kind].has("intendedCheck")).toBe(true);
     }
   });
 
   it("no apply run writes the output-only steps; the output run lists none of the retired overlays", () => {
-    for (const kind of ["remove", "ir", "flush", "assign", "marks"] as const) {
+    for (const kind of ["remove", "ir", "assign", "marks"] as const) {
       for (const step of ["touchInject", "css", "authoredDocs", "identity", "descriptor", "rename"] as const) {
         expect(PROJECTION_STEPS[kind].has(step)).toBe(false);
       }

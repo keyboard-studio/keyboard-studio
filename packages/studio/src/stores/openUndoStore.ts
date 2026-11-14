@@ -54,13 +54,11 @@ export type OpenUndoView =
         /** Touch methods put back (they leave the restore list). */
         | { type: "restores"; ids: string[] };
     }
-  /** Held overlays written into the file ahead of another step. */
-  | { kind: "flush" }
   /** Any other precomputed or projected write (rule additions, `files`). */
   | { kind: "files" };
 
 /** Which known step a record is, so the UI can word it in the author's language. */
-export type OpenUndoLabelKey = "code-view" | "context-tolerance" | "earlier-changes" | "take-back" | "layout-edit";
+export type OpenUndoLabelKey = "code-view" | "context-tolerance" | "take-back" | "layout-edit";
 
 export interface OpenUndoRecord {
   id: string;
@@ -134,7 +132,6 @@ function rebuildDerived(records: readonly OpenUndoRecord[]): void {
       case "restore":
       case "marks":
       case "touch":
-      case "flush":
       case "files":
         break;
     }

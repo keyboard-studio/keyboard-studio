@@ -43,8 +43,6 @@ export function OpenUndoButton() {
         return t({ id: "openUndo.codeView", message: "Undo: code view edit" });
       case "context-tolerance":
         return t({ id: "openUndo.contextTolerance", message: "Undo: context-tolerance fix" });
-      case "earlier-changes":
-        return t({ id: "openUndo.flush", message: "Undo: earlier changes written to the file" });
       case "take-back":
         return t({ id: "openUndo.unassign", message: "Undo: took back an assignment" });
       case "layout-edit":
@@ -64,8 +62,6 @@ export function OpenUndoButton() {
         return t({ id: "openUndo.assign", message: "Undo: assigned characters" });
       case "marks":
         return t({ id: "openUndo.marks", message: "Undo: wrote the marks guards" });
-      case "flush":
-        return t({ id: "openUndo.flush", message: "Undo: earlier changes written to the file" });
       case "files":
       case "touch":
         return t({ id: "openUndo.generic", message: `Undo: ${{ label: r.label }}` });

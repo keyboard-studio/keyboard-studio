@@ -86,7 +86,6 @@ import {
   capsHandlingFromDecisions,
   marksGuardsFromValue,
   openModeProjection,
-  startHasTouchFile,
   projectionInputFromState,
   selectKmnEdits,
 } from "../lib/projectionInput.ts";
@@ -561,7 +560,6 @@ export function useWorkingCopyTransform(
       const openMode = isOpenedWithDescriptor(instantiationMode, startVfs, keyboardId)
         ? openModeProjection({
             kind: "output",
-            noTouchFile: !startHasTouchFile(startVfs),
             identity: { displayName: identityDisplayName ?? undefined, languages: identityLanguages },
             startDisplayName: storeStartDisplayName,
             consentedReemit: true,

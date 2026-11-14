@@ -46,7 +46,7 @@ export type ProjectionStep =
   | "rename" // 4: keyboard id rename
   | "intendedCheck"; // apply runs only: the written text must match the IR the change meant
 
-/** What a run is for: an apply kind (`OpenChange["kind"]`), the flush of held overlays, or the output. */
+/** What a run is for: an apply kind (`OpenChange["kind"]`) or the output. */
 export type ProjectionKind =
   | "remove"
   | "reinsert"
@@ -56,22 +56,23 @@ export type ProjectionKind =
   | "model"
   | "files"
   | "touch"
-  | "flush"
-  | "output"
-  | "outputNoTouchFile";
+  | "output";
 
 const set = (...steps: ProjectionStep[]): ReadonlySet<ProjectionStep> => new Set(steps);
 
-/** The carved items and the held rule additions: what a removal, an `ir` change or a flush projects. */
-const CARRY = set("carve", "ruleAdditions", "carveKeycaps", "intendedCheck");
+/**
+ * What an `ir` change projects: the carved items and the rules-step additions of the
+ * change's own `nextIr` (the rules step writes them when applied). A removal and an
+ * assignment run carry no held additions: nothing is held on Open.
+ */
+const IR_CARRY = set("carve", "ruleAdditions", "carveKeycaps", "intendedCheck");
 
 export const PROJECTION_STEPS: Readonly<Record<ProjectionKind, ReadonlySet<ProjectionStep>>> = {
-  remove: CARRY,
-  ir: CARRY,
-  flush: CARRY,
+  remove: set("carve", "carveKeycaps", "intendedCheck"),
+  ir: IR_CARRY,
   // The assignments' own rules and labels; the guards are a second run (`marks`),
   // and the caller checks the .kmn itself (assignments add lines the carve IR lacks).
-  assign: set("carve", "ruleAdditions", "carveKeycaps", "assignments", "layerPropagation", "keycapLabels"),
+  assign: set("carve", "carveKeycaps", "assignments", "layerPropagation", "keycapLabels"),
   // The guard rules, which must see the rules an assignment just wrote.
   marks: set("carve", "ruleAdditions", "carveKeycaps", "markGuards", "intendedCheck"),
   // These kinds write precomputed text and do not project.
@@ -79,7 +80,7 @@ export const PROJECTION_STEPS: Readonly<Record<ProjectionKind, ReadonlySet<Proje
   model: set(),
   files: set(),
   touch: set(),
-  // The preview and the download on Open, for a keyboard WITH a touch file. Decisions
+  // The preview and the download on Open (with or without a touch file: a keyboard with none ships without one unless the author created it, an applied change). Decisions
   // are a record only, so the guards, the tolerance fix, the deadkey ops, and (phase 16)
   // every touch edit are never replayed here: they are in the files. Gone with phase 16:
   // touch injection, touch deletions, key edits, desktop-to-touch layer propagation and
@@ -99,26 +100,6 @@ export const PROJECTION_STEPS: Readonly<Record<ProjectionKind, ReadonlySet<Proje
     "carve",
     "carveKeycaps",
     "assignments",
-    "caps",
-    "identity",
-    "keycapLabels",
-    "descriptor",
-    "rename",
-  ),
-  // Interim (T087b): an opened keyboard with NO touch file still builds its layout at
-  // output, so it keeps the touch steps and the rule additions the touch editor holds in
-  // the working IR. Removed when T087b makes creating the touch file one applied change.
-  outputNoTouchFile: set(
-    "touchInject",
-    "css",
-    "authoredDocs",
-    "carve",
-    "ruleAdditions",
-    "carveKeycaps",
-    "touchDeletions",
-    "keyEdits",
-    "assignments",
-    "layerPropagation",
     "caps",
     "identity",
     "keycapLabels",

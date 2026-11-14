@@ -258,6 +258,7 @@ export {
   applyIdentityToKps,
   DESCRIPTOR_CONSUMED_FIELDS,
   parseTargetTokens,
+  KMW_JS_TARGETS,
   kpsMemberRef,
   normaliseKpsFontEntries,
   // spec 080 FR-002 — the welcome page's folder-convention member reference.

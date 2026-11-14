@@ -25,12 +25,10 @@ import { isLiveOpen } from "./openMode.ts";
 import { readVfsText } from "./vfsText.ts";
 import {
   beforeFrom,
-  EARLIER_CHANGES_LABEL,
   failure,
   findAnchor,
   spliceKmnIntended,
   nextUndoId,
-  projectChange,
   recordUndo,
   reinsertRules,
   textOrNull,
@@ -46,10 +44,11 @@ export type {
   OpenApplyResult,
   OpenChange,
   RefusalCode,
+  TouchReplacementSummary,
 } from "./openApply/types.ts";
 import type { OpenApplyOptions, OpenApplyResult, OpenChange } from "./openApply/types.ts";
 
-function applyFiles(change: Extract<OpenChange, { kind: "files" }>): OpenApplyResult {
+function applyFiles(change: Extract<OpenChange, { kind: "files" }>, opts: OpenApplyOptions = {}): OpenApplyResult {
   const { startVfs, startKeyboard } = useWorkingCopyStore.getState();
   if (startVfs === null || startKeyboard === null) {
     return { status: "failed", reason: "No keyboard is open." };
@@ -63,6 +62,10 @@ function applyFiles(change: Extract<OpenChange, { kind: "files" }>): OpenApplyRe
   }
   const changedPaths = Object.keys(changed);
   if (changedPaths.length === 0) return { status: "unchanged" };
+  // Asked first (FR-009): nothing is written until the author has agreed.
+  if (change.askFirst !== undefined && opts.consentedReemit !== true) {
+    return { status: "needs-consent", files: changedPaths, touchReplacement: change.askFirst };
+  }
   for (const path of changedPaths) {
     const text = changed[path];
     if (typeof text !== "string" || !path.endsWith(".kmn")) continue;
@@ -150,10 +153,6 @@ function applyReinsert(
   opts: OpenApplyOptions,
 ): OpenApplyResult {
   const consented = opts.consentedReemit === true;
-  // Overlays held for the output go into the files first, so the re-parse that
-  // follows does not drop them.
-  const flush = projectChange({ kind: "flush" }, opts);
-  if (!flush.ok) return flush.result;
   const st = useWorkingCopyStore.getState();
   const { startVfs, startKeyboard } = st;
   if (startVfs === null || startKeyboard === null) {
@@ -162,9 +161,6 @@ function applyReinsert(
   const keyboardId = startKeyboard.id;
   const kmnPath = `source/${keyboardId}.kmn`;
   const work = new Map<string, string>();
-  for (const [path, text] of Object.entries(flush.projection.changed)) {
-    if (text !== null) work.set(path, text);
-  }
   const current = (path: string): string | undefined => work.get(path) ?? readVfsText(startVfs, path);
 
   const restored = new Set<string>();
@@ -220,32 +216,17 @@ function applyReinsert(
   for (const [path, text] of work) {
     if (readVfsText(startVfs, path) !== text) changed[path] = text;
   }
-  // Held overlays go in as their own step first (see applyRemoveOrIr); the
-  // restore is the second step, and undoing it puts the removals back on the list.
-  const flushAfter = flush.projection.changed;
-  const flushRecord =
-    Object.keys(flushAfter).length > 0
-      ? recordUndo(
-          nextUndoId(),
-          EARLIER_CHANGES_LABEL,
-          keyboardId,
-          beforeFrom(startVfs, {}),
-          flushAfter,
-          { kind: "flush" },
-          "earlier-changes",
-        )
-      : undefined;
+  // The restore is one step; undoing it puts the removals back on the list.
   const record = recordUndo(
     nextUndoId(),
     "Restore removed items",
     keyboardId,
-    beforeFrom(startVfs, flushAfter),
+    beforeFrom(startVfs, {}),
     changed,
     { kind: "restore", entries: change.entries.filter((e) => restored.has(e.id)) },
   );
   const written = useWorkingCopyStore.getState().replaceStartingPointFiles(changed);
   if (!written.ok) return { status: "failed", reason: written.error };
-  if (flushRecord !== undefined) useOpenUndoStore.getState().push(flushRecord);
   // Always logged: the restored removals leave the Removed list because of it.
   useOpenUndoStore.getState().push(record);
   return {
@@ -273,7 +254,7 @@ export function applyOpenChange(change: OpenChange, opts: OpenApplyOptions = {})
   // files as they were: the store is only written as the last step, in one update.
   try {
     if (change.kind === "reinsert") return applyReinsert(change, opts);
-    if (change.kind === "files") return applyFiles(change);
+    if (change.kind === "files") return applyFiles(change, opts);
     if (change.kind === "model") return applyModel(change, opts);
     if (change.kind === "assign") return applyAssign(change, opts);
     if (change.kind === "marks") return applyMarks(opts);
@@ -291,7 +272,6 @@ function revertView(view: OpenUndoView): void {
     case "restore": // its entries return to the Removed list with its record
     case "assign": // the session is the previous assign record's `after`
     case "marks":
-    case "flush":
     case "files":
       return;
     case "touch": {

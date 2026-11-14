@@ -174,15 +174,8 @@ export function openModeProjection(args: {
   preview?: boolean;
   /** What the run is for; picks its row of `PROJECTION_STEPS`. */
   kind: ProjectionKind;
-  /**
-   * `kind: "output"` only: the opened keyboard has no touch file, so the output still builds
-   * its layout (interim, until the touch file can be generated on Open). Picks the
-   * `outputNoTouchFile` row. Anything else reads as "has a touch file".
-   */
-  noTouchFile?: boolean;
 }): NonNullable<ProjectWorkingCopyVfsInput["openMode"]> {
-  const { identity, startDisplayName, consentedReemit, preview, noTouchFile } = args;
-  const kind: ProjectionKind = args.kind === "output" && noTouchFile === true ? "outputNoTouchFile" : args.kind;
+  const { identity, startDisplayName, consentedReemit, preview, kind } = args;
   return {
     steps: PROJECTION_STEPS[kind],
     kps: {
@@ -223,18 +216,13 @@ export function applyOpenWorkingCopyFiles(
   }
 }
 
-/** True when the opened keyboard's working files include a touch layout file. */
-export function startHasTouchFile(startVfs: VirtualFS | null | undefined): boolean {
-  return startVfs !== null && startVfs !== undefined && findTouchLayoutPath(startVfs) !== undefined;
-}
-
 export function projectionInputFromState(
   state: ProjectionState,
   extras: ProjectionExtras,
 ): ProjectWorkingCopyVfsInput {
   const { liveLayoutOverride, liveCssOverride, marksTreatment, kmnEdits, capsHandling, ...callSite } = extras;
-  // Open output with a touch file (spec 111 FR-041, SC-013): every touch edit is in the file,
-  // so no touch overlay is read. The store holds none of them here; say so in development.
+  // Open output (spec 111 FR-041, SC-013): every touch edit is in the file (or there is no
+  // touch file and the keyboard ships without one), so no touch overlay is read. The store holds none of them here; say so in development.
   const openOutputWithTouchFile = extras.openMode?.steps === PROJECTION_STEPS.output;
   if (openOutputWithTouchFile) {
     // The store mirrors the file's own text in `touchLayoutJson` after a touch write; that is not a held edit.

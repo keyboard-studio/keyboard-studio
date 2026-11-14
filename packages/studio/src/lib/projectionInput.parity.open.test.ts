@@ -293,15 +293,19 @@ describe("SC-010 and SC-013: output on Open with a touch file", () => {
     }
   });
 
-  it("an opened keyboard with no touch file still builds its layout at output (until the touch file can be generated)", async () => {
+  it("an opened keyboard with no touch file and no generation downloads without one; nothing is held (T087b)", async () => {
     openWithTouch(false);
-    const built = '{"phone":{"layer":[{"id":"default","row":[{"id":1,"key":[{"id":"K_A","text":"a"}]}]}]}}';
-    useWorkingCopyStore.getState().setTouchLayoutJson(built);
     const projected = await projectWorkingCopyForOutput();
     expect(projected).not.toBeNull();
-    const out = projected!.vfs.get(TOUCH_PATH)?.content;
-    expect(typeof out).toBe("string");
-    expect(JSON.parse((out as string).replace(/^﻿/, ""))).toEqual(JSON.parse(built));
+    expect(projected!.vfs.get(TOUCH_PATH)).toBeUndefined();
+    expect(projected!.vfs.list().some((p) => p.endsWith(".keyman-touch-layout"))).toBe(false);
+  });
+
+  it("a layout the store holds is never built into a keyboard that has no touch file (the interim path is gone)", async () => {
+    openWithTouch(false);
+    useWorkingCopyStore.getState().setTouchLayoutJson('{"phone":{"layer":[{"id":"default","row":[{"id":1,"key":[{"id":"K_A","text":"a"}]}]}]}}');
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected!.vfs.get(TOUCH_PATH)).toBeUndefined();
   });
 
   it("a touch layout the store holds is ignored when the keyboard has a touch file", async () => {

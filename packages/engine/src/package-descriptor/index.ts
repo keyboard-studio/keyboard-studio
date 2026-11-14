@@ -21,6 +21,7 @@ export {
   buildLanguageElement,
   buildLanguagesBlock,
   parseTargetTokens,
+  KMW_JS_TARGETS,
   kpsMemberRef,
   normaliseKpsFontEntries,
   WELCOME_PAGE_KPS_REF,
