@@ -130,3 +130,56 @@ export function applyIdentityStubMutation(
 
   vfs.set(path, rewritten.join("\n"));
 }
+
+const TARGETS_ANY = "store(&TARGETS) 'any'";
+
+/**
+ * Sets the keyboard's target platforms to `'any'` (product owner ruling,
+ * 2026-11-07). Every produced keyboard ships desktop and touch, the two
+ * outputs that adapt per OS, so no keyboard picks individual platforms. It
+ * also gives every keyboard a web build, which the preview and the Layout
+ * tab simulate; a `'windows'`-only keyboard compiles to `.kmx` alone.
+ *
+ * Every existing `store(&TARGETS)` line is rewritten in place. When there is
+ * none, the line is inserted after the last system-store line, or before
+ * `begin`, or prepended — the same placement as an inserted `&NAME`. A file
+ * that already says exactly `'any'` is left byte-identical.
+ *
+ * @throws if the keyboard source file is not present in `vfs` or is binary.
+ */
+export function applyTargetsAnyMutation(vfs: VirtualFS, keyboardId: string): void {
+  const path = `source/${keyboardId}.kmn`;
+  const entry = vfs.get(path);
+  if (entry === undefined) {
+    throw new Error(`stub-mutator: keyboard file not found in VirtualFS: ${path}`);
+  }
+  if (typeof entry.content !== "string") {
+    throw new Error(`stub-mutator: keyboard file is binary, expected text: ${path}`);
+  }
+
+  const lines = entry.content.split("\n");
+  const isTargets = (line: string): boolean => /^\s*store\s*\(\s*&TARGETS\s*\)/i.test(line);
+  if (lines.some(isTargets)) {
+    const next = lines.map((line) =>
+      isTargets(line) && !/^\s*store\s*\(\s*&TARGETS\s*\)\s*'any'\s*$/i.test(line.replace(/\r$/, ""))
+        ? `${TARGETS_ANY}${line.endsWith("\r") ? "\r" : ""}`
+        : line,
+    );
+    vfs.set(path, next.join("\n"));
+    return;
+  }
+
+  const inserted = entry.content.includes("\r\n") ? `${TARGETS_ANY}\r` : TARGETS_ANY;
+  let insertAfter = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*store\s*\(\s*&/i.test(lines[i] ?? "")) insertAfter = i;
+  }
+  if (insertAfter >= 0) {
+    lines.splice(insertAfter + 1, 0, inserted);
+  } else {
+    const beginIdx = lines.findIndex((l) => /^\s*begin\b/i.test(l));
+    if (beginIdx >= 0) lines.splice(beginIdx, 0, inserted);
+    else lines.unshift(inserted);
+  }
+  vfs.set(path, lines.join("\n"));
+}

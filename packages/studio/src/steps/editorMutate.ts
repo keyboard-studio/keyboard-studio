@@ -336,3 +336,65 @@ export const DEADKEY_WRITES: readonly IRPath[] = [
   irPath("stores", ARRAY_INDEX),
   irPath("raw", ARRAY_INDEX),
 ];
+
+// ---------------------------------------------------------------------------
+// Layout-tab key edits (spec 117)
+// ---------------------------------------------------------------------------
+
+/**
+ * The Layout-tab write surface: the entry group's rules, which live inside `groups[]`. The
+ * patch helper treats an array as one leaf, so a patch that replaces the groups array is
+ * authorised by the `groups` path itself -- the declaration cannot be narrower than that.
+ * `stores`, `raw`, `header`, `comments`, and `touchLayout` are never touched by a layout op, so
+ * a patch reaching them fails the M3 containment check. Mirrored by `decisionIRPaths["kmn-edits"]`.
+ */
+export const LAYOUT_WRITES: readonly IRPath[] = [irPath("groups")];
+
+// ---------------------------------------------------------------------------
+// Code-tab edits (spec 117 US8)
+// ---------------------------------------------------------------------------
+
+/**
+ * The Code-tab write surface: an applied code edit is a structural IR diff, so it may change
+ * groups (with their rules), stores, comments, opaque `raw[]` fragments, and the header
+ * (including its `begin` entry points). Arrays are one patch leaf, so each is declared whole.
+ * `touchLayout` and the other IR members are never touched by a code edit, so a patch reaching
+ * them fails the M3 containment check. Mirrored by `decisionIRPaths["kmn-edits"]`.
+ */
+export const CODE_WRITES: readonly IRPath[] = [
+  irPath("groups"),
+  irPath("stores"),
+  irPath("comments"),
+  irPath("raw"),
+  irPath("header"),
+];
+
+function isPlain(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** `next` with every key `base` has and `next` lacks set to `undefined`, recursively. */
+function withClearedKeys(base: unknown, next: unknown): unknown {
+  if (!isPlain(next)) return next;
+  const out: Record<string, unknown> = {};
+  if (isPlain(base)) {
+    for (const key of Object.keys(base)) if (!(key in next)) out[key] = undefined;
+  }
+  for (const key of Object.keys(next)) out[key] = withClearedKeys(isPlain(base) ? base[key] : undefined, next[key]);
+  return out;
+}
+
+/**
+ * The patch that moves `base` to `next` over the Code-tab write surface. `applyMutatePatch`
+ * deep-merges objects, so a header field the edit removed would survive the merge; each dropped
+ * header key is therefore named explicitly as `undefined`.
+ */
+export function codeEditPatch(base: KeyboardIR, next: KeyboardIR): Partial<KeyboardIR> {
+  return {
+    groups: next.groups,
+    stores: next.stores,
+    comments: next.comments,
+    raw: next.raw,
+    header: withClearedKeys(base.header, next.header) as KeyboardIR["header"],
+  };
+}

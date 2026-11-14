@@ -203,15 +203,20 @@ describe("buildLdmlExportForDownload", () => {
     await expect(buildLdmlExportForDownload("46")).resolves.toBeDefined();
   });
 
-  it("passes the touch layout through only when &TARGETS includes a touch or web target (row 4.6)", async () => {
-    const xmlOf = async (kmn: string): Promise<string> => {
-      instantiate(kmn, TOUCH_JSON);
+  // Row 4.6's rule itself (touch form only for a touch or web target) is pinned on
+  // the function's direct input in the targetsIncludeTouch table above. Through the
+  // projection it can no longer be reached: the projection always writes
+  // store(&TARGETS) 'any' (product owner ruling 2026-11-07), so the exporter
+  // reads 'any' whatever the starting point declared.
+  it("always exports the touch form, because the projected .kmn says 'any' whatever the start declared (row 4.6)", async () => {
+    for (const declared of ["'any'", "'windows macosx linux'", "'windows web'"]) {
+      instantiate(KMN.replace("'any'", declared), TOUCH_JSON);
       const r = await buildLdmlExportForDownload("46");
-      return strFromU8(unzipSync(r.bytes)["source/ldml_fixture_ldml.xml"]!);
-    };
-    expect(await xmlOf(KMN)).toContain('formId="touch"');
-    expect(await xmlOf(KMN.replace("'any'", "'windows macosx linux'"))).not.toContain('formId="touch"');
-    expect(await xmlOf(KMN.replace("'any'", "'windows web'"))).toContain('formId="touch"');
+      expect(strFromU8(unzipSync(r.bytes)["source/ldml_fixture_ldml.xml"]!), `declared ${declared}`).toContain('formId="touch"');
+      const projectedKmn = spies.projected.current!.get("source/ldml_fixture.kmn")?.content as string;
+      expect(projectedKmn, `declared ${declared}`).toContain("store(&TARGETS) 'any'");
+      expect(projectedKmn, `declared ${declared}`).not.toMatch(/store\(&TARGETS\) '(?!any')/);
+    }
   });
 
   it("throws an OutputBundleError with the ANSI-only reason for a begin ANSI keyboard", async () => {

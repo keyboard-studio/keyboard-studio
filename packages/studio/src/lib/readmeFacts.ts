@@ -24,7 +24,7 @@ import {
   shortestKeySteps,
   type CharGroup,
 } from "./docContent.ts";
-import { displayChar } from "./irToCarveNodes.ts";
+import { charProducerCandidates, displayChar } from "./irToCarveNodes.ts";
 import type { LayoutFamilyValue } from "./layoutFamily.ts";
 
 /** At most this many example rows in the README's How to type table (spec 110 FR-004). */
@@ -138,8 +138,9 @@ function methodOfSteps(steps: readonly string[]): TypingMethod {
 
 function desktopCandidates(ir: KeyboardIR, extras: readonly string[]): Candidate[] {
   const rows: Candidate[] = [];
+  const producers = charProducerCandidates(ir);
   for (const ch of extras) {
-    const steps = shortestKeySteps(ir, ch);
+    const steps = shortestKeySteps(ir, ch, producers);
     if (steps === undefined) continue;
     rows.push({ keys: keysOf(steps), steps, output: readmeChar(ch), method: methodOfSteps(steps), group: groupOf(ch.codePointAt(0)!), char: ch });
   }
@@ -198,8 +199,9 @@ function literalRows(ir: KeyboardIR, candidates: readonly Candidate[]): ReadmeTy
     if ([...first].length === 1 && first !== " ") triggers.add(first);
   }
   const rows: ReadmeTypingRow[] = [];
+  const producers = charProducerCandidates(ir);
   for (const trigger of [...triggers].sort(compareCodePoints)) {
-    const steps = shortestKeySteps(ir, trigger);
+    const steps = shortestKeySteps(ir, trigger, producers);
     if (steps !== undefined && steps.length > 1) rows.push({ keys: keysOf(steps), output: trigger });
   }
   return rows;

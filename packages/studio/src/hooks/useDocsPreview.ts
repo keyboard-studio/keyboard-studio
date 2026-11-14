@@ -88,11 +88,10 @@ export function useDocsPreview(): DocsPreview {
 
   return useMemo(() => {
     const displayName = identity?.displayName ?? startKeyboard?.displayName ?? "";
-    // The base IR's own header.targets — a synchronous approximation of the
-    // final projected .kmn's store(&TARGETS) (which projectWorkingCopyForOutput
-    // reads instead, after carve/identity/rename have run). Good enough for a
-    // live preview; not claimed byte-identical to the eventual output list.
-    const platforms = startIr?.header.targets.map((t) => t.toLowerCase()) ?? [];
+    // The projection always writes store(&TARGETS) 'any' (step 3.1, product
+    // owner ruling 2026-11-07), so the preview names the same platform list the
+    // output will, whatever the starting point declared.
+    const platforms = startIr ? ["any"] : [];
     // Same input the output projection passes (serializeWorkingCopy step 5c):
     // the start prose is non-null on Track 2 only.
     // Removals are applied at projection, never to the store's working IR, so

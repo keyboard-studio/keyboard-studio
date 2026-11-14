@@ -28,6 +28,7 @@ import {
   TEXT_DIM,
   FONT,
 } from "../../lib/galleryTheme.ts";
+import { ChangedInCodeNote } from "../assignLoop/ChangedInCodeNote.tsx";
 import { withRepairedDuplicateTriggerIds, commitDeadkeyEdit, hex4 } from "./deadkeyWrite.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type { DeadkeyOperation } from "../../lib/deadkeyOps.ts";
@@ -219,6 +220,7 @@ export function DeadkeyInventory({ ir, onDefine, onEdit, onCommitRepair }: Deadk
 
   return (
     <div>
+      <ChangedInCodeNote owner="deadkeys" />
       <div style={headStyle}>
         <h2 style={titleStyle}>
           <Trans id="deadkey.inventory.title">Deadkeys — {deadkeys.length} in this keyboard</Trans>

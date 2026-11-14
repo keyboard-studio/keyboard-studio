@@ -343,3 +343,104 @@ dk(acute) + any(acuteIn) > index(acuteOut, 2)
     expect(text).toContain("+ U+0061 > U+0061");
   });
 });
+
+describe("insert-pair and set-display ops", () => {
+  const pairs = (vfs: VirtualFS) => {
+    const { text, deadkeys } = projectedDeadkeys(vfs);
+    return { text, dk: deadkeys[0]! };
+  };
+
+  it("remove-pair then insert-pair at its index restores the emitted .kmn exactly", () => {
+    const setup: DeadkeyOperation[] = [
+      DEFINE,
+      { kind: "add-pair", id: 0x3000, base: "a", accented: "\u00e1" },
+      { kind: "add-pair", id: 0x3000, base: "e", accented: "\u00e9" },
+      { kind: "add-pair", id: 0x3000, base: "i", accented: "\u00ed" },
+    ];
+    const before = makeVfs();
+    applyDeadkeyOpsToVfs(before, KEYBOARD_ID, setup);
+
+    const undone = makeVfs();
+    const result = applyDeadkeyOpsToVfs(undone, KEYBOARD_ID, [
+      ...setup,
+      { kind: "remove-pair", id: 0x3000, index: 1 },
+      { kind: "insert-pair", id: 0x3000, index: 1, base: "e", accented: "\u00e9" },
+    ]);
+    expect(result.warnings).toEqual([]);
+    expect(pairs(undone).text).toBe(pairs(before).text);
+
+    // The class the new op exists for: add-pair would append, reordering the stores.
+    const appended = makeVfs();
+    applyDeadkeyOpsToVfs(appended, KEYBOARD_ID, [
+      ...setup,
+      { kind: "remove-pair", id: 0x3000, index: 1 },
+      { kind: "add-pair", id: 0x3000, base: "e", accented: "\u00e9" },
+    ]);
+    expect(pairs(appended).text).not.toBe(pairs(before).text);
+  });
+
+  it("insert-pair at the end appends; an out-of-range index is skipped with a warning", () => {
+    const vfs = makeVfs();
+    const result = applyDeadkeyOpsToVfs(vfs, KEYBOARD_ID, [
+      DEFINE,
+      { kind: "insert-pair", id: 0x3000, index: 0, base: "a", accented: "\u00e1" },
+      { kind: "insert-pair", id: 0x3000, index: 5, base: "x", accented: "y" },
+    ]);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain("insert-pair");
+    expect(pairs(vfs).dk.pairCount).toBe(1);
+  });
+
+  it("set-display stores the display character, keeps the name, and round-trips", () => {
+    const vfs = makeVfs();
+    const result = applyDeadkeyOpsToVfs(vfs, KEYBOARD_ID, [
+      DEFINE,
+      { kind: "set-display", id: 0x3000, display: "\u00b4" },
+    ]);
+    expect(result.warnings).toEqual([]);
+    const { text, dk } = pairs(vfs);
+    expect(dk.displayChar).toBe("\u00b4");
+    expect(dk.authorName).toBe("acute");
+    expect(text).toContain("display=00b4");
+  });
+
+  it("set-display with undefined clears the stored display; an absent deadkey is skipped with a warning", () => {
+    const vfs = makeVfs();
+    const result = applyDeadkeyOpsToVfs(vfs, KEYBOARD_ID, [
+      DEFINE,
+      { kind: "set-display", id: 0x3000, display: "Z" },
+      { kind: "set-display", id: 0x3000, display: undefined },
+      { kind: "set-display", id: 0x9999, display: "Q" },
+    ]);
+    expect(result.warnings).toHaveLength(1);
+    const { text, dk } = pairs(vfs);
+    expect(text).not.toContain("display=");
+    // Falls back to the escape rule's output.
+    expect(dk.displayChar).toBe("\u00b4");
+  });
+});
+
+describe("modifier-layer triggers through the ops", () => {
+  it("define with triggerModifiers replays on that layer, not the default layer", () => {
+    const vfs = makeVfs();
+    const result = applyDeadkeyOpsToVfs(vfs, KEYBOARD_ID, [
+      { kind: "define", triggerKey: "K_QUOTE", triggerModifiers: ["RALT"], id: 0x3001, accentChar: "\u00b4" },
+    ]);
+    expect(result.warnings).toEqual([]);
+    const dk = projectedDeadkeys(vfs).deadkeys[0]!;
+    expect(dk.triggerKey).toBe("K_QUOTE");
+    expect(dk.triggerModifiers).toEqual(["RALT"]);
+  });
+
+  it("retarget with newTriggerModifiers moves the trigger onto that layer", () => {
+    const vfs = makeVfs();
+    const result = applyDeadkeyOpsToVfs(vfs, KEYBOARD_ID, [
+      DEFINE,
+      { kind: "retarget", id: 0x3000, newTriggerKey: "K_6", newTriggerModifiers: ["SHIFT"] },
+    ]);
+    expect(result.warnings).toEqual([]);
+    const dk = projectedDeadkeys(vfs).deadkeys[0]!;
+    expect(dk.triggerKey).toBe("K_6");
+    expect(dk.triggerModifiers).toEqual(["SHIFT"]);
+  });
+});

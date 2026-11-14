@@ -5,13 +5,13 @@
 // for a one-shot read. See the hook's module doc for why there are TWO
 // produced sets and which feeds what.
 
-import type { KeyboardIR, MechanismAssignment, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { KeyboardIR, KmnEdit, MechanismAssignment, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import {
   augmentWithComposable,
   buildProducedSet,
   buildReachableProducedSet,
 } from "@keyboard-studio/contracts";
-import { buildSessionProducedSet } from "@keyboard-studio/engine";
+import { buildSessionProducedSet, replayKmnEdits } from "@keyboard-studio/engine";
 import { lowercaseFirst } from "./caseOrder.ts";
 import {
   inventoryCoverageGate,
@@ -67,6 +67,18 @@ export interface InventoryDiff {
    * before).
    */
   rawProducedSet: ReadonlySet<string>;
+}
+
+/**
+ * The starting rules as the Code tab's recorded edits leave them (spec 117 ruling 10). A code edit
+ * that replaces or removes a rule changes what the keyboard types, so a character it displaces
+ * must return to the letters to place. Only `code-apply` entries are replayed; with none, the
+ * starting IR itself is returned (the common case stays reference-stable for the hook's memos).
+ */
+export function withCodeEdits(startIr: KeyboardIR | null, entries: readonly KmnEdit[]): KeyboardIR | null {
+  if (startIr === null) return null;
+  const code = entries.filter((e) => e.op === "code-apply");
+  return code.length === 0 ? startIr : replayKmnEdits(startIr, code).ir;
 }
 
 /** STATIC (base-only) — drives lettersToAdd/alreadyProduced; never session-aware. */
@@ -166,8 +178,11 @@ export function deriveInventoryDiff(inputs: {
   startIr: KeyboardIR | null;
   inventory: readonly string[];
   phaseResults: readonly SurveyPhaseResult[];
+  /** The recorded `kmn-edits` entries; Code-tab edits are counted (ruling 10). */
+  kmnEdits?: readonly KmnEdit[];
 }): InventoryDiff {
-  const { startIr, inventory } = inputs;
+  const { inventory } = inputs;
+  const startIr = withCodeEdits(inputs.startIr, inputs.kmnEdits ?? []);
   const raw = rawSessionProducedSet(startIr, selectDesktopAssignments(inputs.phaseResults));
   return splitInventory(
     startIr,
@@ -213,11 +228,13 @@ export function deriveInventoryCoverageGate(state: {
   phaseResults: readonly SurveyPhaseResult[];
   touchLayoutJson: string | null;
   session: Omit<CoverageGateSlices, "touchLayoutJson">;
+  kmnEdits?: readonly KmnEdit[];
 }): InventoryCoverageGate {
   const diff = deriveInventoryDiff({
     startIr: state.startIr,
     inventory: state.session.confirmedInventory,
     phaseResults: state.phaseResults,
+    ...(state.kmnEdits !== undefined ? { kmnEdits: state.kmnEdits } : {}),
   });
   return coverageGateFrom(selectDesktopAssignments(state.phaseResults), diff, {
     touchLayoutJson: state.touchLayoutJson,

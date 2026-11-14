@@ -66,6 +66,11 @@ vi.mock("../lib/serverDraftStore.ts", () => ({
 
 import { draftKey, saveDraft } from "../lib/draftPersistence.ts";
 import { instantiateMinimal } from "../test/draftSeeds.ts";
+import { parseKmn, emitKmn, diffIR } from "@keyboard-studio/engine";
+import {
+  makeReadyRulesDemoArtifact,
+  useRulesDemoArtifactStore,
+} from "../stores/rulesDemoArtifactStore.ts";
 
 const SRC_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -328,11 +333,60 @@ describe("B. registry integrity", () => {
     expect(claimed).toContain("recordPhase");
   });
 
-  it("exactly one surface is equivalence-proven today: the survey replay arm", () => {
+  it("exactly two surfaces are equivalence-proven today: the survey replay arm and kmn-edits (born derived)", () => {
     const proven = DERIVED_SURFACES.filter((s) => s.status === "equivalence-proven").map((s) => s.id);
-    expect(proven).toEqual(["survey-decision-replay"]);
+    expect(proven).toEqual(["survey-decision-replay", "kmn-edits"]);
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// Spec 117: the kmn-edits surface (born derived). Layout-tab edits are recorded at edit
+// time; arms C and D prove replay and draft reload reproduce the entry group's rules.
+// ---------------------------------------------------------------------------
+
+const LAYOUT_KMN = `store(&VERSION) '10.0'
+store(&NAME) 'layout_gate'
+store(&TARGETS) 'any'
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_A] > 'a'
++ [SHIFT K_A] > 'A'
++ [K_B] > 'b'
+`;
+
+function seedLayoutWorkingCopy(): KeyboardIR {
+  const ir = parseKmn(LAYOUT_KMN, "layout_gate").ir;
+  useWorkingCopyStore.setState({ startIr: ir, ir, undoStack: [], desktopLocked: false });
+  useRulesDemoArtifactStore.getState().setArtifact(makeReadyRulesDemoArtifact("blob:gate", "layout_gate"));
+  return ir;
+}
+
+function makeLayoutEdits(): void {
+  const s = useWorkingCopyStore.getState();
+  s.commitKmnEdit(
+    { op: "set-key", vkey: "K_A", layer: [], output: { kind: "text", text: "ŋ" } },
+    { partner: { op: "set-key", vkey: "K_A", layer: ["SHIFT"], output: { kind: "text", text: "Ŋ" } } },
+  );
+}
+
+/** A Layout edit then a Code-tab edit (SC-011): a changed rule, an added rule, and a new store. */
+function makeMixedEdits(): void {
+  makeLayoutEdits();
+  const s = useWorkingCopyStore.getState();
+  const ir = s.ir!;
+  const edited = parseKmn(
+    `${emitKmn(ir)}`
+      .replace("U+0062", "U+0079")
+      .replace("store(&TARGETS)", "store(codeStore) 'xyz'\nstore(&TARGETS)") + "+ [K_C] > 'c'\n",
+    "layout_gate",
+  ).ir;
+  expect(s.commitKmnEdit({ op: "code-apply", changes: diffIR(ir, edited), overrides: [] }).ok).toBe(true);
+}
+
+const liveIrText = (): string => emitKmn(useWorkingCopyStore.getState().ir!);
 
 // ---------------------------------------------------------------------------
 // Arm C — replay equivalence (the proven arm)
@@ -361,6 +415,60 @@ describe("C. replay equivalence", () => {
     expect(installed.identity).toMatchObject({ keyboardId: "testish_new" });
     expect(installed.helpDocs).toMatchObject({ description: "Welcome to the keyboard." });
     expect(installed.ir?.header.keyboardId).toBe("base_id");
+  });
+
+  it("kmn-edits: a rebuild from decisions reproduces the entry group's rules after Layout edits", () => {
+    const start = seedLayoutWorkingCopy();
+    makeLayoutEdits();
+    const live = liveIrText();
+    expect(live).toContain("U+014B");
+    expect(live).toContain("U+014A");
+
+    // A rebuild from the recorded decisions alone, from the starting point.
+    useWorkingCopyStore.setState({ ir: start });
+    resetRebuildTrail();
+    expect(rebuildWorkingCopyFromStores(["physical-layout"])).not.toBeNull();
+    expect(liveIrText()).toBe(live);
+    expect(emitKmn(manualFold(start, getDecisionSnapshot()).ir!)).toBe(live);
+  });
+
+  it("kmn-edits: a rebuild reproduces a mix of Layout and Code entries", () => {
+    const start = seedLayoutWorkingCopy();
+    makeMixedEdits();
+    const live = liveIrText();
+    expect(live).toContain("U+014B");
+    expect(live).toContain("U+0079");
+    expect(live).toContain("codeStore");
+    expect(live).toContain("U+0063");
+
+    useWorkingCopyStore.setState({ ir: start });
+    resetRebuildTrail();
+    expect(rebuildWorkingCopyFromStores(["physical-layout"])).not.toBeNull();
+    expect(liveIrText()).toBe(live);
+    expect(emitKmn(manualFold(start, getDecisionSnapshot()).ir!)).toBe(live);
+  });
+
+  it("kmn-edits: an edit made after the trail was seeded survives a later completion's rebuild", () => {
+    const start = seedLayoutWorkingCopy();
+    recordProvenDecisions();
+    // Seed the checkpoint trail BEFORE the edit, as a session that has already completed steps.
+    expect(rebuildWorkingCopyFromStores(["author-name"])).not.toBeNull();
+
+    makeLayoutEdits();
+    const live = liveIrText();
+
+    // kmn-edits is the LAST decision in the derived order (registered after every other module
+    // and requiring the rule writers), so no completion's rebuild resumes from a cached
+    // checkpoint past it -- a checkpoint built before the edit would silently drop it.
+    // The live rebuild's module list (see manualFold): the registry plus the authoring-track
+    // provider, without which the sort throws on characterInventory's authoring-track edge.
+    const modules = [...Object.values(questionRegistry), authoringTrackProviderModule];
+    const order = decisionOrderFor(modules);
+    expect(order[order.length - 1]).toBe("kmn-edits");
+    const lastCompletion = order[order.length - 2]!;
+    expect(rebuildWorkingCopyFromStores([lastCompletion])).not.toBeNull();
+    expect(liveIrText()).toBe(live);
+    expect(start).not.toBe(useWorkingCopyStore.getState().ir);
   });
 });
 
@@ -425,6 +533,53 @@ describe("D. draft-load sufficiency without the working-copy slice", () => {
     expect(rebuildWorkingCopyFromStores(["copyright-holder"])).not.toBeNull();
     const second = captureDerivedFromWorkingCopy();
     expect(second).toEqual(first);
+  });
+
+  it("kmn-edits: the recorded value reloads from the draft envelope and rebuilds the same rules", () => {
+    const baseId = "derived_gate_layout";
+    instantiateMinimal(baseId);
+    const start = seedLayoutWorkingCopy();
+    makeLayoutEdits();
+    const live = liveIrText();
+
+    saveDraft(baseId);
+    const envelope = JSON.parse(localStorage.getItem(draftKey(baseId))!) as { decisions?: DecisionSet };
+    const reloaded = envelope.decisions?.["kmn-edits"]?.value as { entries: unknown[] } | undefined;
+    expect(reloaded?.entries).toHaveLength(2);
+    const decisionsFromEnvelope = envelope.decisions!;
+
+    useWorkingCopyStore.getState().reset();
+    useDecisionStore.getState().reset();
+    resetRebuildTrail();
+    useWorkingCopyStore.setState({ startIr: start, ir: start });
+    applyDecisionSnapshot(decisionsFromEnvelope);
+
+    expect(rebuildWorkingCopyFromStores(["physical-layout"])).not.toBeNull();
+    expect(liveIrText()).toBe(live);
+  });
+});
+
+describe("D. draft reload with Code entries", () => {
+  it("kmn-edits: a mix of Layout and Code entries reloads from the draft envelope and rebuilds the same keyboard", () => {
+    const baseId = "derived_gate_mixed";
+    instantiateMinimal(baseId);
+    const start = seedLayoutWorkingCopy();
+    makeMixedEdits();
+    const live = liveIrText();
+
+    saveDraft(baseId);
+    const envelope = JSON.parse(localStorage.getItem(draftKey(baseId))!) as { decisions?: DecisionSet };
+    const reloaded = envelope.decisions?.["kmn-edits"]?.value as { entries: Array<{ op: string }> } | undefined;
+    expect(reloaded?.entries.map((e) => e.op)).toEqual(["set-key", "set-key", "code-apply"]);
+
+    useWorkingCopyStore.getState().reset();
+    useDecisionStore.getState().reset();
+    resetRebuildTrail();
+    useWorkingCopyStore.setState({ startIr: start, ir: start });
+    applyDecisionSnapshot(envelope.decisions!);
+
+    expect(rebuildWorkingCopyFromStores(["physical-layout"])).not.toBeNull();
+    expect(liveIrText()).toBe(live);
   });
 });
 

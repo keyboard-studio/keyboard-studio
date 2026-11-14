@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { render } from "../../../test/renderWithI18n.tsx";
-import { LayerSelector } from "./LayerSelector.tsx";
+import { LayerSelector, formatLayerCombo } from "./LayerSelector.tsx";
 
 afterEach(() => {
   cleanup();
@@ -241,5 +241,36 @@ describe("LayerSelector — zero layers: render nothing", () => {
     );
 
     expect(screen.queryByTestId("key-layer-selector")).toBeNull();
+  });
+});
+
+describe("LayerSelector - desktop layer ids and labels", () => {
+  it("formats a modifier combination the way authors say it", () => {
+    expect(formatLayerCombo(["SHIFT", "RALT"])).toBe("Shift+AltGr");
+    expect(formatLayerCombo(["CTRL", "ALT"])).toBe("Ctrl+Alt");
+    expect(formatLayerCombo([])).toBe("");
+  });
+
+  it("shows layerLabels text, falls back to the id, and can hide family headings", () => {
+    const onSelectLayer = vi.fn();
+    render(
+      <LayerSelector
+        layerIds={["SHIFT+RALT", "SHIFT", "plain"]}
+        activeLayerId="plain"
+        onSelectLayer={onSelectLayer}
+        findingCountsByLayerId={new Map()}
+        layerLabels={new Map([["SHIFT+RALT", "Shift+AltGr"], ["plain", ""]])}
+        hideGroupHeadings
+      />,
+    );
+    const combo = screen.getByTestId("key-layer-selector-option-SHIFT+RALT");
+    expect(combo.textContent).toBe("Shift+AltGr");
+    expect(combo.getAttribute("aria-label")).toContain("Shift+AltGr");
+    expect(screen.getByTestId("key-layer-selector-option-SHIFT").textContent).toBe("SHIFT");
+    expect(screen.getByTestId("key-layer-selector-option-plain").textContent).toBe("plain");
+    expect(screen.queryByText("Other layers")).toBeNull();
+    expect(screen.queryByText("Base")).toBeNull();
+    fireEvent.click(combo);
+    expect(onSelectLayer).toHaveBeenCalledWith("SHIFT+RALT");
   });
 });

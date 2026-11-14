@@ -98,6 +98,7 @@ const IR_RULE_FIELDS = {
   nodeId: "internal", context: "row", output: "row", trailingComment: "row",
   ownedByPattern: "internal", ownedByBehaviour: "internal", matchKind: "row",
   targetSelector: "row", sourceLine: "internal", consumedSourceLines: "internal", rulesStepAdded: "internal",
+  authorEdit: "internal",
 } as const satisfies Record<keyof IRRule, FieldClass>;
 
 const IR_STORE_FIELDS = {

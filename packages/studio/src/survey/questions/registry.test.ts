@@ -15,16 +15,18 @@ import {
   demotedPhaseFModules,
   reserveOnlyModules,
   galleryModules,
+  layoutEditModules,
   moduleRecord,
 } from "./registry.ts";
 
 describe("questionRegistry", () => {
   // 143 question modules, including the body-parity, trial, and publish gallery
-  // modules; track_choice is no longer registered.
+  // modules; track_choice is no longer registered. + 1 layout-edit module (spec 117
+  // kmn-edits, registered for replay but not a wizard step) = 144.
   // (re-verified 2026-11-11 -- update this count in the same change that adds
   // or removes a questionRegistry entry.)
-  it("has exactly the verified inventory of 143 entries", () => {
-    expect(Object.keys(questionRegistry).length).toBe(143);
+  it("has exactly the verified inventory of 144 entries", () => {
+    expect(Object.keys(questionRegistry).length).toBe(144);
   });
 
   it("no entry has a 'default' key (namespace-import leak guard)", () => {
@@ -61,6 +63,7 @@ describe("flow membership (single source)", () => {
       demotedPhaseFModules,
       reserveOnlyModules,
       galleryModules,
+      layoutEditModules,
     ];
     const total = groups.reduce((n, g) => n + g.length, 0);
     expect(total).toBe(Object.keys(questionRegistry).length);

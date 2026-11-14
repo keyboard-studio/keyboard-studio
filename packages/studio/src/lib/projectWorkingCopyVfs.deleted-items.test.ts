@@ -76,6 +76,10 @@ function findRuleId(ir: KeyboardIR, char: string): string {
 // Tests
 // ---------------------------------------------------------------------------
 
+// The projection always writes store(&TARGETS) 'any'; a stub already saying so
+// stays byte-identical, which is what the no-edit assertion below pins.
+const ANYSTUB = "store(&TARGETS) 'any'\nc stub\n";
+
 describe("projectWorkingCopyVfs deleted-items end-to-end — real engine, no mock", () => {
   // AC#1: deletedItemIds removes rule#0 (K_A) from the emitted .kmn
   // while leaving rule#1 (K_B) and the group header intact.
@@ -118,7 +122,7 @@ describe("projectWorkingCopyVfs deleted-items end-to-end — real engine, no moc
     const rule1 = makeRule("rule#1", "K_B", "b");
     const entryGroup = makeGroup("group#main", "main", [rule0, rule1]);
     const ir = makeTestIR([entryGroup]);
-    const vfs = stubKmnVfs("test_kb");
+    const vfs = stubKmnVfs("test_kb", ANYSTUB);
 
     projectWorkingCopyVfs({
       vfs,
@@ -133,7 +137,7 @@ describe("projectWorkingCopyVfs deleted-items end-to-end — real engine, no moc
 
     // No re-emit occurs when both sets are empty; original stub content is unchanged.
     const content = vfs.get("source/test_kb.kmn")?.content as string;
-    expect(content).toBe("c stub\n");
+    expect(content).toBe(ANYSTUB);
   });
 
   // deletedItemIds + deletedNodeIds union: the K_A rule via itemIds, the whole

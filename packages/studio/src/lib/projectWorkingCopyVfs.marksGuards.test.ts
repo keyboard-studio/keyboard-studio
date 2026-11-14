@@ -16,6 +16,7 @@ const ACUTE = "́";
 const KMN = [
   "store(&NAME) 'Projected'",
   "store(&VERSION) '14.0'",
+  "store(&TARGETS) 'any'",
   "begin Unicode > use(main)",
   "group(main) using keys",
   "+ [K_A] > 'a'",

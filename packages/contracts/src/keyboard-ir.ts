@@ -554,6 +554,14 @@ export interface IRRule {
    * additions already bind (no double projection).
    */
   rulesStepAdded?: true;
+  /**
+   * Which editor wrote this rule as a `kmn-edits` entry (spec 117). Its only
+   * writers are the engine's `applyLayoutOp` (`"layout-tab"`) and
+   * `applyIRChanges` (`"code-tab"`); never the codec parser. Layout
+   * attribution reads it to label the rule hand-set. The emitter ignores it:
+   * a rule carrying it emits byte-identically to the same rule without it.
+   */
+  authorEdit?: "layout-tab" | "code-tab";
 }
 
 /** A KMN comment node. */

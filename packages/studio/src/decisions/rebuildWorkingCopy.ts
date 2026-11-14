@@ -27,13 +27,13 @@
 // recompute. Editor-owned derivation functions can be injected later
 // without changing this wiring's shape.
 
-import type { KeyboardIR } from "@keyboard-studio/contracts";
+import type { KeyboardIR, KmnEdit } from "@keyboard-studio/contracts";
 import { isNormalizationStepBatch } from "@keyboard-studio/engine";
 import type { QuestionModule } from "../survey/types.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import { authoringTrackProviderModule } from "../survey/questions/authoringTrackProvider.ts";
 import { useDecisionStore, getDecisionSnapshot } from "../stores/decisionStore.ts";
-import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { registerKmnEditsFold, useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { Decision, DecisionId, DecisionSet } from "./decisionTypes.ts";
 import type { ExtractContext } from "./extractContext.ts";
 import { buildLiveExtractContext } from "./liveExtraction.ts";
@@ -47,6 +47,7 @@ import {
 } from "./replayCheckpoints.ts";
 import {
   providerFromModules,
+  replayKeyboard,
   type ReplayState,
 } from "./replayKeyboard.ts";
 
@@ -433,3 +434,28 @@ export function recalculateForStartingPointChangeFromStores(): RebuildOutcome | 
   }
   return outcome;
 }
+
+/**
+ * The live model's fold for a log that holds a Code-tab entry (spec 117 R15): the whole decision
+ * replay from the starting point, with `entries` standing in for the recorded `kmn-edits` value.
+ * It is the IR `rebuildWorkingCopyFromStores(["kmn-edits"])` would install, computed without
+ * installing it, so a `kmn-edits` commit or undo and a rebuild land on the same rules. Pure read.
+ */
+export function foldWithKmnEdits(entries: readonly KmnEdit[]): KeyboardIR | null {
+  const startIr = useWorkingCopyStore.getState().startIr;
+  if (startIr === null) return null;
+  const modules = [...Object.values(questionRegistry), authoringTrackProviderModule];
+  const snapshot = getDecisionSnapshot();
+  const { ["kmn-edits"]: _recorded, ...others } = snapshot;
+  const decisions: DecisionSet =
+    entries.length === 0
+      ? others
+      : { ...others, "kmn-edits": { id: "kmn-edits", value: { entries }, provenance: "asked" } };
+  return replayKeyboard(providerFromModules(modules), {
+    decisions,
+    order: decisionOrderFor(modules),
+    startingPointIR: startIr,
+  }).state.ir;
+}
+
+registerKmnEditsFold(foldWithKmnEdits);

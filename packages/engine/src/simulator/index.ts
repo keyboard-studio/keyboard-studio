@@ -222,6 +222,127 @@ function extractJsSource(compiled: CompileResult): string {
   return UTF8_DECODER.decode(jsArtifact.data);
 }
 
+/** A loaded keyboard plus the processor and fired-rule hook driving it. */
+interface SimulatorSession {
+  keyboard: { isMnemonic: boolean };
+  processor: JSKeyboardProcessor;
+  /** The last rule-match marker recorded; reset before every keystroke. */
+  hits: { last: FiredRuleHit | null };
+}
+
+/**
+ * Load the compiled keyboard once and build the processor around it.
+ *
+ * Fired-rule tracking (spec 082): the compiled script is instrumented so each
+ * rule-match marker reports (group, ruleIndex, srcLine) to the sandbox global
+ * below. `hits.last` is reset before every keystroke; the last hit recorded
+ * during `processKeystroke` is the rule that fired for that step. (With
+ * `use()` delegation the innermost rule's hit lands last.)
+ */
+function loadSession(compiled: CompileResult): SimulatorSession {
+  const scriptSrc = extractJsSource(compiled);
+  const hits: { last: FiredRuleHit | null } = { last: null };
+  const instrumented = instrumentScriptCached(scriptSrc);
+
+  // Load the keyboard via the installed loader. The returned JSKeyboardInterface
+  // already has activeKeyboard set (blueprint §3).
+  const kbdInterface = loadKeyboardInterface(
+    instrumented?.script ?? scriptSrc,
+    NO_OP_STORE_SERIALIZER,
+    instrumented
+      ? {
+          sandboxSetup: (sandbox) => {
+            sandbox[instrumented.hookName] = (
+              group: string,
+              ruleIndex: number,
+              srcLine: number | null,
+            ): void => {
+              hits.last = { group, ruleIndex, srcLine };
+            };
+          },
+        }
+      : undefined,
+  );
+
+  // Build the processor with the loaded interface (mirrors nodeProctor.ts:58-62).
+  const processor = new JSKeyboardProcessor(DEVICE, {
+    baseLayout: 'us',           // blueprint §7: must be 'us' for non-mnemonic keyboards
+    keyboardInterface: kbdInterface,
+    defaultOutputRules: new DefaultOutputRules(),
+  });
+
+  return { keyboard: kbdInterface.activeKeyboard, processor, hits };
+}
+
+/** Insert the seed's pending deadkeys, then restore the caret to `caretPos`. */
+function seedDeadkeys(
+  textStore: SyntheticTextStore,
+  seed: SimulatorContextSeed | undefined,
+  caretPos: number,
+): void {
+  if (!seed?.pendingDeadkeys) return;
+  for (const snapshot of seed.pendingDeadkeys) {
+    textStore.setSelection(snapshot.position);
+    textStore.insertDeadkeyBeforeCaret(snapshot.id);
+  }
+  textStore.setSelection(caretPos);
+}
+
+/** Process one keystroke against `textStore` and capture the resulting step. */
+function stepKeystroke(
+  session: SimulatorSession,
+  textStore: SyntheticTextStore,
+  input: SimKeyInput,
+): SimulationStep {
+  const { keyboard, processor, hits } = session;
+  const keyEvent = buildKeyEvent(input);
+
+  // For mnemonic keyboards, set the mnemonic code before processing.
+  // Pattern.tests K_XXXX keys are positional — skip unless isMnemonic (blueprint §7).
+  if (keyboard.isMnemonic) {
+    const shifted = input.modifiers.includes('shift');
+    const caps = input.caps ?? false;
+    keyEvent.setMnemonicCode(shifted, caps);
+  }
+
+  // processKeystroke mutates textStore and returns a ProcessorAction.
+  // Do NOT re-apply the transform; processKeystroke already applied it (blueprint §5).
+  // Reset the fired-rule hit first: anything recorded from here on belongs
+  // to this keystroke (resetContext above may have run NewContext groups).
+  hits.last = null;
+  const ruleBehavior = processor.processKeystroke(keyEvent, textStore);
+
+  // Finalize the action: applies setStore mutations, variable store saves, beep, etc.
+  if (ruleBehavior?.transcription) {
+    processor.finalizeProcessorAction(ruleBehavior, textStore);
+  }
+
+  // Capture text store state after this keystroke (blueprint §5).
+  const outputAfter = textStore.getText();
+
+  // Capture pending (unmatched) deadkeys (blueprint §5).
+  const pendingDeadkeys: DeadkeySnapshot[] = textStore
+    .deadkeys()
+    .dks.filter((dk) => dk.matched === 0)
+    .map((dk) => ({ id: dk.d, position: dk.p }));
+
+  const beep = ruleBehavior?.beep ?? false;
+
+  // Attach the fired rule when one matched (absent on default-output fall-through).
+  // Built as a fresh object per step; `hits.last` is re-armed at the top of the
+  // next keystroke, so no hit can leak across keystrokes.
+  const step: SimulationStep = {
+    input,
+    outputAfter,
+    pendingDeadkeys,
+    beep,
+  };
+  if (hits.last !== null) {
+    step.firedRule = buildFiredRule(hits.last, ruleBehavior);
+  }
+  return step;
+}
+
 /**
  * Simulate a sequence of key events against a compiled Keyman keyboard.
  *
@@ -255,43 +376,8 @@ export function simulate(
   keys: SimKeyInput[],
   initialContext?: SimulatorContextSeed,
 ): SimulationResult {
-  const scriptSrc = extractJsSource(compiled);
-
-  // Fired-rule tracking (spec 082): instrument the compiled script so each
-  // rule-match marker reports (group, ruleIndex, srcLine) to the sandbox
-  // global below. `lastHit` is reset before every keystroke; the last hit
-  // recorded during `processKeystroke` is the rule that fired for that step.
-  // (With `use()` delegation the innermost rule's hit lands last.)
-  let lastHit: FiredRuleHit | null = null;
-  const instrumented = instrumentScriptCached(scriptSrc);
-
-  // Load the keyboard via the installed loader. The returned JSKeyboardInterface
-  // already has activeKeyboard set (blueprint §3).
-  const kbdInterface = loadKeyboardInterface(
-    instrumented?.script ?? scriptSrc,
-    NO_OP_STORE_SERIALIZER,
-    instrumented
-      ? {
-          sandboxSetup: (sandbox) => {
-            sandbox[instrumented.hookName] = (
-              group: string,
-              ruleIndex: number,
-              srcLine: number | null,
-            ): void => {
-              lastHit = { group, ruleIndex, srcLine };
-            };
-          },
-        }
-      : undefined,
-  );
-  const keyboard = kbdInterface.activeKeyboard;
-
-  // Build the processor with the loaded interface (mirrors nodeProctor.ts:58-62).
-  const processor = new JSKeyboardProcessor(DEVICE, {
-    baseLayout: 'us',           // blueprint §7: must be 'us' for non-mnemonic keyboards
-    keyboardInterface: kbdInterface,
-    defaultOutputRules: new DefaultOutputRules(),
-  });
+  const session = loadSession(compiled);
+  const { processor } = session;
 
   // Prepare the text store, seeded from initialContext when provided.
   // Omitting initialContext reproduces today's empty-buffer behaviour
@@ -328,67 +414,50 @@ export function simulate(
 
     if (!seeded) {
       seeded = true;
-      if (initialContext?.pendingDeadkeys) {
-        for (const snapshot of initialContext.pendingDeadkeys) {
-          textStore.setSelection(snapshot.position);
-          textStore.insertDeadkeyBeforeCaret(snapshot.id);
-        }
-        textStore.setSelection(caretPos);
-      }
+      seedDeadkeys(textStore, initialContext, caretPos);
     }
 
-    const keyEvent = buildKeyEvent(input);
-
-    // For mnemonic keyboards, set the mnemonic code before processing.
-    // Pattern.tests K_XXXX keys are positional — skip unless isMnemonic (blueprint §7).
-    if (keyboard.isMnemonic) {
-      const shifted = input.modifiers.includes('shift');
-      const caps = input.caps ?? false;
-      keyEvent.setMnemonicCode(shifted, caps);
-    }
-
-    // processKeystroke mutates textStore and returns a ProcessorAction.
-    // Do NOT re-apply the transform; processKeystroke already applied it (blueprint §5).
-    // Reset the fired-rule hit first: anything recorded from here on belongs
-    // to this keystroke (resetContext above may have run NewContext groups).
-    lastHit = null;
-    const ruleBehavior = processor.processKeystroke(keyEvent, textStore);
-
-    // Finalize the action: applies setStore mutations, variable store saves, beep, etc.
-    if (ruleBehavior?.transcription) {
-      processor.finalizeProcessorAction(ruleBehavior, textStore);
-    }
-
-    // Capture text store state after this keystroke (blueprint §5).
-    const outputAfter = textStore.getText();
-
-    // Capture pending (unmatched) deadkeys (blueprint §5).
-    const pendingDeadkeys: DeadkeySnapshot[] = textStore
-      .deadkeys()
-      .dks.filter((dk) => dk.matched === 0)
-      .map((dk) => ({ id: dk.d, position: dk.p }));
-
-    const beep = ruleBehavior?.beep ?? false;
-
-    // Attach the fired rule when one matched (absent on default-output fall-through).
-    // Built as a fresh object per step; `lastHit` is re-armed at the top of the
-    // next iteration, so no hit can leak across keystrokes.
-    const step: SimulationStep = {
-      input,
-      outputAfter,
-      pendingDeadkeys,
-      beep,
-    };
-    if (lastHit !== null) {
-      step.firedRule = buildFiredRule(lastHit, ruleBehavior);
-    }
-
-    trace.push(step);
+    trace.push(stepKeystroke(session, textStore, input));
   }
 
   const finalOutput = trace.length > 0 ? (trace[trace.length - 1]?.outputAfter ?? '') : '';
 
   return { finalOutput, trace };
+}
+
+/**
+ * Simulate each input independently against one compiled keyboard, returning
+ * one `SimulationStep` (including `firedRule`) per input.
+ *
+ * The keyboard is loaded ONCE; before every input the context is reset to
+ * `seed` (a fresh text store with the seed text and caret, a context reset,
+ * and the seed's pending deadkeys). Each step therefore equals the single
+ * trace step of `simulate(compiled, [input], seed)`, without paying the
+ * keyboard load per input.
+ *
+ * @throws {Error} Same load failures as `simulate()`.
+ */
+export function simulateEach(
+  compiled: CompileResult,
+  inputs: readonly SimKeyInput[],
+  seed?: SimulatorContextSeed,
+): SimulationStep[] {
+  if (inputs.length === 0) return [];
+  const session = loadSession(compiled);
+  const { processor } = session;
+
+  const seedText = seed?.text ?? '';
+  const caretPos = seed?.caretPos ?? seedText.length;
+
+  return inputs.map((input) => {
+    const textStore = new SyntheticTextStore(seedText, caretPos);
+    processor.resetContext(textStore);
+    // Caps-sync reset clears deadkeys, so seed them after it (as simulate() does).
+    processor.stateKeys['K_CAPS'] = input.caps ?? false;
+    processor.resetContext(textStore);
+    seedDeadkeys(textStore, seed, caretPos);
+    return stepKeystroke(session, textStore, input);
+  });
 }
 
 // ---------------------------------------------------------------------------

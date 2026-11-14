@@ -37,6 +37,7 @@ import invisiblesInventoryModule from "./gallery/invisiblesInventory.ts";
 import retainedConvenienceCharsModule from "./gallery/retainedConvenienceChars.ts";
 import carvedLayoutModule from "./gallery/carvedLayout.ts";
 import deadkeysDefinedModule from "./gallery/deadkeysDefined.ts";
+import kmnEditsModule from "./gallery/kmnEdits.ts";
 import ruleSetModule from "./gallery/ruleSet.ts";
 import physicalLayoutModule from "./gallery/physicalLayout.ts";
 import fallbackPolicyModule from "./gallery/fallbackPolicy.ts";
@@ -157,13 +158,29 @@ export const galleryModules: readonly QuestionModule[] = galleryModuleList.map(
 );
 
 /**
+ * Decision modules that are replayed and looked up but are NOT wizard steps (spec 117,
+ * research R12): they are recorded at edit time by an editor tab, so they are in
+ * `questionRegistry` / `decisionIndex` but deliberately absent from `galleryModules` and
+ * `decisionModules` -- a gallery module would form its own wizard screen.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const layoutEditModuleList: readonly GalleryModule<any>[] = [kmnEditsModule];
+
+export const layoutEditModules: readonly QuestionModule[] = layoutEditModuleList.map(
+  (m) => m as QuestionModule,
+);
+
+/**
  * The typed gallery module for a decision id, for the gallery host and its
  * wrappers — the registry-side counterpart of `decisionIndex` that keeps
  * the value type. Returns undefined for decisions no gallery module settles.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function galleryModuleFor(decisionId: DecisionId): GalleryModule<any> | undefined {
-  return galleryModuleList.find((m) => m.provides[0] === decisionId);
+  return (
+    galleryModuleList.find((m) => m.provides[0] === decisionId) ??
+    layoutEditModuleList.find((m) => m.provides[0] === decisionId)
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -336,6 +353,7 @@ export const questionRegistry: Readonly<Record<string, QuestionModule>> = module
   ...flowModules.project_name,
   ...reserveModules,
   ...galleryModules,
+  ...layoutEditModules,
 ]);
 
 /**

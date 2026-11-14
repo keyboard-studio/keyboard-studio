@@ -44,7 +44,7 @@ export type {
   DeadkeyOverlay,
   DeadkeysDefinedValue,
 } from "../survey/deadkeys/deadkeyOps.ts";
-export { applyDeadkeyOpsToIr } from "../survey/deadkeys/deadkeyOps.ts";
+export { applyDeadkeyOp, applyDeadkeyOpsToIr } from "../survey/deadkeys/deadkeyOps.ts";
 // ---------------------------------------------------------------------------
 // Replay
 // ---------------------------------------------------------------------------
@@ -67,6 +67,11 @@ export function applyDeadkeyOpsToVfs(
   vfs: VirtualFS,
   keyboardId: string,
   ops: readonly DeadkeyOperation[],
+  /**
+   * How the changed IR reaches the file. Defaults to a full emit; Open passes a splice into the
+   * parsed text (`currentIr` is parsed from `currentText`, so spans agree by construction).
+   */
+  write?: (path: string, currentText: string, currentIr: KeyboardIR, nextIr: KeyboardIR) => void,
 ): ApplyDeadkeyOpsResult {
   const warnings: string[] = [];
   if (ops.length === 0) return { warnings, changed: false };
@@ -81,8 +86,10 @@ export function applyDeadkeyOpsToVfs(
   }
 
   let ir: KeyboardIR;
+  let parsedIr: KeyboardIR;
   try {
     ir = parseKmn(kmnText, keyboardId).ir;
+    parsedIr = ir;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     warnings.push(
@@ -108,7 +115,8 @@ export function applyDeadkeyOpsToVfs(
 
   if (changed) {
     try {
-      vfs.set(kmnPath, emitKmn(ir), false);
+      if (write !== undefined) write(kmnPath, kmnText, parsedIr, ir);
+      else vfs.set(kmnPath, emitKmn(ir), false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       warnings.push(

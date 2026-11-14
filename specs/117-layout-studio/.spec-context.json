@@ -1,0 +1,1316 @@
+{
+  "workflow": "companion",
+  "specName": "Layout tab — a visual desktop-layout editor that never shows what it can't produce",
+  "branch": "km/117-layout-studio",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-04T20:11:13.039Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-05T00:51:47.789Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-05T17:20:18.630Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-11-05T17:47:54.617Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-11-07T17:00:00.931Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:25.749Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:26.027Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:26.292Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:26.561Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:26.830Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:27.098Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:27.364Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:27.632Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T057",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:27.901Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T058",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:28.173Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T059",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:28.436Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T060",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:28.704Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T061",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:28.977Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T062",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:29.250Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T064",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:29.516Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T065",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:29.783Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T066",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:30.051Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T067",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:30.317Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T068",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:30.586Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T069",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T18:11:30.861Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T071",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T21:42:57.129Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T072",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T21:42:57.402Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T073",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T21:42:57.670Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T074",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T21:42:57.942Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T075",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T21:42:58.229Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T076",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T21:42:58.517Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T079",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T21:51:41.559Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T077",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T22:02:57.680Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T078",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T22:02:58.071Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T080",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T22:02:58.433Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T081",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T22:02:58.776Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T082",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T22:02:59.103Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T083",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T22:02:59.398Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T084",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:02:21.134Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T085",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:02:21.423Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T086",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:02:21.710Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T087",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:10:03.800Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T088",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:30:10.545Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T090",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:30:10.807Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T089",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:39:48.979Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T091",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:39:49.678Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T095",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:39:50.029Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T096",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:39:50.374Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T097",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-07T23:39:50.725Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T092",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:03:59.563Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T094",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:03:59.826Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T098",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:04:00.097Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T093",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:06:53.493Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T099",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:06:53.763Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T100",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:08:39.118Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T101",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:09:19.564Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T102",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:10:49.136Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T103",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:12:52.296Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T104",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T00:13:38.931Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T105",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T05:55:52.860Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T106",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:02:10.938Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T107",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:02:11.207Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T108",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:02:11.474Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T109",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:02:11.758Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T110",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:24:41.944Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T111",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:24:42.230Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T112",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:24:42.506Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T113",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:24:42.772Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T114",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:24:43.037Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T115",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:24:43.311Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T116",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:36:09.516Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T117",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:50:43.999Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T118",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:50:44.273Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T119",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:50:44.544Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T120",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:50:44.814Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T121",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T06:50:45.085Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T122",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T07:24:03.961Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T123",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T07:24:04.433Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T124",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T07:24:05.090Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T125",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T07:24:05.774Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-11-08T07:33:08.391Z"
+    }
+  ],
+  "unattended": true,
+  "currentTask": "T125",
+  "task_summaries": {
+    "T049": {
+      "status": "DONE",
+      "did": "kmnEdits module test: replay, compose from decisions, empty list, registration",
+      "files": [
+        "packages/studio/src/survey/questions/gallery/kmnEdits.test.ts"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "commitKmnEdit/undoKmnEdit store tests incl. refusals and undo after re-mint",
+      "files": [
+        "packages/studio/src/stores/workingCopyStore.kmnEdits.test.ts"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "projection step 2.2 tests: no-entry byte parity, set-key, after deadkeys/assignments, tolerance skip (2.5 ordering not separately tested)",
+      "files": [
+        "packages/studio/src/lib/projectWorkingCopyVfs.kmnEdits.test.ts"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "case partner tests",
+      "files": [
+        "packages/studio/src/editors/layout/casePartner.test.ts"
+      ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "key-first displacement tests",
+      "files": [
+        "packages/studio/src/editors/layout/keyFirstDisplacement.test.ts"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "KeyEditPanel tests",
+      "files": [
+        "packages/studio/src/editors/layout/KeyEditPanel.test.tsx"
+      ]
+    },
+    "T055": {
+      "status": "DONE",
+      "did": "SC-004 one-spine static guard with planted-violation self-test",
+      "files": [
+        "packages/studio/src/editors/layout/oneSpine.test.ts"
+      ]
+    },
+    "T056": {
+      "status": "DONE",
+      "did": "settled recording-vs-rebuild and ordering; recorded in research R12",
+      "files": [
+        "specs/117-layout-studio/research.md"
+      ]
+    },
+    "T057": {
+      "status": "DONE",
+      "did": "added kmn-edits DecisionId and IR paths",
+      "files": [
+        "packages/studio/src/decisions/decisionTypes.ts"
+      ]
+    },
+    "T058": {
+      "status": "DONE",
+      "did": "kmn-edits module and trail renderer, registered in layoutEditModules (not a wizard step)",
+      "files": [
+        "packages/studio/src/survey/questions/gallery/kmnEdits.ts",
+        "packages/studio/src/survey/questions/gallery/KmnEditsRenderer.tsx",
+        "packages/studio/src/survey/questions/registry.ts"
+      ]
+    },
+    "T059": {
+      "status": "DONE",
+      "did": "LAYOUT_WRITES",
+      "files": [
+        "packages/studio/src/steps/editorMutate.ts"
+      ]
+    },
+    "T060": {
+      "status": "DONE",
+      "did": "commitKmnEdit/undoKmnEdit and undo kinds l/lb",
+      "files": [
+        "packages/studio/src/stores/workingCopyStore.ts"
+      ]
+    },
+    "T061": {
+      "status": "DONE",
+      "did": "derived surface kmn-edits equivalence-proven with replay and draft arms",
+      "files": [
+        "packages/studio/src/decisions/derivedSurfaceRegistry.ts",
+        "packages/studio/src/decisions/derivedEquivalence.test.ts"
+      ]
+    },
+    "T062": {
+      "status": "DONE",
+      "did": "projection input and step 2.2",
+      "files": [
+        "packages/studio/src/lib/projectionInput.ts",
+        "packages/studio/src/lib/projectWorkingCopyVfs.ts",
+        "packages/studio/src/lib/serializeWorkingCopy.ts",
+        "packages/studio/src/hooks/useWorkingCopyTransform.ts"
+      ]
+    },
+    "T064": {
+      "status": "DONE",
+      "did": "casePartner",
+      "files": [
+        "packages/studio/src/editors/layout/casePartner.ts"
+      ]
+    },
+    "T065": {
+      "status": "DONE",
+      "did": "keyFirstDisplacement and ledger kmn-edits overlay",
+      "files": [
+        "packages/studio/src/editors/layout/keyFirstDisplacement.ts",
+        "packages/studio/src/survey/slotOccupancy.ts"
+      ]
+    },
+    "T066": {
+      "status": "DONE",
+      "did": "KeyEditPanel wired into LayoutPane, plus undo button",
+      "files": [
+        "packages/studio/src/editors/layout/KeyEditPanel.tsx",
+        "packages/studio/src/editors/layout/LayoutPane.tsx"
+      ]
+    },
+    "T067": {
+      "status": "DONE",
+      "did": "LayoutEditedKeys label mounted in MechanismGallery",
+      "files": [
+        "packages/studio/src/editors/assignLoop/LayoutEditedKeys.tsx",
+        "packages/studio/src/editors/assignLoop/MechanismGallery.layoutEdits.test.tsx"
+      ]
+    },
+    "T068": {
+      "status": "DONE",
+      "did": "SC-003 round trip test",
+      "files": [
+        "packages/studio/src/editors/layout/roundTrip.test.ts"
+      ]
+    },
+    "T069": {
+      "status": "DONE",
+      "did": "i18n extract, French, catalog lint",
+      "files": [
+        "packages/studio/src/locales/fr/messages.json",
+        "packages/studio/src/locales/en/messages.json"
+      ]
+    },
+    "T071": {
+      "status": "DONE",
+      "did": "insert-pair restore-order tests",
+      "files": [
+        "packages/studio/src/editors/deadkey/deadkeyWrite.test.ts"
+      ]
+    },
+    "T072": {
+      "status": "DONE",
+      "did": "modifier-layer define/retarget tests",
+      "files": [
+        "packages/engine/src/deadkey-lifecycle/deadkey-lifecycle.test.ts"
+      ]
+    },
+    "T073": {
+      "status": "DONE",
+      "did": "insert-pair and set-display op tests",
+      "files": [
+        "packages/studio/src/lib/deadkeyOps.test.ts",
+        "packages/engine/src/deadkey-lifecycle/deadkey-lifecycle.test.ts"
+      ]
+    },
+    "T074": {
+      "status": "DONE",
+      "did": "insert-pair DeadkeyOperation + withInsertedDeadkeyPair",
+      "files": [
+        "packages/studio/src/survey/deadkeys/deadkeyOps.ts",
+        "packages/studio/src/editors/deadkey/deadkeyWrite.ts"
+      ]
+    },
+    "T075": {
+      "status": "DONE",
+      "did": "set-display op, engine setDeadkeyDisplay, display= token, DeadkeyInfo.displayChar",
+      "files": [
+        "packages/contracts/src/ir/deadkeys.ts",
+        "packages/engine/src/deadkey-lifecycle/mutations.ts",
+        "packages/studio/src/survey/deadkeys/deadkeyOps.ts"
+      ]
+    },
+    "T076": {
+      "status": "DONE",
+      "did": "modifier-layer triggers end to end: options, rules, DeadkeyInfo.triggerModifiers, occupancy",
+      "files": [
+        "packages/contracts/src/ir/deadkeys.ts",
+        "packages/engine/src/deadkey-lifecycle/mutations.ts",
+        "packages/engine/src/deadkey-lifecycle/types.ts"
+      ]
+    },
+    "T079": {
+      "status": "DONE",
+      "did": "store: commitLayoutDeadkeyOp + undo kind ld (multi-op, inverse ops), modifier triggers on define/retarget ops, tests",
+      "files": [
+        "packages/studio/src/stores/workingCopyStore.ts",
+        "packages/studio/src/stores/workingCopyStore.kmnEdits.test.ts",
+        "packages/studio/src/lib/deadkeyInverse.ts",
+        "packages/studio/src/survey/deadkeys/deadkeyOps.ts",
+        "packages/studio/src/lib/deadkeyOps.test.ts"
+      ]
+    },
+    "T077": {
+      "status": "DONE",
+      "did": "DeadkeyTablePanel tests: both row shapes, add/change/remove, read-only store rows, space proposal, chain link, empty flag",
+      "files": [
+        "packages/studio/src/editors/layout/DeadkeyTablePanel.test.tsx"
+      ]
+    },
+    "T078": {
+      "status": "DONE",
+      "did": "AfterContextView tests: pendingDeadkeys-seeded simulateEach, no-row fallback, chains, named deadkey, not compiled",
+      "files": [
+        "packages/studio/src/editors/layout/AfterContextView.test.tsx"
+      ]
+    },
+    "T080": {
+      "status": "DONE",
+      "did": "KeyEditPanel deadkey option: new (define op + 083 disclosure, replaces occupied rule) and existing (set-key deadkey); records deadkeys-defined",
+      "files": [
+        "packages/studio/src/editors/layout/KeyEditPanel.tsx",
+        "packages/studio/src/editors/layout/KeyEditPanel.test.tsx"
+      ]
+    },
+    "T081": {
+      "status": "DONE",
+      "did": "DeadkeyTablePanel + deadkeyTable model; ld undo kind in workingCopyStore; space-row proposal",
+      "files": [
+        "packages/studio/src/editors/layout/DeadkeyTablePanel.tsx",
+        "packages/studio/src/editors/layout/deadkeyTable.ts",
+        "packages/studio/src/stores/workingCopyStore.ts"
+      ]
+    },
+    "T082": {
+      "status": "DONE",
+      "did": "AfterContextView deadkey mode via useLayoutAttribution(layer, context); toolbar select and table switch in LayoutPane",
+      "files": [
+        "packages/studio/src/editors/layout/AfterContextView.tsx",
+        "packages/studio/src/editors/layout/LayoutPane.tsx"
+      ]
+    },
+    "T083": {
+      "status": "DONE",
+      "did": "DeadkeyList in LayoutPane (place/delete, no-combinations flag, one entry per deadkey) with tests",
+      "files": [
+        "packages/studio/src/editors/layout/DeadkeyList.tsx",
+        "packages/studio/src/editors/layout/DeadkeyList.test.tsx",
+        "packages/studio/src/editors/layout/LayoutPane.tsx"
+      ]
+    },
+    "T084": {
+      "status": "DONE",
+      "did": "SC-007 deadkey half: every editable deadkey-context row matches simulateEach seeded with its deadkey on the 23 corpus keyboards (compiler numbers deadkeys by first mention)",
+      "files": [
+        "packages/engine/src/layout-attribution/layout-attribution.corpus.test.ts"
+      ]
+    },
+    "T085": {
+      "status": "DONE",
+      "did": "SC-008 MSKLC parity: four shift states, ligatures and two deadkeys with tables and space rows built from kmn-edits and spec 083 ops only, compiled and typed",
+      "files": [
+        "packages/studio/src/editors/layout/msklcParity.test.ts"
+      ]
+    },
+    "T086": {
+      "status": "DONE",
+      "did": "Phase 5 i18n: messages:extract, 66 French strings, i18n-catalog-lint green",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T087": {
+      "status": "DONE",
+      "did": "US3 E2E row runs green: new deadkey on a typed key with disclosure, three rows plus space row, after-this-deadkey via simulator, download carries the rules",
+      "files": [
+        "packages/studio/e2e/layout-tab.spec.ts"
+      ]
+    },
+    "T088": {
+      "status": "DONE",
+      "did": "km-validator approved the Apply gate against D3; recorded in R13, no amendment",
+      "files": [
+        "specs/117-layout-studio/research.md"
+      ]
+    },
+    "T090": {
+      "status": "DONE",
+      "did": "engine/contract side verified: tests pass",
+      "files": [
+        "kmnEdits.ts"
+      ]
+    },
+    "T089": {
+      "status": "DONE",
+      "did": "engine/contract side verified: tests pass",
+      "files": [
+        "diffIR.test.ts"
+      ]
+    },
+    "T091": {
+      "status": "DONE",
+      "did": "engine/contract side verified: tests pass",
+      "files": [
+        "applyIRChanges.test.ts"
+      ]
+    },
+    "T095": {
+      "status": "DONE",
+      "did": "engine/contract side verified: tests pass",
+      "files": [
+        "diffIR.ts"
+      ]
+    },
+    "T096": {
+      "status": "DONE",
+      "did": "engine/contract side verified: tests pass",
+      "files": [
+        "replayKmnEdits.ts"
+      ]
+    },
+    "T097": {
+      "status": "DONE",
+      "did": "engine/contract side verified: tests pass",
+      "files": [
+        "kmn-diff.corpus.test.ts"
+      ]
+    },
+    "T092": {
+      "status": "DONE",
+      "did": "KmnCodePane Apply tests: gate errors record nothing, formatting-only, owner confirm, one CodeEdit + undo c, no setWorkingIR; compile gate fail-closed pinned",
+      "files": [
+        "packages/studio/src/editors/assignLoop/KmnCodePane.test.tsx",
+        "packages/studio/src/lib/compileCandidateKmn.ts"
+      ]
+    },
+    "T094": {
+      "status": "DONE",
+      "did": "CODE_WRITES, codeEditPatch, kmn-edits irPaths and module writes extended to groups/stores/comments/raw/header",
+      "files": [
+        "packages/studio/src/steps/editorMutate.ts",
+        "packages/studio/src/decisions/decisionTypes.ts",
+        "packages/studio/src/survey/questions/gallery/kmnEdits.ts"
+      ]
+    },
+    "T098": {
+      "status": "DONE",
+      "did": "Apply rewired: parse/lint, Layer A, candidate compile, diffIR, owner confirm, commitKmnEdit code-apply, undo kind c",
+      "files": [
+        "packages/studio/src/editors/assignLoop/KmnCodePane.tsx",
+        "packages/studio/src/stores/workingCopyStore.ts",
+        "packages/studio/src/lib/compileCandidateKmn.ts"
+      ]
+    },
+    "T093": {
+      "status": "DONE",
+      "did": "reviewFlags tests: flags a/b/c, keep clears, revert latest undoes, revert older appends inverse",
+      "files": [
+        "packages/studio/src/editors/assignLoop/reviewFlags.test.ts",
+        "packages/studio/src/editors/assignLoop/reviewFlags.ts"
+      ]
+    },
+    "T099": {
+      "status": "DONE",
+      "did": "reviewFlags.ts, CodeReviewList.tsx, tab count in addPhysicalAdapter, kmn-edits renderer entry words; test for tab name and button names",
+      "files": [
+        "packages/studio/src/editors/assignLoop/reviewFlags.ts",
+        "packages/studio/src/editors/assignLoop/CodeReviewList.tsx",
+        "packages/studio/src/editors/adapters/addPhysicalAdapter.tsx",
+        "packages/studio/src/editors/adapters/addPhysicalAdapter.test.tsx",
+        "packages/studio/src/survey/questions/gallery/KmnEditsRenderer.tsx"
+      ]
+    },
+    "T100": {
+      "status": "DONE",
+      "did": "ChangedInCodeNote (Assign, deadkey inventory) and key-detail changed-in-code line",
+      "files": [
+        "packages/studio/src/editors/assignLoop/ChangedInCodeNote.tsx",
+        "packages/studio/src/editors/assignLoop/ChangedInCodeNote.test.tsx",
+        "packages/studio/src/editors/layout/KeyDetailPanel.tsx",
+        "packages/studio/src/editors/deadkey/DeadkeyInventory.tsx",
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T101": {
+      "status": "DONE",
+      "did": "LayoutPane test: Code-tab Apply then republish shows the change, hand-set from the Code tab",
+      "files": [
+        "packages/studio/src/editors/layout/LayoutPane.test.tsx"
+      ]
+    },
+    "T102": {
+      "status": "DONE",
+      "did": "kmn-edits surface evidence and derivedEquivalence arms C and D with mixed Layout and Code entries",
+      "files": [
+        "packages/studio/src/decisions/derivedSurfaceRegistry.ts",
+        "packages/studio/src/decisions/derivedEquivalence.test.ts"
+      ]
+    },
+    "T103": {
+      "status": "DONE",
+      "did": "Projection codeEdits test: live, projected (vs projection of edited text), and rebuilt agree with zero misses on the SC-010 set",
+      "files": [
+        "packages/studio/src/lib/projectWorkingCopyVfs.codeEdits.test.ts"
+      ]
+    },
+    "T104": {
+      "status": "DONE",
+      "did": "i18n for Phase 6: extracted, French written, catalog lint green",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T105": {
+      "status": "DONE",
+      "did": "Ruling 10 scenario 4a: keystroke anchor + assign-tab owner, Apply anchors assigned keys, changed-in-code note, inventory counts kmn-edits, E2E 4a row passing",
+      "files": [
+        "packages/contracts/src/kmnEdits.ts",
+        "packages/contracts/src/schemas.ts",
+        "packages/engine/src/kmn-diff/applyIRChanges.ts",
+        "packages/studio/src/editors/assignLoop/KmnCodePane.tsx",
+        "packages/studio/src/editors/assignLoop/AssignedKeysChangedInCode.tsx",
+        "packages/studio/src/lib/assignedKeys.ts",
+        "packages/studio/src/lib/claimedInputs.ts",
+        "packages/studio/src/lib/inventoryDiff.ts",
+        "packages/studio/src/hooks/useInventoryDiff.ts",
+        "packages/studio/e2e/layout-tab.spec.ts"
+      ]
+    },
+    "T106": {
+      "status": "DONE",
+      "did": "Extended KeyDetailPanel tests: rule count, every rule with shape and editability, replaced value, view-in-code default",
+      "files": [
+        "packages/studio/src/editors/layout/KeyDetailPanel.test.tsx"
+      ]
+    },
+    "T107": {
+      "status": "DONE",
+      "did": "KeyDetailPanel lists plain rule and rows with shape/editability, shows replaced starting-point value (derived in LayoutPane from startIr)",
+      "files": [
+        "packages/studio/src/editors/layout/KeyDetailPanel.tsx",
+        "packages/studio/src/editors/layout/LayoutPane.tsx"
+      ]
+    },
+    "T108": {
+      "status": "DONE",
+      "did": "Extracted Phase 7 messages and wrote French; catalog lint passes",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T109": {
+      "status": "DONE",
+      "did": "E2E US5 row: read-only key detail and view in code reveals the rule line",
+      "files": [
+        "packages/studio/e2e/layout-tab.spec.ts"
+      ]
+    },
+    "T110": {
+      "status": "DONE",
+      "did": "Tests for provisional cells, announcement, per-layer counts, confirmed class and assigned keys",
+      "files": [
+        "packages/studio/src/editors/layout/desktopGridViewModel.test.ts",
+        "packages/studio/src/editors/layout/DesktopKeyGrid.test.tsx",
+        "packages/studio/src/editors/layout/LayoutPane.test.tsx"
+      ]
+    },
+    "T111": {
+      "status": "DONE",
+      "did": "Provisional flag, styling, aria announcement, per-layer counts into LayerSelector",
+      "files": [
+        "packages/studio/src/editors/layout/desktopGridViewModel.ts",
+        "packages/studio/src/editors/layout/DesktopKeyCell.tsx",
+        "packages/studio/src/editors/layout/useLayoutCopy.ts",
+        "packages/studio/src/editors/layout/LayoutPane.tsx",
+        "packages/studio/src/editors/assignLoop/keyGrid/LayerSelector.tsx"
+      ]
+    },
+    "T112": {
+      "status": "DONE",
+      "did": "Change the fallback policy entry in KeyDetailPanel opening FallbackPolicySection",
+      "files": [
+        "packages/studio/src/editors/layout/KeyDetailPanel.tsx",
+        "packages/studio/src/editors/layout/KeyDetailPanel.test.tsx"
+      ]
+    },
+    "T113": {
+      "status": "DONE",
+      "did": "SC-006 studio provenance test and engine corpus sweep",
+      "files": [
+        "packages/studio/src/editors/layout/provenance.test.ts",
+        "packages/engine/src/layout-attribution/provisional.corpus.test.ts"
+      ]
+    },
+    "T114": {
+      "status": "DONE",
+      "did": "i18n en and fr catalogs for Phase 8",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T115": {
+      "status": "DONE",
+      "did": "E2E US6 row (written, not run)",
+      "files": [
+        "packages/studio/e2e/layout-tab.spec.ts"
+      ]
+    },
+    "T116": {
+      "status": "DONE",
+      "did": "isContextReachable added to engine layout-attribution with tests",
+      "files": [
+        "packages/engine/src/layout-attribution/isContextReachable.ts",
+        "packages/engine/src/layout-attribution/isContextReachable.test.ts",
+        "packages/engine/src/layout-attribution/index.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T117": {
+      "status": "DONE",
+      "did": "literal-context mode tests added to AfterContextView.test.tsx",
+      "files": [
+        "packages/studio/src/editors/layout/AfterContextView.test.tsx"
+      ]
+    },
+    "T118": {
+      "status": "DONE",
+      "did": "literal-context mode in AfterContextView plus BecomesEditor writing set-row/remove-row; LayoutPane Typed text option",
+      "files": [
+        "packages/studio/src/editors/layout/AfterContextView.tsx",
+        "packages/studio/src/editors/layout/BecomesEditor.tsx",
+        "packages/studio/src/editors/layout/LayoutPane.tsx"
+      ]
+    },
+    "T119": {
+      "status": "DONE",
+      "did": "SC-007 literal-context half and SC-009 corpus cases; editable-share table in research.md R14",
+      "files": [
+        "packages/engine/src/layout-attribution/layout-attribution.corpus.test.ts",
+        "specs/117-layout-studio/research.md"
+      ]
+    },
+    "T120": {
+      "status": "DONE",
+      "did": "i18n ids extracted and French written for Phase 9; i18n-catalog-lint passes",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T121": {
+      "status": "DONE",
+      "did": "E2E US4 row added and passing",
+      "files": [
+        "packages/studio/e2e/layout-tab.spec.ts"
+      ]
+    },
+    "T122": {
+      "status": "DONE",
+      "did": "packages.md and architecture.md updated for layout modules and kmn-edits",
+      "files": [
+        "docs/packages.md",
+        "docs/architecture.md"
+      ]
+    },
+    "T123": {
+      "status": "DONE",
+      "did": "manual cross-artifact consistency pass; drift fixed in plan, spec, layout-ops contract",
+      "files": [
+        "specs/117-layout-studio/plan.md",
+        "specs/117-layout-studio/spec.md",
+        "specs/117-layout-studio/contracts/layout-ops.md"
+      ]
+    },
+    "T124": {
+      "status": "DONE",
+      "did": "quickstart unit, corpus and layout-tab E2E (11 rows) all green",
+      "files": [
+        "specs/117-layout-studio/quickstart.md"
+      ]
+    },
+    "T125": {
+      "status": "DONE",
+      "did": "Art XI deferrals have owner+trigger; spec 109 dependency given one",
+      "files": [
+        "specs/117-layout-studio/spec.md"
+      ]
+    }
+  },
+  "concerns": [
+    {
+      "note": "T105 blocked: ruling 9 says assign-then-code-edit is an FR-063(b) review flag, but the T098 Apply gate (compileCandidateKmn unplaceable) refuses the Apply. Needs a product decision; the E2E row is test.fixme. Partial work in 76b8d874.",
+      "step": "implement"
+    },
+    {
+      "note": "useKeyboardArtifact.startDocs test is slow (~12-19s) and flaked once under the full parallel run; unrelated to spec 117",
+      "step": "implement"
+    },
+    {
+      "note": "T123 done as manual consistency pass, not a literal /speckit-analyze run",
+      "step": "implement"
+    }
+  ],
+  "last_action": "all 125 tasks done",
+  "decisions": [
+    {
+      "decision": "Replaced starting-point value derived in LayoutPane via attributeLayer(startIr) for the selected hand-set key",
+      "why": "working-copy rules do not keep the replaced value; avoids changing the attribution contract",
+      "rejected": "adding a replaced field to RowAttribution in the engine"
+    }
+  ],
+  "verified": [
+    {
+      "what": "Phase 7 gates",
+      "command": "pnpm typecheck; pnpm lint; vitest run src/editors/layout (studio)",
+      "result": "TC=0, LINT=0, 16 files / 293 tests pass"
+    },
+    {
+      "what": "US5 E2E row",
+      "command": "pnpm exec playwright test e2e/layout-tab.spec.ts -g US5",
+      "result": "1 passed (23.3s)"
+    },
+    {
+      "what": "layout-tab E2E (11 rows, desktop)",
+      "command": "npx playwright test e2e/layout-tab.spec.ts --project=desktop",
+      "result": "11 passed"
+    },
+    {
+      "what": "pnpm typecheck and pnpm lint",
+      "command": "pnpm typecheck; pnpm lint",
+      "result": "both exit 0"
+    },
+    {
+      "what": "pnpm -r test",
+      "command": "pnpm -r test",
+      "result": "all green except useKeyboardArtifact.startDocs (timeout under load, 19s); passes alone 4/4"
+    }
+  ],
+  "step_summaries": {
+    "implement": {
+      "summary": "Phase 10 polish: docs, spec drift, Art XI deferrals, quickstart verified"
+    }
+  },
+  "livingSpecs": {
+    "skipped": [
+      {
+        "name": "none-loaded",
+        "reason": "n/a"
+      }
+    ]
+  },
+  "telemetryInstanceId": "e95f77fb-67d4-472c-abb0-4072fddb2d2c"
+}

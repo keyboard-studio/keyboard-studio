@@ -141,6 +141,21 @@ export interface DeadkeyInfo {
    */
   triggerKey: string | null;
   /**
+   * Modifier names on the trigger's vkey context (e.g. `["RALT"]` for
+   * `[RALT K_QUOTE]`). Present only when the trigger is on a modifier layer;
+   * absent means the default layer (or a char-literal / unknown trigger).
+   * {@link triggerKey} stays the bare vkey name, so `[K_QUOTE]` and
+   * `[RALT K_QUOTE]` are told apart by this field.
+   */
+  triggerModifiers?: string[];
+  /**
+   * The deadkey's display character(s): the `display=` attribute stored on
+   * the trigger rule's `@deadkey:<hexid>` token, else the output of the
+   * escape rule (`dk(id) + [trigger] > 'c'`) when it sits on the trigger key
+   * itself. Absent when neither exists (e.g. an imported fan-out-only deadkey).
+   */
+  displayChar?: string;
+  /**
    * Fan-out base store name (the `any(...)` storeRef). `null` when no
    * fan-out rule was found. Store names are taken as-is — never matched
    * against a `dk_<hex>_*` pattern, because corpus keyboards use other
@@ -197,18 +212,21 @@ function nonSeparatorElements(rule: IRRule): ContextElement[] {
  */
 function matchTriggerRule(
   rule: IRRule,
-): { id: number; triggerKey: string } | null {
+): { id: number; triggerKey: string; modifiers: string[] } | null {
   const ctx = nonSeparatorElements(rule);
   if (ctx.length !== 1) return null;
   const c0 = ctx[0] as ContextElement | undefined;
   let triggerKey: string | null = null;
-  if (c0?.kind === "vkey") triggerKey = c0.name;
-  else if (c0?.kind === "char") triggerKey = c0.value;
+  let modifiers: string[] = [];
+  if (c0?.kind === "vkey") {
+    triggerKey = c0.name;
+    modifiers = [...c0.modifiers];
+  } else if (c0?.kind === "char") triggerKey = c0.value;
   else return null;
   if (rule.output.length !== 1) return null;
   const o0 = rule.output[0] as OutputElement | undefined;
   if (o0?.kind !== "deadkey") return null;
-  return { id: o0.id, triggerKey };
+  return { id: o0.id, triggerKey, modifiers };
 }
 
 /**
@@ -508,7 +526,20 @@ function isLegacyCodepointId(id: number, triggerKey: string | null): boolean {
 const NAME_RE = /^[A-Za-z0-9_]{1,64}$/;
 
 /** `@deadkey:<hex>` with an optional ` name=<name>` attribute. */
-const NAME_TOKEN_RE = /@deadkey:([0-9A-Fa-f]+)(?:\s+name=([A-Za-z0-9_]+))?/;
+const NAME_TOKEN_RE =
+  /@deadkey:([0-9A-Fa-f]+)(?:\s+name=([A-Za-z0-9_]+))?(?:\s+display=([0-9A-Fa-f]+(?:\.[0-9A-Fa-f]+)*))?/;
+
+/** Encode a display string as dot-joined lowercase hex codepoints ("0301"). */
+function encodeDisplay(display: string): string {
+  return Array.from(display, (c) => c.codePointAt(0)!.toString(16).padStart(4, "0")).join(".");
+}
+
+function decodeDisplay(encoded: string): string {
+  return encoded
+    .split(".")
+    .map((h) => String.fromCodePoint(parseInt(h, 16)))
+    .join("");
+}
 
 function hexId(id: number): string {
   return id.toString(16).padStart(4, "0");
@@ -583,8 +614,13 @@ export function setDeadkeyName(
       `setDeadkeyName: invalid name "${name}" — use 1-64 ASCII letters, digits, or underscore`,
     );
   }
-  const token = name === undefined ? `@deadkey:${hexId(id)}` : `@deadkey:${hexId(id)} name=${name}`;
   const existing = rule.trailingComment ?? "";
+  // A stored display attribute rides on the same token; renaming must not drop it.
+  const keptDisplay = NAME_TOKEN_RE.exec(existing)?.[3];
+  const token =
+    `@deadkey:${hexId(id)}` +
+    (name === undefined ? "" : ` name=${name}`) +
+    (keptDisplay === undefined ? "" : ` display=${keptDisplay}`);
   if (NAME_TOKEN_RE.test(existing)) {
     rule.trailingComment = existing.replace(NAME_TOKEN_RE, token);
   } else if (existing.trim().length === 0) {
@@ -592,6 +628,76 @@ export function setDeadkeyName(
   } else {
     rule.trailingComment = `${existing.trimEnd()} ${token}`;
   }
+}
+
+/**
+ * Read the stored display character(s) from a trigger rule's
+ * `@deadkey:<hexid> ... display=<hex>[.<hex>...]` token. Returns `undefined`
+ * when absent or when the token's hex does not match the rule's own id.
+ */
+export function getDeadkeyDisplay(rule: IRRule): string | undefined {
+  if (rule.trailingComment === undefined) return undefined;
+  const id = triggerRuleDeadkeyId(rule);
+  if (id === null) return undefined;
+  const m = NAME_TOKEN_RE.exec(rule.trailingComment);
+  if (!m || parseInt(m[1] ?? "", 16) !== id || m[3] === undefined) return undefined;
+  return decodeDisplay(m[3]);
+}
+
+/**
+ * Write (or clear, with `undefined`) the display character(s) on a trigger
+ * rule's `@deadkey` token, keeping any `name=` attribute and the authorship
+ * marker. Throws on an empty string or a non-trigger rule (programmer errors).
+ */
+export function setDeadkeyDisplay(
+  rule: IRRule,
+  display: string | undefined,
+): void {
+  const id = triggerRuleDeadkeyId(rule);
+  if (id === null) {
+    throw new Error(
+      "setDeadkeyDisplay: rule has no single deadkey output — not a trigger rule",
+    );
+  }
+  if (display !== undefined && display.length === 0) {
+    throw new Error("setDeadkeyDisplay: display must be a non-empty string");
+  }
+  const existing = rule.trailingComment ?? "";
+  const m = NAME_TOKEN_RE.exec(existing);
+  const name = m !== null && parseInt(m[1] ?? "", 16) === id ? m[2] : undefined;
+  const token =
+    `@deadkey:${hexId(id)}` +
+    (name === undefined ? "" : ` name=${name}`) +
+    (display === undefined ? "" : ` display=${encodeDisplay(display)}`);
+  if (m !== null) {
+    rule.trailingComment = existing.replace(NAME_TOKEN_RE, token);
+  } else if (existing.trim().length === 0) {
+    rule.trailingComment = token;
+  } else {
+    rule.trailingComment = `${existing.trimEnd()} ${token}`;
+  }
+}
+
+/** Escape-rule fallback: `dk(id) + [trigger] > 'c'` on the trigger key itself. */
+function escapeRuleDisplay(
+  ir: KeyboardIR,
+  id: number,
+  triggerKey: string,
+  modifiers: readonly string[],
+): string | undefined {
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      const ctx = nonSeparatorElements(rule);
+      if (ctx.length !== 2 || rule.output.length !== 1) continue;
+      const [c0, c1] = ctx as [ContextElement, ContextElement];
+      const o0 = rule.output[0] as OutputElement | undefined;
+      if (c0.kind !== "deadkey" || c0.id !== id) continue;
+      if (c1.kind !== "vkey" || c1.name !== triggerKey) continue;
+      if (c1.modifiers.join(" ") !== modifiers.join(" ")) continue;
+      if (o0?.kind === "char") return o0.value;
+    }
+  }
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -691,7 +797,10 @@ export function listDeadkeys(ir: KeyboardIR): DeadkeyInfo[] {
   // top-level collections — normalise once so every scanner below can
   // iterate unconditionally (see resolveTouchProduction's groups guard).
   ir = { ...ir, groups: ir.groups ?? [], stores: ir.stores ?? [], raw: ir.raw ?? [] };
-  const triggerById = new Map<number, { rule: IRRule; triggerKey: string }>();
+  const triggerById = new Map<
+    number,
+    { rule: IRRule; triggerKey: string; modifiers: string[] }
+  >();
   const fanoutById = new Map<
     number,
     { baseStore: string; outputStore: string }
@@ -702,7 +811,13 @@ export function listDeadkeys(ir: KeyboardIR): DeadkeyInfo[] {
     for (const rule of group.rules) {
       const t = matchTriggerRule(rule);
       if (t !== null) {
-        if (!triggerById.has(t.id)) triggerById.set(t.id, { rule, triggerKey: t.triggerKey });
+        if (!triggerById.has(t.id)) {
+          triggerById.set(t.id, {
+            rule,
+            triggerKey: t.triggerKey,
+            modifiers: t.modifiers,
+          });
+        }
         continue;
       }
       const f = matchFanoutRule(rule);
@@ -740,6 +855,17 @@ export function listDeadkeys(ir: KeyboardIR): DeadkeyInfo[] {
     result.push({
       id,
       triggerKey,
+      ...(t !== undefined && t.modifiers.length > 0
+        ? { triggerModifiers: t.modifiers }
+        : {}),
+      ...(t !== undefined
+        ? (() => {
+            const displayChar =
+              getDeadkeyDisplay(t.rule) ??
+              escapeRuleDisplay(ir, id, t.triggerKey, t.modifiers);
+            return displayChar === undefined ? {} : { displayChar };
+          })()
+        : {}),
       baseStore: f?.baseStore ?? null,
       outputStore: f?.outputStore ?? null,
       pairCount:

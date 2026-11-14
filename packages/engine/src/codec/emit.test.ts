@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { emit } from "./emit.js";
+import { emit, emitRule, emitStore } from "./emit.js";
 import { parse } from "./parse.js";
+import { existsSync, readFileSync } from "fs";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 import { normaliseForComparison } from "./normalise-ir.js";
 import { compile } from "../compiler/index.js";
 import {
@@ -55,6 +58,13 @@ function makeIR(): KeyboardIR {
 }
 
 describe("emit", () => {
+  it("emits a rule carrying authorEdit byte-identically to the same rule without it (spec 117 T008)", () => {
+    const plain = makeIR();
+    const stamped = makeIR();
+    for (const rule of stamped.groups[0]!.rules) rule.authorEdit = "layout-tab";
+    expect(emit(stamped)).toBe(emit(plain));
+  });
+
   it("includes begin Unicode > use(main)", () => {
     const out = emit(makeIR());
     expect(out).toContain("begin Unicode > use(main)");
@@ -1349,5 +1359,105 @@ describe("emit — store-declaration dependency order (#2404)", () => {
     const idxBase = out.indexOf("store(base)");
     expect(idxBase).toBeGreaterThanOrEqual(0);
     expect(idxCombo).toBeGreaterThan(idxBase);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Line map (spec 117 T012)
+// ---------------------------------------------------------------------------
+
+const FRAGMENT_FREE_KMN = `store(&VERSION) '10.0'
+store(&NAME) 'Plain'
+store(vowels) 'aeiou'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_A] > U+0061
++ [K_E] > U+0065
+any(vowels) + [K_X] > index(vowels, 1)
+
+group(post)
+
+'a' + 'b' > 'c'
+`;
+
+const FRAGMENT_KMN = `store(&VERSION) '10.0'
+store(&NAME) 'Opaque'
+store(myFlag) 'x'
+store(otherStore) U+0061 U+0062
+
+begin Unicode > use(main)
+
+group(main) using keys
+
++ [K_A] > U+0061
++ [K_B] > save(myFlag, 1)
++ [K_C] > outs(otherStore)
+dk(0001) context(0) > U+0061
++ [K_D] > U+1F600
+`;
+
+const KBDFR_PATH = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../../keyboards/release/basic/basic_kbdfr/source/basic_kbdfr.kmn",
+);
+
+const LINE_MAP_FIXTURES: ReadonlyArray<readonly [string, string]> = [
+  ["fragment-free", FRAGMENT_FREE_KMN],
+  ["fragment-bearing", FRAGMENT_KMN],
+  ...(existsSync(KBDFR_PATH)
+    ? ([["basic_kbdfr", readFileSync(KBDFR_PATH, "utf-8")]] as const)
+    : []),
+];
+
+describe("emit line map", () => {
+  it("leaves plain emit(ir) returning the string", () => {
+    expect(typeof emit(makeIR())).toBe("string");
+  });
+
+  it.each(LINE_MAP_FIXTURES)("text equals plain emit and every node maps to its line (%s)", (_name, source) => {
+    const { ir } = parse(source, "fixture");
+    const { text, lineByNodeId } = emit(ir, { lineMap: true });
+    expect(text).toBe(emit(ir));
+
+    const physical = text.split("\n");
+    const lineOf = (nodeId: string): string => {
+      const line = lineByNodeId.get(nodeId);
+      expect(line, nodeId).toBeDefined();
+      return physical[line! - 1] ?? "";
+    };
+
+    for (const store of ir.stores) {
+      expect(lineOf(store.nodeId)).toBe(emitStore(store).split("\n")[0]);
+    }
+    for (const group of ir.groups) {
+      expect(lineOf(group.nodeId)).toMatch(new RegExp(`^group[(]${group.name}[)]`));
+      for (const rule of group.rules) {
+        expect(lineOf(rule.nodeId)).toBe(emitRule(rule, group.usingKeys).split("\n")[0]);
+      }
+    }
+    for (const frag of ir.raw) {
+      expect(lineOf(frag.nodeId)).toBe(frag.sourceText.split("\n")[0]);
+    }
+  });
+
+  it("covers raw nodes on the fragment-bearing fixture", () => {
+    const { ir } = parse(FRAGMENT_KMN, "fixture");
+    expect(ir.raw.length).toBeGreaterThan(0);
+  });
+
+  it("counts a multi-line raw fragment as several lines for the nodes after it", () => {
+    const { ir } = parse(FRAGMENT_KMN, "fixture");
+    const frag = ir.raw[0]!;
+    frag.sourceText = `${frag.sourceText}\nc continuation`;
+    const { text, lineByNodeId } = emit(ir, { lineMap: true });
+    const physical = text.split("\n");
+    for (const group of ir.groups) {
+      for (const rule of group.rules) {
+        expect(physical[lineByNodeId.get(rule.nodeId)! - 1]).toBe(emitRule(rule, group.usingKeys));
+      }
+    }
   });
 });
