@@ -86,6 +86,7 @@ import {
   capsHandlingFromDecisions,
   marksGuardsFromValue,
   openModeProjection,
+  startHasTouchFile,
   projectionInputFromState,
   selectKmnEdits,
 } from "../lib/projectionInput.ts";
@@ -534,6 +535,11 @@ export function useWorkingCopyTransform(
         }
         effectiveAssignments = [];
       }
+      // Open (spec 111 FR-042): assignments are already in the files (written when
+      // applied), so the preview replays none, matching the download.
+      if (isOpenedWithDescriptor(instantiationMode, startVfs, keyboardId)) {
+        effectiveAssignments = [];
+      }
 
       // Open (spec 111 FR-043): the preview reads the working copy's CURRENT
       // files, not the fetch-time copy the artifact hook restores before each
@@ -555,6 +561,7 @@ export function useWorkingCopyTransform(
       const openMode = isOpenedWithDescriptor(instantiationMode, startVfs, keyboardId)
         ? openModeProjection({
             kind: "output",
+            noTouchFile: !startHasTouchFile(startVfs),
             identity: { displayName: identityDisplayName ?? undefined, languages: identityLanguages },
             startDisplayName: storeStartDisplayName,
             consentedReemit: true,

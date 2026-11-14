@@ -83,7 +83,7 @@ const PATTERNS = new Map([SWAP, WITH_STORE, WITH_SYSTEM_STORE, LAYER_SWITCH].map
 
 vi.mock("./services.ts", () => ({
   getToZip: vi.fn(async () => vi.fn(async () => new Uint8Array())),
-  getPatternLibraryService: vi.fn(() => ({ getById: async () => undefined })),
+  getPatternLibraryService: vi.fn(() => ({ getById: async (id: string) => PATTERNS.get(id) })),
   getPatternByIdSync: (id: string) => PATTERNS.get(id),
 }));
 
@@ -235,6 +235,24 @@ function expectReplayEmpty(): void {
   expect(s.contextToleranceOverlay).toBeNull();
   expect(s.ir).toBe(s.startIr);
 }
+
+describe("held assignments on Open", () => {
+  beforeEach(() => open());
+  it("an assignment held in the decisions is never replayed over the files (preview and download)", async () => {
+    // Simulate a held Phase C assignment (e.g. from a code path that bypassed the seam):
+    // on Open the files are the truth, so neither route may write it.
+    useWorkingCopyStore.getState().recordAssignments([swap("ɛ", "+ [K_E] > U+025B")]);
+    const s = useWorkingCopyStore.getState();
+    const { result } = renderHook(() => useWorkingCopyTransform({ previewedStartId: ID, patternMap: PATTERNS }));
+    const preview = createVirtualFS(s.startVfs!.entries());
+    result.current!(preview, ID);
+    const projected = await projectWorkingCopyForOutput();
+    expect(readVfsText(preview, KMN_PATH)).not.toContain("U+025B");
+    expect(projected!.vfs.get(KMN_PATH)!.content as string).not.toContain("U+025B");
+    expect(readVfsText(preview, KVKS_PATH)).not.toContain("ɛ");
+    expect(projected!.vfs.get(KVKS_PATH)!.content as string).not.toContain("ɛ");
+  });
+});
 
 describe("applyOpenChange assign", () => {
   beforeEach(() => open());

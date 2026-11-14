@@ -47,6 +47,9 @@ import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
 import { welcomePagePath } from "./welcomeFolder.ts";
 import { isOpenMode, isOpenedWithDescriptor } from "./openMode.ts";
 import { PROJECTION_STEPS, type ProjectionKind } from "./projectionSteps.ts";
+import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
+import { readVfsText } from "./vfsText.ts";
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 
 /** The store fields the projection reads. `startIr` must already be set. */
 export type ProjectionState = Pick<
@@ -171,8 +174,15 @@ export function openModeProjection(args: {
   preview?: boolean;
   /** What the run is for; picks its row of `PROJECTION_STEPS`. */
   kind: ProjectionKind;
+  /**
+   * `kind: "output"` only: the opened keyboard has no touch file, so the output still builds
+   * its layout (interim, until the touch file can be generated on Open). Picks the
+   * `outputNoTouchFile` row. Anything else reads as "has a touch file".
+   */
+  noTouchFile?: boolean;
 }): NonNullable<ProjectWorkingCopyVfsInput["openMode"]> {
-  const { identity, startDisplayName, consentedReemit, preview, kind } = args;
+  const { identity, startDisplayName, consentedReemit, preview, noTouchFile } = args;
+  const kind: ProjectionKind = args.kind === "output" && noTouchFile === true ? "outputNoTouchFile" : args.kind;
   return {
     steps: PROJECTION_STEPS[kind],
     kps: {
@@ -213,18 +223,43 @@ export function applyOpenWorkingCopyFiles(
   }
 }
 
+/** True when the opened keyboard's working files include a touch layout file. */
+export function startHasTouchFile(startVfs: VirtualFS | null | undefined): boolean {
+  return startVfs !== null && startVfs !== undefined && findTouchLayoutPath(startVfs) !== undefined;
+}
+
 export function projectionInputFromState(
   state: ProjectionState,
   extras: ProjectionExtras,
 ): ProjectWorkingCopyVfsInput {
   const { liveLayoutOverride, liveCssOverride, marksTreatment, kmnEdits, capsHandling, ...callSite } = extras;
+  // Open output with a touch file (spec 111 FR-041, SC-013): every touch edit is in the file,
+  // so no touch overlay is read. The store holds none of them here; say so in development.
+  const openOutputWithTouchFile = extras.openMode?.steps === PROJECTION_STEPS.output;
+  if (openOutputWithTouchFile) {
+    // The store mirrors the file's own text in `touchLayoutJson` after a touch write; that is not a held edit.
+    const touchPath = state.startVfs === null || state.startVfs === undefined ? undefined : findTouchLayoutPath(state.startVfs);
+    const fileText = touchPath === undefined ? null : (readVfsText(state.startVfs!, touchPath) ?? null);
+    const held =
+      (state.touchLayoutJson !== null && state.touchLayoutJson !== fileText) ||
+      state.deletedTouchKeyIds.size > 0 ||
+      state.carveTouchKeepInert.length > 0 ||
+      (liveLayoutOverride !== undefined &&
+        ((liveLayoutOverride.touchLayoutJson !== null && liveLayoutOverride.touchLayoutJson !== fileText) ||
+          liveLayoutOverride.keyEditOps.length > 0));
+    if (held) {
+      devLog.error("[projection] a touch overlay is held on a keyboard opened with a touch file; it is ignored (the file is the layout)");
+    }
+  }
   // spec 082 FR-018: disabled families' member rules are removed outright.
   // They join the deletion set and are exempt from the fallback-policy
   // expansion, which would otherwise carve them instead.
   const disabledRuleIds = disabledFamilyRuleIds(state.ir, state.disabledFamilyIds);
-  const touchLayoutJson = liveLayoutOverride !== undefined
-    ? liveLayoutOverride.touchLayoutJson
-    : state.touchLayoutJson;
+  const touchLayoutJson = openOutputWithTouchFile
+    ? null
+    : liveLayoutOverride !== undefined
+      ? liveLayoutOverride.touchLayoutJson
+      : state.touchLayoutJson;
   return {
     ...callSite,
     startIr: state.startIr,
@@ -234,13 +269,13 @@ export function projectionInputFromState(
       : new Set([...state.deletedItemIds, ...disabledRuleIds]),
     ...(disabledRuleIds.size > 0 ? { suppressionExemptIds: disabledRuleIds } : {}),
     carveChars: state.carveChars,
-    deletedTouchKeyIds: state.deletedTouchKeyIds,
+    deletedTouchKeyIds: openOutputWithTouchFile ? new Set<string>() : state.deletedTouchKeyIds,
     fallbackPolicy: state.fallbackPolicy,
     // T020 (FR-023): the store array is NFC-normalized at write time.
-    ...(state.carveTouchKeepInert.length > 0
+    ...(!openOutputWithTouchFile && state.carveTouchKeepInert.length > 0
       ? { carveTouchKeepInert: new Set(state.carveTouchKeepInert) }
       : {}),
-    keyEditOps: liveLayoutOverride?.keyEditOps ?? [],
+    keyEditOps: openOutputWithTouchFile ? [] : (liveLayoutOverride?.keyEditOps ?? []),
     deadkeyOps: state.deadkeyOverlay.ops,
     touchLayoutJson,
     customCss: liveCssOverride !== undefined ? liveCssOverride : state.customCss,

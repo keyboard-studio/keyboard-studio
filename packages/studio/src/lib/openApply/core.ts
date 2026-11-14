@@ -231,13 +231,15 @@ export interface ProjectExtra {
  *
  * The one overlay still held on Open and carried INTO the same run, so the
  * re-parse in `replaceStartingPointFiles` does not drop it, is the rules-step
- * additions (derived from `ir` against `startIr`): the touch key-identity commit
- * still writes them through `setWorkingIR` until the touch phase. Carves, the
+ * additions (derived from `ir` against `startIr`). With a touch file nothing holds
+ * them: the touch commits send the key-identity rules through the seam
+ * (`touchOpenCommit`). Only an opened keyboard with NO touch file still writes them
+ * through `setWorkingIR` (the touch editor's build-at-output path), so the carry and
+ * the flush stay for exactly that case until T087b. Carves, the
  * context-tolerance fix and the deadkey ops are written when applied and never
  * held on Open, so there is nothing to carry for them.
- * Overlays the re-parse does NOT clear stay overlays and are left empty here:
- * key-edit ops, disabled families, touch-key deletions, touch keep-inert chars
- * (touch, phase 16). Marks guards are written by their own apply (`marks`) and
+ * Key-edit ops, touch-key deletions and touch keep-inert chars are written into the
+ * touch file when applied (phase 16) and are left empty here. Marks guards are written by their own apply (`marks`) and
  * the output no longer regenerates them; an answered caps decision is the one
  * remaining decision-driven `.kmn` step at output.
  */

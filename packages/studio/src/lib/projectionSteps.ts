@@ -57,7 +57,8 @@ export type ProjectionKind =
   | "files"
   | "touch"
   | "flush"
-  | "output";
+  | "output"
+  | "outputNoTouchFile";
 
 const set = (...steps: ProjectionStep[]): ReadonlySet<ProjectionStep> => new Set(steps);
 
@@ -78,13 +79,36 @@ export const PROJECTION_STEPS: Readonly<Record<ProjectionKind, ReadonlySet<Proje
   model: set(),
   files: set(),
   touch: set(),
-  // The preview and the download on Open. Decisions are a record only, so the
-  // guards, the tolerance fix and the deadkey ops are never replayed here (they
-  // are in the files; the deadkey op log stays only as the decision record). Still replayed until the phase that moves each one into
-  // the files: rule additions, touch deletions and key edits (touch, phase 16),
-  // carved items a non-live path still holds, assignments (empty on Open),
-  // the stylesheet, documents and descriptor (phase 17).
+  // The preview and the download on Open, for a keyboard WITH a touch file. Decisions
+  // are a record only, so the guards, the tolerance fix, the deadkey ops, and (phase 16)
+  // every touch edit are never replayed here: they are in the files. Gone with phase 16:
+  // touch injection, touch deletions, key edits, desktop-to-touch layer propagation and
+  // the rule-additions splice (the assign seam and the touch commits write them).
+  // What remains, and why:
+  //   carve, carveKeycaps  carved items a non-live path still holds (empty on live Open); T096
+  //   assignments          empty on Open (assignments are written when applied); T096
+  //   caps                 an answered caps decision, the one decision-driven .kmn step; T096
+  //   identity             version bump (FR-048)
+  //   rename               keyboard id rename (inert on Open: the id is fixed)
+  //   keycapLabels         labels for assignments (empty on Open); T091
+  //   css, authoredDocs    documents and stylesheet overlays; T089, T089a
+  //   descriptor           the language list into the package descriptor; T090
   output: set(
+    "css",
+    "authoredDocs",
+    "carve",
+    "carveKeycaps",
+    "assignments",
+    "caps",
+    "identity",
+    "keycapLabels",
+    "descriptor",
+    "rename",
+  ),
+  // Interim (T087b): an opened keyboard with NO touch file still builds its layout at
+  // output, so it keeps the touch steps and the rule additions the touch editor holds in
+  // the working IR. Removed when T087b makes creating the touch file one applied change.
+  outputNoTouchFile: set(
     "touchInject",
     "css",
     "authoredDocs",

@@ -238,3 +238,76 @@ describe("SC-010: a family off and on, and a Narrow exception, on Open", () => {
 function ruleOfNeedle(needle: string) {
   return useWorkingCopyStore.getState().startIr!.groups.flatMap((g) => g.rules).find((r) => JSON.stringify(r.context).includes(needle))!;
 }
+
+// -- SC-010 / SC-013 with a touch file (phase 16, S4) ---------------------------------
+
+const TOUCH_PATH = `source/${ID}.keyman-touch-layout`;
+const TOUCH = '{\r\n\t"phone": {\r\n\t\t"layer": [{"id":"default","row":[{"id":1,"key":[{"id":"K_A","text":"a"},{"id":"K_B","text":"b"},{"id":"K_C","text":"c"}]}]}]\r\n\t}\r\n}\r\n';
+
+function openWithTouch(withTouch: boolean): void {
+  const files = [
+    { path: KMN_PATH, content: KMN, isBinary: false },
+    { path: `source/${ID}.kps`, content: "<Package/>", isBinary: false },
+    ...(withTouch ? [{ path: TOUCH_PATH, content: TOUCH, isBinary: false }] : []),
+  ];
+  const kb = {
+    id: ID, path: "release/t/tiny", script: "Latn", targets: ["desktop"],
+    displayName: "Tiny", version: "1.0", languages: ["en"],
+  } as StartKeyboard;
+  clearOpenSession();
+  const wc = useWorkingCopyStore.getState();
+  wc.reset();
+  wc.instantiateFromExisting(kb, { vfs: createVirtualFS(files), ir: parseKmn(KMN, ID).ir });
+  wc.setAttribution({ authorName: "Parity", copyrightHolder: "Parity" });
+  wc.setFallbackPolicy("pass-through");
+}
+
+describe("SC-010 and SC-013: output on Open with a touch file", () => {
+  it("after a key edit, a placement, a delete and a desktop edit the output is the working copy's files apart from version and HISTORY", async () => {
+    openWithTouch(true);
+    const set = { kind: "set", seq: 1, address: "phone:default:K_A", fields: { text: "ä" } } as const;
+    const add = { kind: "add", seq: 1, address: "phone:default:K_B", position: "after", key: { id: "K_ZZNEW", text: "z", sp: 0 } } as const;
+    expect(applyOpenChange({ kind: "touch", edit: { ops: [set] }, label: "edit" }).status).toBe("applied");
+    expect(applyOpenChange({ kind: "touch", edit: { ops: [add] }, label: "place" }).status).toBe("applied");
+    expect(applyOpenChange({ kind: "touch", edit: { removeIds: ["phone:default:K_C"] }, label: "drop" }).status).toBe("applied");
+    expect(applyOpenChange({ kind: "remove", itemIds: [ruleOf("K_B").nodeId], chars: ["b"] }).status).toBe("applied");
+    // Records the touch editor keeps are never replayed over the files.
+    useWorkingCopyStore.setState((s) => ({ keyEditOverlay: { ops: [...s.keyEditOverlay.ops, { ...set, seq: 9 }] } }));
+
+    const wc = useWorkingCopyStore.getState();
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected).not.toBeNull();
+    const touchNow = readVfsText(wc.startVfs!, TOUCH_PATH)!;
+    expect(touchNow).toContain("ä");
+    expect(touchNow).toContain("K_ZZNEW");
+    expect(touchNow).not.toContain('"K_C"');
+    for (const entry of wc.startVfs!.entries()) {
+      const out = projected!.vfs.get(entry.path)?.content;
+      if (entry.path === KMN_PATH) {
+        expect(withoutVersion(out as string), entry.path).toBe(withoutVersion(entry.content as string));
+      } else if (/HISTORY/i.test(entry.path) || entry.path.endsWith(".kps")) {
+        continue;
+      } else {
+        expect(out, entry.path).toBe(entry.content);
+      }
+    }
+  });
+
+  it("an opened keyboard with no touch file still builds its layout at output (until the touch file can be generated)", async () => {
+    openWithTouch(false);
+    const built = '{"phone":{"layer":[{"id":"default","row":[{"id":1,"key":[{"id":"K_A","text":"a"}]}]}]}}';
+    useWorkingCopyStore.getState().setTouchLayoutJson(built);
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected).not.toBeNull();
+    const out = projected!.vfs.get(TOUCH_PATH)?.content;
+    expect(typeof out).toBe("string");
+    expect(JSON.parse((out as string).replace(/^﻿/, ""))).toEqual(JSON.parse(built));
+  });
+
+  it("a touch layout the store holds is ignored when the keyboard has a touch file", async () => {
+    openWithTouch(true);
+    useWorkingCopyStore.getState().setTouchLayoutJson('{"phone":{"layer":[]}}');
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected!.vfs.get(TOUCH_PATH)?.content).toBe(TOUCH);
+  });
+});

@@ -25,7 +25,7 @@ import { OUTPUT_FORM_SEAM_PATTERN_IDS } from "@keyboard-studio/engine";
 import { getToZip, getPatternLibraryService } from "./services.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
-import { capsHandlingFromDecisions, openModeProjection, projectionInputFromState } from "./projectionInput.ts";
+import { capsHandlingFromDecisions, openModeProjection, projectionInputFromState, startHasTouchFile } from "./projectionInput.ts";
 import { selectKmnEdits } from "./projectionInput.ts";
 import { getMarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
@@ -580,7 +580,9 @@ export async function projectWorkingCopyForOutput(
       vfs: clonedVfs,
       keyboardId,
       targetKeyboardId: outputKeyboardId,
-      assignments: sessionAssignments,
+      // Open (spec 111 FR-042): assignments are written to the files when applied
+      // (the assign seam), so nothing held in the decisions is replayed here.
+      assignments: isOpen ? [] : sessionAssignments,
       getPattern: (id) => patternCache.get(id),
       identity: identityForProjection,
       marksTreatment: getMarksTreatmentValue(),
@@ -596,6 +598,7 @@ export async function projectWorkingCopyForOutput(
         ? {
             openMode: openModeProjection({
               kind: "output",
+              noTouchFile: !startHasTouchFile(startVfs),
               identity,
               startDisplayName: startKeyboard.displayName,
               ...(opts?.consentedReemit === true ? { consentedReemit: true } : {}),
