@@ -65,7 +65,21 @@ const WITH_SYSTEM_STORE: Pattern = makePattern({
   reviewedBy: "",
   reviewDate: "2026-10-29",
 });
-const PATTERNS = new Map([SWAP, WITH_STORE, WITH_SYSTEM_STORE].map((p) => [p.id, p] as const));
+const LAYER_SWITCH: Pattern = makePattern({
+  id: "modifier_as_layer_switch",
+  title: "modifier_as_layer_switch",
+  description: "modifier_as_layer_switch",
+  category: "desktop",
+  appliesTo: [],
+  questions: [{ id: "kmnRules", prompt: "kmnRules", answerType: "text" as const }],
+  kmnFragment: "{{kmnRules}}\n",
+  tests: [],
+  validatedForFamilies: [],
+  sourceKeyboards: [],
+  reviewedBy: "",
+  reviewDate: "2026-10-29",
+});
+const PATTERNS = new Map([SWAP, WITH_STORE, WITH_SYSTEM_STORE, LAYER_SWITCH].map((p) => [p.id, p] as const));
 
 vi.mock("./services.ts", () => ({
   getToZip: vi.fn(async () => vi.fn(async () => new Uint8Array())),
@@ -336,6 +350,30 @@ describe("applyOpenChange assign", () => {
     expect(applyOpenChange({ kind: "assign", add: [a], remove: [] }).status).toBe("applied");
     expect(files().touch).toBe(odd.replace('"text":"e"', '"text":"ɛ"'));
     expect(applyOpenChange({ kind: "assign", add: [], remove: [assignmentFingerprint(a)] }).status).toBe("applied");
+    expect(files().touch).toBe(odd);
+  });
+
+  it("places an added touch layer in the file's own text (no consent), and undo keeps every byte", () => {
+    const odd = '{\n\t"phone": {"font":"Tahoma",\n\t\t"layer":[{"id":"default","row":[{"id":1,"key":[{"id":"K_A","text":"a"},{"id":"K_E","text":"e"}]}]}]}\n}\n';
+    open("\n");
+    useWorkingCopyStore.getState().replaceStartingPointFiles({ [TOUCH_PATH]: odd });
+    const a: MechanismAssignment = {
+      scope: "individual",
+      target: "ɛ",
+      modality: "physical",
+      mechanisms: [{ patternId: "modifier_as_layer_switch", strategyId: "S-01", slotValues: { kmnRules: "+ [RALT K_E] > U+025B" } }],
+      source: "user",
+    };
+    const result = applyOpenChange({ kind: "assign", add: [a], remove: [] });
+    expect(result.status).toBe("applied");
+    const touch = files().touch;
+    expect(JSON.parse(touch).phone.layer.length).toBeGreaterThan(1);
+    // The file's own head is untouched: only layers were added after it.
+    expect(touch.startsWith(odd.slice(0, odd.indexOf('"layer":[{"id":"default"')))).toBe(true);
+    // Placed in the file's own compact layout, not re-serialised wholesale.
+    expect(touch).toContain('"layer":[{"id":"default","row":[{"id":1,"key":[{"id":"K_A","text":"a"');
+    expect(touch.split("\n")).toHaveLength(odd.split("\n").length);
+    expect(undoLastOpenApply().ok).toBe(true);
     expect(files().touch).toBe(odd);
   });
 

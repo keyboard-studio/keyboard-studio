@@ -48,6 +48,7 @@ export type ProjectionKind =
   | "marks"
   | "model"
   | "files"
+  | "touch"
   | "flush"
   | "output";
 
@@ -69,6 +70,7 @@ export const PROJECTION_STEPS: Readonly<Record<ProjectionKind, ReadonlySet<Proje
   reinsert: set(),
   model: set(),
   files: set(),
+  touch: set(),
   // The preview and the download on Open. Decisions are a record only, so the
   // guards, the tolerance fix and the deadkey ops are never replayed here (they
   // are in the files; the deadkey op log stays only as the decision record). Still replayed until the phase that moves each one into

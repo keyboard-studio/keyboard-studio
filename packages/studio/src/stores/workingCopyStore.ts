@@ -30,6 +30,7 @@ import type {
   GuardSpecification,
   HelpDocsAnswers,
   KeyboardIR,
+  TouchLayoutIR,
   KeyIdentityDecision,
   LintFinding,
   RemovalCapability,
@@ -2442,6 +2443,31 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       nextCapabilities = classifyRemovalCapabilities(recognized);
       nextIr = deriveFacets(recognized);
     }
+    // A touch-only change leaves the `.kmn` alone but the layouts the IRs carry
+    // must follow the file. On Open this replaces `ir.touchLayout` with the file's
+    // own layout by design (the file is the truth). No facet derives from
+    // `touchLayout`, so facets and capabilities need no recompute.
+    let touchOnly: { layout: TouchLayoutIR | undefined } | null = null;
+    if (nextIr === null) {
+      const touchPath = findTouchLayoutPath(startVfs);
+      const touchChange = touchPath === undefined ? undefined : files[touchPath];
+      if (touchChange !== undefined) {
+        let layout: TouchLayoutIR | undefined;
+        if (touchChange !== null) {
+          try {
+            layout = parseTouchLayout(touchChange);
+          } catch {
+            layout = undefined;
+          }
+        }
+        touchOnly = { layout };
+      }
+    }
+    const withLayout = (ir: KeyboardIR, layout: TouchLayoutIR | undefined): KeyboardIR => {
+      const { touchLayout: _drop, ...rest } = ir;
+      void _drop;
+      return layout === undefined ? (rest as KeyboardIR) : { ...rest, touchLayout: layout };
+    };
     // A fresh VFS object so subscribers see the change; file text is verbatim.
     const nextVfs = createVirtualFS(startVfs.entries());
     let nextTouchJson: string | undefined;
@@ -2486,6 +2512,12 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
             carveSuggestion:
               s.carveSuggestion === null ? null : { ...s.carveSuggestion, derived: [] },
             contextToleranceOverlay: null,
+          }
+        : {}),
+      ...(touchOnly !== null
+        ? {
+            startIr: s.startIr === null ? s.startIr : withLayout(s.startIr, touchOnly.layout),
+            ir: s.ir === null ? s.ir : withLayout(s.ir, touchOnly.layout),
           }
         : {}),
       ...(nextTouchJson !== undefined ? { touchLayoutJson: nextTouchJson } : {}),

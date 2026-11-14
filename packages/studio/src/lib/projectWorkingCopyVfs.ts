@@ -1610,7 +1610,7 @@ export function projectWorkingCopyVfs(
  * every key has a rule (e.g. a `U_` id that self-outputs), so this is the
  * ordinary case, not a sign of drift.
  */
-function applyKeyRenamesToRuleBindings(
+export function applyKeyRenamesToRuleBindings(
   ir: KeyboardIR,
   renameOps: readonly RenameKeyOp[],
 ): { ir: KeyboardIR; changed: boolean; warnings: string[] } {

@@ -17,7 +17,7 @@
 // The shared projection run and undo record are in `openApply/core.ts`; the
 // assignment and marks kinds are in `openApply/assign.ts`.
 
-import { emitKmn, isKeyboardSource, parseKmn, projectKmnText } from "@keyboard-studio/engine";
+import { emitKmn, isKeyboardSource, parseKmn } from "@keyboard-studio/engine";
 import { useWorkingCopyStore, type WorkingCopyState } from "../stores/workingCopyStore.ts";
 import type { RemovedRuleRecord } from "../stores/openRemovalStore.ts";
 import { useOpenUndoStore, type OpenUndoRecord, type OpenUndoView } from "../stores/openUndoStore.ts";
@@ -28,7 +28,7 @@ import {
   EARLIER_CHANGES_LABEL,
   failure,
   findAnchor,
-  intendedMatchesText,
+  spliceKmnIntended,
   nextUndoId,
   projectChange,
   recordUndo,
@@ -37,6 +37,7 @@ import {
   applyRemoveOrIr,
 } from "./openApply/core.ts";
 import { applyAssign, applyMarks } from "./openApply/assign.ts";
+import { applyTouch } from "./openApply/touch.ts";
 import { scopeToWrites } from "./openApply/scopeToWrites.ts";
 import { setOpenChangeApplier } from "./openApplyNotifier.ts";
 
@@ -91,20 +92,9 @@ function applyModel(change: Extract<OpenChange, { kind: "model" }>, opts: OpenAp
   const consented = opts.consentedReemit === true;
   // Only what the change declared it writes is diffed against the file.
   const intended = scopeToWrites(startIr, change.nextIr, change.writes);
-  const projected = projectKmnText(current, startIr, intended);
-  let next: string;
-  if (projected.ok) {
-    next = projected.text;
-    // A splice that does not give the rules the change meant is "not placed precisely".
-    if (!intendedMatchesText(intended, next, keyboardId)) {
-      if (!consented) return { status: "needs-consent", files: [kmnPath] };
-      next = emitKmn(intended);
-    }
-  } else if (consented) {
-    next = emitKmn(intended);
-  } else {
-    return { status: "needs-consent", files: [kmnPath] };
-  }
+  const spliced = spliceKmnIntended(current, startIr, intended, keyboardId, consented);
+  if (!spliced.ok) return { status: "needs-consent", files: [kmnPath] };
+  const next = spliced.text;
   return applyFiles({ kind: "files", files: { [kmnPath]: next }, label: change.label });
 }
 
@@ -282,6 +272,7 @@ export function applyOpenChange(change: OpenChange, opts: OpenApplyOptions = {})
     if (change.kind === "model") return applyModel(change, opts);
     if (change.kind === "assign") return applyAssign(change, opts);
     if (change.kind === "marks") return applyMarks(opts);
+    if (change.kind === "touch") return applyTouch(change, opts);
     return applyRemoveOrIr(change, opts);
   } catch (err) {
     return failure(err);
@@ -295,6 +286,7 @@ function revertView(view: OpenUndoView): void {
     case "restore": // its entries return to the Removed list with its record
     case "assign": // the session is the previous assign record's `after`
     case "marks":
+    case "touch":
     case "flush":
     case "files":
       return;

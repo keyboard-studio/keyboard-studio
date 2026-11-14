@@ -42,6 +42,6 @@ describe("labelPatchedTouchText", () => {
   it("adds the member to a key that had no label", () => {
     const before = layout('{"id":"K_E"}');
     const after = JSON.stringify({ phone: { layer: [{ id: "default", row: [{ id: 1, key: [{ id: "K_E", text: "ɛ" }] }] }] } });
-    expect(labelPatchedTouchText(before, after)).toBe(before.replace('{"id":"K_E"}', '{"id":"K_E", "text": "ɛ"}'));
+    expect(labelPatchedTouchText(before, after)).toBe(before.replace('{"id":"K_E"}', '{"id":"K_E","text":"ɛ"}'));
   });
 });

@@ -274,6 +274,7 @@ T070-T077 (FR-035..FR-040) moved to [spec 114](../114-ctrl-and-letter-removal/sp
 - [ ] T087a Retire on Open the touch overlays that S1 leaves in place: `deletedTouchKeyIds` and `carveTouchKeepInert` (touch-key deletions and keep-inert characters) are written into the touch layout file when applied.
 - [ ] T087b Reseed touch from desktop on Open: an understated secondary action (OWNER RULING 2026-11-14); replaces the touch file as one applied change, shown and agreed first (FR-009), undoable; creates the file when none exists (FR-017). Desktop letter placements reach touch only as suggestions in the touch step, as on Copy (OWNER RULING 2026-11-14).
 - [ ] T088 Tests: SC-013.
+- [ ] T087c (S2a prerequisite) The `touch` change kind needs a layer-add path (an intended-layout edit or a layer applier) before the builder's add-layer is routed (S2a).
 
 ## Phase 17: Remaining files (FR-041, FR-047)
 

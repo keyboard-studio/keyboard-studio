@@ -2,6 +2,7 @@
 // modules (kept apart so the modules do not import each other in a cycle).
 
 import type { IRPath, KeyboardIR, MechanismAssignment } from "@keyboard-studio/contracts";
+import type { KeyEditOperation, RenameKeyOp } from "@keyboard-studio/engine";
 import type { OpenRemovalEntry } from "../../stores/openRemovalStore.ts";
 import type { OpenUndoLabelKey } from "../../stores/openUndoStore.ts";
 
@@ -61,6 +62,22 @@ export type OpenChange =
     }
   | {
       /**
+       * A touch-layout edit written into the file's own text (only the
+       * affected lines change), optionally with its `.kmn` half in the same
+       * applied change (one undo record, one file write). The layout is
+       * recomputed from the file as it is at apply time. Needs consent when the
+       * text cannot be patched precisely (the canonical layout is then written).
+       */
+      kind: "touch";
+      edit: TouchEdit;
+      /** The rules half: only `writes` of `nextIr` are diffed against the `.kmn`. */
+      rules?: { nextIr: KeyboardIR; writes: readonly IRPath[] };
+      /** Key renames whose vkey bindings are rewritten in the `.kmn`. */
+      renames?: RenameKeyOp[];
+      label: string;
+    }
+  | {
+      /**
        * A precomputed multi-file write (`null` deletes a file). It skips the
        * projection; a `.kmn` among the files is re-parsed and must still be a
        * keyboard. Later phases' editors use it.
@@ -72,6 +89,12 @@ export type OpenChange =
       /** Marks a step the undo UI words itself. */
       labelKey?: OpenUndoLabelKey;
     };
+
+/** What a `touch` change does to the layout. */
+export type TouchEdit =
+  | { ops: KeyEditOperation[] }
+  | { assignments: MechanismAssignment[] }
+  | { removeIds: string[] };
 
 export type OpenApplyResult =
   | {

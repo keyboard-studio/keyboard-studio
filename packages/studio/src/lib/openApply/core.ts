@@ -10,9 +10,11 @@ import {
   type VirtualFS,
 } from "@keyboard-studio/contracts";
 import {
+  emitKmn,
   emitRule,
   isKeyboardSource,
   parseKmn,
+  projectKmnText,
   spliceKmn,
 } from "@keyboard-studio/engine";
 import type { KmnEdit } from "@keyboard-studio/engine";
@@ -489,3 +491,24 @@ export function findAnchor(group: KeyboardIR["groups"][number], rec: RemovedRule
  * neighbour is gone goes to the start of its group; the author accepted that
  * the placement is approximate.
  */
+
+/**
+ * Splice the rules `intended` into the `.kmn` text `current` (the file's own
+ * parse is `startIr`). `needs-consent` when the splice cannot place them
+ * precisely and the author has not agreed to a re-emit.
+ */
+export function spliceKmnIntended(
+  current: string,
+  startIr: KeyboardIR,
+  intended: KeyboardIR,
+  keyboardId: string,
+  consented: boolean,
+): { ok: true; text: string } | { ok: false } {
+  const projected = projectKmnText(current, startIr, intended);
+  if (projected.ok) {
+    // A splice that does not give the rules the change meant is "not placed precisely".
+    if (intendedMatchesText(intended, projected.text, keyboardId)) return { ok: true, text: projected.text };
+    return consented ? { ok: true, text: emitKmn(intended) } : { ok: false };
+  }
+  return consented ? { ok: true, text: emitKmn(intended) } : { ok: false };
+}

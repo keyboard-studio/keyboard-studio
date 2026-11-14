@@ -41,7 +41,7 @@ import {
   textOrNull,
   type Projection,
 } from "./core.ts";
-import { labelPatchedTouchText } from "./touchLabels.ts";
+import { patchTouchText } from "./touchText.ts";
 import type { OpenApplyOptions, OpenApplyResult, OpenChange, RefusalCode } from "./types.ts";
 
 // -- small text helpers -------------------------------------------------------
@@ -303,7 +303,7 @@ function verify(
 }
 
 /**
- * Touch labels: patch only the key `text` values in the file's own text, so a
+ * Touch layout: patch only what changed (labels, an added layer) in the file's own text, so a
  * touch file that is not in the engine's canonical layout keeps every other
  * byte (FR-010). Falls back to the projection's re-serialised text only when
  * the text patch cannot be located, and then only with the author's consent.
@@ -318,7 +318,14 @@ function keepTouchBytes(
     if (before === null) continue;
     // Put back from the saved text (taking an assignment back): already exact bytes.
     if (ctx.sess?.base[path] === after) continue;
-    const patched = labelPatchedTouchText(before, after);
+    // Labels, subkeys and an added layer are all placed in the file's own text.
+    let intended: unknown;
+    try {
+      intended = JSON.parse(after);
+    } catch {
+      intended = undefined;
+    }
+    const patched = intended === undefined ? undefined : patchTouchText(before, intended);
     if (patched !== undefined) changed[path] = patched;
     else if (ctx.opts.consentedReemit !== true) return { ok: false, result: { status: "needs-consent", files: [path] } };
   }

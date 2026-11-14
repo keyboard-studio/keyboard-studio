@@ -65,6 +65,7 @@ export function OpenUndoButton() {
       case "flush":
         return t({ id: "openUndo.flush", message: "Undo: earlier changes written to the file" });
       case "files":
+      case "touch":
         return t({ id: "openUndo.generic", message: `Undo: ${{ label: r.label }}` });
     }
   };

@@ -15,6 +15,7 @@
 // No timers.
 
 import { create } from "zustand";
+import type { KeyEditOperation } from "@keyboard-studio/engine";
 import { useOpenRemovalStore, type OpenRemovalEntry } from "./openRemovalStore.ts";
 import { useOpenAssignStore, type OpenAssignSession } from "./openAssignStore.ts";
 
@@ -32,6 +33,11 @@ export type OpenUndoView =
   /** An assignment step (guards included): the session list before and after. */
   | { kind: "assign"; before: OpenAssignSession | null; after: OpenAssignSession | null }
   | { kind: "marks" }
+  /** A touch-layout edit (with its `.kmn` half, if any); `ops` are the key edits it carried. */
+  | {
+      kind: "touch";
+      edit: { type: "ops"; ops: KeyEditOperation[] } | { type: "assignments" } | { type: "removals" };
+    }
   /** Held overlays written into the file ahead of another step. */
   | { kind: "flush" }
   /** Any other precomputed or projected write (rule additions, `files`). */
@@ -111,6 +117,7 @@ function rebuildDerived(records: readonly OpenUndoRecord[]): void {
         break;
       case "restore":
       case "marks":
+      case "touch":
       case "flush":
       case "files":
         break;
