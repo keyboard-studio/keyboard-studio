@@ -24,6 +24,16 @@ export interface OpenUndoFile {
   after: string | null;
 }
 
+/** One touch key a deletion changed: where it is, as it was, and as the deletion left it (lib/openApply/touchRestore). */
+export interface TouchKeyRestoreEntry {
+  platform: string;
+  layerId: string;
+  row: number;
+  index: number;
+  before: unknown;
+  after: unknown;
+}
+
 /** What kind of step a record is; the caches are derived from these. */
 export type OpenUndoView =
   /** A removal: it is on the Removed list until a restore step takes it off. */
@@ -36,7 +46,13 @@ export type OpenUndoView =
   /** A touch-layout edit (with its `.kmn` half, if any); `ops` are the key edits it carried. */
   | {
       kind: "touch";
-      edit: { type: "ops"; ops: KeyEditOperation[] } | { type: "assignments" } | { type: "removals" };
+      edit:
+        | { type: "ops"; ops: KeyEditOperation[] }
+        | { type: "assignments" }
+        /** Deleted touch methods (`ids`) and the keys a restore puts back. */
+        | { type: "removals"; ids: string[]; keys: TouchKeyRestoreEntry[] }
+        /** Touch methods put back (they leave the restore list). */
+        | { type: "restores"; ids: string[] };
     }
   /** Held overlays written into the file ahead of another step. */
   | { kind: "flush" }

@@ -2090,6 +2090,7 @@
   "open.apply.refused.rules-edited": "That change was not applied. Rules it added were edited in the code, so it cannot be taken back automatically. Use the remove tool to take those rules out. Your files are unchanged.",
   "open.apply.refused.store-collision": "That change was not applied. This keyboard already has a store named {store}, and the method needs that name. Rename or remove that store first. Your files are unchanged.",
   "open.apply.refused.system-store": "That change was not applied. It would write the system store {store}, which a method may not do. Your files are unchanged.",
+  "open.apply.refused.touch-key-changed": "That change was not applied. The key was changed since it was deleted, so it is not put back over that change. Your files are unchanged.",
   "open.entry.button": "Open this keyboard",
   "open.entry.intro": "Update a keyboard in place. Its languages, documentation and formatting are kept, and only what you change is rewritten.",
   "open.entry.picker.label": "Keyboard to open",

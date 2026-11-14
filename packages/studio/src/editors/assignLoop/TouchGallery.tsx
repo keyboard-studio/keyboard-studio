@@ -163,7 +163,9 @@ import { resolveStartTouchJson } from "../../lib/resolveStartTouchJson.ts";
 import { isLiveOpen } from "../../lib/openMode.ts";
 import { findTouchLayoutPath } from "../../lib/findTouchLayoutPath.ts";
 import { readVfsText } from "../../lib/vfsText.ts";
-import { commitTouchOpOnOpen, groupTouchCommitsOnOpen, installRulesOnOpen } from "./touchOpenCommit.ts";
+import { commitTouchEditOnOpen, commitTouchOpOnOpen, groupTouchCommitsOnOpen, installRulesOnOpen } from "./touchOpenCommit.ts";
+import { useOpenUndoStore, type TouchKeyRestoreEntry } from "../../stores/openUndoStore.ts";
+import { pendingTouchDeletions, putKeysBack } from "../../lib/openApply/touchRestore.ts";
 import { TOUCH_STEP_ID } from "../../steps/stepIds.ts";
 import { useCharWalkPosition } from "../../hooks/useCharWalkPosition.ts";
 import { cursorCharIn } from "../../lib/stepWalk.ts";
@@ -2042,6 +2044,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       touchDraft !== null ? new Map(touchDraft.charTouchEntries) : new Map(),
   );
 
+  // Open: characters whose placement was written into the touch file this session.
+  // Once written a character is "detected" (the file holds it), which would drop it
+  // from the walk list mid-walk; keeping it there mirrors Copy, where a placed
+  // character stays a walk stop until the author moves on. Memory only.
+  const [sessionPlacedChars, setSessionPlacedChars] = useState<ReadonlySet<string>>(() => new Set());
+
   // Sibling-accent bulk groups (longpress accelerator): each batch the author
   // confirms via the "Add them" banner is recorded here so the gallery renders
   // ONE removable summary box per batch instead of a chip per sibling.
@@ -2250,6 +2258,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // method no longer produces the character at all, so there'd be nothing
   // left to name/restore if this were the only seed layout kept around.
   const rawDetectionSeedLayout = useMemo<TouchLayoutIR | null>(() => {
+    // Open: the touch FILE is the layout, as the key grid shows it. No desktop mods are
+    // replayed onto it (a letter placed on the desktop reaches touch only as a
+    // suggestion, never as a key) and no seed source re-derives it.
+    if (fileTouchLayout !== null) return fileTouchLayout;
     if (startIr === null) return null;
     try {
       const baseTouchJson =
@@ -2268,7 +2280,29 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       );
       return null;
     }
-  }, [startIr, startVfs, mods, resolvedSeedSource]);
+  }, [startIr, startVfs, mods, resolvedSeedSource, fileTouchLayout]);
+
+  // Open: the methods the session log holds as deleted (restorable), and the file's
+  // layout with them put back (for naming them only; never written).
+  const openRecords = useOpenUndoStore((st) => st.records);
+  const pendingDeletions = useMemo(
+    () => (openTouch ? pendingTouchDeletions(openRecords) : new Map<string, TouchKeyRestoreEntry[]>()),
+    [openTouch, openRecords],
+  );
+  const layoutWithDeletionsBack = useMemo<TouchLayoutIR | null>(() => {
+    if (!openTouch || pendingDeletions.size === 0 || startVfs === null) return null;
+    const path = findTouchLayoutPath(startVfs);
+    const text = path === undefined ? undefined : readVfsText(startVfs, path);
+    if (text === undefined) return null;
+    try {
+      const raw: unknown = JSON.parse(text.replace(/^\uFEFF/, ""));
+      for (const entries of new Set(pendingDeletions.values())) putKeysBack(raw, entries, true);
+      return parseTouchLayout(JSON.stringify(raw));
+    } catch (err) {
+      devLog.error("[TouchGallery] the deleted methods could not be laid back over the touch file:", err);
+      return null;
+    }
+  }, [openTouch, pendingDeletions, startVfs]);
 
   // The seed layout for the chosen seed source, with desktop mods (spec 035
   // R3) AND the author's touch-method deletions both replayed — mirroring
@@ -3022,7 +3056,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
       return { committed: true, warnings };
     },
-    [checkKeyEditOperation, checkKeyEditRejectionNotices, acknowledgedRejections, keyModeProvenance, openTouch, openTouchLabel, openTouchUnreadable],
+    [checkKeyEditOperation, checkKeyEditRejectionNotices, acknowledgedRejections, keyModeProvenance, openTouch, openTouchLabel, openTouchUnreadable, startVfs],
   );
 
   // T013 (FR-065) — offer the layer-family fan-out after an edit that can
@@ -4629,8 +4663,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // applied to the file yet) hold undo entries, and says so by name and by a
   // description mounted below.
   const touchUndoHintId = useId();
+  // With the touch file open, placements, deletions and key edits are all applied
+  // changes the footer's Undo covers, so this button is not shown at all.
   const touchUndoSlot: Pick<StepNavSpec, "secondary"> =
-    liveOpen && undoStack.length === 0
+    liveOpen && (openTouch || undoStack.length === 0)
       ? {}
       : {
           secondary: {
@@ -4649,7 +4685,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
             disabled: undoStack.length === 0,
           },
         };
-  const touchUndoHint = liveOpen ? (
+  const touchUndoHint = liveOpen && !openTouch ? (
     <span id={touchUndoHintId} style={visuallyHidden}>
       {t({
         id: "editor.assignLoop.touch.undoTouchEdit.hint",
@@ -4844,7 +4880,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           (c) =>
             !detectedChars.has(c) ||
             desktopSuggestionTargets.has(c) ||
-            (returnedSet.has(c) && unplacedSet.has(c)),
+            (returnedSet.has(c) && unplacedSet.has(c)) ||
+            sessionPlacedChars.has(c),
         ),
       ),
       loanwordSet,
@@ -4861,6 +4898,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     unplacedCharsKey,
     returnedToWorklistKey,
     loanwordSet,
+    sessionPlacedChars,
   ]);
   const touchLettersToAddKey = touchLettersToAdd.join("\0");
 
@@ -5471,13 +5509,21 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // name here. Scoped to `deletable` methods only — a non-deletable
   // (desktop-backed) row is never in deletedTouchKeyIds in the first place.
   const deletedExistingTouchMethods = useMemo<TouchMethodDescriptor[]>(() => {
+    if (openTouch) {
+      // Open: the restore list is the session log's deletions (a restore step or an
+      // undo takes one off it), named from the file with those keys put back.
+      if (layoutWithDeletionsBack === null || currentChar === null) return [];
+      return enumerateTouchMethodsForChar(layoutWithDeletionsBack, currentChar).filter(
+        (m) => m.deletable && pendingDeletions.has(m.id),
+      );
+    }
     if (rawDetectionSeedLayout === null || currentChar === null) return [];
     return enumerateTouchMethodsForChar(
       rawDetectionSeedLayout,
       currentChar,
     ).filter((m) => m.deletable && isTouchKeyDeleted(m.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawDetectionSeedLayout, currentChar, isTouchKeyDeleted, deletedTouchKeyIds]);
+  }, [rawDetectionSeedLayout, currentChar, isTouchKeyDeleted, deletedTouchKeyIds, openTouch, layoutWithDeletionsBack, pendingDeletions]);
 
   // The FULL, unfiltered enumeration of touch methods for currentChar —
   // sourced from rawDetectionSeedLayout (the UNDELETED seed, same source as
@@ -5490,9 +5536,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // already-filtered arrays alone is a safe stand-in for "every method this
   // char has".
   const allTouchMethodsForChar = useMemo<TouchMethodDescriptor[]>(() => {
-    if (rawDetectionSeedLayout === null || currentChar === null) return [];
-    return enumerateTouchMethodsForChar(rawDetectionSeedLayout, currentChar);
-  }, [rawDetectionSeedLayout, currentChar]);
+    const layout = layoutWithDeletionsBack ?? rawDetectionSeedLayout;
+    if (layout === null || currentChar === null) return [];
+    return enumerateTouchMethodsForChar(layout, currentChar);
+  }, [rawDetectionSeedLayout, layoutWithDeletionsBack, currentChar]);
 
   // Unified "Existing methods" row list (SHOW-ALL, spec follow-up — mirrors
   // MechanismGallery's desktop `existingMethods`): every real touch method
@@ -5593,9 +5640,30 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // deletedExistingTouchMethods above.
   const handleRestoreExistingTouchMethod = useCallback(
     (method: TouchMethodDescriptor) => {
+      if (openTouch) {
+        // Open: the saved key goes back through the seam, and is refused (with a
+        // notice) when the key there has changed since the deletion.
+        const entries = pendingDeletions.get(method.id);
+        if (entries === undefined) return;
+        commitTouchEditOnOpen({ restoreKeys: entries, ids: [method.id] }, openTouchLabel);
+        return;
+      }
       restoreTouchKey(method.id);
     },
-    [restoreTouchKey],
+    [restoreTouchKey, openTouch, pendingDeletions, openTouchLabel],
+  );
+
+  // Delete an existing method: on Open a `removeIds` change to the file, else the overlay.
+  const handleDeleteExistingTouchMethod = useCallback(
+    (id: string) => {
+      if (openTouch) {
+        commitTouchEditOnOpen({ removeIds: [id] }, openTouchLabel);
+        return;
+      }
+      if (openTouchUnreadable) return;
+      deleteTouchKey(id);
+    },
+    [deleteTouchKey, openTouch, openTouchUnreadable, openTouchLabel],
   );
 
   // ---------------------------------------------------------------------------
@@ -6174,12 +6242,63 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     return next;
   }
 
+  /**
+   * Open: write character placements into the touch file now, as one `touch`
+   * change (one undo record, recorded only once applied). Nothing goes into the
+   * in-progress `charTouch` set: the file is the truth, so a placement is never
+   * shown twice (file and overlay) and a declined or refused one leaves the file,
+   * the grid and `charTouch` as they were. `afterApplied` runs once the file holds
+   * the placements (at once when placed precisely, after the author agreed when
+   * asked first), never otherwise.
+   */
+  function placeOnOpen(
+    placements: readonly { char: string; ref: MechanismRef }[],
+    afterApplied?: () => void,
+  ): void {
+    let map = new Map<string, TouchAssignment>();
+    for (const p of placements) map = appendMechanismToChar(map, p.char, p.ref);
+    const assignments = [...map.values()].filter((a) =>
+      a.mechanisms.some((m) => m.patternId !== "touch_inherited"),
+    );
+    if (assignments.length === 0) {
+      afterApplied?.();
+      return;
+    }
+    commitTouchEditOnOpen({ assignments }, openTouchLabel, () => {
+      setSessionPlacedChars((prev) => new Set([...prev, ...assignments.map((a) => a.target)]));
+      afterApplied?.();
+    });
+  }
+
   const handleCasePairConfirm = useCallback(() => {
     if (casePairProposal === null || casePairProposal.mechanism !== "touch") {
       return;
     }
     const { originalChar, counterpart, baseKey: hk, targetLayer, baseRef } =
       casePairProposal;
+
+    if (openTouch) {
+      // Open: the base placement is already in the file, so there is no in-progress
+      // entry to guard against; the capital is written as its own change.
+      placeOnOpen(
+        [
+          {
+            char: counterpart,
+            ref: {
+              patternId: baseRef.patternId,
+              slotValues: {
+                ...(baseRef.slotValues ?? {}),
+                char: counterpart,
+                hostKey: hk,
+                layer: targetLayer,
+              },
+            },
+          },
+        ],
+        clearCompanion,
+      );
+      return;
+    }
 
     setCharTouch((prev) => {
       // Stale-base guard (FR-008): the placement this was raised for must
@@ -6204,7 +6323,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     });
 
     clearCompanion();
-  }, [casePairProposal, clearCompanion]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [casePairProposal, clearCompanion, openTouch, openTouchLabel]);
 
   // Confirm the sibling-accent proposal: place every sibling in ONE update
   // (single Accept places all — spec: "one click to accept all"). Each
@@ -6224,7 +6344,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // siblings would share — must still be present. Without this, removing the
     // just-placed base chip while this banner is open and then clicking "Add
     // them" would place orphaned siblings with no base longpress underneath.
-    const acceptedStillPlaced = (
+    // Open: the accepted placement is in the file, not in `charTouch`.
+    const acceptedStillPlaced = openTouch || (
       charTouch.get(acceptedChar)?.mechanisms ?? []
     ).some((m) => normalizeTouchSlots(m.slotValues)["hostKey"] === acceptedBaseKey);
     if (!acceptedStillPlaced) {
@@ -6248,6 +6369,28 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       });
       return !alreadyProduced;
     });
+
+    if (openTouch) {
+      // Open: the siblings are written into the file as one change. They are
+      // not recorded as a bulk group: that box's "Remove all" acts on `charTouch`,
+      // and a written placement is removed from the file (delete on its own chip).
+      const refs: { char: string; ref: MechanismRef }[] = [];
+      for (const placement of toPlace) {
+        const ref = buildTouchMechanismRef(
+          "longpress_alternates",
+          placement.baseKey,
+          "",
+          placement.char,
+          placement.layer,
+        );
+        if (ref !== null) refs.push({ char: placement.char, ref });
+      }
+      placeOnOpen(refs, () => {
+        setDeferredCompanionInput(null);
+        setSiblingAccentProposal(null);
+      });
+      return;
+    }
 
     if (toPlace.length > 0) {
       setCharTouch((prev) => {
@@ -6294,7 +6437,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // is discarded rather than raised.
     setDeferredCompanionInput(null);
     setSiblingAccentProposal(null);
-  }, [siblingAccentProposal, charTouch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siblingAccentProposal, charTouch, openTouch, openTouchLabel]);
 
   const handleSiblingAccentDismiss = useCallback(() => {
     // CHANGE 4 precedence fallback: the bulk proposal is denied, so if a
@@ -6355,8 +6499,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // handleApply's own `if (ref === null) return;`, not a second real path.
     const ref = buildTouchMechanismRef(nextMethod, hk, "", currentChar);
     if (ref === null) return;
-    setCharTouch((prev) => appendMechanismToChar(prev, currentChar, ref));
-    markSuggestionResolved(currentChar);
+    const placed = (): void => {
 
     // Case-pair companion (CHANGE 3: the companion must fire whenever a
     // lowercase letter is implemented, not only via the manual chooser's
@@ -6424,10 +6567,25 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     } else if (companionInput !== null) {
       proposeCompanion(companionInput);
     }
+    };
+    if (openTouch) {
+      // Open: written into the touch file now; the resolution and the offers
+      // that follow run once the file holds the placement.
+      placeOnOpen([{ char: currentChar, ref }], () => {
+        markSuggestionResolved(currentChar);
+        placed();
+      });
+      return;
+    }
+    setCharTouch((prev) => appendMechanismToChar(prev, currentChar, ref));
+    markSuggestionResolved(currentChar);
+    placed();
     // inventoryKey is the stable primitive proxy for `inventory` (same
     // precedent as detectedChars/touchKey above).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    openTouch,
+    openTouchLabel,
     suggestion,
     currentChar,
     markSuggestionResolved,
@@ -6460,7 +6618,38 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // null) return;` style.
     const ref = buildMechanismRef(currentChar);
     if (ref === null) return;
+    if (openTouch) {
+      // Open: written into the touch file now. The offers and the reset of the
+      // chooser follow once the file holds it; a decline leaves the chooser as it is.
+      placeOnOpen([{ char: currentChar, ref }], () => afterPlacement(ref));
+      return;
+    }
     setCharTouch((prev) => appendMechanismToChar(prev, currentChar, ref));
+    afterPlacement(ref);
+    // `charTouch` is listed because the case-pair "already placed" predicate in
+    // `afterPlacement` closes over it — a stale map would re-propose a pairing the
+    // author has already made.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    currentChar,
+    canApply,
+    method,
+    baseKey,
+    resolvedBaseKey,
+    flickDirection,
+    layerTokens,
+    charTouch,
+    assembledLayerCombo,
+    isLayerComboInUse,
+    proposeCompanion,
+    i18n,
+    openTouch,
+    openTouchLabel,
+  ]);
+
+  // What follows an applied placement (on Copy at once; on Open once the file holds it).
+  function afterPlacement(ref: MechanismRef): void {
+    if (currentChar === null) return;
 
     // Case-pair proposal (FR-005): offer the capital on the casing-parallel
     // layer of the layer being edited. Suppressed when that layer has no
@@ -6521,24 +6710,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     setBaseKeyCustomChar("");
     setFlickDirection("");
     setLayerTokens(seedLayerTokensForChar(currentChar));
-    // `charTouch` is listed because the case-pair "already placed" predicate
-    // above closes over it — a stale map would re-propose a pairing the author
-    // has already made.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    currentChar,
-    canApply,
-    method,
-    baseKey,
-    resolvedBaseKey,
-    flickDirection,
-    layerTokens,
-    charTouch,
-    assembledLayerCombo,
-    isLayerComboInUse,
-    proposeCompanion,
-    i18n,
-  ]);
+  }
 
   // Strip every bulk-added longpress mechanism for `members` on `baseKey` from
   // a charTouch map (dropping any member left with no mechanisms). Touches ONLY
@@ -6574,8 +6746,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // Bulk box "Remove all": delete every sibling the group added, in one click.
   const handleRemoveBulkGroup = useCallback(
     (group: BulkAccentGroup) => {
+      // On Open `charTouch` holds nothing written (placements go to the file, and no bulk
+      // group is recorded), so this leaves it untouched: only a restored draft can have entries.
       setCharTouch((prev) =>
-        stripBulkMembers(prev, group.members, group.baseKey),
+        prev.size === 0 ? prev : stripBulkMembers(prev, group.members, group.baseKey),
       );
       setBulkAccentGroups((prev) => prev.filter((g) => g.id !== group.id));
     },
@@ -6631,6 +6805,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // cleared, since its pending placements would target a removed base.
   const handleRemoveMechanism = useCallback(
     (char: string, idx: number) => {
+      // On Open this is a no-op unless a restored draft left an entry: a written
+      // placement is not in `charTouch` (it is removed with its own chip, from the file).
       setCharTouch((prev) => {
         const existing = prev.get(char);
         if (existing === undefined) return prev;
@@ -7677,7 +7853,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               row.deletable ? (
                 <HoverDangerChip
                   key={row.id}
-                  onClick={() => deleteTouchKey(row.id)}
+                  onClick={() => handleDeleteExistingTouchMethod(row.id)}
                   ariaLabel={t({
                     id: "editor.assignLoop.touch.removeExistingMethodAriaLabel",
                     message: `Remove existing touch method ${{ label: row.label }} for ${{ notation: toUPlusNotation(currentChar) }}`,

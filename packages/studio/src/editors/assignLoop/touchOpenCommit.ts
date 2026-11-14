@@ -120,6 +120,40 @@ export function installRulesOnOpen(nextIr: KeyboardIR, label: string, onApplied?
   return "failed";
 }
 
+/**
+ * Write a touch edit that carries no key-grid op (character placements, a delete,
+ * a restore) as one change: one write, one undo record, recorded on applied.
+ * `onApplied` runs once the file holds it (now, or after the author agreed); on a
+ * decline or a refusal it never runs and nothing has changed. Returns the outcome.
+ */
+export function commitTouchEditOnOpen(
+  edit: Extract<OpenChange, { kind: "touch" }>["edit"],
+  label: string,
+  onApplied?: () => void,
+): TouchOpenOutcome {
+  const change: OpenChange = { kind: "touch", edit, label };
+  const result = applyThroughOpenSeam(change);
+  if (result.status === "applied" || result.status === "unchanged") {
+    onApplied?.();
+    return result.status;
+  }
+  const handed = handOverToOpenApplyHost({
+    build: () => change,
+    onNotApplied: () => {},
+    ...(onApplied !== undefined ? { onApplied } : {}),
+  });
+  // With a host mounted its notice tells the author (a refused restore included: it
+  // applies the change again and shows the refusal). With none, say so in the log.
+  if (!handed) {
+    devLog.warn(
+      `[touch-open] a touch change was not written (no host to ask the author): ${
+        result.status === "failed" ? result.reason : "it needs the author's agreement"
+      }`,
+    );
+  }
+  return handed && result.status === "needs-consent" ? "pending" : "failed";
+}
+
 let scope: TouchOpenSubmission[] | null = null;
 
 /**

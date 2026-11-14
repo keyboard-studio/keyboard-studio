@@ -4,7 +4,7 @@
 import type { IRPath, KeyboardIR, MechanismAssignment } from "@keyboard-studio/contracts";
 import type { KeyEditOperation, RenameKeyOp } from "@keyboard-studio/engine";
 import type { OpenRemovalEntry } from "../../stores/openRemovalStore.ts";
-import type { OpenUndoLabelKey } from "../../stores/openUndoStore.ts";
+import type { OpenUndoLabelKey, TouchKeyRestoreEntry } from "../../stores/openUndoStore.ts";
 
 /** A change the author applies to the opened keyboard. */
 export type OpenChange =
@@ -96,7 +96,9 @@ export type OpenChange =
 export type TouchEdit =
   | { ops: KeyEditOperation[] }
   | { assignments: MechanismAssignment[] }
-  | { removeIds: string[] };
+  | { removeIds: string[] }
+  /** Put saved keys back at their places (refused if a key there has changed); `ids` are the methods restored. */
+  | { restoreKeys: TouchKeyRestoreEntry[]; ids: string[] };
 
 export type OpenApplyResult =
   | {
@@ -129,7 +131,8 @@ export type RefusalCode =
   | "claimed-restore"
   | "store-collision"
   | "own-rule"
-  | "system-store";
+  | "system-store"
+  | "touch-key-changed";
 
 export interface OpenApplyOptions {
   /** The author agreed to a full re-emit of a file that cannot be spliced. */

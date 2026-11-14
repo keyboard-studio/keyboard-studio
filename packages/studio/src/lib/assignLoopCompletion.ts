@@ -31,6 +31,8 @@ import { repropagate } from "../steps/repropagate.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { buildTouchLayoutJson } from "./buildTouchLayoutJson.ts";
 import { resolveStartTouchJson } from "./resolveStartTouchJson.ts";
+import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
+import { isLiveOpen } from "./openMode.ts";
 import {
   resolveTouchSeedSource,
   shouldEmitTouchLayout,
@@ -148,6 +150,15 @@ export function applyTouchCompletionEffects(
   } = payload;
 
   const wc = useWorkingCopyStore.getState();
+  if (isLiveOpen(wc) && wc.startVfs !== null && findTouchLayoutPath(wc.startVfs) !== undefined) {
+    // Open with a touch file (spec 111 FR-041, SC-013): the file is the touch layout,
+    // every placement, deletion and key edit is already written into it, and
+    // Continue builds nothing. A placement the author declined is not in the file
+    // and is not emitted. Desktop letter placements are suggestions here, never keys.
+    wc.setTouchLayoutJson(null);
+    wc.clearStale("touch");
+    return;
+  }
   if (startIr === null) {
     // No working IR to derive from — clear the stored touch layout (KMW
     // uses its native default).

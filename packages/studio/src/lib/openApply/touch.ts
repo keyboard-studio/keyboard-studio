@@ -18,15 +18,18 @@ import {
   projectKmnText,
   emitKmn,
   emitRule,
+  TOUCH_LAYOUT_JSON_INDENT,
   type RenameKeyOp,
 } from "@keyboard-studio/engine";
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { useOpenUndoStore, type OpenUndoView } from "../../stores/openUndoStore.ts";
+import { useOpenUndoStore, type OpenUndoView, type TouchKeyRestoreEntry } from "../../stores/openUndoStore.ts";
 import { findTouchLayoutPath } from "../findTouchLayoutPath.ts";
 import { applyKeyRenamesToRuleBindings } from "../projectWorkingCopyVfs.ts";
 import { readVfsText } from "../vfsText.ts";
 import { beforeFrom, intendedMatchesText, nextUndoId, recordUndo, spliceKmnIntended } from "./core.ts";
 import { scopeToWrites } from "./scopeToWrites.ts";
+import { diffTouchKeys, putKeysBack, restoreMatches } from "./touchRestore.ts";
 import { patchTouchText } from "./touchText.ts";
 import type { OpenApplyOptions, OpenApplyResult, OpenChange } from "./types.ts";
 
@@ -36,7 +39,15 @@ const BOM = "﻿";
 function canonicalAfter(raw: string, change: Extract<OpenChange, { kind: "touch" }>): string {
   const { edit } = change;
   if ("ops" in edit) return applyKeyEditsToRawJson(raw, [...edit.ops].sort((a, b) => a.seq - b.seq)).json;
+  // An assignment also sets the platform's `defaultHint` where it adds a long-press: the
+  // engine applier does that on Copy too, and it is kept here on purpose so Open and
+  // Copy write the same layout.
   if ("assignments" in edit) return applyTouchAssignmentsToRawJson(raw, edit.assignments).json;
+  if ("restoreKeys" in edit) {
+    const layout: unknown = JSON.parse(raw);
+    putKeysBack(layout, edit.restoreKeys);
+    return JSON.stringify(layout, null, TOUCH_LAYOUT_JSON_INDENT);
+  }
   return applyTouchKeycapRemovalsToRawJson(raw, new Set(edit.removeIds)).json;
 }
 
@@ -82,6 +93,24 @@ export function applyTouch(change: Extract<OpenChange, { kind: "touch" }>, opts:
 
   const changed: Record<string, string | null> = {};
   const needConsent: string[] = [];
+
+  // A restore puts back only keys that are still as the deletion left them.
+  if ("restoreKeys" in change.edit) {
+    let current: unknown;
+    try {
+      current = JSON.parse(before.replace(/^\uFEFF/, ""));
+    } catch (err) {
+      return { status: "failed", reason: `${touchPath} cannot be read as a touch layout: ${err instanceof Error ? err.message : String(err)}` };
+    }
+    if (!restoreMatches(current, change.edit.restoreKeys)) {
+      return {
+        status: "failed",
+        reason: "A key has changed since it was deleted, so it is not put back over the change.",
+        refused: true,
+        code: "touch-key-changed",
+      };
+    }
+  }
 
   // The touch file.
   const bom = before.startsWith(BOM) ? BOM : "";
@@ -148,13 +177,27 @@ export function applyTouch(change: Extract<OpenChange, { kind: "touch" }>, opts:
   const changedPaths = Object.keys(changed);
   if (changedPaths.length === 0) return { status: "unchanged" };
 
+  // What a deletion changed, so its restore can put exactly that back.
+  let removedKeys: TouchKeyRestoreEntry[] = [];
+  if ("removeIds" in change.edit) {
+    try {
+      removedKeys = diffTouchKeys(JSON.parse(before.replace(/^\uFEFF/, "")), intendedLayout);
+    } catch (err) {
+      devLog.warn("[touch-open] what a touch deletion changed could not be recorded; it cannot be restored:", err);
+      removedKeys = [];
+    }
+  }
+
   const undoId = nextUndoId();
   const edit: Extract<OpenUndoView, { kind: "touch" }>["edit"] =
     "ops" in change.edit
       ? { type: "ops", ops: change.edit.ops }
       : "assignments" in change.edit
         ? { type: "assignments" }
-        : { type: "removals" };
+        : "restoreKeys" in change.edit
+          ? { type: "restores", ids: change.edit.ids }
+          : // No saved keys, nothing to put back: the restore list is not offered.
+            { type: "removals", ids: removedKeys.length > 0 ? change.edit.removeIds : [], keys: removedKeys };
   const record = recordUndo(undoId, change.label, keyboardId, beforeFrom(startVfs, {}), changed, { kind: "touch", edit });
   const written = useWorkingCopyStore.getState().replaceStartingPointFiles(changed);
   if (!written.ok) return { status: "failed", reason: written.error };

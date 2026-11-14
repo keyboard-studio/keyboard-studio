@@ -81,7 +81,7 @@ function previewTouchText(): string | undefined {
 }
 
 describe("TouchGallery on a keyboard opened for update", () => {
-  it("the character view's preview keeps a key-grid edit that is already in the file, with an in-progress assignment laid over it", async () => {
+  it("the character view's preview keeps a key-grid edit and a placement that are both in the file (a placement is written when applied)", async () => {
     seedOpen(TOUCH);
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
@@ -89,7 +89,7 @@ describe("TouchGallery on a keyboard opened for update", () => {
     await changeSelectMenu(screen.getByLabelText(/Host key for long-press/i), "K_A");
     fireEvent.click(screen.getByRole("button", { name: /Apply touch method for/i }));
     await waitFor(() => {
-      expect(useWorkingCopyStore.getState().touchDraft?.charTouchEntries).toHaveLength(1);
+      expect(readVfsText(useWorkingCopyStore.getState().startVfs!, "source/basic_kbdus.keyman-touch-layout")).toContain("中");
     });
     await act(async () => {
       commitTouchOpOnOpen(
@@ -97,11 +97,11 @@ describe("TouchGallery on a keyboard opened for update", () => {
         "touch layout edit",
       );
     });
-    // Character view is showing; the preview has the edit AND the placed 中.
+    // Character view is showing; the preview has the edit AND the placed 中, once.
     expect(screen.getByTestId("touch-mode-tab-character").getAttribute("aria-selected")).toBe("true");
     const withBoth = previewTouchText()!;
     expect(withBoth).toContain("ɛ");
-    expect(withBoth).toContain("中");
+    expect(withBoth.split("中").length - 1).toBe(1);
     await act(async () => {
       expect(undoLastOpenApply().ok).toBe(true);
     });

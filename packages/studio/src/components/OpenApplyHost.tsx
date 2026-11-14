@@ -153,6 +153,12 @@ export function OpenApplyHost({ children }: { children: ReactNode }) {
           id: "open.apply.refused.system-store",
           message: `That change was not applied. It would write the system store ${store}, which a method may not do. Your files are unchanged.`,
         });
+      case "touch-key-changed":
+        return t({
+          id: "open.apply.refused.touch-key-changed",
+          message:
+            "That change was not applied. The key was changed since it was deleted, so it is not put back over that change. Your files are unchanged.",
+        });
     }
   };
 
