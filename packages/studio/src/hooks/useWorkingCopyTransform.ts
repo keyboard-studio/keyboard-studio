@@ -253,6 +253,9 @@ export function useWorkingCopyTransform(
   const kmnStageTap = opts?.kmnStageTap;
   const storeCustomCss = useWorkingCopyStore((s) => s.customCss);
   const customCss = liveCss !== undefined ? liveCss : storeCustomCss;
+  // The icon step's edited icon (#2927): a store field like customCss, so
+  // the preview's projection and the download read the same bytes.
+  const iconIcoBase64 = useWorkingCopyStore((s) => s.iconIcoBase64);
   // Documentation-step overrides (specs/html-editor): the authored doc files
   // are store fields like customCss, read through the hook's own selectors
   // so the memo keys below stay the single trigger for rebuilding this closure.
@@ -604,6 +607,7 @@ export function useWorkingCopyTransform(
             contextToleranceOverlay: storeContextToleranceOverlay,
             touchLayoutJson: storeTouchLayoutJson,
             customCss,
+            iconIcoBase64,
             authoredWelcomeHtm,
             authoredReadmeHtm,
             authoredReadmeMd,
@@ -666,6 +670,7 @@ export function useWorkingCopyTransform(
     kmnStageTap,
     capsHandlingMode,
     customCss,
+    iconIcoBase64,
     authoredWelcomeHtm,
     authoredReadmeHtm,
     authoredReadmeMd,

@@ -23,14 +23,21 @@
  *
  * On Continue: passes { iconIcoBase64, iconPngDataUrl } via onComplete.
  * Keep passes the source bytes through; Edit/Create encode the working
- * canvas at 16 / 32 / 48. The output pipeline writes the .ico file into
- * the package.
+ * canvas at 16 / 32 / 48. Where the bytes land (#2927): on Copy the value
+ * is held in the working-copy store (`setIconIco`) and the projection's
+ * step 4c writes the `.ico` into the working copy; on Open the value is
+ * written to its file through the apply seam (`lib/iconOpenCommit`) when
+ * applied, with an undo record.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
+import { useApplyOnOpen } from "../../components/OpenApplyHost.tsx";
+import { isLiveOpen } from "../../lib/openMode.ts";
+import { commitIconOnOpen } from "../../lib/iconOpenCommit.ts";
+import type { IconValue } from "../../survey/questions/gallery/icon.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import {
   decodeIco,
@@ -190,6 +197,9 @@ function SizePreview({
 export function IconEditor({ onComplete, onBack }: EditorStepProps) {
   const { t } = useLingui();
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  const liveOpen = useWorkingCopyStore((s) => isLiveOpen(s));
+  const applyOnOpen = useApplyOnOpen();
+  const setIconIco = useWorkingCopyStore((s) => s.setIconIco);
 
   // The three options — Keep is the default when the template has an icon.
   // The source icon is found on mount; until then the step shows loading.
@@ -448,7 +458,8 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
     }
   };
 
-  const handleContinue = () => {
+  // The edited icon as the step's value (both modes encode the same shape).
+  const buildValue = (): IconValue => {
     if (mode === "keep" && sourceIcon) {
       // Keep: the template's .ico passes through byte-for-byte; the PNG
       // comes from the 48px preview pixels.
@@ -463,11 +474,10 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
           0,
         );
       }
-      onComplete({
+      return {
         iconIcoBase64: icoToBase64(sourceIcon.bytes),
         iconPngDataUrl: canvas.toDataURL("image/png"),
-      });
-      return;
+      };
     }
     // Edit / Create: encode the working canvas at 16 / 32 / 48.
     const ico = encodeIco(
@@ -482,10 +492,28 @@ export function IconEditor({ onComplete, onBack }: EditorStepProps) {
     if (ctx) {
       ctx.putImageData(new ImageData(pixels, ICON_SIZE, ICON_SIZE), 0, 0);
     }
-    onComplete({
+    return {
       iconIcoBase64: icoToBase64(ico),
       iconPngDataUrl: canvas.toDataURL("image/png"),
-    });
+    };
+  };
+
+  const handleContinue = async () => {
+    const value = buildValue();
+    if (liveOpen) {
+      // Open (spec 111 FR-041): the icon goes into its file through the
+      // apply seam now, with an undo record. A refused apply keeps the
+      // author on this step, like the docs step — the host already showed
+      // its notice, so nothing is completed here.
+      const outcome = await commitIconOnOpen(value, applyOnOpen);
+      if (outcome === "written") onComplete(value);
+      return;
+    }
+    // Copy: the value is held in the store field; the projection's step 4c
+    // writes it into the working copy, so the preview, the download and the
+    // PR carry the edited icon (#2927).
+    setIconIco(value.iconIcoBase64 ?? null);
+    onComplete(value);
   };
 
   // Footer nav (spec 081, #2527): Back / Continue publish to the footer

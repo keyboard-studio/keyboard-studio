@@ -22,6 +22,7 @@ import {
   type PixelBuffer,
 } from "../../../editors/assignLoop/iconTools.ts";
 import { useWorkingCopyStore } from "../../../stores/workingCopyStore.ts";
+import { isLiveOpen } from "../../../lib/openMode.ts";
 import type { StepDrivers } from "./types.ts";
 
 // --- Minimal PNG encoder (filter-0 scanlines, color type 6 RGBA) -----------
@@ -104,6 +105,7 @@ export const iconDrivers: StepDrivers = {
   icon: async () => {
     // -- Keep (the default when a source icon exists) ----------------------
     const startVfs = useWorkingCopyStore.getState().startVfs;
+    let value: { iconIcoBase64: string; iconPngDataUrl: string };
     if (startVfs) {
       for (const p of startVfs
         .list()
@@ -113,10 +115,17 @@ export const iconDrivers: StepDrivers = {
         try {
           const decoded = await decodeIco(entry.content);
           const pixels48 = resample(decoded, ICON_SIZE, ICON_SIZE);
-          return {
+          value = {
             iconIcoBase64: icoToBase64(entry.content),
             iconPngDataUrl: encodePngDataUrl(pixels48, ICON_SIZE, ICON_SIZE),
           };
+          // Mirror IconEditor's Continue (#2927): on Copy the value is held
+          // in the store field, so the projection's step 4c writes it. On
+          // Open the file is the truth and this stays unset.
+          if (!isLiveOpen(useWorkingCopyStore.getState())) {
+            useWorkingCopyStore.getState().setIconIco(value.iconIcoBase64);
+          }
+          return value;
         } catch {
           // Try the next .ico file.
         }
@@ -128,9 +137,13 @@ export const iconDrivers: StepDrivers = {
       { width: ICON_SIZE, height: ICON_SIZE, pixels },
       [16, 32, 48],
     );
-    return {
+    value = {
       iconIcoBase64: icoToBase64(ico),
       iconPngDataUrl: encodePngDataUrl(pixels, ICON_SIZE, ICON_SIZE),
     };
+    if (!isLiveOpen(useWorkingCopyStore.getState())) {
+      useWorkingCopyStore.getState().setIconIco(value.iconIcoBase64);
+    }
+    return value;
   },
 };

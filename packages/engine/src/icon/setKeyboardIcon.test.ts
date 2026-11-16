@@ -96,4 +96,16 @@ describe("ensureBitmapStore", () => {
     expect(twice.match(/store\(&BITMAP\)/g)).toHaveLength(1);
     expect(twice).toContain("store(&BITMAP) 'b.ico'");
   });
+
+  it("keeps a CRLF file CRLF, on insert and on rewrite (#2927)", () => {
+    const crlf = KMN.replace(/\n/g, "\r\n");
+    const inserted = ensureBitmapStore(crlf, "test.ico");
+    expect(inserted).toContain("store(&BITMAP) 'test.ico'\r\n");
+    expect(inserted).not.toMatch(/(?<!\r)\n/);
+    expect(inserted.split("\r\n")).toHaveLength(crlf.split("\r\n").length + 1);
+    const rewritten = ensureBitmapStore(inserted, "other.ico");
+    expect(rewritten).toContain("store(&BITMAP) 'other.ico'\r\n");
+    expect(rewritten).not.toMatch(/(?<!\r)\n/);
+    expect(rewritten.split("\r\n")).toHaveLength(inserted.split("\r\n").length);
+  });
 });

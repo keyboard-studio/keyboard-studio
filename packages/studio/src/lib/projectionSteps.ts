@@ -44,6 +44,7 @@ export type ProjectionStep =
   | "keycapLabels" // 3.5: keycap labels on the .kvks / touch layout
   | "descriptor" // 3.6: the package descriptor
   | "rename" // 4: keyboard id rename
+  | "icon" // 4c: the edited icon (Copy only; on Open the file is written when applied)
   | "intendedCheck"; // apply runs only: the written text must match the IR the change meant
 
 /** What a run is for: an apply kind (`OpenChange["kind"]`) or the output. */

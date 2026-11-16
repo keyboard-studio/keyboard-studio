@@ -92,6 +92,8 @@ describe("icon driver", () => {
     const icoBytes = base64ToIco(result.iconIcoBase64);
     // Exactly three entries: 16, 32, 48 — no 256px entry.
     expect(new DataView(icoBytes.buffer, icoBytes.byteOffset).getUint16(4, true)).toBe(3);
+    // The driver holds the value in the store field (#2927), like IconEditor.
+    expect(useWorkingCopyStore.getState().iconIcoBase64).toBe(result.iconIcoBase64);
     const decoded = await decodeIco(icoBytes);
     expect(decoded.width).toBe(48);
     expect(decoded.height).toBe(48);
@@ -121,6 +123,8 @@ describe("icon driver", () => {
     };
     // The .ico passes through unchanged — not re-encoded.
     expect(result.iconIcoBase64).toBe(icoToBase64(seed));
+    // …and the driver holds it in the store field (#2927), like IconEditor.
+    expect(useWorkingCopyStore.getState().iconIcoBase64).toBe(icoToBase64(seed));
     // The PNG is the source icon at 48px (red, not white).
     const png = Uint8Array.from(
       atob(result.iconPngDataUrl.slice("data:image/png;base64,".length)),
