@@ -53,6 +53,7 @@ export type ProjectionKind =
   | "ir"
   | "assign"
   | "marks"
+  | "caps"
   | "model"
   | "files"
   | "touch"
@@ -75,6 +76,8 @@ export const PROJECTION_STEPS: Readonly<Record<ProjectionKind, ReadonlySet<Proje
   assign: set("carve", "carveKeycaps", "assignments", "layerPropagation", "keycapLabels"),
   // The guard rules, which must see the rules an assignment just wrote.
   marks: set("carve", "ruleAdditions", "carveKeycaps", "markGuards", "intendedCheck"),
+  // The answered caps decision (steps 2.8): the store, the CAPS/NCAPS rules and the touch caps layer.
+  caps: set("caps", "intendedCheck"),
   // These kinds write precomputed text and do not project.
   reinsert: set(),
   model: set(),
@@ -86,25 +89,19 @@ export const PROJECTION_STEPS: Readonly<Record<ProjectionKind, ReadonlySet<Proje
   // touch injection, touch deletions, key edits, desktop-to-touch layer propagation and
   // the rule-additions splice (the assign seam and the touch commits write them).
   // What remains, and why:
-  //   carve, carveKeycaps  carved items a non-live path still holds (empty on live Open); T096
-  //   assignments          empty on Open (assignments are written when applied); T096
-  //   caps                 an answered caps decision, the one decision-driven .kmn step; T096
+  // `caps` is in no Open output row: an answered caps decision is written into the files when it
+  // is answered (lib/openCapsCommit, the `caps` apply row), so nothing decision-driven is left.
   //   identity             version bump (FR-048)
-  //   rename               keyboard id rename (inert on Open: the id is fixed)
+  // `descriptor` is in no Open output row: the language list, the project link and the copyright
+  // are written into the .kps when answered (lib/descriptorOpenCommit, lib/openIdentityCommit), and the
+  // display name cannot be edited on Open (the identity and project-name screens are not walked).
+  // `carve`, `carveKeycaps`, `assignments` and `rename` are in no Open output row: a carve and an
+  // assignment are written when applied (nothing is held to replay), and the id cannot change.
   // `keycapLabels` is in no Open row: it needs assignments (step 3.5) and there are none at output;
   // the assign seam writes the .kvks and touch labels when an assignment is applied (T091).
   // `authoredDocs` is in no Open row either: a documentation page is written into its file when the
   // author moves on (lib/docsOpenCommit), so the output carries the start files' pages.
   // `css` is in no Open row: the stylesheet editor writes the file (and its store line) when
   // Apply is pressed (lib/cssOpenCommit), so the output carries the start files' stylesheet.
-  //   descriptor           the language list into the package descriptor; T090
-  output: set(
-    "carve",
-    "carveKeycaps",
-    "assignments",
-    "caps",
-    "identity",
-    "descriptor",
-    "rename",
-  ),
+  output: set("identity"),
 };

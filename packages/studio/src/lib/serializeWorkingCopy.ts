@@ -128,12 +128,6 @@ export interface ProjectWorkingCopyForOutputResult {
    * welcome row without parsing prose.
    */
   missingInheritedImages: string[];
-  /**
-   * Open mode: the `.kmn` files a change could not be placed into precisely.
-   * They were left as they were, awaiting the author's agreement to a full
-   * re-emit (`ReformatConsentDialog`). Absent when there are none.
-   */
-  reformatRequired?: string[];
 }
 
 /**
@@ -158,11 +152,6 @@ export interface ProjectForOutputOptions {
    * overlay, which is how "what if the author had left this blank?" is expressed.
    */
   identityOverride?: Partial<IdentityOverlay>;
-  /**
-   * Open mode: the author agreed to a full re-emit of the files named in an
-   * earlier result's `reformatRequired` (spec 111 FR-009).
-   */
-  consentedReemit?: boolean;
   /**
    * spec 094 (contracts C2): produce test build `number` at `version` — the
    * version replaces the publish version everywhere it ships, and the package
@@ -399,7 +388,9 @@ export async function projectWorkingCopyForOutput(
   // spec 061 FR-012: thread the project link (home-page line only, research
   // D-06) through the SAME single descriptor writer every other identity
   // field reaches, rather than a second `<WebSite>` writer.
-  const websiteUrl = helpDocs?.projectHomeUrl;
+  // Open (spec 111 FR-041): the link is written into the descriptor when the author
+  // answers it (lib/openIdentityCommit), so output carries the file's own `<WebSite>`.
+  const websiteUrl = isOpenedWithDescriptor(instantiationMode, startVfs, keyboardId) ? undefined : helpDocs?.projectHomeUrl;
   let identityForProjection: IdentityOverlay = identity !== null ? {
     ...(identity.displayName !== undefined ? { displayName: identity.displayName } : {}),
     ...(identity.bcp47 !== undefined ? { bcp47: identity.bcp47 } : {}),
@@ -575,20 +566,20 @@ export async function projectWorkingCopyForOutput(
   const {
     warnings: projectionWarnings,
     effectiveKeyboardId,
-    reformatRequired,
   } = projectWorkingCopyVfs(
     projectionInputFromState({ ...state, startIr }, {
       vfs: clonedVfs,
       keyboardId,
       targetKeyboardId: outputKeyboardId,
-      // Open (spec 111 FR-042): assignments are written to the files when applied
-      // (the assign seam), so nothing held in the decisions is replayed here.
-      assignments: isOpen ? [] : sessionAssignments,
+      // Open (spec 111 FR-042): assignments are written to the files when applied, and
+      // the Open output row has no `assignments` step, so none is replayed here.
+      assignments: sessionAssignments,
       getPattern: (id) => patternCache.get(id),
       identity: identityForProjection,
       marksTreatment: getMarksTreatmentValue(),
       kmnEdits: withCandidateEdit(selectKmnEdits(getDecisionSnapshot()), opts?.candidateKmnEdit),
-      capsHandling: capsHandlingFromDecisions(getDecisionSnapshot(), { askedOnly: isOpen }),
+      // Open: an answered caps decision is written into the files when answered, never replayed here.
+      capsHandling: isOpen ? undefined : capsHandlingFromDecisions(getDecisionSnapshot()),
       welcomeFolderFiles,
       ...(state.startPackageFonts !== null ? { packageFonts: state.startPackageFonts } : {}),
       // Anchor for step 3's "is the display name an EDIT?" test. The no-identity
@@ -601,7 +592,6 @@ export async function projectWorkingCopyForOutput(
               kind: "output",
               identity,
               startDisplayName: startKeyboard.displayName,
-              ...(opts?.consentedReemit === true ? { consentedReemit: true } : {}),
             }),
           }
         : {}),
@@ -974,7 +964,6 @@ export async function projectWorkingCopyForOutput(
     version,
     warnings,
     missingInheritedImages,
-    ...(reformatRequired !== undefined ? { reformatRequired } : {}),
   };
 }
 

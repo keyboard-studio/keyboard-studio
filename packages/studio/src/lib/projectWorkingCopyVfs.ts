@@ -464,12 +464,6 @@ export interface ProjectWorkingCopyVfsInput {
      */
     consentedReemit?: boolean;
     /**
-     * The projection feeds the preview, not the download. Only the wording of
-     * the re-emit warning changes: the preview shows the reformatted text
-     * without the author having agreed to it.
-     */
-    preview?: boolean;
-    /**
      * Which projection steps this Open run executes (`PROJECTION_STEPS`): the
      * set for the one change an apply is writing into the files
      * (`lib/openApply`, one row per apply kind), or `PROJECTION_STEPS.output`
@@ -676,11 +670,7 @@ export function projectWorkingCopyVfs(
     }
     if (openMode.consentedReemit === true) {
       vfs.set(path, emitKmn(nextIr), false);
-      warnings.push(
-        openMode.preview === true
-          ? `[open] ${path} cannot be updated in place (${projected.reason}); the preview shows it reformatted`
-          : `[open] ${path} was reformatted with the author's agreement (${projected.reason})`,
-      );
+      warnings.push(`[open] ${path} was reformatted with the author's agreement (${projected.reason})`);
       return;
     }
     reformatRequired.push(path);
@@ -746,11 +736,11 @@ export function projectWorkingCopyVfs(
   // Union the aggregated pass over the incremental per-character union before
   // partitioning, so the .kmn slot pruning, the whole-node filter, and the
   // keycap projection below all consume the same pruned result (§11).
-  const aggregatedItemIds = unionAggregatedCarveIds(
-    startIr,
-    deletedItemIds,
-    carveChars,
-  );
+  // An Open output run carves nothing (a removal is written when applied), so it
+  // reads none of the carve inputs.
+  const aggregatedItemIds = runs("carve")
+    ? unionAggregatedCarveIds(startIr, deletedItemIds, carveChars)
+    : new Set<string>();
 
   // Spec 106 US4 (FR-040): starting rules an assignment shadows (same key,
   // same modifiers, merged ahead of them in step 2) are dropped here, fresh
@@ -758,7 +748,9 @@ export function projectWorkingCopyVfs(
   // them. They are plain removals, not carves: exempt from the fallback
   // policy's suppression rewrite, and kept out of the keycap cascade (step
   // 1.5), whose key the assignment itself still needs.
-  const claimedRuleIds = claimedInputRuleIds(startIr, assignments, getPattern);
+  const claimedRuleIds = runs("assignments")
+    ? claimedInputRuleIds(startIr, assignments, getPattern)
+    : new Set<string>();
   const effectiveItemIds =
     claimedRuleIds.size === 0
       ? aggregatedItemIds
@@ -790,7 +782,7 @@ export function projectWorkingCopyVfs(
   //
   // The slot partition above is kept for that legacy path and for the keycap
   // cascade (step 1.5), which is driven off startIr.
-  const allWholeNodeIds = new Set([...deletedNodeIds, ...wholeNodeItemIds]);
+  const allWholeNodeIds = new Set([...(runs("carve") ? deletedNodeIds : []), ...wholeNodeItemIds]);
   // The same set without the claimed-only rules (US4): the keycap cascade's
   // input. A rule the author also carved stays in it.
   const carvedWholeNodeIds =
@@ -1651,14 +1643,10 @@ export function projectWorkingCopyVfs(
   // id via the result so callers that compile/re-read from the VFS after this
   // function returns know to use `targetKeyboardId`, not `keyboardId`.
   let effectiveKeyboardId: string | undefined;
-  // On Open the keyboard's id cannot change (spec 111, Edge Cases): the rename
-  // re-emits the whole `.kmn` and moves every file, so it never runs.
+  // On Open the keyboard's id cannot change (spec 111, Edge Cases): no Open row lists
+  // `rename`, so the rename (it re-emits the whole `.kmn` and moves every file) never runs.
   const renameRequested = runs("rename") && targetKeyboardId !== undefined && targetKeyboardId !== keyboardId;
-  if (renameRequested && openMode !== undefined) {
-    warnings.push(
-      `[open] the keyboard id cannot change on a keyboard opened for update; the rename to "${targetKeyboardId}" was skipped`,
-    );
-  } else if (renameRequested && targetKeyboardId !== undefined) {
+  if (renameRequested && targetKeyboardId !== undefined) {
     effectiveKeyboardId = targetKeyboardId;
     const kmnPath = `source/${keyboardId}.kmn`;
     const kmnText = readVfsText(vfs, kmnPath);

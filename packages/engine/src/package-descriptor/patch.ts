@@ -77,13 +77,21 @@ export interface KpsLanguageEntry {
  *   - `<Description>` is kept unless `description` is given (the author edited it);
  *   - `<Languages>` is written from `languages` (the author's list) and left
  *     byte-identical when that list matches the descriptor's own;
- *   - `<WebSite>` is never removed, and the welcome-path migration and font
+ *   - `<WebSite>` is written only from `websiteUrl`, and the welcome-path migration and font
  *     re-declaration (Copy-track writes) do not run.
  */
 export interface OpenKpsOptions {
   nameEdited: boolean;
   description?: string;
   languages?: readonly KpsLanguageEntry[];
+  /**
+   * The project link for `<Info><WebSite>`. A blank value removes the element
+   * (a descriptor with no link carries none, as most shipped packages do); an
+   * absent field leaves the element as it is.
+   */
+  websiteUrl?: string;
+  /** The single-line copyright notice for `<Info><Copyright>`; absent leaves the element as it is. */
+  copyright?: string;
 }
 
 export interface ApplyIdentityToKpsResult {
@@ -471,7 +479,8 @@ function patchKpsIdentity(
         if (openOpts.description !== undefined) {
           patched = replaceElementText(patched, "Description", escapeHtml(openOpts.description));
         }
-        if ((identity.websiteUrl?.trim() ?? "") !== "") patched = patchWebSite(patched, identity.websiteUrl);
+        if (openOpts.websiteUrl !== undefined) patched = patchOpenWebSite(patched, openOpts.websiteUrl);
+        if (openOpts.copyright !== undefined) patched = patchOpenCopyright(patched, openOpts.copyright);
       }
       return `${openTag}${patched}${close}`;
     });
@@ -525,6 +534,10 @@ function patchKpsIdentity(
 export interface OpenKpsInfoPatch {
   /** The author's language list, in order (see `OpenKpsOptions.languages`). */
   languages?: readonly KpsLanguageEntry[];
+  /** The project link; blank removes `<WebSite>` (see `OpenKpsOptions.websiteUrl`). */
+  websiteUrl?: string;
+  /** The copyright notice line for `<Copyright>` (see `OpenKpsOptions.copyright`). */
+  copyright?: string;
 }
 
 /**
@@ -540,12 +553,14 @@ export function patchOpenKpsInfo(
   const openOpts: OpenKpsOptions = {
     nameEdited: false,
     ...(patch.languages !== undefined ? { languages: patch.languages } : {}),
+    ...(patch.websiteUrl !== undefined ? { websiteUrl: patch.websiteUrl } : {}),
+    ...(patch.copyright !== undefined ? { copyright: patch.copyright } : {}),
   };
   // The dummy identity and the empty id are safe: with `openOpts` set, the Open
   // branch of `patchKpsIdentity` reads neither. `<Name>` is rewritten only when
   // `nameEdited` (false here), `<Description>` only when `description` is given
-  // (never here), `<WebSite>` only for a non-blank `identity.websiteUrl` (blank
-  // here), and `keyboardId` feeds only the Copy-track display-name fallback.
+  // (never here), `<WebSite>` only from `openOpts.websiteUrl` (never `identity`), and
+  // `keyboardId` feeds only the Copy-track display-name fallback.
   return patchKpsIdentity(text, { displayName: "" }, "", openOpts);
 }
 
@@ -617,6 +632,68 @@ function patchWebSite(body: string, websiteUrl: string | undefined): string {
   }
   // No <Description> anchor either (unusual) — append rather than drop it.
   return `${body}\n    ${element}`;
+}
+
+// ---------------------------------------------------------------------------
+// Open-mode <Info> element writes (<WebSite>, <Copyright>). Unlike the Copy
+// helpers above these keep the file's own line ending and indentation, remove
+// an element together with its line, and return the text untouched when the
+// element already says what is asked.
+// ---------------------------------------------------------------------------
+
+function infoEol(body: string): string {
+  return body.includes("\r\n") ? "\r\n" : "\n";
+}
+
+function infoIndent(body: string): string {
+  return /(?:^|\n)([ \t]*)<[A-Za-z]/.exec(body)?.[1] ?? "    ";
+}
+
+/** Insert `element` on its own line after the match of `anchor`, or after the last child. */
+function insertInfoElement(body: string, element: string, anchor: RegExp): string {
+  const eol = infoEol(body);
+  const line = `${eol}${infoIndent(body)}${element}`;
+  const hit = anchor.exec(body);
+  if (hit !== null) return `${body.slice(0, hit.index + hit[0].length)}${line}${body.slice(hit.index + hit[0].length)}`;
+  const trailing = /[ \t\r\n]*$/.exec(body)?.[0] ?? "";
+  return `${body.slice(0, body.length - trailing.length)}${line}${trailing === "" ? eol : trailing}`;
+}
+
+/** The `<tag ...>text</tag>` or `<tag .../>` element, with its own line when it has one to itself. */
+function infoElementRe(tag: string): RegExp {
+  return new RegExp(`(?:^|(?<=\\n))[ \\t]*<${tag}\\b[^>]*?(?:/>|>[^<]*</${tag}\\s*>)[ \\t]*(?:\\r?\\n)?|<${tag}\\b[^>]*?(?:/>|>[^<]*</${tag}\\s*>)`, "i");
+}
+
+function unescapeText(s: string): string {
+  return s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
+}
+
+function patchOpenWebSite(body: string, websiteUrl: string): string {
+  const url = websiteUrl.trim();
+  const re = infoElementRe("WebSite");
+  const found = re.exec(body);
+  if (url === "") return found === null ? body : body.replace(re, "");
+  const element = `<WebSite URL="${escapeHtml(url)}">${escapeHtml(url)}</WebSite>`;
+  if (found !== null) {
+    const text = />([^<]*)</.exec(found[0])?.[1];
+    if (text !== undefined && unescapeText(text.trim()) === url) return body;
+    return body.replace(/<WebSite\b[^>]*?(?:\/>|>[^<]*<\/WebSite\s*>)/i, () => element);
+  }
+  return insertInfoElement(body, element, /<\/Description\s*>/i);
+}
+
+function patchOpenCopyright(body: string, copyright: string): string {
+  const line = copyright.trim();
+  if (line === "") return body;
+  const re = /<Copyright\b[^>]*?(?:\/>|>[^<]*<\/Copyright\s*>)/i;
+  const found = re.exec(body);
+  if (found !== null) {
+    const text = />([^<]*)</.exec(found[0])?.[1];
+    if (text !== undefined && unescapeText(text) === line) return body;
+    const open = /^<Copyright\b[^>]*?(?=\/?>)/i.exec(found[0])?.[0] ?? "<Copyright";
+    return body.replace(re, () => `${open}>${escapeHtml(line)}</Copyright>`);
+  }
+  return insertInfoElement(body, `<Copyright URL="">${escapeHtml(line)}</Copyright>`, /<\/Name\s*>/i);
 }
 
 /**

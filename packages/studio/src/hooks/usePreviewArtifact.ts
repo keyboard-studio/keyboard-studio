@@ -43,7 +43,6 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { instantiateFromStartIfConfirmed } from "../lib/confirmRebase.ts";
 import { recalculateForStartingPointChangeFromStores } from "../decisions/rebuildWorkingCopy.ts";
 import { useWorkingCopyTransform } from "./useWorkingCopyTransform.ts";
-import { useReformatConsent, type ReformatConsentProps } from "./useReformatConsent.ts";
 import {
   buildKmpForDownload,
   buildLdmlExportForDownload,
@@ -63,8 +62,6 @@ import type { InventoryCoverageGate } from "../lib/unimplementedInventory.ts";
 export type PickerMode = "open" | "scaffold";
 
 export interface PreviewArtifact {
-  /** Props for the Open-mode reformat consent dialog; render it where the downloads live. */
-  reformatConsent: ReformatConsentProps;
   // Picker state
   startKeyboard: StartKeyboard | null;
   pickerMode: PickerMode;
@@ -153,7 +150,6 @@ export interface PreviewArtifact {
 }
 
 export function usePreviewArtifact(): PreviewArtifact {
-  const reformatConsent = useReformatConsent();
   const { t } = useLingui();
   // Lazy-init from the working-copy store's already-instantiated base (if any)
   // rather than always starting null. The default flow can navigate straight
@@ -464,11 +460,7 @@ export function usePreviewArtifact(): PreviewArtifact {
       // shipped descriptor's ..\build\<id>.* references resolve and the project
       // opens cleanly in Keyman Developer. Returns null when the working copy is
       // not instantiated.
-      const result = await reformatConsent.guard((c) =>
-        buildSourceZipForDownload(c ? { consentedReemit: true } : undefined),
-      );
-      // The author declined to reformat: nothing is delivered.
-      if (result === undefined) return;
+      const result = await buildSourceZipForDownload();
       if (result === null) {
         setDownloadError(
           t({
@@ -497,7 +489,7 @@ export function usePreviewArtifact(): PreviewArtifact {
     } finally {
       setDownloading(false);
     }
-  }, [stage, triggerDownload, coverageGate.blocked, emissionBlockReason, t, reformatConsent.guard]);
+  }, [stage, triggerDownload, coverageGate.blocked, emissionBlockReason, t]);
 
   // Shared by the .kmp and test-build paths: show the real reason and keep the
   // .zip available — never a silent fallback, and never a dead end.
@@ -543,10 +535,7 @@ export function usePreviewArtifact(): PreviewArtifact {
     setKmpDiagnostics([]);
     setDownloadWarnings([]);
     try {
-      const result = await reformatConsent.guard((c) =>
-        buildKmpForDownload(c ? { consentedReemit: true } : undefined),
-      );
-      if (result === undefined) return;
+      const result = await buildKmpForDownload();
       if (result === null) {
         setKmpError(
           t({
@@ -567,7 +556,7 @@ export function usePreviewArtifact(): PreviewArtifact {
     } finally {
       setBuildingKmp(false);
     }
-  }, [stage, triggerDownload, reportKmpError, coverageGate.blocked, emissionBlockReason, t, reformatConsent.guard]);
+  }, [stage, triggerDownload, reportKmpError, coverageGate.blocked, emissionBlockReason, t]);
 
   // spec 108: the LDML export. Same gates as the .zip and the .kmp, checked on the emission
   // path itself and not only on the button. Runs once per click; no timer, no live diagnostics.
@@ -642,10 +631,7 @@ export function usePreviewArtifact(): PreviewArtifact {
         return null;
       }
       const number = useTestingStore.getState().nextBuildNumber;
-      const result = await reformatConsent.guard((c) =>
-        buildTestBuildKmp({ number, version: nextTestVersion }, c ? { consentedReemit: true } : undefined),
-      );
-      if (result === undefined) return null;
+      const result = await buildTestBuildKmp({ number, version: nextTestVersion });
       if (result === null) {
         setKmpError(
           t({
@@ -699,7 +685,7 @@ export function usePreviewArtifact(): PreviewArtifact {
       makingTestBuildRef.current = false;
       setBuildingKmp(false);
     }
-  }, [stage, triggerDownload, reportKmpError, coverageGate.blocked, emissionBlockReason, nextTestVersion, t, reformatConsent.guard]);
+  }, [stage, triggerDownload, reportKmpError, coverageGate.blocked, emissionBlockReason, nextTestVersion, t]);
 
   return {
     startKeyboard,
@@ -731,6 +717,5 @@ export function usePreviewArtifact(): PreviewArtifact {
     handleMakeTestBuild,
     coverageGate,
     showIdentityWarn,
-    reformatConsent: reformatConsent.dialog,
   };
 }

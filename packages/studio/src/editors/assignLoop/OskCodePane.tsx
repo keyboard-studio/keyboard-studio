@@ -21,7 +21,9 @@ import { plural } from "@lingui/core/macro";
 import { emitKvks, parseKvks } from "@keyboard-studio/engine";
 import type { KvksIR } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { isOpenMode } from "../../lib/openMode.ts";
+import { isLiveOpen, isOpenMode } from "../../lib/openMode.ts";
+import { useApplyOnOpen } from "../../components/OpenApplyHost.tsx";
+import { buildOskCodeChange, commitKvksOnOpen } from "../../lib/kvksOpenCommit.ts";
 import { useUnappliedText } from "../../hooks/useUnappliedText.ts";
 import { readVfsText } from "../../lib/vfsText.ts";
 import {
@@ -58,6 +60,7 @@ export function OskCodePane({
   onApply: (kvks: KvksIR) => void;
 }) {
   const { t } = useLingui();
+  const applyOnOpen = useApplyOnOpen();
 
   const mode = useWorkingCopyStore((s) => s.instantiationMode);
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
@@ -152,7 +155,7 @@ export function OskCodePane({
 
   // Leave guard (spec 111 FR-046): text typed here and not applied is asked about when the author
   // leaves the Code tab or the step, on a keyboard opened for update.
-  const applyForLeaveRef = useRef<() => boolean>(() => false);
+  const applyForLeaveRef = useRef<() => Promise<boolean>>(() => Promise.resolve(false));
   // The one definition of "unapplied": on Open the text differs from the file's text; otherwise
   // from what the draft was last synced to. The Apply badge and the leave guard both read it.
   const isDirtyNow = (): boolean => {
@@ -164,7 +167,7 @@ export function OskCodePane({
   useUnappliedText({
     label: t({ id: "open.unapplied.view.osk", message: "the on-screen keyboard (Code tab)" }),
     hasUnapplied: isDirtyNow,
-    apply: () => Promise.resolve(applyForLeaveRef.current()),
+    apply: () => applyForLeaveRef.current(),
     discard: () => {
       const c = canonicalRef.current;
       if (c === null) return;
@@ -218,7 +221,7 @@ export function OskCodePane({
   };
 
   // True when the text was applied (the leave guard stays when it was not).
-  const handleApply = (): boolean => {
+  const handleApply = async (): Promise<boolean> => {
     const current = textRef.current;
     if (current === null || canonical === null) return false;
     // Synchronous gate: the debounced lint state may lag behind the text.
@@ -238,9 +241,29 @@ export function OskCodePane({
       // whenever it is). The text is already the file's: nothing left unapplied.
       return true;
     }
+    if (openText !== undefined && openPath !== null && isLiveOpen({ instantiationMode: mode, startVfs, startKeyboard })) {
+      // Live files (spec 111 FR-041/FR-045): the author's text goes into the file through
+      // the apply seam, as typed: one undo step, the host's consent and notices. A refused,
+      // declined or failed apply leaves the file as it was and the text unapplied. Only once
+      // written is the draft snapped to what the file holds (the canonical-text effect may
+      // already have run for the new file text, and keeps a dirty draft).
+      const { outcome, result } = await commitKvksOnOpen(() => buildOskCodeChange(openPath, current), applyOnOpen);
+      if (outcome === "written") {
+        canonicalRef.current = current;
+        lastAppliedRef.current = current;
+        textRef.current = current;
+        setText(current);
+        setApplyError(null);
+        runLint(current);
+        return true;
+      }
+      if (outcome === "unchanged") return true;
+      if (result?.status === "failed") setApplyError(result.reason);
+      return false;
+    }
     onApply(after);
     if (openText !== undefined && openPath !== null) {
-      // After onApply so the author's text, not a re-emit, is what the file holds.
+      // Not live (an older draft): after onApply so the author's text, not a re-emit, is what the file holds.
       const result = useWorkingCopyStore.getState().replaceStartingPointFromText(openPath, current);
       if (!result.ok) {
         setApplyError(result.error);

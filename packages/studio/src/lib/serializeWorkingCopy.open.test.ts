@@ -237,36 +237,26 @@ describe.skipIf(!CORPUS_PRESENT)("Open: no-edit round trip over the corpus sampl
   });
 });
 
-describe.skipIf(!CORPUS_PRESENT)("Open: one rule deleted changes only that rule (SC-003)", () => {
+describe.skipIf(!CORPUS_PRESENT)("Open: output carves nothing, asks no consent (T096)", () => {
   const SAMPLE = ["basic_kbdus", "sil_cameroon_qwerty", "basic_kbdfr", "akan", "bambara", "basic_kbduk"];
 
   for (const id of SAMPLE) {
-    it(`${id}: the .kmn differs only in the deleted rule's lines plus the version`, async () => {
+    it(`${id}: a held carve set is not replayed; the .kmn differs only in the version`, async () => {
       if (!existsSync(folderOf(id))) return;
       const { kmnText } = await openKeyboard(id);
       const state = useWorkingCopyStore.getState();
       const group = state.startIr!.groups.find((g) => !g.readonly)!;
-      const rule = group.rules.find((r) => r.sourceLine !== undefined && /\+\s*\[/.test(linesOf(kmnText)[r.sourceLine! - 1] ?? ""));
+      const rule = group.rules[0];
       if (rule === undefined) return;
       useWorkingCopyStore.setState({ deletedNodeIds: new Set([rule.nodeId]) });
 
       const projected = await projectWorkingCopyForOutput();
       const got = readVfsText(projected!.vfs, `source/${id}.kmn`)!;
       expect(projected!.warnings.filter((w) => w.startsWith("[open]"))).toEqual([]);
-
-      const ruleLine = linesOf(kmnText)[rule.sourceLine! - 1]!;
       const { removed, added } = diffLines(linesOf(kmnText), linesOf(got));
       const nonVersion = (l: string): boolean => !/&KEYBOARDVERSION/i.test(l);
-      expect(removed.filter(nonVersion)).toContain(ruleLine);
-      // The rule itself, and at most the comment lines anchored to it.
-      expect(removed.filter(nonVersion).length).toBeLessThanOrEqual(4);
-      // The fallback policy replaces the removed rule with a swallowing rule on the same key;
-      // that replacement is the only line added.
-      const addedLines = added.filter(nonVersion);
-      expect(addedLines.length).toBeLessThanOrEqual(1);
-      for (const l of addedLines) expect(l).toMatch(/>\s*(nul|context)\s*$/);
-      // Untouched bytes: every line that survives keeps its original terminator.
-      expect(got.split("\n").length).toBeLessThanOrEqual(kmnText.split("\n").length + 1);
+      expect(removed.filter(nonVersion)).toEqual([]);
+      expect(added.filter(nonVersion)).toEqual([]);
     }, 60_000);
   }
 });

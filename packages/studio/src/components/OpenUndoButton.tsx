@@ -58,6 +58,14 @@ export function OpenUndoButton() {
         return t({ id: "openUndo.docsEdit", message: "Undo: documentation page edit" });
       case "docs-regenerate":
         return t({ id: "openUndo.docsRegenerate", message: "Undo: regenerated documentation section" });
+      case "osk":
+        return t({ id: "openUndo.osk", message: "Undo: on-screen keyboard change" });
+      case "copyright":
+        return t({ id: "openUndo.copyright", message: "Undo: copyright holder change" });
+      case "project-link":
+        return t({ id: "openUndo.projectLink", message: "Undo: project link change" });
+      case "caps":
+        return t({ id: "openUndo.caps", message: "Undo: Caps Lock handling" });
       case undefined:
         break;
     }

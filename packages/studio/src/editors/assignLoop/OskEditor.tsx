@@ -33,7 +33,9 @@ import { lookupHostOutput, DEADKEY, type BaseLayoutId } from "../../lib/referenc
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
-import { isOpenMode } from "../../lib/openMode.ts";
+import { isLiveOpen, isOpenMode } from "../../lib/openMode.ts";
+import { useApplyOnOpen } from "../../components/OpenApplyHost.tsx";
+import { buildOskVisualChange, commitKvksOnOpen } from "../../lib/kvksOpenCommit.ts";
 import { readVfsText } from "../../lib/vfsText.ts";
 
 /**
@@ -157,6 +159,7 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
   const { t, i18n } = useLingui();
   const ir = useWorkingCopyStore((s) => s.ir);
   const kbdname = useWorkingCopyStore((s) => s.ir?.header.name ?? "keyboard");
+  const applyOnOpen = useApplyOnOpen();
 
   const mode = useWorkingCopyStore((s) => s.instantiationMode);
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
@@ -191,6 +194,11 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
     }
   }, [ir, kbdname, openKvksText]);
 
+  // Live files (spec 111 FR-041/FR-045): on a keyboard opened for update the file is the
+  // state. An edit is applied through the apply host (one undo record, the one Undo in the
+  // shell); what the editor shows is read back from the file, not held here.
+  const liveFiles = useWorkingCopyStore((s) => isLiveOpen(s)) && openKvksText !== undefined;
+
   // Current (edited) KvksIR + undo history.
   const [kvks, setKvks] = useState<KvksIR | null>(baseKvks);
   const [history, setHistory] = useState<KvksIR[]>([]);
@@ -214,9 +222,10 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
   }, []);
 
   // Sync when base regenerates (e.g. IR changes).
-  const effectiveKvks = kvks ?? baseKvks;
+  const effectiveKvks = liveFiles ? baseKvks : (kvks ?? baseKvks);
 
   const undo = () => {
+    if (liveFiles) return;
     setHistory((h) => {
       if (h.length === 0) return h;
       const prev = h[h.length - 1];
@@ -268,12 +277,17 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
                 },
               }
             : {}),
-          secondary: {
-            label: t({ id: "editor.assignLoop.osk.undo", message: "Undo" }),
-            onClick: undo,
-            testId: "osk-undo",
-            disabled: history.length === 0,
-          },
+          // Live files: the shell's Undo undoes the applied change; no second one here.
+          ...(liveFiles
+            ? {}
+            : {
+                secondary: {
+                  label: t({ id: "editor.assignLoop.osk.undo", message: "Undo" }),
+                  onClick: undo,
+                  testId: "osk-undo",
+                  disabled: history.length === 0,
+                },
+              }),
           forward: {
             label: t({ id: "editor.assignLoop.osk.continue", message: "Continue" }),
             onClick: () => {
@@ -302,6 +316,13 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
 
   // Commit helper: push prior state to history, apply update.
   const commit = (next: KvksIR) => {
+    if (liveFiles && openKvksPath !== null && openKvksText !== undefined) {
+      // Applied through the seam: a refused, declined or failed apply leaves the file
+      // as it was and the host says so. The view follows the file.
+      void commitKvksOnOpen(() => buildOskVisualChange(openKvksPath, openKvksText, next), applyOnOpen);
+      setError(null);
+      return;
+    }
     setHistory((h) => [...h, effectiveKvks]);
     setKvks(next);
     setError(null);

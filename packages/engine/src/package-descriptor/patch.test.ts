@@ -643,3 +643,94 @@ describe("patchOpenKpsInfo (spec 111 live descriptor write)", () => {
     expect(out).toContain("<Language ID=\"xx\">A&amp;B &lt;x&gt;</Language>");
   });
 });
+
+describe("patchOpenKpsInfo website and copyright (spec 111 live descriptor write)", () => {
+  const WITH = [
+    "<Package>\r\n",
+    "  <Info>\r\n    <Name URL=\"\">Cam</Name>\r\n    <Copyright URL=\"\">(c) Old</Copyright>\r\n",
+    "    <WebSite URL=\"https://old.example\">https://old.example</WebSite>\r\n",
+    "    <Description URL=\"\">Mine.</Description>\r\n  </Info>\r\n",
+    "</Package>\r\n",
+  ].join("");
+  const WITHOUT = [
+    "<Package>\r\n",
+    "  <Info>\r\n    <Name URL=\"\">Cam</Name>\r\n    <Description URL=\"\">Mine.</Description>\r\n  </Info>\r\n",
+    "</Package>\r\n",
+  ].join("");
+  const BOM_WITH = `﻿${WITH}`;
+
+  it("is byte-identical when the values already match, and when given nothing", () => {
+    expect(patchOpenKpsInfo(BOM_WITH, { websiteUrl: "https://old.example", copyright: "(c) Old" }).text).toBe(BOM_WITH);
+    expect(patchOpenKpsInfo(BOM_WITH, {}).text).toBe(BOM_WITH);
+  });
+
+  it("sets the link and the copyright in place, changing nothing else", () => {
+    const out = patchOpenKpsInfo(BOM_WITH, { websiteUrl: "https://new.example/a", copyright: "(c) New" }).text;
+    expect(out).toBe(
+      BOM_WITH.replace("https://old.example\">https://old.example", "https://new.example/a\">https://new.example/a").replace(
+        "(c) Old",
+        "(c) New",
+      ),
+    );
+    expect(out.startsWith("﻿")).toBe(true);
+    expect(out).not.toMatch(/[^\r]\n/);
+  });
+
+  it("clearing the link removes the element and its line only", () => {
+    const out = patchOpenKpsInfo(BOM_WITH, { websiteUrl: "  " }).text;
+    expect(out).toBe(BOM_WITH.replace(/    <WebSite[^\r]*<\/WebSite>\r\n/, ""));
+    expect(patchOpenKpsInfo(WITHOUT, { websiteUrl: "" }).text).toBe(WITHOUT);
+  });
+
+  it("inserts a missing child on its own line with the file's line ending", () => {
+    const out = patchOpenKpsInfo(WITHOUT, { websiteUrl: "https://x.example", copyright: "(c) Me" }).text;
+    expect(out).not.toMatch(/[^\r]\n/);
+    expect(out).toContain(
+      "    <Name URL=\"\">Cam</Name>\r\n    <Copyright URL=\"\">(c) Me</Copyright>\r\n    <Description URL=\"\">Mine.</Description>\r\n    <WebSite URL=\"https://x.example\">https://x.example</WebSite>\r\n  </Info>",
+    );
+    // Setting then clearing returns the original bytes.
+    expect(patchOpenKpsInfo(patchOpenKpsInfo(WITHOUT, { websiteUrl: "https://x.example" }).text, { websiteUrl: "" }).text).toBe(
+      WITHOUT,
+    );
+  });
+
+  it("expands an empty or self-closing element", () => {
+    const empty = WITHOUT.replace("<Description", "<Copyright/>\r\n    <WebSite URL=\"\"/>\r\n    <Description");
+    const out = patchOpenKpsInfo(empty, { websiteUrl: "https://x.example", copyright: "(c) Me" }).text;
+    expect(out).toContain("<Copyright>(c) Me</Copyright>");
+    expect(out).toContain("<WebSite URL=\"https://x.example\">https://x.example</WebSite>");
+    expect(out).not.toContain("<WebSite URL=\"\"/>");
+  });
+
+  it("escapes markup characters", () => {
+    const out = patchOpenKpsInfo(WITHOUT, { websiteUrl: "https://x.example/?a=1&b=2", copyright: "A & B <c>" }).text;
+    expect(out).toContain("<Copyright URL=\"\">A &amp; B &lt;c&gt;</Copyright>");
+    expect(out).toContain("https://x.example/?a=1&amp;b=2</WebSite>");
+    // The escaped text round-trips as unchanged.
+    expect(patchOpenKpsInfo(out, { websiteUrl: "https://x.example/?a=1&b=2", copyright: "A & B <c>" }).text).toBe(out);
+  });
+
+  it("reports a descriptor with no <Info> block", () => {
+    expect(patchOpenKpsInfo("<Package></Package>", { websiteUrl: "https://x.example" }).unwritable).toContain("no <Info> block");
+  });
+});
+
+describe("applyIdentityToKps on Open ignores identity.websiteUrl (the link is written live)", () => {
+  it("leaves <WebSite> as the file has it", () => {
+    const kps = "<Package>\r\n  <Info>\r\n    <Name URL=\"\">N</Name>\r\n    <WebSite URL=\"https://a.example\">https://a.example</WebSite>\r\n  </Info>\r\n  <Keyboards>\r\n    <Keyboard>\r\n      <Name>N</Name>\r\n      <Languages/>\r\n    </Keyboard>\r\n  </Keyboards>\r\n</Package>\r\n";
+    const vfs = createVirtualFS([{ path: "source/k.kps", content: kps, isBinary: false }]);
+    applyIdentityToKps(vfs, "k", { displayName: "N", websiteUrl: "https://b.example" }, "", undefined, [], "k", undefined, [], { nameEdited: false });
+    expect((vfs.get("source/k.kps")?.content as string)).toContain("https://a.example");
+    expect((vfs.get("source/k.kps")?.content as string)).not.toContain("https://b.example");
+  });
+});
+
+describe("patchOpenKpsInfo keeps replacement patterns literal", () => {
+  it("a $& or $1 in the holder or the link cannot corrupt the element", () => {
+    const kps = "<Package>\r\n  <Info>\r\n    <Name URL=\"\">N</Name>\r\n    <Copyright URL=\"\">Old</Copyright>\r\n    <WebSite URL=\"https://a.example\">https://a.example</WebSite>\r\n  </Info>\r\n</Package>\r\n";
+    const out = patchOpenKpsInfo(kps, { websiteUrl: "https://x.example/$&/$1", copyright: "A $& B $1 $$" }).text;
+    expect(out).toContain("<Copyright URL=\"\">A $&amp; B $1 $$</Copyright>");
+    expect(out).toContain("<WebSite URL=\"https://x.example/$&amp;/$1\">https://x.example/$&amp;/$1</WebSite>");
+  });
+});
+

@@ -66,6 +66,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import { parseKmn, STUDIO_METADATA_PREFIX } from "@keyboard-studio/engine";
 import { unzipSync } from "fflate";
+import { applyOpenChange } from "../lib/openApply.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { recordStepCompletion, type ReducerDeps } from "../steps/reducer.ts";
@@ -117,6 +118,12 @@ const KVKS = [
   '<?xml version="1.0" encoding="utf-8"?>',
   "<visualkeyboard>",
   `  <header><kbdname>${START_ID}</kbdname></header>`,
+  "  <encoding name=\"unicode\">",
+  "    <layer shift=\"\">",
+  '      <key vkey="K_A">a</key>',
+  '      <key vkey="K_B">b</key>',
+  "    </layer>",
+  "  </encoding>",
   "</visualkeyboard>",
   "",
 ].join("\n");
@@ -148,8 +155,7 @@ function makeIr(): KeyboardIR {
 function kbRuleNodeId(ir: KeyboardIR): string {
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      const hit = rule.context.some((c) => c.kind === "vkey" && c.name === "K_B");
-      if (hit) return rule.nodeId;
+      if (rule.context.some((c) => c.kind === "vkey" && c.name === "K_B")) return rule.nodeId;
     }
   }
   throw new Error("fixture has no [K_B] rule to carve");
@@ -253,10 +259,12 @@ const SESSION: ReadonlyArray<{ stepId: string; result: unknown; act: () => void 
       // different date than the baseline carries. `normalizeHistoryDateStamp`
       // must absorb that, and must absorb it only for the comparison.
       vi.setSystemTime(DAY_TWO);
-      // A real carve: the [K_B] rule leaves the projected .kmn.
+      // A real carve through the Open apply seam: it splices the [K_B] rule out of the .kmn and
+      // blanks its keycap on the .kvks, writing both files when applied (the output replays none).
       const ir = useWorkingCopyStore.getState().startIr;
       if (ir === null) throw new Error("no working copy to carve");
-      useWorkingCopyStore.getState().deleteNode(kbRuleNodeId(ir));
+      const result = applyOpenChange({ kind: "remove", itemIds: [kbRuleNodeId(ir)], chars: ["b"] });
+      if (result.status !== "applied") throw new Error(`carve not applied: ${result.status}`);
     },
   },
   {
@@ -523,7 +531,16 @@ describe("FR-007 — the widened capture writes to nothing it reads", () => {
     // into the base the working copy was instantiated from.
     const pristine = entrySnapshot(makeStartVfs());
     expect([...startVfs.keys()].sort()).toEqual([...pristine.keys()].sort());
+    // The session's carve goes through the Open apply seam, which writes it into the files
+    // when applied: the .kmn rule is swallowed and the .kvks keycap is blanked. Those two
+    // files changed as expected; every other file is exactly as instantiated.
+    const carved = new Set([`source/${START_ID}.kmn`, `source/${START_ID}.kvks`]);
+    expect(String(startVfs.get(`source/${START_ID}.kmn`)?.content)).toMatch(/\[K_B\] > nul/);
+    const kvks = String(startVfs.get(`source/${START_ID}.kvks`)?.content);
+    expect(kvks).not.toContain(">b</key>");
+    expect(kvks).toContain('<key vkey="K_A">a</key>');
     for (const [path, entry] of pristine) {
+      if (carved.has(path)) continue;
       expectSameBytes(startVfs.get(path), entry, path);
     }
   });

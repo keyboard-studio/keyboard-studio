@@ -51,7 +51,6 @@ import { ManagedPRSubmitPanel } from "../../components/ManagedPRSubmitPanel.tsx"
 import { SignUpPanel } from "../../components/SignUpPanel.tsx";
 import { TrackOneIdentityPanel } from "../../editors/panels/TrackOneIdentityPanel.tsx";
 import { AdvancedKmnEditor } from "../../components/AdvancedKmnEditor.tsx";
-import { ReformatConsentDialog } from "../../components/ReformatConsentDialog.tsx";
 import { usePrefersReducedMotion } from "../../ui/motion.ts";
 
 // Cap the package-failure diagnostic list. A dangling asset reference can
@@ -608,7 +607,6 @@ export function PublishStep({ onComplete, onBack }: EditorStepProps) {
           </section>
         </>
       )}
-      <ReformatConsentDialog {...artifact.reformatConsent} />
     </div>
   );
 }

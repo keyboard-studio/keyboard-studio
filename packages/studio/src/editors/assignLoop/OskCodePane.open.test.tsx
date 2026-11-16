@@ -1,7 +1,7 @@
 // Open mode (spec 111 FR-009): the OSK Code tab shows the .kvks file's own text.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { StartKeyboard } from "@keyboard-studio/contracts";
@@ -9,6 +9,8 @@ import { parseKmn } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { parseKvks } from "@keyboard-studio/engine";
 import { OskCodePane } from "./OskCodePane.tsx";
+import { undoLastOpenApply } from "../../lib/openApply.ts";
+import { clearOpenSession, useOpenUndoStore } from "../../stores/openUndoStore.ts";
 
 vi.mock("./touchBuilder/monacoSetup.ts", () => ({}));
 
@@ -62,5 +64,45 @@ describe("OskCodePane on Open", () => {
     fireEvent.click(screen.getByTestId("osk-code-apply"));
     expect(onApply).toHaveBeenCalledTimes(1);
     expect(vfsText("source/kb.kvks")).toBe(edited);
+  });
+});
+
+describe("OskCodePane on a keyboard opened with its descriptor (live files)", () => {
+  beforeEach(() => {
+    const vfs = createVirtualFS();
+    vfs.set("source/kb.kmn", KMN, false);
+    vfs.set("source/kb.kps", "<Package/>", false);
+    vfs.set("source/kb.kvks", KVKS, false);
+    clearOpenSession();
+    useWorkingCopyStore.getState().reset();
+    useWorkingCopyStore.getState().instantiateFromExisting(KB, { vfs, ir: parseKmn(KMN, "kb").ir });
+  });
+
+  it("Apply goes through the seam: written as typed, one undo record, onApply not used; undo restores", async () => {
+    const onApply = vi.fn();
+    render(<OskCodePane kvks={parseKvks(KVKS)} onApply={onApply} />);
+    const edited = KVKS.replace("version>10.0", "version>10.0 ");
+    typeInto(edited);
+    fireEvent.click(screen.getByTestId("osk-code-apply"));
+    await waitFor(() => expect(vfsText("source/kb.kvks")).toBe(edited));
+    expect(onApply).not.toHaveBeenCalled();
+    expect(useOpenUndoStore.getState().records.at(-1)!.labelKey).toBe("osk");
+    expect(undoLastOpenApply().ok).toBe(true);
+    expect(vfsText("source/kb.kvks")).toBe(KVKS);
+  });
+
+  it("a refused apply leaves the file and the text unapplied", async () => {
+    render(
+      <OskCodePane kvks={parseKvks(KVKS)} onApply={vi.fn()} />,
+    );
+    const edited = KVKS.replace("version>10.0", "version>10.0 ");
+    typeInto(edited);
+    // A write that fails leaves the file as it was.
+    const spy = vi.spyOn(useWorkingCopyStore.getState(), "replaceStartingPointFiles").mockReturnValue({ ok: false, error: "no" });
+    fireEvent.click(screen.getByTestId("osk-code-apply"));
+    await waitFor(() => expect(screen.getByTestId("osk-code-apply-error")).toBeTruthy());
+    spy.mockRestore();
+    expect(vfsText("source/kb.kvks")).toBe(KVKS);
+    expect(screen.getByTestId("osk-code-dirty")).toBeTruthy();
   });
 });

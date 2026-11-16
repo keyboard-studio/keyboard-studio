@@ -233,7 +233,7 @@ describe("delivered artifact — adapt track (US3, FR-005, FR-006)", () => {
     expect(kps).not.toContain("US English (Basic)");
   });
 
-  it("names the renamed descriptor, not the base's, when it cannot be written", async () => {
+  it("an opened keyboard's descriptor is not written at output, so an unwritable one raises no descriptor warning (the id cannot change)", async () => {
     const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
     const vfs = createVirtualFS([
       { path: "source/basic_kbdus.kmn", content: BASE_KMN, isBinary: false },
@@ -248,12 +248,10 @@ describe("delivered artifact — adapt track (US3, FR-005, FR-006)", () => {
     const descriptorWarnings = result!.warnings.filter((w) =>
       w.startsWith("[package-descriptor] could not write identity into"),
     );
-    expect(descriptorWarnings).toHaveLength(1);
-    expect(descriptorWarnings[0]).toContain("source/bm_sil.kps");
-    expect(descriptorWarnings[0]).not.toContain("basic_kbdus");
+    expect(descriptorWarnings).toHaveLength(0);
   });
 
-  it("names an unwritable descriptor on the download path instead of failing silently", async () => {
+  it("an opened keyboard's unwritable descriptor is carried as it is: the download is still produced, with no descriptor warning", async () => {
     const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
     const vfs = createVirtualFS([
       { path: "source/basic_kbdus.kmn", content: BASE_KMN, isBinary: false },
@@ -270,10 +268,10 @@ describe("delivered artifact — adapt track (US3, FR-005, FR-006)", () => {
     const descriptorWarnings = result!.warnings.filter((w) =>
       w.startsWith("[package-descriptor] could not write identity into"),
     );
-    expect(descriptorWarnings).toHaveLength(1);
-    expect(descriptorWarnings[0]).toContain("source/basic_kbdus.kps");
-    // The archive is still produced — a descriptor that cannot be written is a
-    // named warning, not an aborted download.
+    expect(descriptorWarnings).toHaveLength(0);
+    // The version bump still names the descriptor it could not update.
+    expect(result!.warnings.some((w) => w.startsWith("[adapt] could not update .kps <Version>"))).toBe(true);
+    // The archive is still produced.
     expect(result!.bytes.length).toBeGreaterThan(0);
   });
 });

@@ -1,12 +1,12 @@
 // useReformatConsent -- the one place Open mode's "agree to a full re-emit"
-// (spec 111 FR-009) is asked for, shared by every delivery path (downloads and
-// the pull-request submit).
+// (spec 111 FR-009) is asked for. Its only consumer is `OpenApplyHost`, which asks
+// when an applied change cannot be placed precisely in a file; the output and the
+// pull-request submit ask nothing (every change is in the files when it is applied).
 //
-// `guard(run)` runs the delivery with consent withheld. When the projection
-// reports files it could not update in place it throws
-// ReformatConsentRequiredError; the hook then opens the dialog and halts. On
-// agreement `run(true)` is called and its result returned; on keep the delivery
-// is cancelled (`undefined`). No timer.
+// `guard(run)` runs the change with consent withheld. When the apply reports files it
+// could not update in place it throws ReformatConsentRequiredError; the hook then
+// opens the dialog and halts. On agreement `run(true)` is called and its result
+// returned; on keep the change is cancelled (`undefined`). No timer.
 
 import { useCallback, useRef, useState } from "react";
 import { ReformatConsentRequiredError } from "../lib/reformatConsentError.ts";

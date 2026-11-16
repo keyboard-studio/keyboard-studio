@@ -41,7 +41,6 @@ import type {
 } from "./projectWorkingCopyVfs.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import type { CapsHandlingValue, DecisionSet } from "../decisions/decisionTypes.ts";
-import { alphabetOf, isCasedAlphabet } from "../survey/caps/capsLogic.ts";
 import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.ts";
 import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
 import { welcomePagePath } from "./welcomeFolder.ts";
@@ -133,34 +132,15 @@ export function marksGuardsFromValue(value: MarksTreatmentValue | undefined): Ma
   };
 }
 
-/**
- * Step 2.8's input from the decision set: the recorded caps-handling value,
- * or undefined when it was not asked. A caseless alphabet is never asked, so
- * a value left over from an earlier alphabet is ignored rather than writing a
- * store nothing needs. `askedOnly` (Open) also ignores a value the author did
- * not answer.
- */
-export function capsHandlingFromDecisions(
-  decisions: DecisionSet,
-  opts: { askedOnly?: boolean } = {},
-): CapsHandlingValue | undefined {
-  const value = decisions["caps-handling"]?.value as CapsHandlingValue | undefined;
-  if (value === undefined) return undefined;
-  // On Open (spec 111) a seeded default or an extracted value is not a change
-  // the author made, so it never edits the opened keyboard's caps handling.
-  if (opts.askedOnly === true && decisions["caps-handling"]?.provenance !== "asked") return undefined;
-  return isCasedAlphabet(alphabetOf(decisions["character-inventory"]?.value)) ? value : undefined;
-}
+export { capsHandlingFromDecisions } from "./capsHandlingFromDecisions.ts";
 
 /**
  * The Open-mode projection options, built once for the download and the
  * preview so both place a `.kmn` change and patch the descriptor identically.
  *
  * `consentedReemit` is the author's agreement to a full re-emit of a file whose
- * change cannot be placed precisely. The download passes it only once the
- * author has agreed; the preview passes it always, so it compiles the
- * reformatted text the author would be asked to accept (it writes nothing the
- * output does not).
+ * change cannot be placed precisely. Only an apply run passes it (the consent is
+ * asked when the change is applied); the output and the preview never do.
  */
 export function openModeProjection(args: {
   identity: {
@@ -170,12 +150,10 @@ export function openModeProjection(args: {
   /** The starting point's display name; null/undefined (not known) reads as "not edited". */
   startDisplayName: string | null | undefined;
   consentedReemit?: boolean;
-  /** The projection feeds the preview: the re-emit warning does not claim agreement. */
-  preview?: boolean;
   /** What the run is for; picks its row of `PROJECTION_STEPS`. */
   kind: ProjectionKind;
 }): NonNullable<ProjectWorkingCopyVfsInput["openMode"]> {
-  const { identity, startDisplayName, consentedReemit, preview, kind } = args;
+  const { identity, startDisplayName, consentedReemit, kind } = args;
   return {
     steps: PROJECTION_STEPS[kind],
     kps: {
@@ -187,7 +165,6 @@ export function openModeProjection(args: {
       ...(identity?.languages !== undefined ? { languages: identity.languages } : {}),
     },
     ...(consentedReemit === true ? { consentedReemit: true } : {}),
-    ...(preview === true ? { preview: true } : {}),
   };
 }
 
@@ -256,6 +233,13 @@ export function projectionInputFromState(
       state.authoredHelpPhp !== null)
   ) {
     devLog.error("[projection] an authored documentation page is held on a keyboard opened for update; it is ignored (the file is the page)");
+  }
+  // Open output: a carve is in the files (written when applied), so no deleted node or item is held.
+  if (
+    extras.openMode?.steps === PROJECTION_STEPS.output &&
+    (state.deletedNodeIds.size > 0 || state.deletedItemIds.size > 0)
+  ) {
+    devLog.error("[projection] a carve is held on a keyboard opened for update; it is ignored (the file already has it)");
   }
   // spec 082 FR-018: disabled families' member rules are removed outright.
   // They join the deletion set and are exempt from the fallback-policy

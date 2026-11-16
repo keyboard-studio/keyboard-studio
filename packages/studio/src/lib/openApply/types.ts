@@ -5,6 +5,7 @@ import type { IRPath, KeyboardIR, MechanismAssignment } from "@keyboard-studio/c
 import type { KeyEditOperation, RenameKeyOp } from "@keyboard-studio/engine";
 import type { OpenRemovalEntry } from "../../stores/openRemovalStore.ts";
 import type { OpenUndoLabelKey, TouchKeyRestoreEntry } from "../../stores/openUndoStore.ts";
+import type { CapsHandlingValue } from "../../decisions/decisionTypes.ts";
 
 /** A change the author applies to the opened keyboard. */
 export type OpenChange =
@@ -46,6 +47,16 @@ export type OpenChange =
        * applying the same decision again changes nothing.
        */
       kind: "marks";
+    }
+  | {
+      /**
+       * The answered caps-handling decision, written into the `.kmn` (the `&CasedKeys`
+       * store and the CAPS/NCAPS rules) and the touch layout's caps layer (step 2.8).
+       * Needs consent when the splice cannot place it; idempotent, so applying the same
+       * answer again changes nothing.
+       */
+      kind: "caps";
+      value: CapsHandlingValue;
     }
   | {
       /**
@@ -94,6 +105,11 @@ export type OpenChange =
        * nothing and answers `needs-consent` with this summary for the dialog.
        */
       askFirst?: TouchReplacementSummary;
+      /**
+       * Set when the files hold a whole re-emit of a file that could not be edited in
+       * place: the author agrees to the reformat first (the shared reformat dialog).
+       */
+      askReformat?: true;
       /** Marks a step the undo UI words itself. */
       labelKey?: OpenUndoLabelKey;
     };

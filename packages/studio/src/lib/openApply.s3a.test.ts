@@ -254,17 +254,19 @@ describe("caps and id rename on Open (T082c)", () => {
     return { text, vfs, result };
   }
 
-  it("the id rename never runs: files stay under the keyboard's own id, with a warning", () => {
+  it("the id rename never runs: files stay under the keyboard's own id", () => {
     const { text, vfs, result } = projectOnOpen({ targetKeyboardId: "renamed" });
     expect(result.effectiveKeyboardId).toBeUndefined();
     expect(vfs.get("source/renamed.kmn")).toBeUndefined();
     expect(readVfsText(vfs, KMN_PATH)).toBe(text);
-    expect(result.warnings.some((w) => w.includes("cannot change"))).toBe(true);
+    expect(result.warnings.filter((w) => w.startsWith("[open]"))).toEqual([]);
   });
 
-  it("an answered caps decision is spliced into the file, not a whole re-emit", () => {
+  it("an answered caps decision is spliced into the file when applied, not a whole re-emit; the output does not run it", () => {
     const { text, vfs } = projectOnOpen({ capsHandling: { mode: "cased-keys" } });
-    const out = readVfsText(vfs, KMN_PATH)!;
+    expect(readVfsText(vfs, KMN_PATH)).toBe(text);
+    expect(applyOpenChange({ kind: "caps", value: { mode: "cased-keys" } }).status).toBe("applied");
+    const out = fileText();
     expect(out).not.toBe(text);
     expect(out).toContain("&CasedKeys");
     // Lines the caps step has no reason to touch are byte-identical, CRLF kept.

@@ -30,6 +30,7 @@ import {
   type OpenUndoView,
 } from "../../stores/openUndoStore.ts";
 import type { MarksTreatmentValue } from "../../survey/marks/marksValue.ts";
+import type { CapsHandlingValue } from "../../decisions/decisionTypes.ts";
 import { getPatternByIdSync } from "../services.ts";
 import {
   openModeProjection,
@@ -218,6 +219,12 @@ export interface ProjectExtra {
    * Defaults to the change's own kind (`flush` for a flush).
    */
   runAs?: ProjectionKind;
+  /** The answered caps decision to project (the `caps` run only). */
+  capsHandling?: CapsHandlingValue;
+  /** The author's language tag, which the caps key set may read (the `caps` run only). */
+  bcp47?: string;
+  /** A projection warning matching this makes the run fail rather than quietly change nothing. */
+  failOnWarning?: RegExp;
 }
 
 /**
@@ -227,15 +234,16 @@ export interface ProjectExtra {
  * the touch edits (key-edit ops, deletions, keep-inert chars, key-identity rule
  * additions) and the marks guards are all written into the files when applied, and
  * a touch file is created only by the agreed reseed. So the run carries no held
- * overlay and the output derives none. An answered caps decision is the one
- * remaining decision-driven `.kmn` step at output.
+ * overlay and the output derives none. An answered caps decision is written the
+ * same way (the `caps` run), so no decision-driven step is left at output.
  */
 export function projectChange(
   change:
     | { kind: "remove"; itemIds: string[]; chars: string[]; disabledRuleIds?: string[] }
     | { kind: "ir"; nextIr: KeyboardIR }
     | { kind: "assign" }
-    | { kind: "marks" },
+    | { kind: "marks" }
+    | { kind: "caps" },
   opts: OpenApplyOptions,
   extra: ProjectExtra = {},
 ): { ok: true; projection: Projection } | { ok: false; result: OpenApplyResult } {
@@ -290,9 +298,9 @@ export function projectChange(
     keyboardId,
     assignments: extra.assignments ?? [],
     getPattern: extra.assignments !== undefined ? getPatternByIdSync : () => undefined,
-    identity: null,
+    identity: extra.bcp47 !== undefined ? { bcp47: extra.bcp47 } : null,
     marksTreatment: extra.marksTreatment,
-    capsHandling: undefined,
+    capsHandling: extra.capsHandling,
     // An apply run replays no kmn-edits entries (no `layoutEdits`/`codeEdits` in any apply row).
     kmnEdits: undefined,
     openMode: {
@@ -309,6 +317,10 @@ export function projectChange(
     disabled.length > 0 ? { ...input, suppressionExemptIds: new Set(disabled) } : input,
   );
 
+  if (extra.failOnWarning !== undefined) {
+    const bad = result.warnings.find((w) => extra.failOnWarning!.test(w));
+    if (bad !== undefined) return { ok: false, result: { status: "failed", reason: bad } };
+  }
   if (result.reformatRequired !== undefined && !consented) {
     return { ok: false, result: { status: "needs-consent", files: result.reformatRequired } };
   }
@@ -344,11 +356,12 @@ export function projectChange(
 }
 
 export function applyRemoveOrIr(
-  change: Extract<OpenChange, { kind: "remove" | "ir" }>,
+  change: Extract<OpenChange, { kind: "remove" | "ir" | "caps" }>,
   opts: OpenApplyOptions,
   extra: ProjectExtra = {},
   label = "Apply change",
   view: OpenUndoView = { kind: "files" },
+  labelKey?: OpenUndoLabelKey,
 ): OpenApplyResult {
   const out = projectChange(change, opts, extra);
   if (!out.ok) return out.result;
@@ -398,6 +411,7 @@ export function applyRemoveOrIr(
     baseOf,
     changed,
     entry !== undefined ? { kind: "removal", entry } : view,
+    labelKey,
   );
   const written = useWorkingCopyStore.getState().replaceStartingPointFiles(changed);
   if (!written.ok) return { status: "failed", reason: written.error };

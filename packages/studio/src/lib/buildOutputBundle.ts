@@ -40,8 +40,6 @@ import {
   getParseTouchLayout,
   getRenderCompileReport,
 } from "./services.ts";
-import { ReformatConsentRequiredError } from "./reformatConsentError.ts";
-export { ReformatConsentRequiredError };
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { getLayoutFamilyAnswer, getPickedWindowsLayouts } from "./layoutFamily.ts";
 import { resolveLdmlBaseLayout } from "./ldmlBaseLayout.ts";
@@ -69,8 +67,6 @@ export interface OutputBundle {
   compileDiagnostics: CompilerDiagnostic[];
   /** Projection warnings, plus any doc stub this call had to synthesize. */
   warnings: string[];
-  /** Open mode: `.kmn` files left unchanged pending the author's agreement to a re-emit. */
-  reformatRequired?: string[];
 }
 
 /**
@@ -103,11 +99,6 @@ export class OutputBundleError extends Error {
 export async function buildOutputBundle(opts?: ProjectForOutputOptions): Promise<OutputBundle | null> {
   const projected = await projectWorkingCopyForOutput(opts);
   if (projected === null) return null;
-  // Open (spec 111 FR-009): files that could not be updated in place wait for
-  // the author's agreement; nothing is delivered without it.
-  if (projected.reformatRequired !== undefined && opts?.consentedReemit !== true) {
-    throw new ReformatConsentRequiredError(projected.reformatRequired);
-  }
 
   const { vfs, keyboardId, displayName, version } = projected;
   const warnings = [...projected.warnings];
@@ -155,9 +146,6 @@ export async function buildOutputBundle(opts?: ProjectForOutputOptions): Promise
     artifacts: { kmx, ...(kvk !== undefined ? { kvk } : {}), ...(js !== undefined ? { js } : {}) },
     compileDiagnostics,
     warnings,
-    ...(projected.reformatRequired !== undefined
-      ? { reformatRequired: projected.reformatRequired }
-      : {}),
   };
 }
 

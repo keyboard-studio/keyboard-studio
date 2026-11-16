@@ -62,6 +62,7 @@ export function applyIdentityStubMutation(
 
   // Rewrite lines for name/copyright/version if the store already exists.
   let nameFound = false;
+  let copyrightFound = false;
   let versionFound = false;
   const rewritten = lines.map((line) => {
     if (
@@ -75,6 +76,14 @@ export function applyIdentityStubMutation(
       identity.copyright !== undefined &&
       /^\s*store\s*\(\s*&COPYRIGHT\s*\)/i.test(line)
     ) {
+      copyrightFound = true;
+      if (open) {
+        // Open: a line that already holds this text stays as the file has it, and a
+        // rewritten one keeps a leading byte order mark.
+        const next = escapeQuote(identity.copyright);
+        if (/^\s*store\s*\(\s*&COPYRIGHT\s*\)\s*'([^']*)'/i.exec(line)?.[1] === next) return line;
+        return `${line.startsWith("\uFEFF") ? "\uFEFF" : ""}store(&COPYRIGHT) '${next}'${eol(line)}`;
+      }
       return `store(&COPYRIGHT) '${escapeQuote(identity.copyright)}'${eol(line)}`;
     }
     if (
@@ -97,6 +106,21 @@ export function applyIdentityStubMutation(
         0,
         `store(&KEYBOARDVERSION) '${escapeQuote(identity.version)}'${crlf ? "\r" : ""}`,
       );
+    }
+  }
+
+  // Open: INSERT store(&COPYRIGHT) right after store(&NAME) (the order a scaffolded
+  // keyboard has), else after the last system store, when absent.
+  if (open && identity.copyright !== undefined && !copyrightFound) {
+    let at = rewritten.findIndex((l) => /^\s*store\s*\(\s*&NAME\s*\)/i.test(l));
+    if (at < 0) {
+      for (let i = 0; i < rewritten.length; i++) {
+        if (/^\s*store\s*\(\s*&/i.test(rewritten[i] ?? "")) at = i;
+      }
+    }
+    if (at >= 0) {
+      const crlf = (rewritten[at] ?? "").endsWith("\r");
+      rewritten.splice(at + 1, 0, `store(&COPYRIGHT) '${escapeQuote(identity.copyright)}'${crlf ? "\r" : ""}`);
     }
   }
 

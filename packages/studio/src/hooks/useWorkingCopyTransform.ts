@@ -342,10 +342,10 @@ export function useWorkingCopyTransform(
   // spec 112: the caps-handling decision step 2.8 applies. Read through the
   // same gate the download uses (a caseless alphabet is not asked), keyed on
   // the mode so an unrelated re-record never rebuilds the projection.
-  // On Open only an answered value counts (the same gate the download uses).
+  // On Open the answer is in the files (written when answered), so none is replayed.
   const openWithDescriptor = useWorkingCopyStore((s) => isLiveOpen(s));
   const capsHandlingMode = useDecisionStore(
-    (s) => capsHandlingFromDecisions(s.decisions, { askedOnly: openWithDescriptor })?.mode ?? null,
+    (s) => (openWithDescriptor ? null : (capsHandlingFromDecisions(s.decisions)?.mode ?? null)),
   );
   const marksGuardsKey = useMemo(
     () => JSON.stringify(marksGuardsFromValue(marksTreatment)),
@@ -555,15 +555,11 @@ export function useWorkingCopyTransform(
         removedPathsKey === "" ? [] : removedPathsKey.split("\n"),
       );
       // The same Open options the download passes (splice, in-place descriptor).
-      // `consentedReemit` is preview-only: a change the splice cannot place is
-      // compiled as the reformatted text the author would be asked to accept.
       const openMode = isOpenedWithDescriptor(instantiationMode, startVfs, keyboardId)
         ? openModeProjection({
             kind: "output",
             identity: { displayName: identityDisplayName ?? undefined, languages: identityLanguages },
             startDisplayName: storeStartDisplayName,
-            consentedReemit: true,
-            preview: true,
           })
         : undefined;
 

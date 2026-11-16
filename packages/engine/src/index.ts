@@ -134,6 +134,7 @@ export {
   emitRule,
   emitStore,
   parseKvks,
+  unescapeXml,
   emitKvks,
   parseTouchLayout,
   emitTouchLayout,

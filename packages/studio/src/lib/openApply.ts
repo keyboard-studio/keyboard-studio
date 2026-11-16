@@ -36,6 +36,7 @@ import {
 } from "./openApply/core.ts";
 import { applyAssign, applyMarks } from "./openApply/assign.ts";
 import { applyTouch } from "./openApply/touch.ts";
+import { applyCaps } from "./openApply/caps.ts";
 import { scopeToWrites } from "./openApply/scopeToWrites.ts";
 import { setOpenChangeApplier } from "./openApplyNotifier.ts";
 
@@ -65,6 +66,9 @@ function applyFiles(change: Extract<OpenChange, { kind: "files" }>, opts: OpenAp
   // Asked first (FR-009): nothing is written until the author has agreed.
   if (change.askFirst !== undefined && opts.consentedReemit !== true) {
     return { status: "needs-consent", files: changedPaths, touchReplacement: change.askFirst };
+  }
+  if (change.askReformat === true && opts.consentedReemit !== true) {
+    return { status: "needs-consent", files: changedPaths };
   }
   for (const path of changedPaths) {
     const text = changed[path];
@@ -258,6 +262,7 @@ export function applyOpenChange(change: OpenChange, opts: OpenApplyOptions = {})
     if (change.kind === "model") return applyModel(change, opts);
     if (change.kind === "assign") return applyAssign(change, opts);
     if (change.kind === "marks") return applyMarks(opts);
+    if (change.kind === "caps") return applyCaps(change, opts);
     if (change.kind === "touch") return applyTouch(change, opts);
     return applyRemoveOrIr(change, opts);
   } catch (err) {

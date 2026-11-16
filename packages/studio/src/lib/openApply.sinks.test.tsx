@@ -447,13 +447,16 @@ describe("writers of the working IR on Open", () => {
     expect(s.contextToleranceOverlay).toBeNull();
   });
 
-  it("a header.copyright write on Open changes no file, is reported, and the attribution channel still lands", () => {
+  it("a header.copyright write on Open changes no file by itself and is reported; the attribution channel is written when answered", () => {
     const warn = vi.spyOn(devLog, "warn").mockImplementation(() => {});
+    // The attribution answer is written into the descriptor and the .kmn store, so the
+    // descriptor needs an <Info> block to take it.
+    useWorkingCopyStore.getState().startVfs!.set(`source/${ID}.kps`, "<Package><Info><Name URL=\"\">Tiny</Name></Info></Package>");
     sinks.reducer()(
       { ir: { header: { copyright: "(c) Someone" } }, attribution: { authorName: "A", copyrightHolder: "H" } } as never,
       [irPath("header", "copyright")],
     );
-    expect(fileText()).toBe(KMN);
+    expect(fileText()).toBe(KMN.replace("store(&VERSION)", "store(&COPYRIGHT) 'Copyright © H'\r\nstore(&VERSION)"));
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("header.copyright"));
     expect(useWorkingCopyStore.getState().attribution?.copyrightHolder).toBe("H");
   });

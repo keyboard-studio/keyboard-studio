@@ -29,7 +29,7 @@ import type { KvksIR, IRNodeRef } from "@keyboard-studio/contracts";
 import { NodeIdMinter } from "../shared/node-ids.js";
 
 /** Unescape the five standard XML entities. */
-function unescapeXml(s: string): string {
+export function unescapeXml(s: string): string {
   return s
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")

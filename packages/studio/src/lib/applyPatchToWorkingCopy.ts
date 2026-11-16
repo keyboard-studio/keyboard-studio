@@ -30,6 +30,7 @@ import { applyMutatePatch } from "../steps/mutateApply.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { isLiveOpen } from "./openMode.ts";
 import { applyThroughOpenSeam, handOverToOpenApplyHost } from "./openApplyNotifier.ts";
+import { commitOpenCopyright } from "./openIdentityCommit.ts";
 
 /** The decision whose op log the deadkey editor has already written into the files on Open. */
 const DEADKEY_DECISION_ID = "deadkeys-defined";
@@ -155,8 +156,27 @@ export function applyPatchToWorkingCopy(
       wc.setWorkingIR(applyMutatePatch(wc.ir, patch.ir, writes));
     }
   }
+  // Open (spec 111 FR-041/FR-042): the copyright holder is written into the files
+  // now, in place. An answer that could not be written is taken out of the decision
+  // record and kept out of the attribution overlay. (The project link is written when
+  // the step completes, from its own decision: lib/openIdentityCommit.ts.)
+  let attributionWritten = true;
+  if (isLiveOpen(wc) && patch.attribution !== undefined) {
+    const attribution = patch.attribution;
+    const result = commitOpenCopyright(attribution, {
+      onApplied: () => {
+        wc.setAttribution(attribution);
+        origin?.onApplied?.();
+      },
+      ...(origin?.onNotApplied !== undefined ? { onNotApplied: origin.onNotApplied } : {}),
+    });
+    if (result !== undefined) {
+      attributionWritten = result.status === "applied" || result.status === "unchanged";
+      openResult ??= result;
+    }
+  }
   if (patch.identity !== undefined) wc.setIdentity(patch.identity);
-  if (patch.attribution !== undefined) wc.setAttribution(patch.attribution);
+  if (patch.attribution !== undefined && attributionWritten) wc.setAttribution(patch.attribution);
   if (patch.helpDocs !== undefined) wc.setHelpDocs(patch.helpDocs);
   if (patch.historyEntryState !== undefined) wc.setHistoryEntryState(patch.historyEntryState);
   if (patch.docFixProposals !== undefined) wc.setDocFixProposals(patch.docFixProposals);

@@ -102,7 +102,7 @@ describe("useWorkingCopyTransform on Open", () => {
     expect(text(fetched, "source/extra.txt")).toBe("fetched-only");
   });
 
-  it("projects the same .kmn as the download for a session with one carve removal", async () => {
+  it("projects the same .kmn as the download; a carve held in the store is replayed by neither", async () => {
     seed("open");
     const wc = useWorkingCopyStore.getState();
     const ruleId = wc.startIr!.groups[0]!.rules[0]!.nodeId;
@@ -114,7 +114,7 @@ describe("useWorkingCopyTransform on Open", () => {
     // The download also stamps the bumped version; the preview shows the opened one.
     const strip = (s: string) => s.split("\n").filter((l) => !/&KEYBOARDVERSION|&VERSION/.test(l)).join("\n");
     expect(strip(previewKmn)).toBe(strip(outputKmn));
-    expect(previewKmn).toContain("[K_A] > nul");
+    expect(previewKmn).not.toContain("nul");
   });
 });
 
@@ -131,7 +131,7 @@ describe("useWorkingCopyTransform on Open: rule edits and the splice path", () =
     expect(text(preview(), KMN_PATH)).toBe(EDITED_KMN);
   });
 
-  it("splices a carve into the edited file, leaving untouched lines, comments and formatting as written", () => {
+  it("leaves an edited file's lines, comments and formatting as written; a held carve is not replayed", () => {
     seed("open");
     const wc = useWorkingCopyStore.getState();
     expect(wc.replaceStartingPointFromText(KMN_PATH, EDITED_KMN).ok).toBe(true);
@@ -140,8 +140,8 @@ describe("useWorkingCopyTransform on Open: rule edits and the splice path", () =
     const out = text(preview(), KMN_PATH)!;
     expect(out).toContain("c the author's comment\n");
     expect(out).toContain("+   [K_A]   >   'x'   c odd spacing kept\n");
-    expect(out).toContain("[K_B] > nul");
-    expect(out).not.toContain("+ [K_B] > 'b'");
+    expect(out).toContain("+ [K_B] > 'b'\n");
+    expect(out).not.toContain("nul");
   });
 });
 
@@ -197,10 +197,8 @@ describe("useWorkingCopyTransform on Open: file kinds and restored drafts", () =
 });
 
 describe("useWorkingCopyTransform on Open: an unplaceable change", () => {
-  it("previews the reformatted text and warns without claiming the author agreed", () => {
+  it("never reformats or warns at output: the preview carves nothing", () => {
     seed("open");
-    // A rule the starting point holds with no resolvable source line cannot be
-    // spliced out of the text; the carve of it is unplaceable.
     const wc = useWorkingCopyStore.getState();
     const startIr = wc.startIr!;
     const group = startIr.groups[0]!;
@@ -209,11 +207,8 @@ describe("useWorkingCopyTransform on Open: an unplaceable change", () => {
     useWorkingCopyStore.setState({ startIr: patched, ir: patched });
     useWorkingCopyStore.getState().deleteNode(noSpan.nodeId);
     const { vfs, warnings } = previewOnto(createVirtualFS(files()));
-    expect(text(vfs, KMN_PATH)).toContain("[K_A] > nul");
-    const open = warnings.filter((w) => w.startsWith("[open]"));
-    expect(open).toHaveLength(1);
-    expect(open[0]).toContain("the preview shows it reformatted");
-    expect(open[0]).not.toContain("agreement");
+    expect(text(vfs, KMN_PATH)).not.toContain("nul");
+    expect(warnings.filter((w) => w.startsWith("[open]"))).toEqual([]);
   });
 });
 

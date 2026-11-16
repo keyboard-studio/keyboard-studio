@@ -1,12 +1,12 @@
 // ReformatConsentDialog -- asks the author before a whole file is re-emitted
-// (spec 111 FR-009).
+// (spec 111 FR-009), at the moment a change is applied.
 //
 // On Open, a change to a `.kmn` is spliced into the file's own text. When a
-// change cannot be placed precisely, the projection leaves the file as it was
-// and names it (`reformatRequired`). This dialog names each such file and lets
-// the author agree to a full re-emit (which reformats the file) or keep the
-// file as it is. It owns only the frame and the choice; the caller re-projects
-// with `consentedReemit` on agreement.
+// change cannot be placed precisely, nothing is written and the apply names the
+// file (`needs-consent`). This dialog names each such file and lets the author
+// agree to a full re-emit (which reformats the file) or keep the file as it is.
+// It owns only the frame and the choice; `OpenApplyHost` applies again with
+// `consentedReemit` on agreement. Its only consumer is that host.
 //
 // Accessibility (docs/accessibility.md): the shared `Dialog` primitive is the
 // APG modal pattern -- focus moves in on open, Tab cycles, Escape cancels. The
