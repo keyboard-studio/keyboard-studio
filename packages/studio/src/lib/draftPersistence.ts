@@ -24,6 +24,7 @@ import {
   type DeclaredRole,
 } from "@keyboard-studio/contracts";
 import {
+  clearGuardRuleIdsIfModelsChanged,
   prepareWorkingCopySnapshot,
   repairOpenDraftDescriptor,
   snapshotWorkingCopyData,
@@ -1606,6 +1607,7 @@ function applyEnvelopeToStores(input: DurableDraft, pendingSlotKey: string): App
     const workingCopyState = prepareWorkingCopySnapshot(envelope.workingCopy);
     useWorkingCopyStore.setState(workingCopyState);
     clearOpenSession();
+    clearGuardRuleIdsIfModelsChanged(envelope.workingCopy.startIr, workingCopyState);
     applyTraversalSnapshot(envelope.traversal);
 
     // The legacy phaseBDraft slice (P0 fix; removed from the written

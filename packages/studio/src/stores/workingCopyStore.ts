@@ -67,11 +67,6 @@ import {
   invertEffect,
   applyIRChanges,
   invertChanges,
-  parseKmn,
-  isKeyboardSource,
-  NOT_A_KEYBOARD_SOURCE_MESSAGE,
-  recognizePatterns,
-  classifyRemovalCapabilities,
   parseTouchLayout,
 } from "@keyboard-studio/engine";
 import type { KmnEditEffect } from "@keyboard-studio/engine";
@@ -85,6 +80,7 @@ import type {
 } from "@keyboard-studio/engine";
 import { readVfsText } from "../lib/vfsText.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
+import { modelsFromKmnText } from "../lib/modelsFromKmnText.ts";
 import { isLiveOpen, isOpenedWithDescriptor } from "../lib/openMode.ts";
 import { languagesFromKps } from "../lib/kpsLanguages.ts";
 import { clearOpenSession } from "./openUndoStore.ts";
@@ -2895,34 +2891,16 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     let nextIr: KeyboardIR | null = null;
     let nextCapabilities: Map<string, RemovalCapability> | null = null;
     if (typeof kmnText === "string") {
-      let parsedIr: KeyboardIR;
-      try {
-        parsedIr = parseKmn(kmnText, startKeyboard.id).ir;
-      } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : String(err) };
-      }
-      if (!isKeyboardSource(parsedIr)) {
-        return { ok: false, error: NOT_A_KEYBOARD_SOURCE_MESSAGE };
-      }
-      // The same preparation instantiation gives the IR it seeds: recognition
-      // first (the classifier reads `ownedByPattern`), then the touch layout
-      // the starting point carries, then capabilities, then facets.
-      let recognized = recognizePatterns(parsedIr).ir;
       const touchPath = findTouchLayoutPath(startVfs);
-      const touchChange = touchPath === undefined ? undefined : files[touchPath];
-      if (touchChange === undefined) {
-        if (priorStartIr?.touchLayout !== undefined) {
-          recognized = { ...recognized, touchLayout: priorStartIr.touchLayout };
-        }
-      } else if (touchChange !== null) {
-        try {
-          recognized = { ...recognized, touchLayout: parseTouchLayout(touchChange) };
-        } catch {
-          // An unreadable layout leaves ir.touchLayout undefined, as at instantiation.
-        }
-      }
-      nextCapabilities = classifyRemovalCapabilities(recognized);
-      nextIr = deriveFacets(recognized);
+      const models = modelsFromKmnText(
+        kmnText,
+        startKeyboard.id,
+        touchPath === undefined ? undefined : files[touchPath],
+        priorStartIr?.touchLayout,
+      );
+      if (!models.ok) return { ok: false, error: models.error };
+      nextCapabilities = models.capabilities;
+      nextIr = models.ir;
     }
     // A touch-only change leaves the `.kmn` alone but the layouts the IRs carry
     // must follow the file. On Open this replaces `ir.touchLayout` with the file's
