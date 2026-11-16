@@ -64,6 +64,7 @@ import {
   welcomePagePath,
 } from "./welcomeFolder.ts";
 import { readVfsText } from "./vfsText.ts";
+import { KB_CSS, withImageWidthRule } from "./docImageWidthFix.ts";
 import { applyAuthoredDocsToVfs, type AuthoredDocs } from "./authoredDocs.ts";
 import { isOpenedWithDescriptor } from "./openMode.ts";
 import { applyOutputHygiene } from "./outputHygiene.ts";
@@ -812,12 +813,16 @@ export async function projectWorkingCopyForOutput(
     authoredReadmeMd,
     authoredHelpPhp,
   };
-  applyAuthoredDocsToVfs(
-    clonedVfs,
-    resolvedKeyboardId,
-    authoredDocs,
-    welcomePagePath(isOpen, state.startWelcomeConvention),
-  );
+  // On a keyboard opened for update the pages are written into their files when
+  // edited (lib/docsOpenCommit), so nothing is held to apply here.
+  if (!isOpen) {
+    applyAuthoredDocsToVfs(
+      clonedVfs,
+      resolvedKeyboardId,
+      authoredDocs,
+      welcomePagePath(isOpen, state.startWelcomeConvention),
+    );
+  }
 
   // Issue 1908 (criterion 11.8), accepted image-width proposal: the shipped
   // kb.css gains the constraining rule. This engages only when a kb.css is
@@ -830,23 +835,21 @@ export async function projectWorkingCopyForOutput(
   // output, exactly as the loader left it out of the start VFS.
   if (isAdaptation && !isOpen && docFixProposals?.imageWidth === "accepted") {
     for (const path of clonedVfs.list()) {
-      if (!/^source\/(?:help|welcome)\/kb\.css$/i.test(path)) continue;
+      if (!KB_CSS.test(path)) continue;
       const css = readVfsText(clonedVfs, path);
       if (css === undefined) continue;
-      if (/\bimg\s*\{[^}]*\bmax-width\s*:/i.test(css)) continue;
-      clonedVfs.set(path, `${css.replace(/\s+$/, "")}\nimg { max-width: 100%; }\n`, false);
+      const amended = withImageWidthRule(css);
+      if (amended === null) continue;
+      clonedVfs.set(path, amended, false);
     }
     // A slice-carried kb.css is not in the clone yet: write it at its own
     // path with the rule appended, so the shipped package carries the
     // stylesheet its pages link. A path the clone already carries was
     // amended in place above and is not overwritten by the slice text.
     for (const entry of startDocCssTexts ?? []) {
-      if (!/^source\/(?:help|welcome)\/kb\.css$/i.test(entry.path)) continue;
+      if (!KB_CSS.test(entry.path)) continue;
       if (readVfsText(clonedVfs, entry.path) !== undefined) continue;
-      const css = /\bimg\s*\{[^}]*\bmax-width\s*:/i.test(entry.text)
-        ? entry.text
-        : `${entry.text.replace(/\s+$/, "")}\nimg { max-width: 100%; }\n`;
-      clonedVfs.set(entry.path, css, false);
+      clonedVfs.set(entry.path, withImageWidthRule(entry.text) ?? entry.text, false);
     }
   }
 

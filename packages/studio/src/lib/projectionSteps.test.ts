@@ -11,8 +11,10 @@ const none = { identity: null, startDisplayName: null } as const;
 describe("PROJECTION_STEPS output on Open", () => {
   it("with a touch file runs exactly the remaining steps; no touch step is among them", () => {
     expect(sorted(PROJECTION_STEPS.output)).toEqual(
-      (["css", "authoredDocs", "carve", "carveKeycaps", "assignments", "caps", "identity", "keycapLabels", "descriptor", "rename"] as ProjectionStep[]).sort(),
+      (["carve", "carveKeycaps", "assignments", "caps", "identity", "keycapLabels", "descriptor", "rename"] as ProjectionStep[]).sort(),
     );
+    expect(PROJECTION_STEPS.output.has("css")).toBe(false);
+    expect(PROJECTION_STEPS.output.has("authoredDocs")).toBe(false);
     for (const gone of ["touchInject", "touchDeletions", "keyEdits", "layerPropagation", "ruleAdditions"] as const) {
       expect(PROJECTION_STEPS.output.has(gone), gone).toBe(false);
     }

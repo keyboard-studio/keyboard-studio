@@ -256,6 +256,7 @@ export {
   buildLanguageElement,
   buildLanguagesBlock,
   applyIdentityToKps,
+  patchOpenKpsInfo,
   DESCRIPTOR_CONSUMED_FIELDS,
   parseTargetTokens,
   KMW_JS_TARGETS,
@@ -270,6 +271,7 @@ export type {
   ApplyIdentityToKpsResult,
   KpsFontDescriptorEntry,
   OpenKpsOptions,
+  OpenKpsInfoPatch,
   KpsLanguageEntry,
 } from "./package-descriptor/index.js";
 

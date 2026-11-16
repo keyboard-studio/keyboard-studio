@@ -9,6 +9,8 @@ import { docMemberPath, type DocMemberId } from "@keyboard-studio/contracts";
 
 import type { SuggestedFix } from "./consistencySuggestions.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { isLiveOpen } from "./openMode.ts";
+import type { OpenApplyResult, OpenChange } from "./openApply/types.ts";
 
 export interface DocRegenerationInput {
   member: DocMemberId;
@@ -25,6 +27,16 @@ export function proposeRegeneratedDoc(current: string, generated: string): strin
   return replaceGeneratedBlock(current, generated);
 }
 
+/** A short stable hash (FNV-1a, 32 bits) of the current and proposed text. */
+function proposalHash(before: string, after: string): string {
+  let h = 0x811c9dc5;
+  for (const ch of `${before}\u0000${after}`) {
+    h ^= ch.codePointAt(0)!;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
+
 /**
  * The suggested fix for one document, or null when regenerating would change
  * nothing (so nothing is offered).
@@ -33,7 +45,9 @@ export function docRegenerationFix(input: DocRegenerationInput): SuggestedFix | 
   const after = proposeRegeneratedDoc(input.current, input.generated);
   if (after === input.current) return null;
   return {
-    id: `docs:regenerate:${input.member}`,
+    // Content-addressed: a different proposal is a different fix, so an accepted or
+    // skipped one never hides the next (the page is regenerated again after the keyboard changes).
+    id: `docs:regenerate:${input.member}:${proposalHash(input.current, after)}`,
     kind: "docs",
     findingKey: null,
     preview: [{ file: input.path, before: input.current, after }],
@@ -80,9 +94,46 @@ export function docRegenerationFixes(input: DocRegenerationProducerInput): Sugge
   return out;
 }
 
-/** Accepting a regeneration: the previewed text becomes the file, through the working-copy store. */
-export function applyDocRegeneration(fix: SuggestedFix): boolean {
+/** Plain label of the undo step an accepted regeneration records on Open. */
+export const DOC_REGENERATE_LABEL = "Regenerate the generated section";
+
+type ApplyOnOpen = (change: OpenChange) => Promise<OpenApplyResult>;
+
+/**
+ * True when the file no longer holds the text the fix was previewed against (it
+ * changed after the fix was built), so writing the proposal would overwrite it.
+ */
+export function isDocRegenerationStale(fix: SuggestedFix): boolean {
+  const preview = fix.preview[0];
+  if (preview === undefined) return true;
+  const vfs = useWorkingCopyStore.getState().startVfs;
+  const content = vfs?.get(preview.file)?.content;
+  return typeof content !== "string" || content !== preview.before;
+}
+
+/**
+ * Accepting a regeneration. On a keyboard opened for update the previewed text is
+ * written into the file through the apply host (one undo step; the host owns the
+ * busy guard and the failure notices); without a host nothing is written. The
+ * preview the author saw is the agreement, so nothing more is asked, but a file
+ * that changed since the preview is left alone (false). Off live Open the
+ * previewed text becomes the file through the working-copy store, as before.
+ * True when the file holds the text.
+ */
+export async function applyDocRegeneration(fix: SuggestedFix, applyOnOpen?: ApplyOnOpen): Promise<boolean> {
   const preview = fix.preview[0];
   if (fix.kind !== "docs" || preview === undefined) return false;
+  if (isLiveOpen(useWorkingCopyStore.getState())) {
+    // No apply host means no busy guard or notices: refuse rather than write around it.
+    if (applyOnOpen === undefined) return false;
+    if (isDocRegenerationStale(fix)) return false;
+    const result = await applyOnOpen({
+      kind: "files",
+      files: { [preview.file]: preview.after },
+      label: DOC_REGENERATE_LABEL,
+      labelKey: "docs-regenerate",
+    });
+    return result.status === "applied" || result.status === "unchanged";
+  }
   return useWorkingCopyStore.getState().replaceStartingPointFromText(preview.file, preview.after).ok;
 }

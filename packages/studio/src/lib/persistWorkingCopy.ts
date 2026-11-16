@@ -57,7 +57,8 @@ import type {
   WelcomeFolderImage,
 } from "@keyboard-studio/contracts";
 import { createVirtualFS, mergePhaseResults } from "@keyboard-studio/contracts";
-import { classifyRemovalCapabilities, parseKpsLanguages, rewriteKpsBuildEntries } from "@keyboard-studio/engine";
+import { languagesFromKps } from "./kpsLanguages.ts";
+import { classifyRemovalCapabilities, rewriteKpsBuildEntries } from "@keyboard-studio/engine";
 import type { KeyEditOverlay, StartDocCssText } from "@keyboard-studio/engine";
 import type { DeadkeyOverlay } from "./deadkeyOps.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -623,7 +624,8 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     touchLayoutJson: snapshot.touchLayoutJson,
     // Drafts saved before the CSS step wrote a value carry no key.
     customCss: snapshot.customCss ?? null,
-    // Drafts saved before the Documentation step wrote a value carry no key.
+    // Drafts saved before the Documentation step wrote a value carry no key. A keyboard opened for
+    // update ignores these (the pages are in the files; no migration of older Open drafts, spec 111 FR-049).
     authoredWelcomeHtm: snapshot.authoredWelcomeHtm ?? null,
     authoredReadmeHtm: snapshot.authoredReadmeHtm ?? null,
     authoredReadmeMd: snapshot.authoredReadmeMd ?? null,
@@ -824,7 +826,7 @@ export async function repairOpenDraftDescriptor(deps?: {
 
   const vfs = createVirtualFS(current.startVfs.entries());
   vfs.set(kpsPath, rewriteKpsBuildEntries(text, startKeyboard.id), false);
-  const languages = parseKpsLanguages(text).map((l) => ({ tag: l.tag, name: l.name }));
+  const languages = languagesFromKps(text);
   const identity = current.identity;
   useWorkingCopyStore.setState({
     startVfs: vfs,

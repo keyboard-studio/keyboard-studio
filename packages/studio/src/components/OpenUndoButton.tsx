@@ -47,6 +47,16 @@ export function OpenUndoButton() {
         return t({ id: "openUndo.unassign", message: "Undo: took back an assignment" });
       case "layout-edit":
         return t({ id: "openUndo.layoutEdit", message: "Undo: Layout tab change" });
+      case "languages":
+        return t({ id: "openUndo.languages", message: "Undo: language list change" });
+      case "stylesheet":
+        return t({ id: "openUndo.stylesheet", message: "Undo: stylesheet change" });
+      case "doc-image-width":
+        return t({ id: "openUndo.docImageWidth", message: "Undo: image width rule" });
+      case "docs-edit":
+        return t({ id: "openUndo.docsEdit", message: "Undo: documentation page edit" });
+      case "docs-regenerate":
+        return t({ id: "openUndo.docsRegenerate", message: "Undo: regenerated documentation section" });
       case undefined:
         break;
     }

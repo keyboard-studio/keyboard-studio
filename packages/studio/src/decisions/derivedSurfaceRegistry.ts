@@ -389,7 +389,7 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
     fields: ["authoredWelcomeHtm", "authoredReadmeHtm", "authoredReadmeMd", "authoredHelpPhp"],
     decisionIds: ["welcome-htm"],
     evidence: [
-      "HtmlEditor writes the edited doc text to workingCopyStore.authored* fields, which projectWorkingCopyVfs step 0b projects into the VFS and serializeWorkingCopy step 5c re-applies after regeneration (specs/html-editor); the welcome-htm decision records the step's completion (lib/htmlStepCompletion.ts)",
+      "HtmlEditor writes the edited doc text to workingCopyStore.authored* fields, which projectWorkingCopyVfs step 0b projects into the VFS and serializeWorkingCopy step 5c re-applies after regeneration (specs/html-editor); the welcome-htm decision records the step's completion (lib/htmlStepCompletion.ts). On a keyboard opened for update none of that holds: each page is written into its file when edited (lib/docsOpenCommit), authored* stays null, and the decision records only the page names",
     ],
   },
 ];

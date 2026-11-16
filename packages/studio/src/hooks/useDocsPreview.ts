@@ -27,6 +27,8 @@ import { useDecisionStore } from "../stores/decisionStore.ts";
 import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
 import { applyCarveMutate } from "../steps/editorMutate.ts";
 import { resolveDocMemberText, type AuthoredDocs } from "../lib/authoredDocs.ts";
+import { isLiveOpen } from "../lib/openMode.ts";
+import { readOpenDocText } from "../lib/docsOpenCommit.ts";
 
 export interface DocsPreview {
   readmeMd: string;
@@ -35,6 +37,13 @@ export interface DocsPreview {
   helpPhp: string;
   /** spec 102 FR-034: the generated typing guide was left out because the inherited docs already hold one. */
   typingGuideSuppressed: boolean;
+  /** The raw renders, before an authored override or a carried file replaces them (the regeneration fixes compare against these). */
+  generated: {
+    readmeMd: string;
+    readmeHtm: string;
+    welcomeHtm: string;
+    helpPhp: string;
+  };
 }
 
 export function useDocsPreview(): DocsPreview {
@@ -85,6 +94,10 @@ export function useDocsPreview(): DocsPreview {
   const authoredReadmeHtm = useWorkingCopyStore((s) => s.authoredReadmeHtm);
   const authoredReadmeMd = useWorkingCopyStore((s) => s.authoredReadmeMd);
   const authoredHelpPhp = useWorkingCopyStore((s) => s.authoredHelpPhp);
+  // A keyboard opened for update: the files are the truth (spec 111 FR-043), so a
+  // page the working copy has reads as its file, never as a render or a held edit.
+  const liveOpen = useWorkingCopyStore((s) => isLiveOpen(s));
+  const startWelcomeConvention = useWorkingCopyStore((s) => s.startWelcomeConvention);
 
   return useMemo(() => {
     const displayName = identity?.displayName ?? startKeyboard?.displayName ?? "";
@@ -163,20 +176,32 @@ export function useDocsPreview(): DocsPreview {
       authoredReadmeMd,
       authoredHelpPhp,
     };
-    return {
-      readmeMd: resolveDocMemberText("readme-md", renderReadmeMd(input), authored),
-      readmeHtm: resolveDocMemberText("readme-htm", renderReadmeHtm(input), authored),
-      welcomeHtm: resolveDocMemberText(
-        "welcome-htm",
-        renderWelcomeHtm(input, startWelcomeHtmText, [], startHelpPhpText),
-        authored,
-      ),
-      helpPhp: resolveDocMemberText(
-        "help-php",
-        renderHelpPhp(input, startHelpPhpText, startWelcomeHtmText),
-        authored,
-      ),
-      typingGuideSuppressed: docContent?.typingGuideSuppressed ?? false,
+    const generated = {
+      readmeMd: renderReadmeMd(input),
+      readmeHtm: renderReadmeHtm(input),
+      welcomeHtm: renderWelcomeHtm(input, startWelcomeHtmText, [], startHelpPhpText),
+      helpPhp: renderHelpPhp(input, startHelpPhpText, startWelcomeHtmText),
     };
-  }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText, docFixProposals, isAdaptation, startVfs, carveChars, marksOutputForm, deletedNodeIds, deletedItemIds, fallbackPolicy, decisions, authoredWelcomeHtm, authoredReadmeHtm, authoredReadmeMd, authoredHelpPhp]);
+    const id = resolveOutputKeyboardId(identity, startKeyboard);
+    const fileOr = (member: "readme-md" | "readme-htm" | "welcome-htm" | "help-php", render: string): string =>
+      readOpenDocText(member, id, startVfs, startWelcomeConvention) ?? render;
+    if (liveOpen) {
+      return {
+        readmeMd: fileOr("readme-md", generated.readmeMd),
+        readmeHtm: fileOr("readme-htm", generated.readmeHtm),
+        welcomeHtm: fileOr("welcome-htm", generated.welcomeHtm),
+        helpPhp: fileOr("help-php", generated.helpPhp),
+        typingGuideSuppressed: docContent?.typingGuideSuppressed ?? false,
+        generated,
+      };
+    }
+    return {
+      readmeMd: resolveDocMemberText("readme-md", generated.readmeMd, authored),
+      readmeHtm: resolveDocMemberText("readme-htm", generated.readmeHtm, authored),
+      welcomeHtm: resolveDocMemberText("welcome-htm", generated.welcomeHtm, authored),
+      helpPhp: resolveDocMemberText("help-php", generated.helpPhp, authored),
+      typingGuideSuppressed: docContent?.typingGuideSuppressed ?? false,
+      generated,
+    };
+  }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText, docFixProposals, isAdaptation, startVfs, carveChars, marksOutputForm, deletedNodeIds, deletedItemIds, fallbackPolicy, decisions, authoredWelcomeHtm, authoredReadmeHtm, authoredReadmeMd, authoredHelpPhp, liveOpen, startWelcomeConvention]);
 }

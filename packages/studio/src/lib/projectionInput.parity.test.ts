@@ -146,12 +146,12 @@ describe("projectionInputFromState — authored welcome path on a flat-conventio
     expect(input.welcomePath).toBe(path);
   });
 
-  it("open: the OSK preview writes the edit over the carried flat page and adds no folder page", () => {
+  it("open: the OSK preview keeps the carried flat page (a page is written when edited, never replayed) and adds no folder page", () => {
     const startVfs = seedFlat("open");
     const { result } = renderHook(() => useWorkingCopyTransform({ previewedStartId: basicKbdus.id }));
     const vfs = createVirtualFS(startVfs.entries());
     result.current!(vfs, basicKbdus.id);
-    expect(vfs.get("source/welcome.htm")?.content).toBe(AUTHORED);
+    expect(vfs.get("source/welcome.htm")?.content).toBe("<p>carried</p>");
     expect(vfs.get("source/welcome/welcome.htm")).toBeUndefined();
   });
 });

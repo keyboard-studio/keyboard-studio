@@ -239,6 +239,24 @@ export function projectionInputFromState(
       devLog.error("[projection] a touch overlay is held on a keyboard opened with a touch file; it is ignored (the file is the layout)");
     }
   }
+  // Open output: the stylesheet is in the files (written when applied), so the text the CSS step
+  // holds is never replayed; a held one is a bug, not an overlay.
+  if (
+    extras.openMode?.steps === PROJECTION_STEPS.output &&
+    ((state.customCss !== null && state.customCss !== undefined) || (liveCssOverride !== undefined && liveCssOverride !== null))
+  ) {
+    devLog.error("[projection] a stylesheet overlay is held on a keyboard opened for update; it is ignored (the file is the stylesheet)");
+  }
+  // Open output: a documentation page is in its file (written when edited), so no authored text is held.
+  if (
+    extras.openMode?.steps === PROJECTION_STEPS.output &&
+    (state.authoredWelcomeHtm !== null ||
+      state.authoredReadmeHtm !== null ||
+      state.authoredReadmeMd !== null ||
+      state.authoredHelpPhp !== null)
+  ) {
+    devLog.error("[projection] an authored documentation page is held on a keyboard opened for update; it is ignored (the file is the page)");
+  }
   // spec 082 FR-018: disabled families' member rules are removed outright.
   // They join the deletion set and are exempt from the fallback-policy
   // expansion, which would otherwise carve them instead.

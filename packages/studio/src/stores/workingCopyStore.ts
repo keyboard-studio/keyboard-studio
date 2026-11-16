@@ -67,7 +67,6 @@ import {
   invertEffect,
   applyIRChanges,
   invertChanges,
-  parseKpsLanguages,
   parseKmn,
   isKeyboardSource,
   NOT_A_KEYBOARD_SOURCE_MESSAGE,
@@ -87,6 +86,7 @@ import type {
 import { readVfsText } from "../lib/vfsText.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
 import { isLiveOpen, isOpenedWithDescriptor } from "../lib/openMode.ts";
+import { languagesFromKps } from "../lib/kpsLanguages.ts";
 import { clearOpenSession } from "./openUndoStore.ts";
 import type { PreviewProjection } from "../lib/previewProjection.ts";
 import type { BaseLayoutId as LdmlBaseLayoutChoice } from "../lib/referenceBaseLayouts.ts";
@@ -1738,7 +1738,7 @@ function openLanguagesFromVfs(
   if (seed?.languages !== undefined) return {};
   const kps = readVfsText(vfs, `source/${keyboardId}.kps`);
   if (kps === undefined) return {};
-  const languages = parseKpsLanguages(kps).map((l) => ({ tag: l.tag, name: l.name }));
+  const languages = languagesFromKps(kps);
   return languages.length > 0 ? { languages } : {};
 }
 
@@ -2979,8 +2979,17 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     if (nextIr !== null) {
       useGuardIntentStore.setState({ keptGuardRuleIds: new Set(), narrowUndoStack: [] });
     }
+    // On a keyboard opened for update the `.kps` is the single source of the
+    // language list: when its text changed, identity follows it (undo included).
+    const kpsPath = `source/${startKeyboard.id}.kps`;
+    const nextKps = files[kpsPath];
+    const kpsLanguages =
+      typeof nextKps === "string" && nextKps !== readVfsText(startVfs, kpsPath) && isLiveOpen(get())
+        ? languagesFromKps(nextKps)
+        : null;
     set((s) => ({
       startVfs: nextVfs,
+      ...(kpsLanguages !== null ? { identity: { ...(s.identity ?? {}), languages: kpsLanguages } } : {}),
       ...(nextIr !== null && nextCapabilities !== null
         ? {
             startIr: nextIr,

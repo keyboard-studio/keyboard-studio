@@ -28,7 +28,7 @@
 // StepNavContext; StudioFooter reads that on `#criteria`. Open walk only: same
 // predicate as the former in-page Continue bar (`isOpenMode`).
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 
 import { CriteriaPage } from "../criteria/CriteriaPage.tsx";
@@ -48,7 +48,8 @@ import { upgradePairFor } from "../criteria/upgradePairs.ts";
 import { useRouteSuggestedFix } from "../hooks/useRouteSuggestedFix.ts";
 import { missingCharacterFixes } from "../criteria/missingCharacterFixes.ts";
 import { useDocRegenerationFixes } from "../hooks/useDocRegenerationFixes.ts";
-import { applyDocRegeneration } from "../lib/docRegenerationFix.ts";
+import { applyDocRegeneration, isDocRegenerationStale } from "../lib/docRegenerationFix.ts";
+import { useApplyOnOpen } from "./OpenApplyHost.tsx";
 import { SuggestedFixesPanel } from "./SuggestedFixes.tsx";
 import {
   severityForAuthoredRow,
@@ -148,6 +149,10 @@ function CriteriaScreenBody() {
   const ratchet = useOpenRatchet(result, artifact.stage.kind === "error");
   const routeFix = useRouteSuggestedFix();
   const docFixes = useDocRegenerationFixes();
+  const applyOnOpen = useApplyOnOpen();
+  const [docFixStale, setDocFixStale] = useState(false);
+  // The notice belongs to the list it was raised against: a recomputed list clears it.
+  useEffect(() => setDocFixStale(false), [docFixes]);
   const setReviewNote = useCriteriaRecordStore((s) => s.setReviewNote);
   const removeReviewNote = useCriteriaRecordStore((s) => s.removeReviewNote);
 
@@ -225,9 +230,28 @@ function CriteriaScreenBody() {
       <div style={{ flex: "none", padding: "12px 24px 0", maxHeight: "40%", overflowY: "auto" }}>
         <SuggestedFixesPanel
           extra={[...missingFixes, ...docFixes]}
-          onAccept={(fix) => (fix.kind === "docs" ? void applyDocRegeneration(fix) : routeFix(fix))}
+          onAccept={(fix) => {
+            if (fix.kind !== "docs") {
+              routeFix(fix);
+              return;
+            }
+            setDocFixStale(false);
+            if (isDocRegenerationStale(fix)) {
+              // The page changed since the preview: nothing is written; the list recomputes.
+              setDocFixStale(true);
+              return Promise.resolve(false);
+            }
+            return applyDocRegeneration(fix, applyOnOpen);
+          }}
           testId="criteria-suggested-fixes"
         />
+        <p role="status" aria-live="polite" data-testid="criteria-doc-fix-stale" style={{ margin: "4px 0", fontSize: 13 }}>
+          {docFixStale ? (
+            <Trans id="criteria.docFix.stale">
+              That page changed since the suggestion was made, so it was not updated. The suggestion has been refreshed.
+            </Trans>
+          ) : null}
+        </p>
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
         <CriteriaPage

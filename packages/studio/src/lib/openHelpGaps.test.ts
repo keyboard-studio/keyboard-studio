@@ -27,6 +27,15 @@ describe("deriveOpenHelpGaps", () => {
     expect(deriveOpenHelpGaps({ vfs: fullVfs(), keyboardId: "kb_x", baselineFindings: [] }).size).toBe(0);
   });
 
+  it("a flat-convention welcome page is present, not a gap", () => {
+    const vfs = fullVfs();
+    vfs.delete("source/welcome/welcome.htm");
+    vfs.set("source/welcome.htm", "x");
+    expect(deriveOpenHelpGaps({ vfs, keyboardId: "kb_x", baselineFindings: [] }).size).toBe(0);
+    vfs.delete("source/welcome.htm");
+    expect([...deriveOpenHelpGaps({ vfs, keyboardId: "kb_x", baselineFindings: [] })]).toEqual(["welcome-htm"]);
+  });
+
   it("names a missing document and only that one", () => {
     const vfs = fullVfs();
     vfs.delete("source/help/kb_x.php");

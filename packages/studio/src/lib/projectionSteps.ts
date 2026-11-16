@@ -25,7 +25,7 @@
 /** Projection steps, named for the numbered steps in `projectWorkingCopyVfs`. */
 export type ProjectionStep =
   | "touchInject" // 0: the touch layout the author built
-  | "css" // 0b, 4b: the OSK stylesheet
+  | "css" // 0b, 4b: the OSK stylesheet (Copy only; on Open it is written when applied)
   | "authoredDocs" // 0b-ii: documentation overlays
   | "carve" // 1: carved nodes/items/chars out of the .kmn
   | "ruleAdditions" // 1.8: working-IR rule additions spliced into the .kmn
@@ -92,11 +92,12 @@ export const PROJECTION_STEPS: Readonly<Record<ProjectionKind, ReadonlySet<Proje
   //   identity             version bump (FR-048)
   //   rename               keyboard id rename (inert on Open: the id is fixed)
   //   keycapLabels         labels for assignments (empty on Open); T091
-  //   css, authoredDocs    documents and stylesheet overlays; T089, T089a
+  // `authoredDocs` is in no Open row either: a documentation page is written into its file when the
+  // author moves on (lib/docsOpenCommit), so the output carries the start files' pages.
+  // `css` is in no Open row: the stylesheet editor writes the file (and its store line) when
+  // Apply is pressed (lib/cssOpenCommit), so the output carries the start files' stylesheet.
   //   descriptor           the language list into the package descriptor; T090
   output: set(
-    "css",
-    "authoredDocs",
     "carve",
     "carveKeycaps",
     "assignments",

@@ -278,9 +278,9 @@ T070-T077 (FR-035..FR-040) moved to [spec 114](../114-ctrl-and-letter-removal/sp
 
 ## Phase 17: Remaining files (FR-041, FR-047)
 
-- [ ] T089 The documentation and style editors write their files on Open; no separate edited copy replaces a file at output.
-- [ ] T089a Retire on Open the CSS output override: the OSK stylesheet (`customCss`, projection steps 0b and 4b) is written into the stylesheet file when the author applies it, so the output writes none. Goes with T089.
-- [ ] T090 The language list patches the package descriptor when applied.
+- [x] T089 The documentation and style editors write their files on Open; no separate edited copy replaces a file at output.
+- [x] T089a Retire on Open the CSS output override: the OSK stylesheet (`customCss`, projection steps 0b and 4b) is written into the stylesheet file when the author applies it, so the output writes none. Goes with T089.
+- [x] T090 The language list patches the package descriptor when applied.
 - [ ] T091 On-screen keyboard key labels after a Mechanisms change, per the owner's answer to open question 1.
 - [ ] T092 Tests: SC-014, and SC-010 for these files.
 

@@ -517,6 +517,39 @@ function patchKpsIdentity(
 }
 
 /**
+ * What a live write into an opened keyboard's own descriptor can change. Each
+ * field present is written; an absent field leaves its elements untouched.
+ * Further fields (the website link, the copyright line) join here without a
+ * signature change.
+ */
+export interface OpenKpsInfoPatch {
+  /** The author's language list, in order (see `OpenKpsOptions.languages`). */
+  languages?: readonly KpsLanguageEntry[];
+}
+
+/**
+ * Open mode (spec 111 FR-041/FR-012): patch an opened keyboard's `.kps` text in
+ * place with only the fields given. Everything else in the descriptor stays
+ * byte-for-byte as it was, and the text is returned unchanged when the given
+ * fields already match. `unwritable` names anchors the descriptor lacks.
+ */
+export function patchOpenKpsInfo(
+  text: string,
+  patch: OpenKpsInfoPatch,
+): { text: string; unwritable: string[] } {
+  const openOpts: OpenKpsOptions = {
+    nameEdited: false,
+    ...(patch.languages !== undefined ? { languages: patch.languages } : {}),
+  };
+  // The dummy identity and the empty id are safe: with `openOpts` set, the Open
+  // branch of `patchKpsIdentity` reads neither. `<Name>` is rewritten only when
+  // `nameEdited` (false here), `<Description>` only when `description` is given
+  // (never here), `<WebSite>` only for a non-blank `identity.websiteUrl` (blank
+  // here), and `keyboardId` feeds only the Copy-track display-name fallback.
+  return patchKpsIdentity(text, { displayName: "" }, "", openOpts);
+}
+
+/**
  * Open mode: write the author's language list into the first `<Languages>`
  * block, preserving each kept entry's own markup. When the tags already match,
  * in order, the block is returned untouched (byte-identical round trip, spec
@@ -526,23 +559,25 @@ function patchKpsIdentity(
  */
 function patchOpenLanguages(keyboardBody: string, languages: readonly KpsLanguageEntry[]): string {
   const block = /(<Languages(?:\s[^>]*)?>)([\s\S]*?)(<\/Languages\s*>)/.exec(keyboardBody);
+  // BCP 47 tags are case-insensitive: entries match on the lower-cased tag, and a
+  // matched entry keeps the file's own spelling (it is reused verbatim).
   const existing = new Map<string, string>();
   const existingOrder: string[] = [];
   if (block !== null) {
     for (const m of (block[2] ?? "").matchAll(/<Language\b[^>]*\bID="([^"]*)"[^>]*>[^<]*<\/Language\s*>/g)) {
-      const tag = m[1] ?? "";
+      const tag = (m[1] ?? "").toLowerCase();
       if (!existing.has(tag)) existingOrder.push(tag);
       existing.set(tag, m[0]);
     }
     if (
       existingOrder.length === languages.length &&
-      existingOrder.every((tag, i) => tag === languages[i]?.tag)
+      existingOrder.every((tag, i) => tag === languages[i]?.tag.toLowerCase())
     ) {
       return keyboardBody;
     }
   }
   const elements = languages.map((lang) => {
-    const kept = existing.get(lang.tag);
+    const kept = existing.get(lang.tag.toLowerCase());
     if (kept !== undefined) return kept;
     const name = lang.name?.trim() ?? "";
     return `<Language ID="${escapeHtml(lang.tag)}">${escapeHtml(name !== "" ? name : lang.tag)}</Language>`;
