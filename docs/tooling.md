@@ -250,8 +250,12 @@ The `.kmn` reader (spec 116) has its own corpus suites, run through the engine's
 
 - `src/codec/reader-regression.corpus.test.ts` holds the reader to the IR, node-id, opaque-reason
   and comment counts recorded in `specs/116-ng-parser-adoption/evidence/reader-differential.md`.
-- `src/codec/reader-timing.corpus.test.ts` is the read-time budget: total within 2x the recorded
-  baseline (`evidence/baseline.md`), slowest file within 300 ms.
+- `src/codec/reader-timing.corpus.test.ts` is the read-time budget (opt-in, `KS_CORPUS_PERF=1`):
+  locally, total within 2x the recorded baseline (`evidence/baseline.md`), slowest file within
+  300 ms. On CI (`CI=true`) the hosted runner is the wrong machine for that baseline, so the
+  test instead allows 1.3x the slowest recorded CI runs in the same file's CI section;
+  re-record that section by hand from main's CI logs when the reader's speed legitimately
+  changes.
 - `src/codec/ng/lexer-equivalence.corpus.test.ts` checks the locally patched lexer emits exactly
   the unpatched upstream token stream; `parser-equivalence.corpus.test.ts` checks the local
   FIRST-set prediction patch changes no parse result.
