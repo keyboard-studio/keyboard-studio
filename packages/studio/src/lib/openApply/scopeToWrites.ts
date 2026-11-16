@@ -3,10 +3,13 @@
 // and the file that sits outside the change's declared write paths can never be
 // swept into the file (spec 111, defence in depth). A path is followed down to
 // its first array step; the subtree at that prefix is taken whole.
+//
+// `prefixOf`, `getIn` and `setIn` are shared with `rebaseModelPatch`, which
+// walks the same write prefixes at node granularity.
 
 import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
 
-function prefixOf(path: IRPath): string[] {
+export function prefixOf(path: IRPath): string[] {
   const out: string[] = [];
   for (const seg of path) {
     if (typeof seg !== "string") break;
@@ -15,7 +18,7 @@ function prefixOf(path: IRPath): string[] {
   return out;
 }
 
-function getIn(root: unknown, prefix: readonly string[]): unknown {
+export function getIn(root: unknown, prefix: readonly string[]): unknown {
   let cur = root;
   for (const k of prefix) {
     if (cur === null || typeof cur !== "object") return undefined;
@@ -24,7 +27,7 @@ function getIn(root: unknown, prefix: readonly string[]): unknown {
   return cur;
 }
 
-function setIn(root: Record<string, unknown>, prefix: readonly string[], value: unknown): Record<string, unknown> {
+export function setIn(root: Record<string, unknown>, prefix: readonly string[], value: unknown): Record<string, unknown> {
   if (prefix.length === 0) return root;
   const [head, ...rest] = prefix as [string, ...string[]];
   const child = root[head];
