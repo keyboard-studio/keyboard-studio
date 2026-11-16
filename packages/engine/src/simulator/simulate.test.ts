@@ -16,7 +16,7 @@ import { dirname, resolve } from "node:path";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { SimKeyInput } from "@keyboard-studio/contracts";
 import { compile } from "../compiler/index.js";
-import { simulate, runPatternTests } from "./index.js";
+import { simulate, simulateEach, runPatternTests } from "./index.js";
 import { makePattern } from "@keyboard-studio/contracts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -215,5 +215,51 @@ describe("simulate() — initialContext seeding (spec 062)", () => {
       simulate(compiled, defaultOutputKeys),
     );
     expect(simulate(compiled, defaultOutputKeys).finalOutput).toBe("z");
+  }, 30_000);
+});
+
+describe("simulate() — astral seed caret (main-CI run 43933968353)", () => {
+  const astralKmnPath = resolve(here, "__fixtures__", "astral_context.kmn");
+  const astralKmn = readFileSync(astralKmnPath, "utf8");
+
+  async function compileAstral() {
+    const vfs = createVirtualFS([
+      { path: "source/astral_context.kmn", content: astralKmn, isBinary: false },
+    ]);
+    const compiled = await compile(vfs, "astral_context");
+    expect(compiled.success).toBe(true);
+    return compiled;
+  }
+
+  const bkSlash: SimKeyInput[] = [{ vkey: "K_BKSLASH", modifiers: [], caps: false }];
+
+  it("a context rule deletes its astral seed character (default caret is the code-point end)", async () => {
+    const compiled = await compileAstral();
+    // U+114BC is one code point but two UTF-16 units: `String.length` would
+    // land the caret past the end and the rule's context deletion would
+    // silently remove nothing, appending U+114BD to the seed instead.
+    const result = simulate(compiled, bkSlash, { text: "𑒼" });
+
+    expect(result.finalOutput).toBe("𑒽");
+    expect(result.trace[0]!.firedRule?.matchedContext).toBe("𑒼");
+    expect(result.trace[0]!.firedRule?.emittedOutput).toBe("𑒽");
+  }, 30_000);
+
+  it("a two-character decomposed astral seed is deleted by its context rule", async () => {
+    const compiled = await compileAstral();
+    // U+114B9 U+114B0 is the NFD of U+114BC — the shape the context-tolerance
+    // generator emits for a decomposed-context variant.
+    const result = simulate(compiled, bkSlash, { text: "𑒼" });
+
+    expect(result.finalOutput).toBe("𑒽");
+    expect(result.trace[0]!.firedRule?.matchedContext).toBe("𑒼");
+  }, 30_000);
+
+  it("simulateEach places the default caret at the code-point end for an astral seed", async () => {
+    const compiled = await compileAstral();
+    const [step] = simulateEach(compiled, bkSlash, { text: "𑒼" });
+
+    expect(step!.outputAfter).toBe("𑒽");
+    expect(step!.firedRule?.matchedContext).toBe("𑒼");
   }, 30_000);
 });

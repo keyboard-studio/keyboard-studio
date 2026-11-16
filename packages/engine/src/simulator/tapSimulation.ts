@@ -19,6 +19,7 @@
 import type { CompileResult } from '@keyboard-studio/contracts';
 
 import { loadKeyboardInterface } from './keyboardLoader.js';
+import { KMWString } from './vendor/keyman/common/web-utils/index.js';
 import { JSKeyboardProcessor } from './vendor/keyman/engine/js-processor/jsKeyboardProcessor.js';
 import { DefaultOutputRules } from './vendor/keyman/engine/keyboard/defaultOutputRules.js';
 import { SyntheticTextStore } from './vendor/keyman/engine/keyboard/syntheticTextStore.js';
@@ -173,7 +174,10 @@ export class TouchTapSession {
   tapPair(layerId: string, firstKeyId: string, secondKeyId: string, seedText = ''): TapOutcome {
     const first = this.findKey(layerId, firstKeyId);
     const second = this.findKey(layerId, secondKeyId);
-    const textStore = new SyntheticTextStore(seedText, seedText.length);
+    // Code-point length, not `String.length` — see simulate() in index.ts:
+    // an astral seed's UTF-16 length would land the caret past the end and
+    // silently defeat context deletion.
+    const textStore = new SyntheticTextStore(seedText, KMWString.length(seedText));
     // resetContext unconditionally clears deadkeys (see simulate()'s caps
     // discipline), so the context is reset ONCE for the pair — both keys
     // are on one layer, hence one caps state — and the second tap runs
@@ -210,7 +214,8 @@ export class TouchTapSession {
   }
 
   private tapEvent(event: KeyEvent, layerId: string, seedText: string): TapOutcome {
-    const textStore = new SyntheticTextStore(seedText, seedText.length);
+    // Code-point length — see tapPair() above.
+    const textStore = new SyntheticTextStore(seedText, KMWString.length(seedText));
     return this.tapEventOnStore(event, layerId, textStore, seedText, true);
   }
 
