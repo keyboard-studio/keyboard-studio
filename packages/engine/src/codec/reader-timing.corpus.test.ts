@@ -67,6 +67,35 @@ function recordedBaselineTotalMs(): number {
   return Number(m[1]);
 }
 
+/**
+ * On CI the recorded baseline above is the wrong machine: the hosted runner is
+ * about 1.9x slower and varies run to run. There the budget is 1.3x the
+ * slowest observed CI runs of the current reader, kept in the evidence file's
+ * CI section, which sits above MARKER so a KS_RECORD_BASELINE=1 rewrite of the
+ * local section leaves it alone.
+ */
+const ON_CI = process.env["CI"] === "true";
+const CI_MARKER = "## CI runner timing baseline";
+const CI_FACTOR = 1.3;
+type CiBaseline = { lexTotal: number; lexSlowest: number; fullTotal: number; fullSlowest: number };
+function recordedCiBaseline(): CiBaseline {
+  const text = fs.readFileSync(EVIDENCE, "utf8");
+  const start = text.indexOf(CI_MARKER);
+  if (start < 0) throw new Error("CI timing baseline not recorded in baseline.md");
+  const section = text.slice(start, text.indexOf(MARKER, start));
+  const num = (label: string): number => {
+    const m = new RegExp(`- ${label.replace(/[+]/g, "\\+")}: (\\d+) ms`).exec(section);
+    if (!m) throw new Error(`CI timing baseline has no "${label}" line`);
+    return Number(m[1]);
+  };
+  return {
+    lexTotal: num("lex+line-parse total"),
+    lexSlowest: num("lex+line-parse slowest file"),
+    fullTotal: num("full path total"),
+    fullSlowest: num("full path slowest file"),
+  };
+}
+
 /** Vendored front end only: lex once, then parse each NEWLINE-terminated slice with LineRule. */
 const lineRule = new LineRule();
 function lexAndParseLines(text: string): unknown {
@@ -89,7 +118,29 @@ const perfRun = process.env["KS_CORPUS_PERF"] === "1";
 
 describe.skipIf(!rootExists || !perfRun)("reader speed budget (lex + per-line parse)", () => {
   // The lexer speed gate: met after local patches 1 and 3 (PROVENANCE.md). See research R1.
-  it("lexing plus per-line parsing stays within 2x baseline total and 300 ms per file", () => {
+  it.skipIf(!ON_CI)("CI: lexing plus per-line parsing stays within 1.3x the recorded CI runs", () => {
+    const ci = recordedCiBaseline();
+    const t = timeReader(ROOT, lexAndParseLines);
+    console.log(
+      `[OK] CI lex+line-parse: ${t.totalMs.toFixed(0)} ms total (budget ${(CI_FACTOR * ci.lexTotal).toFixed(0)} ms), ` +
+        `slowest ${t.slowest.file} ${t.slowest.ms.toFixed(1)} ms (budget ${(CI_FACTOR * ci.lexSlowest).toFixed(0)} ms)`,
+    );
+    expect(t.totalMs).toBeLessThanOrEqual(CI_FACTOR * ci.lexTotal);
+    expect(t.slowest.ms).toBeLessThanOrEqual(CI_FACTOR * ci.lexSlowest);
+  }, 300_000);
+
+  it.skipIf(!ON_CI)("CI: the full reader (parse) stays within 1.3x the recorded CI runs", () => {
+    const ci = recordedCiBaseline();
+    const t = timeReader(ROOT, (text, id) => parse(text, id));
+    console.log(
+      `[OK] CI parse() full path: ${t.totalMs.toFixed(0)} ms total (budget ${(CI_FACTOR * ci.fullTotal).toFixed(0)} ms), ` +
+        `slowest ${t.slowest.file} ${t.slowest.ms.toFixed(1)} ms (budget ${(CI_FACTOR * ci.fullSlowest).toFixed(0)} ms)`,
+    );
+    expect(t.totalMs).toBeLessThanOrEqual(CI_FACTOR * ci.fullTotal);
+    expect(t.slowest.ms).toBeLessThanOrEqual(CI_FACTOR * ci.fullSlowest);
+  }, 300_000);
+
+  it.skipIf(ON_CI)("lexing plus per-line parsing stays within 2x baseline total and 300 ms per file", () => {
     const baseline = recordedBaselineTotalMs();
     const t = timeReader(ROOT, lexAndParseLines);
     console.log(
@@ -105,7 +156,7 @@ describe.skipIf(!rootExists || !perfRun)("reader speed budget (lex + per-line pa
   // max(300 ms, 150 ms per MB); and the measured total (2.5-2.6 s under vitest,
   // about 2.3x baseline) was accepted as close enough, so the full path's total
   // budget is 2.5x baseline. See research R1.
-  it("the full reader (parse) stays within 2.5x baseline total and the per-MB file cap", () => {
+  it.skipIf(ON_CI)("the full reader (parse) stays within 2.5x baseline total and the per-MB file cap", () => {
     const baseline = recordedBaselineTotalMs();
     const t = timeReader(ROOT, (text, id) => parse(text, id));
     const capFor = (file: string): number =>

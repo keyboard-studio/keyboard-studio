@@ -19,6 +19,19 @@
 - 13 files passed, 2 skipped (15); 1871 tests passed, 5 skipped. No failures.
 - Note: this run overlapped authoring of the reader-timing corpus test, so the count may or may not include it.
 
+## CI runner timing baseline
+
+The GitHub-hosted runner reads the corpus about 1.9x slower than the machine
+that recorded the baseline below, and varies by up to 1.9x between runs, so on
+CI (`CI=true`) the speed budget compares against these numbers instead: the
+slowest of seven main runs of the current reader (2026-11-12 to 2026-11-15,
+runs 43180566533 to 43726373372), each allowed 1.3x.
+
+- lex+line-parse total: 3426 ms
+- lex+line-parse slowest file: 605 ms
+- full path total: 4955 ms
+- full path slowest file: 801 ms
+
 ## parse() timing baseline
 
 - files timed: 1036
