@@ -141,6 +141,8 @@ import { buildPathOverlay } from "./dashboard/pathOverlay.ts";
 import { projectWorkingCopyForOutput } from "./lib/serializeWorkingCopy.ts";
 import { StepHost } from "./components/StepHost.tsx";
 import { OpenApplyHost } from "./components/OpenApplyHost.tsx";
+import { noteAccepted } from "./lib/navigationGuard.ts";
+import { UnappliedTextDialog } from "./components/UnappliedTextDialog.tsx";
 import { ResumeDraftBanner } from "./components/ResumeDraftBanner.tsx";
 import {
   loadServerDraftMeta,
@@ -250,6 +252,7 @@ function useRoute(): RouteId {
         // soft-lock described below.
         if (parsed !== null) setPendingWelcomeLocation(parsed);
         window.history.replaceState(window.history.state, "", "#welcome");
+        noteAccepted("#welcome");
       }
       return "welcome";
     }
@@ -2092,6 +2095,7 @@ function StudioShellContent() {
   });
   return (
     <OpenApplyHost>
+    <UnappliedTextDialog />
     <div
       style={{
         display: "flex",

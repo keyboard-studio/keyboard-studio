@@ -94,14 +94,16 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
     : (toDisplay(committedCss ?? startCssText) ?? previewCssText ?? (stage.kind === "error" ? "" : null));
 
   // On Open: write the text into the files; the editor then reseeds from the file.
-  const handleApply = (css: string) => {
+  // Resolves false when the files did not take the text, so the pane keeps it as unapplied.
+  const handleApply = (css: string): void | Promise<boolean> => {
     if (!liveOpen) {
       setApplied(css);
       return;
     }
     setNoStoreLine(false);
-    void commitStylesheetOnOpen(css, applyOnOpen).then((outcome) => {
+    return commitStylesheetOnOpen(css, applyOnOpen).then((outcome) => {
       if (outcome === "no-store-line") setNoStoreLine(true);
+      return outcome === "written" || outcome === "unchanged";
     });
   };
 
@@ -114,7 +116,11 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
   // Clearing the editor and applying it removes the keyboard's stylesheet; an untouched step leaves it as it was.
   const handleContinue = () => {
     if (liveOpen) {
-      onComplete({ css: seedText ?? "" });
+      // The file as it is now: an Apply answered just before this (the leave question) has
+      // written it after this handler's render, so the render-time `seedText` may be one apply old.
+      const wc = useWorkingCopyStore.getState();
+      const fileCss = wc.startVfs === null || wc.startKeyboard === null ? null : readKeyboardCss(wc.startVfs, wc.startKeyboard.id)?.text;
+      onComplete({ css: fileCss ?? "" });
       return;
     }
     if (applied !== null) setCustomCss(rewriteKmwKeyboardSelectors(applied, keyboardId, startId));

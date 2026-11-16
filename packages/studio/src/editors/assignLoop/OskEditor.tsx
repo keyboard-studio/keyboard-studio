@@ -15,6 +15,7 @@
 // functions that push the prior state — the touch builder's discipline
 // (commit → undo batch), simplified for the OSK's flat key model.
 
+import { guardLeave } from "../../stores/unappliedTextStore.ts";
 import { useMemo, useState, lazy, Suspense } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { msg } from "@lingui/core/macro";
@@ -194,6 +195,7 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
   const [kvks, setKvks] = useState<KvksIR | null>(baseKvks);
   const [history, setHistory] = useState<KvksIR[]>([]);
   const [activeTab, setActiveTab] = useState<"visual" | "code">("visual");
+  // Leaving the Code tab with text that is not applied asks first on a keyboard opened for update (spec 111 FR-046).
   const [activeShift, setActiveShift] = useState<string>("");
   const [selected, setSelected] = useState<SelectedKey | null>(null);
   const [labelDraft, setLabelDraft] = useState<string>("");
@@ -446,7 +448,7 @@ export function OskEditor({ onComplete, onBack }: EditorStepProps) {
             type="button"
             role="tab"
             aria-selected={activeTab === tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => (tab === activeTab ? undefined : guardLeave(() => setActiveTab(tab)))}
             style={{
               padding: "6px 12px",
               fontSize: 13,

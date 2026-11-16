@@ -164,6 +164,7 @@ import { isLiveOpen } from "../../lib/openMode.ts";
 import { findTouchLayoutPath } from "../../lib/findTouchLayoutPath.ts";
 import { readVfsText } from "../../lib/vfsText.ts";
 import { useApplyOnOpen } from "../../components/OpenApplyHost.tsx";
+import { guardLeave } from "../../stores/unappliedTextStore.ts";
 import { buildTouchReseedChange } from "../../lib/openApply/touchReseed.ts";
 import { commitTouchEditOnOpen, commitTouchOpOnOpen, groupTouchCommitsOnOpen, installRulesOnOpen } from "./touchOpenCommit.ts";
 import { useOpenUndoStore, type TouchKeyRestoreEntry } from "../../stores/openUndoStore.ts";
@@ -4985,7 +4986,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // behavior change: nothing between the two positions ever called this
   // function (confirmed by search before moving it).
   // ---------------------------------------------------------------------------
-  const handleSwitchTouchEditorMode = useCallback(
+  const switchTouchEditorModeNow = useCallback(
     (mode: TouchEditorMode) => {
       if (
         (mode === "key" || mode === "code") &&
@@ -5030,6 +5031,15 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       setTouchEditorMode,
       selectKeyAddress,
     ],
+  );
+  // Leaving the Code tab with text that is not applied asks first on a keyboard opened for update
+  // (spec 111 FR-046); the switch runs at once when nothing is unapplied.
+  const handleSwitchTouchEditorMode = useCallback(
+    (mode: TouchEditorMode) => {
+      if (touchEditorMode === "code" && mode !== "code") guardLeave(() => switchTouchEditorModeNow(mode));
+      else switchTouchEditorModeNow(mode);
+    },
+    [touchEditorMode, switchTouchEditorModeNow],
   );
 
   // FR-008 completion gate (mechanism-gallery-progression): names of chars

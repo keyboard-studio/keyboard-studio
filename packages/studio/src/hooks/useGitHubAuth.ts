@@ -9,6 +9,7 @@
 // from sessionStorage and re-verifies, so a token captured by the boot-time
 // /oauth/callback handler is picked up on the next render.
 
+import { noteAccepted } from "../lib/navigationGuard.ts";
 import { useCallback, useEffect, useState } from "react";
 import type { VerifyTokenResult } from "@keyboard-studio/contracts";
 import {
@@ -66,6 +67,7 @@ function consumeOAuthErrorParam(): string | null {
   const newUrl =
     window.location.pathname + (query === "" ? "" : `?${query}`) + window.location.hash;
   window.history.replaceState(window.history.state, "", newUrl);
+  noteAccepted(window.location.hash);
 
   if (oauthError === "") return null;
   return (

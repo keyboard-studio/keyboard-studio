@@ -34,6 +34,7 @@
 // by hand clears the pending id so a later visit to Code does not re-scroll.
 
 import { lazy, Suspense, useId, useRef, useState } from "react";
+import { guardLeave } from "../../stores/unappliedTextStore.ts";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -88,10 +89,19 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
   const tabId = (tab: EditorTab) => `${tabIdBase}-tab-${tab}`;
   const panelId = (tab: EditorTab) => `${tabIdBase}-panel-${tab}`;
 
-  function selectTab(tab: EditorTab) {
-    setRevealNodeId(undefined);
-    setActiveTab(tab);
-    if (tab === "layout") setLayoutVisited(true);
+  // Leaving the Code tab with text that is not applied asks first on a keyboard opened for update
+  // (spec 111 FR-046); `guardLeave` runs the switch at once when nothing is unapplied.
+  function selectTab(tab: EditorTab, then?: () => void) {
+    if (tab === activeTab) {
+      then?.();
+      return;
+    }
+    guardLeave(() => {
+      setRevealNodeId(undefined);
+      setActiveTab(tab);
+      if (tab === "layout") setLayoutVisited(true);
+      then?.();
+    });
   }
 
   function handleViewInCode(nodeId: string | undefined) {
@@ -121,8 +131,7 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
     e.preventDefault();
     const next = TAB_ORDER[nextIndex];
     if (next === undefined) return;
-    selectTab(next);
-    tabRefs.current.get(next)?.focus();
+    selectTab(next, () => tabRefs.current.get(next)?.focus());
   }
 
   const flagCount = codeReview.flags.length;

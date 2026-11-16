@@ -22,6 +22,7 @@ import { emitKvks, parseKvks } from "@keyboard-studio/engine";
 import type { KvksIR } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { isOpenMode } from "../../lib/openMode.ts";
+import { useUnappliedText } from "../../hooks/useUnappliedText.ts";
 import { readVfsText } from "../../lib/vfsText.ts";
 import {
   lintOskCodeText,
@@ -73,6 +74,9 @@ export function OskCodePane({
 
   // The canonical text for the current KvksIR (Open: the file's text).
   const canonical = kvks === null ? null : (openText ?? emitKvks(kvks));
+  // The canonical text as a ref: an apply moves it ahead of the next render, and the leave guard reads it then.
+  const canonicalRef = useRef<string | null>(canonical);
+  canonicalRef.current = canonical;
 
   // Editor text. `null` until the first canonical text arrives.
   const [text, setText] = useState<string | null>(null);
@@ -146,6 +150,32 @@ export function OskCodePane({
     [],
   );
 
+  // Leave guard (spec 111 FR-046): text typed here and not applied is asked about when the author
+  // leaves the Code tab or the step, on a keyboard opened for update.
+  const applyForLeaveRef = useRef<() => boolean>(() => false);
+  // The one definition of "unapplied": on Open the text differs from the file's text; otherwise
+  // from what the draft was last synced to. The Apply badge and the leave guard both read it.
+  const isDirtyNow = (): boolean => {
+    const cur = textRef.current;
+    if (cur === null) return false;
+    if (openText !== undefined) return canonicalRef.current !== null && cur !== canonicalRef.current;
+    return cur !== lastAppliedRef.current;
+  };
+  useUnappliedText({
+    label: t({ id: "open.unapplied.view.osk", message: "the on-screen keyboard (Code tab)" }),
+    hasUnapplied: isDirtyNow,
+    apply: () => Promise.resolve(applyForLeaveRef.current()),
+    discard: () => {
+      const c = canonicalRef.current;
+      if (c === null) return;
+      textRef.current = c;
+      lastAppliedRef.current = c;
+      setText(c);
+      setApplyError(null);
+      runLint(c);
+    },
+  });
+
   if (kvks === null) {
     return (
       <div data-testid="osk-code-pane">
@@ -168,7 +198,7 @@ export function OskCodePane({
     );
   }
 
-  const dirty = text !== null && text !== lastAppliedRef.current;
+  const dirty = isDirtyNow();
   const errorCount = markers.filter((m) => m.severity === "error").length;
   const warningCount = markers.filter((m) => m.severity === "warning").length;
 
@@ -187,11 +217,12 @@ export function OskCodePane({
     applyMarkersToModel(markers);
   };
 
-  const handleApply = () => {
+  // True when the text was applied (the leave guard stays when it was not).
+  const handleApply = (): boolean => {
     const current = textRef.current;
-    if (current === null || canonical === null) return;
+    if (current === null || canonical === null) return false;
     // Synchronous gate: the debounced lint state may lag behind the text.
-    if (!lintOskCodeText(current).parsed) return;
+    if (!lintOskCodeText(current).parsed) return false;
     let after: KvksIR;
     try {
       after = parseKvks(current);
@@ -199,13 +230,13 @@ export function OskCodePane({
       // parseKvks is regex-lenient and should not throw, but the handler
       // must not throw if it ever does.
       setApplyError(err instanceof Error ? err.message : String(err));
-      return;
+      return false;
     }
     if (current === canonical) {
       // Formatting-only change: nothing to commit (Open: a formatting-only
       // change is a change, and the file text below differs from `canonical`
-      // whenever it is).
-      return;
+      // whenever it is). The text is already the file's: nothing left unapplied.
+      return true;
     }
     onApply(after);
     if (openText !== undefined && openPath !== null) {
@@ -213,12 +244,16 @@ export function OskCodePane({
       const result = useWorkingCopyStore.getState().replaceStartingPointFromText(openPath, current);
       if (!result.ok) {
         setApplyError(result.error);
-        return;
+        return false;
       }
     }
     justAppliedRef.current = true;
+    canonicalRef.current = current;
     setApplyError(null);
+    return true;
   };
+
+  applyForLeaveRef.current = handleApply;
 
   return (
     <div
@@ -237,7 +272,7 @@ export function OskCodePane({
           type="button"
           data-testid="osk-code-apply"
           disabled={!dirty || !parsed}
-          onClick={handleApply}
+          onClick={() => void handleApply()}
         >
           {t({
             id: "editor.assignLoop.osk.code.apply",

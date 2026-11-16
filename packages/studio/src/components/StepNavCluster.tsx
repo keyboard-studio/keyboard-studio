@@ -14,6 +14,7 @@ import { Button, type ButtonVariant } from "../ui/Button.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { isLiveOpen } from "../lib/openMode.ts";
 import { OpenUndoButton } from "./OpenUndoButton.tsx";
+import { guardLeave } from "../stores/unappliedTextStore.ts";
 
 const SLOT_VARIANTS = [
   ["back", "back"],
@@ -95,7 +96,12 @@ export function StepNavCluster({ stepId }: { stepId: string }) {
             disabled={action.disabled ?? false}
             aria-label={action.ariaLabel}
             aria-describedby={action.ariaDescribedBy}
-            onClick={action.onClick}
+            // Spec 111 FR-046: on an opened keyboard, unapplied code-view text is asked about before
+            // the step navigates (Back, Continue, Skip, the touch Undo). Runs at once when there is none.
+            // After an answer the step's latest handler runs: an Apply may have changed what it reads.
+            onClick={() =>
+              guardLeave(() => (useStepNavStore.getState().entries[stepId]?.spec[slot]?.onClick ?? action.onClick)())
+            }
           >
             {action.label}
           </Button>
@@ -110,7 +116,7 @@ export function StepNavCluster({ stepId }: { stepId: string }) {
           variant="secondary"
           size="compact"
           data-testid="step-revision-discard"
-          onClick={revision.onDiscard}
+          onClick={() => guardLeave(revision.onDiscard, { allowApply: false })}
         >
           {t({ id: "step.revision.discard", message: "Discard changes and go back" })}
         </Button>

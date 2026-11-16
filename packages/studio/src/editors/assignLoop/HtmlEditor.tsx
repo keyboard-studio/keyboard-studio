@@ -55,6 +55,7 @@ import { useDocMemberStates } from "../../hooks/useDocMemberStates.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { isLiveOpen } from "../../lib/openMode.ts";
 import { useApplyOnOpen } from "../../components/OpenApplyHost.tsx";
+import { guardLeave } from "../../stores/unappliedTextStore.ts";
 import { resolveOutputKeyboardId } from "../../lib/outputKeyboardId.ts";
 import { readVfsText } from "../../lib/vfsText.ts";
 import {
@@ -454,14 +455,25 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
     if (snapshot["help-php"] !== undefined) setAuthoredHelpPhp(snapshot["help-php"]);
   };
 
-  const selectMember = (member: SelectorMember) => {
-    if (openRef.current) void flushOpen();
-    else flushToStore(standingEdits());
-    setDropped([]);
-    setRichWarning(null);
-    setSelected(member);
-    if (!isEditable(member)) setMode("preview");
-    else if (mode === "preview" && codeOnlyReason(member) === null) setMode("rich");
+  // Switching page unmounts the code pane: text typed there and not applied is asked about first
+  // (spec 111 FR-046; the staged text is written here, as before).
+  const selectMember = (member: SelectorMember) =>
+    guardLeave(() => {
+      if (openRef.current) void flushOpen();
+      else flushToStore(standingEdits());
+      setDropped([]);
+      setRichWarning(null);
+      setSelected(member);
+      if (!isEditable(member)) setMode("preview");
+      else if (mode === "preview" && codeOnlyReason(member) === null) setMode("rich");
+    });
+
+  // Open: stage the page's text and write it now; true when the file took it.
+  const applyCodeForLeave = async (member: EditableDocMember, next: string): Promise<boolean> => {
+    setMemberText(member, next);
+    textsRef.current = { ...textsRef.current, [member]: { text: next, base: seeds[member] } };
+    const result = await flushOpen();
+    return result.refused.length === 0;
   };
 
   const handleContinue = async () => {
@@ -779,7 +791,7 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
             <button
               key={m}
               type="button"
-              onClick={() => setMode(m)}
+              onClick={() => (m === effectiveMode ? undefined : guardLeave(() => setMode(m)))}
               aria-pressed={effectiveMode === m}
               disabled={m === "rich" && codeOnly !== null}
               style={{
@@ -831,6 +843,11 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
                 initialText={currentText(selected)}
                 language={selected === "readme-md" ? "markdown" : "html"}
                 onApply={(next) => setMemberText(selected, next)}
+                guardLabel={t({
+                  id: "open.unapplied.view.pageNamed",
+                  message: `the code of ${{ page: memberName(selected) }}`,
+                })}
+                {...(isOpen ? { onApplyForLeave: (next: string) => applyCodeForLeave(selected, next) } : {})}
               />
             </Suspense>
           </div>

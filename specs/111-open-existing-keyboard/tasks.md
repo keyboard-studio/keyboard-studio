@@ -287,7 +287,7 @@ T070-T077 (FR-035..FR-040) moved to [spec 114](../114-ctrl-and-letter-removal/sp
 ## Phase 18: Undo, drafts, unapplied text (FR-045, FR-046, FR-049)
 
 - [x] T093 Undo and "Discard changes and go back" restore file text on Open, including code-view edits (depth per open question 3). (Phase 15 S4: `OpenUndoButton` in the footer cluster; Discard restores the log as at arrival, `RevisionSnapshot.openUndo`; no redo exists in the studio, so none added; no undo shortcut exists, so none added; touch key edits keep the touch Undo until T087. Tests: `OpenUndoButton.test.tsx`.)
-- [ ] T094 Leaving a code view with unapplied text asks whether to apply or discard it.
+- [x] T094 Leaving a code view with unapplied text asks whether to apply or discard it.
 - [x] T095 Open drafts save the current files and the record. No migration of drafts saved earlier (OWNER RULING 2026-11-13, FR-049 amended).
 
 ## Phase 19: Cleanup

@@ -255,6 +255,12 @@ export function StudioFooter({ activeRoute = "survey" }: { activeRoute?: RouteId
       setStatusMessage(null);
       return true;
     }
+    // Held behind the unapplied-text question (spec 111 FR-046): not a refusal, so no reason to show.
+    // The jump runs when the author answers.
+    if (outcome.kind === "pending") {
+      setStatusMessage(null);
+      return false;
+    }
     // Both "refused" and "degraded" mean the gate held. A step-bearing
     // location NEVER resolves the resolver's own `kind:"unreachable"`
     // variant (see progressDots.ts's module header) — `resolveLocation`

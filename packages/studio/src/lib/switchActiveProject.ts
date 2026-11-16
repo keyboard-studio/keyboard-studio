@@ -46,6 +46,7 @@
 // update in place. A remount is the only way to reach them from outside.
 import { resumeProject } from "./draftPersistence.ts";
 import { navigateTo } from "./navigate.ts";
+import { runGuardedNavigation, withGuardBypassed } from "./navigationGuard.ts";
 import { useProjectSwitchStore } from "../stores/projectSwitchStore.ts";
 
 /**
@@ -57,12 +58,17 @@ import { useProjectSwitchStore } from "../stores/projectSwitchStore.ts";
  * react to failure still can.
  */
 export function switchActiveProject(projectKey: string): boolean {
-  const applied = resumeProject(projectKey);
-  if (applied) {
-    navigateTo("survey");
-    // P0 fix: force a remount of `SurveyView` even when `navigateTo` above
-    // was a no-op (already on `#survey`) — see this store's own header.
-    useProjectSwitchStore.getState().bump();
-  }
-  return applied;
+  // Spec 111 FR-046: switching keyboards leaves the open one, so unapplied code-view text is
+  // asked about first. Held, the switch runs after the answer and this reports false.
+  let applied = false;
+  const ranNow = runGuardedNavigation(() => {
+    applied = resumeProject(projectKey);
+    if (applied) {
+      withGuardBypassed(() => navigateTo("survey"));
+      // P0 fix: force a remount of `SurveyView` even when the navigate above
+      // was a no-op (already on `#survey`) — see this store's own header.
+      useProjectSwitchStore.getState().bump();
+    }
+  });
+  return ranNow && applied;
 }

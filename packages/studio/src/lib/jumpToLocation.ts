@@ -13,6 +13,7 @@
 
 import { formatLocation, type Location } from "./location.ts";
 import { navigateTo } from "./navigate.ts";
+import { runGuardedNavigation, withGuardBypassed } from "./navigationGuard.ts";
 import { resolveLocation, type ResolveContext, type UnreachableReason } from "./resolveLocation.ts";
 import { manifestStepIds, screenGates } from "../steps/derivedViews.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
@@ -36,7 +37,12 @@ export interface JumpOptions {
 export type JumpOutcome =
   | { readonly kind: "arrived"; readonly at: Location }
   | { readonly kind: "refused"; readonly reason: UnreachableReason }
-  | { readonly kind: "degraded"; readonly at: Location; readonly reason: UnreachableReason };
+  | { readonly kind: "degraded"; readonly at: Location; readonly reason: UnreachableReason }
+  /**
+   * Held behind the unapplied-text question (spec 111 FR-046): nothing has moved yet, and the
+   * jump runs when the author answers Apply or Discard. Not a refusal: there is no reason to show.
+   */
+  | { readonly kind: "pending" };
 
 // ---------------------------------------------------------------------------
 // Pending jump slot.
@@ -205,6 +211,19 @@ export function jumpToLocation(loc: Location, opts?: JumpOptions): JumpOutcome {
     return { kind: "refused", reason: resolution.reason };
   }
 
+  // A leave with unapplied code-view text asks first; the whole jump (the traversal writes as
+  // well as the hash) waits for the answer, so a kept edit leaves the walk where it was.
+  const done: { outcome: JumpOutcome | null } = { outcome: null };
+  const ranNow = runGuardedNavigation(() => {
+    done.outcome = performJump(resolution, opts);
+  });
+  return ranNow && done.outcome !== null ? done.outcome : { kind: "pending" };
+}
+
+function performJump(
+  resolution: Exclude<ReturnType<typeof resolveLocation>, { kind: "unreachable" }>,
+  opts: JumpOptions | undefined,
+): JumpOutcome {
   const target = resolution.kind === "reachable" ? resolution.location : resolution.to;
 
   // Traversal first, then the hash. The hash change is what unmounts and
@@ -240,7 +259,7 @@ export function jumpToLocation(loc: Location, opts?: JumpOptions): JumpOutcome {
   // already on skips the navigate entirely rather than appearing to hang.
   const currentHash = typeof window !== "undefined" ? window.location.hash : "";
   if (currentHash !== formatLocation({ route: target.route })) {
-    navigateTo({ route: target.route });
+    withGuardBypassed(() => navigateTo({ route: target.route }));
   }
 
   return resolution.kind === "reachable"

@@ -11,6 +11,7 @@ import { useLingui } from "@lingui/react/macro";
 import { useOpenUndoStore, type OpenUndoRecord } from "../stores/openUndoStore.ts";
 import { lastUndoableRecord, undoLastOpenApply } from "../lib/openApply.ts";
 import { Button } from "../ui/Button.tsx";
+import { guardLeave } from "../stores/unappliedTextStore.ts";
 import { visuallyHidden } from "../survey/surveyStyles.ts";
 
 const MAX_SHOWN_CHARS = 5;
@@ -114,10 +115,16 @@ export function OpenUndoButton() {
         style={empty ? { color: "var(--app-text-disabled)", cursor: "not-allowed" } : undefined}
         onClick={() => {
           if (last === undefined) return;
-          const result = undoLastOpenApply(last.id);
-          // Empty now, set by the effect after this render commits.
-          setShown(null);
-          setPending(result.ok ? null : { afterId: last.id, text: refusalText(result) });
+          // Spec 111 FR-046: Undo reseeds the code views, so unapplied text there is asked about first.
+          guardLeave(() => {
+            // The step may have changed while the question was open: undo what is last now.
+            const target = lastUndoableRecord();
+            if (target === undefined) return;
+            const result = undoLastOpenApply(target.id);
+            // Empty now, set by the effect after this render commits.
+            setShown(null);
+            setPending(result.ok ? null : { afterId: target.id, text: refusalText(result) });
+          }, { allowApply: false });
         }}
       >
         {t({ id: "openUndo.label", message: "Undo" })}
