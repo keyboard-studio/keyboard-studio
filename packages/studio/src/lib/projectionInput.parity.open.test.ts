@@ -17,10 +17,16 @@ import { readVfsText } from "./vfsText.ts";
 import { useOpenRemovalStore } from "../stores/openRemovalStore.ts";
 import { clearOpenSession, useOpenUndoStore } from "../stores/openUndoStore.ts";
 import { undoLastOpenApply } from "./openApply.ts";
+import { commitDescriptorOnOpen } from "./descriptorOpenCommit.ts";
+import { commitStylesheetOnOpen } from "./cssOpenCommit.ts";
+import { commitDocPagesThroughSeam } from "./docsOpenCommit.ts";
+import { applyDocRegeneration } from "./docRegenerationFix.ts";
+import { useDocRegenerationFixes } from "../hooks/useDocRegenerationFixes.ts";
 
 vi.mock("./services.ts", () => ({
   getToZip: vi.fn(async () => vi.fn(async () => new Uint8Array())),
   getPatternLibraryService: vi.fn(() => ({ getById: async () => undefined })),
+  getPatternByIdSync: () => undefined,
 }));
 
 const ID = "tiny";
@@ -313,5 +319,74 @@ describe("SC-010 and SC-013: output on Open with a touch file", () => {
     useWorkingCopyStore.getState().setTouchLayoutJson('{"phone":{"layer":[]}}');
     const projected = await projectWorkingCopyForOutput();
     expect(projected!.vfs.get(TOUCH_PATH)?.content).toBe(TOUCH);
+  });
+});
+
+// -- SC-010 for the descriptor, stylesheet and documentation files in one session (phase 17, T092) --
+
+describe("SC-010: a mixed session of live-file edits on Open reads the same on every route", () => {
+  const GEN_S = "<!-- ks:generated:start -->";
+  const GEN_E = "<!-- ks:generated:end -->";
+  const KPS_PATH = `source/${ID}.kps`;
+  const CSS_PATH = `source/${ID}.css`;
+  const HELP = `source/help/${ID}.php`;
+  const HELP_ORIGINAL = `<?php $pagename = 'tiny'; ?>\n<p>Mine.</p>\n${GEN_S}\nstale\n${GEN_E}\n`;
+  const KPS = [
+    "<Package>\r\n",
+    "  <Info>\r\n    <Name URL=\"\">Tiny</Name>\r\n  </Info>\r\n",
+    "  <Keyboards>\r\n    <Keyboard>\r\n      <Name>Tiny</Name>\r\n      <Version>1.0</Version>\r\n",
+    "      <Languages>\r\n        <Language ID=\"bas\">Basaa</Language>\r\n        <Language ID=\"bkm\">Kom</Language>\r\n      </Languages>\r\n",
+    "    </Keyboard>\r\n  </Keyboards>\r\n</Package>\r\n",
+  ].join("");
+  const kpsNoVersion = (s: string): string => s.replace(/<Version[^>]*>[^<]*<\/Version>/g, "<Version/>");
+  const host = (c: Parameters<typeof applyOpenChange>[0]) => Promise.resolve(applyOpenChange(c));
+
+  it("code view, preview and download agree on the .kps, .css, .kmn and the page", async () => {
+    const original = [
+      { path: KMN_PATH, content: KMN, isBinary: false },
+      { path: KPS_PATH, content: KPS, isBinary: false },
+      { path: HELP, content: HELP_ORIGINAL, isBinary: false },
+    ];
+    const kb = {
+      id: ID, path: "release/t/tiny", script: "Latn", targets: ["desktop"],
+      displayName: "Tiny", version: "1.0", languages: ["bas"],
+    } as StartKeyboard;
+    clearOpenSession();
+    const wc = useWorkingCopyStore.getState();
+    wc.reset();
+    wc.instantiateFromExisting(kb, { vfs: createVirtualFS(original), ir: parseKmn(KMN, ID).ir });
+    wc.setAttribution({ authorName: "Parity", copyrightHolder: "Parity" });
+    wc.setFallbackPolicy("pass-through");
+    wc.setStartHelpPhpText(HELP_ORIGINAL);
+
+    expect(await commitDescriptorOnOpen({ languages: [{ tag: "bkm" }, { tag: "bas" }] }, host)).toBe("written");
+    expect(await commitStylesheetOnOpen(".kmw-key { color: red; }", host)).toBe("written");
+    const s = useWorkingCopyStore.getState();
+    const edited = HELP_ORIGINAL.replace("Mine.", "Mine, edited.");
+    expect(commitDocPagesThroughSeam({ edits: { "help-php": edited }, keyboardId: ID, startVfs: s.startVfs, convention: s.startWelcomeConvention }).written).toEqual(["help-php"]);
+    const fix = renderHook(() => useDocRegenerationFixes()).result.current.find((f) => f.id.startsWith("docs:regenerate:help-php:"));
+    expect(fix).toBeDefined();
+    expect(await applyDocRegeneration(fix!, host)).toBe(true);
+    expect(useOpenUndoStore.getState().records).toHaveLength(4);
+
+    const { result } = renderHook(() => useWorkingCopyTransform({ previewedStartId: ID }));
+    const fetched = createVirtualFS(original);
+    result.current!(fetched, ID);
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected).not.toBeNull();
+
+    const code = useWorkingCopyStore.getState().startVfs!;
+    const norm = (p: string, t: string): string => (p === KMN_PATH ? withoutVersion(t) : p === KPS_PATH ? kpsNoVersion(t) : t);
+    for (const path of [KPS_PATH, CSS_PATH, KMN_PATH, HELP]) {
+      const c = readVfsText(code, path);
+      expect(c, `${path} code view`).toBeDefined();
+      expect(norm(path, readVfsText(fetched, path)!), `${path} preview`).toBe(norm(path, c!));
+      expect(norm(path, projected!.vfs.get(path)?.content as string), `${path} download`).toBe(norm(path, c!));
+    }
+    // The edits really landed.
+    expect(readVfsText(code, KPS_PATH)!.indexOf('ID="bkm"')).toBeLessThan(readVfsText(code, KPS_PATH)!.indexOf('ID="bas"'));
+    expect(readVfsText(code, CSS_PATH)).toBe(".kmw-key { color: red; }");
+    expect(readVfsText(code, HELP)).toContain("Mine, edited.");
+    expect(readVfsText(code, HELP)).not.toContain("stale");
   });
 });

@@ -281,8 +281,8 @@ T070-T077 (FR-035..FR-040) moved to [spec 114](../114-ctrl-and-letter-removal/sp
 - [x] T089 The documentation and style editors write their files on Open; no separate edited copy replaces a file at output.
 - [x] T089a Retire on Open the CSS output override: the OSK stylesheet (`customCss`, projection steps 0b and 4b) is written into the stylesheet file when the author applies it, so the output writes none. Goes with T089.
 - [x] T090 The language list patches the package descriptor when applied.
-- [ ] T091 On-screen keyboard key labels after a Mechanisms change, per the owner's answer to open question 1.
-- [ ] T092 Tests: SC-014, and SC-010 for these files.
+- [x] T091 On-screen keyboard key labels after a Mechanisms change, per the owner's answer to open question 1. (Design pass found nothing to build: `assign` writes the .kvks and touch labels in the same change (`lib/openApply/assign.ts`, row `assign` in `lib/projectionSteps.ts`), a removal relabels through `carveKeycaps`; evidence `openApply.assign.test.ts` (only the K_E label changes, undo exact). `keycapLabels` left the Open `output` row: assignments are [] on Open, so it did nothing; `projectionSteps.test.ts`.)
+- [x] T092 Tests: SC-014, and SC-010 for these files. (SC-014: `docRegenerationFix.open.test.tsx`; SC-010: the mixed-session case in `projectionInput.parity.open.test.ts`, plus per-file `descriptorOpenCommit.test.ts` and `cssOpenCommit.test.ts`.)
 
 ## Phase 18: Undo, drafts, unapplied text (FR-045, FR-046, FR-049)
 

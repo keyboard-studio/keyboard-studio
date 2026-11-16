@@ -91,7 +91,8 @@ export const PROJECTION_STEPS: Readonly<Record<ProjectionKind, ReadonlySet<Proje
   //   caps                 an answered caps decision, the one decision-driven .kmn step; T096
   //   identity             version bump (FR-048)
   //   rename               keyboard id rename (inert on Open: the id is fixed)
-  //   keycapLabels         labels for assignments (empty on Open); T091
+  // `keycapLabels` is in no Open row: it needs assignments (step 3.5) and there are none at output;
+  // the assign seam writes the .kvks and touch labels when an assignment is applied (T091).
   // `authoredDocs` is in no Open row either: a documentation page is written into its file when the
   // author moves on (lib/docsOpenCommit), so the output carries the start files' pages.
   // `css` is in no Open row: the stylesheet editor writes the file (and its store line) when
@@ -103,7 +104,6 @@ export const PROJECTION_STEPS: Readonly<Record<ProjectionKind, ReadonlySet<Proje
     "assignments",
     "caps",
     "identity",
-    "keycapLabels",
     "descriptor",
     "rename",
   ),
