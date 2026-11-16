@@ -58,6 +58,8 @@ export function OpenUndoButton() {
         return t({ id: "openUndo.docsEdit", message: "Undo: documentation page edit" });
       case "docs-regenerate":
         return t({ id: "openUndo.docsRegenerate", message: "Undo: regenerated documentation section" });
+      case "docs-create":
+        return t({ id: "openUndo.docsCreate", message: "Undo: created documentation page" });
       case "osk":
         return t({ id: "openUndo.osk", message: "Undo: on-screen keyboard change" });
       case "copyright":

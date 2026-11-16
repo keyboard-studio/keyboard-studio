@@ -18,7 +18,7 @@
  *   lists the root files below.
  * - Per-file seeding: copy seeds from the live preview (`useDocsPreview`);
  *   open seeds from the file only (the `start*Text` slices are read-only
- *   seeds for the render paths), and a page with no file is not editable.
+ *   seeds for the render paths), and a page with no file is not editable until its suggested fix creates it.
  *   Copy never inherits base prose (ruling A).
  * - HISTORY.md and LICENSE.md always ship (serialize steps 5c/5d +
  *   `ensurePackageFiles`), so they never render "(absent)" even on Open,
@@ -762,8 +762,8 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
       {absentOnOpen && (
         <p style={{ margin: 0, fontSize: 13, color: "var(--app-text-muted)" }} data-testid="html-absent-note">
           {t({
-            id: "editor.assignLoop.html.openAbsentUnavailable",
-            message: `This keyboard has no ${{ page: memberName(selected) }} file, and creating a missing page is not available yet, so nothing is written here.`,
+            id: "editor.assignLoop.html.openAbsentSuggested",
+            message: `This keyboard has no ${{ page: memberName(selected) }} file yet. A suggested fix on the Criteria screen creates it from the generated text and lists it in the package; once it exists you can edit it here.`,
           })}
         </p>
       )}

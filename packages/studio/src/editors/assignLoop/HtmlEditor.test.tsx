@@ -340,7 +340,8 @@ describe("HtmlEditor on a keyboard opened for update", () => {
     noWelcome.set("README.md", "FILE-README", false);
     seedStore({ instantiationMode: "adapt-existing", startVfs: noWelcome, startWelcomeHtmText: "<p>slice</p>" });
     render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
-    expect(await screen.findByTestId("html-absent-note")).toBeTruthy();
+    // The note points at the suggested fix that creates the page; nothing is editable until then.
+    expect((await screen.findByTestId("html-absent-note")).textContent).toMatch(/suggested fix.*creates it/);
     expect(screen.queryByTestId("rich-seed")).toBeNull();
     expect(useOpenUndoStore.getState().records).toHaveLength(0);
   });

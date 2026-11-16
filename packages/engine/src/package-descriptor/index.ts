@@ -29,8 +29,8 @@ export {
   normaliseWelcomeFolderFiles,
 } from "./build.js";
 export type { PackageDescriptorIdentity, KpsFontDescriptorEntry } from "./build.js";
-export { applyIdentityToKps, patchOpenKpsInfo } from "./patch.js";
-export type { OpenKpsOptions, OpenKpsInfoPatch, KpsLanguageEntry } from "./patch.js";
+export { applyIdentityToKps, patchOpenKpsInfo, addOpenKpsFile } from "./patch.js";
+export type { OpenKpsOptions, OpenKpsInfoPatch, OpenKpsFileEntry, OpenKpsOptionTag, KpsLanguageEntry } from "./patch.js";
 export type { ApplyIdentityToKpsResult } from "./patch.js";
 
 /**

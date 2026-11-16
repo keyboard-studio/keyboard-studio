@@ -44,6 +44,14 @@ export interface DocsPreview {
     welcomeHtm: string;
     helpPhp: string;
   };
+  /**
+   * The welcome and help pages rendered fresh with their generated sections marked: the text a
+   * page created on Open starts from, so a later regeneration replaces the block in place.
+   */
+  created: {
+    welcomeHtm: string;
+    helpPhp: string;
+  };
 }
 
 export function useDocsPreview(): DocsPreview {
@@ -182,6 +190,10 @@ export function useDocsPreview(): DocsPreview {
       welcomeHtm: renderWelcomeHtm(input, startWelcomeHtmText, [], startHelpPhpText),
       helpPhp: renderHelpPhp(input, startHelpPhpText, startWelcomeHtmText),
     };
+    const created = {
+      welcomeHtm: renderWelcomeHtm(input, startWelcomeHtmText, [], startHelpPhpText, { markGenerated: true }),
+      helpPhp: renderHelpPhp(input, startHelpPhpText, startWelcomeHtmText, { markGenerated: true }),
+    };
     const id = resolveOutputKeyboardId(identity, startKeyboard);
     const fileOr = (member: "readme-md" | "readme-htm" | "welcome-htm" | "help-php", render: string): string =>
       readOpenDocText(member, id, startVfs, startWelcomeConvention) ?? render;
@@ -193,6 +205,7 @@ export function useDocsPreview(): DocsPreview {
         helpPhp: fileOr("help-php", generated.helpPhp),
         typingGuideSuppressed: docContent?.typingGuideSuppressed ?? false,
         generated,
+        created,
       };
     }
     return {
@@ -202,6 +215,7 @@ export function useDocsPreview(): DocsPreview {
       helpPhp: resolveDocMemberText("help-php", generated.helpPhp, authored),
       typingGuideSuppressed: docContent?.typingGuideSuppressed ?? false,
       generated,
+      created,
     };
   }, [helpDocs, identity, startKeyboard, startIr, workingIr, touchLayoutJson, startWelcomeHtmText, startHelpPhpText, startReadmeMdText, docFixProposals, isAdaptation, startVfs, carveChars, marksOutputForm, deletedNodeIds, deletedItemIds, fallbackPolicy, decisions, authoredWelcomeHtm, authoredReadmeHtm, authoredReadmeMd, authoredHelpPhp, liveOpen, startWelcomeConvention]);
 }

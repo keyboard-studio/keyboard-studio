@@ -296,7 +296,7 @@ OWNER RULINGS 2026-11-16: the copyright holder and the project link are written 
 
 - [x] T098 Copyright holder on Open is written when answered: the `.kmn` `&COPYRIGHT` store and the descriptor's `<Info><Copyright>`, in place, as one change with one undo record. `LICENSE.md` is left as it is.
 - [x] T099 Project link on Open is written when answered: the descriptor's `<Info><WebSite>` in place, one undo record, through the same descriptor patch as the language list. The `descriptor` step then leaves the Open output row.
-- [ ] T100 A documentation page the keyboard lacks is offered on Open as a suggested fix that creates it from the generated text and lists it in the descriptor (`<Files>`, and `<WelcomeFile>` for the welcome page), as one change with one undo record. Once created it is edited like any other page.
+- [x] T100 A documentation page the keyboard lacks is offered on Open as a suggested fix that creates it from the generated text and lists it in the descriptor (`<Files>`, and `<WelcomeFile>` for the welcome page), as one change with one undo record. Once created it is edited like any other page.
 - [x] T101 The on-screen keyboard editor on Open (Visual and Code) writes the `.kvks` through the apply seam with an undo record, as the other editors do.
 
 ## Phase 19: Cleanup

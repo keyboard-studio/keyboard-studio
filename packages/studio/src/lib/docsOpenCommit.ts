@@ -9,7 +9,8 @@
 // pages edited, never their text. Copy never comes through here.
 //
 // The start*Text slices are read-only seeds for the render paths; nothing here reads or
-// writes them, and a page with no file in the working copy is not created on Open.
+// writes them. A page with no file is not created by an edit: the "create" suggested fix
+// (lib/docCreateFix.ts) makes it, after which it is edited here like any other.
 //
 // No timers.
 

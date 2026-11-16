@@ -258,6 +258,7 @@ export {
   buildLanguagesBlock,
   applyIdentityToKps,
   patchOpenKpsInfo,
+  addOpenKpsFile,
   DESCRIPTOR_CONSUMED_FIELDS,
   parseTargetTokens,
   KMW_JS_TARGETS,
@@ -273,6 +274,8 @@ export type {
   KpsFontDescriptorEntry,
   OpenKpsOptions,
   OpenKpsInfoPatch,
+  OpenKpsFileEntry,
+  OpenKpsOptionTag,
   KpsLanguageEntry,
 } from "./package-descriptor/index.js";
 
@@ -283,6 +286,7 @@ export {
   renderReadmeMd,
   renderReadmeHtm,
   renderWelcomeHtm,
+  type FreshPageOptions,
   renderHelpPhp,
   // spec 080 FR-003 — the standard help-site header a fresh help page opens with.
   helpSiteHeader,

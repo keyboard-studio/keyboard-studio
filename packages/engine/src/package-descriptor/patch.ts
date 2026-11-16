@@ -564,6 +564,136 @@ export function patchOpenKpsInfo(
   return patchKpsIdentity(text, { displayName: "" }, "", openOpts);
 }
 
+/** The `<Options>` elements that name a package member the installer shows. */
+export type OpenKpsOptionTag = "WelcomeFile" | "ReadMeFile";
+
+/** A package member to list in an opened keyboard's `.kps` (spec 111 FR-041). */
+export interface OpenKpsFileEntry {
+  /** The member reference as the descriptor spells it, relative to the `.kps` (e.g. `welcome\\welcome.htm`, `readme.htm`). */
+  name: string;
+  /** Also declare it as this `<Options>` element (filled when absent or blank, never overriding another file). */
+  declareAs?: OpenKpsOptionTag;
+}
+
+/** Where each `<Options>` element sits among its neighbours (the corpus order). */
+const OPTION_PLACEMENT: Record<OpenKpsOptionTag, { after: readonly string[]; before: readonly string[] }> = {
+  WelcomeFile: { after: ["LicenseFile", "ReadMeFile"], before: ["MSIFileName"] },
+  ReadMeFile: { after: ["ExecuteProgram"], before: ["LicenseFile", "WelcomeFile", "MSIFileName"] },
+};
+
+/**
+ * Open mode (spec 111 FR-041): list a package member in an opened keyboard's
+ * `.kps` in place, and optionally declare it as `<WelcomeFile>` / `<ReadMeFile>`.
+ * Everything else stays byte-for-byte as it was: the new `<File>` takes the file's
+ * own line ending and indentation and goes after the last existing entry (its
+ * Description is `File <basename>`, as Keyman Developer writes it), and a BOM is
+ * left where it is. The text is returned unchanged when the member is already
+ * listed (case-insensitive, either slash) and the declaration already holds.
+ * `unwritable` names what the descriptor has no place for: no `<Files>` block
+ * (nothing is invented), no `<Options>` block for the declaration, or an element
+ * that already names another file (left as the author has it).
+ */
+export function addOpenKpsFile(
+  text: string,
+  entry: OpenKpsFileEntry,
+): { text: string; unwritable: string[] } {
+  const unwritable: string[] = [];
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  const wanted = memberKey(entry.name);
+  let out = text;
+
+  const filesRe = /<Files(?:\s[^>]*)?>[\s\S]*?<\/Files\s*>/i;
+  const filesBlock = filesRe.exec(out);
+  if (filesBlock === null && !/<Files\s*\/>/i.test(out)) {
+    unwritable.push("no <Files> block");
+  } else {
+    const listed = [...(filesBlock?.[0] ?? "").matchAll(/<File(?:\s[^>]*)?>[\s\S]*?<\/File\s*>/gi)].some((m) => {
+      const name = /<Name(?:\s[^>]*)?>([^<]*)<\/Name\s*>/i.exec(m[0])?.[1];
+      return name !== undefined && memberKey(name) === wanted;
+    });
+    if (!listed) {
+      const dot = entry.name.lastIndexOf(".");
+      const ext = dot >= 0 ? entry.name.slice(dot).toLowerCase() : "";
+      const base = entry.name.slice(Math.max(entry.name.lastIndexOf("\\"), entry.name.lastIndexOf("/")) + 1);
+      const firstFile = /^([ \t]*)<File(?:\s[^>]*)?>/im.exec(out);
+      const closeLine = /^([ \t]*)<\/Files\s*>/im.exec(out);
+      const fileIndent = firstFile?.[1] ?? `${closeLine?.[1] ?? "  "}  `;
+      const inner = /^([ \t]*)<Name\b/im.exec(firstFile === null ? "" : out.slice(firstFile.index))?.[1] ?? `${fileIndent}  `;
+      const block = [
+        `${fileIndent}<File>`,
+        `${inner}<Name>${escapeHtml(entry.name)}</Name>`,
+        `${inner}<Description>${escapeHtml(`File ${base}`)}</Description>`,
+        `${inner}<CopyLocation>0</CopyLocation>`,
+        `${inner}<FileType>${escapeHtml(ext)}</FileType>`,
+        `${fileIndent}</File>`,
+      ].join(eol);
+      if (filesBlock === null) {
+        out = out.replace(/<Files\s*\/>/i, () => `<Files>${eol}${block}${eol}${closeLine?.[1] ?? "  "}</Files>`);
+      } else if (closeLine !== null) {
+        // `</Files>` starts its line: the entry goes on the line before it.
+        out = `${out.slice(0, closeLine.index)}${block}${eol}${out.slice(closeLine.index)}`;
+      } else {
+        const at = out.search(/<\/Files\s*>/i);
+        out = `${out.slice(0, at)}${eol}${block}${eol}${out.slice(at)}`;
+      }
+    }
+  }
+
+  if (entry.declareAs !== undefined) {
+    const tag = entry.declareAs;
+    const optionRe = new RegExp(`<${tag}\\b[^>]*?(?:/>|>([^<]*)</${tag}\\s*>)`, "i");
+    const found = optionRe.exec(out);
+    const ref = escapeHtml(entry.name);
+    if (found !== null) {
+      const current = unescapeText(found[1] ?? "").trim();
+      if (current === "") {
+        out = out.replace(optionRe, () => `<${tag}>${ref}</${tag}>`);
+      } else if (memberKey(current) !== wanted) {
+        unwritable.push(`<${tag}> already names ${current}`);
+      }
+    } else {
+      const optionsMatch = /<Options(?:\s[^>]*)?>([\s\S]*?)<\/Options\s*>/i.exec(out);
+      if (optionsMatch === null) {
+        unwritable.push("no <Options> block");
+      } else {
+        const bodyStart = optionsMatch.index + optionsMatch[0].indexOf(">") + 1;
+        const bodyEnd = bodyStart + (optionsMatch[1] ?? "").length;
+        const body = optionsMatch[1] ?? "";
+        const indent = /\n([ \t]*)<[A-Za-z]/.exec(body)?.[1] ?? "    ";
+        const element = `<${tag}>${ref}</${tag}>`;
+        const placement = OPTION_PLACEMENT[tag];
+        let result: string | null = null;
+        for (const neighbour of placement.after) {
+          const hit = new RegExp(`</${neighbour}\\s*>|<${neighbour}\\s*/>`, "i").exec(body);
+          if (hit !== null) {
+            const at = bodyStart + hit.index + hit[0].length;
+            result = `${out.slice(0, at)}${eol}${indent}${element}${out.slice(at)}`;
+            break;
+          }
+        }
+        if (result === null) {
+          for (const neighbour of placement.before) {
+            const hit = new RegExp(`^([ \\t]*)<${neighbour}\\b`, "im").exec(body);
+            if (hit !== null) {
+              const at = bodyStart + hit.index;
+              result = `${out.slice(0, at)}${hit[1] ?? ""}${element}${eol}${out.slice(at)}`;
+              break;
+            }
+          }
+        }
+        if (result === null) {
+          const trailing = /[ \t\r\n]*$/.exec(body)?.[0] ?? "";
+          const at = bodyEnd - trailing.length;
+          result = `${out.slice(0, at)}${eol}${indent}${element}${out.slice(at)}`;
+        }
+        out = result;
+      }
+    }
+  }
+
+  return { text: out, unwritable };
+}
+
 /**
  * Open mode: write the author's language list into the first `<Languages>`
  * block, preserving each kept entry's own markup. When the tags already match,

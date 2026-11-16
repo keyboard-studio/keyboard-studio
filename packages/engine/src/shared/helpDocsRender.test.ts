@@ -1206,3 +1206,46 @@ describe("extractReadmeDescription", () => {
     expect(extractReadmeDescription("")).toBeUndefined();
   });
 });
+
+describe("fresh pages with the generated sections marked (markGenerated)", () => {
+  const input: HelpDocsRenderInput = {
+    answers: null,
+    displayName: "Tiny",
+    keyboardId: "tiny",
+    platforms: ["any"],
+    generated: GENERATED,
+  } as HelpDocsRenderInput;
+  const sectionOf = (page: string): string => {
+    const start = page.indexOf(DOC_GENERATED_START) + DOC_GENERATED_START.length;
+    return page.slice(start, page.indexOf(DOC_GENERATED_END)).replace(/^\n/, "").replace(/\n$/, "");
+  };
+
+  it("the default fresh render is unchanged and carries no markers", () => {
+    expect(renderWelcomeHtm(input, null)).not.toContain(DOC_GENERATED_START);
+    expect(renderHelpPhp(input, null)).not.toContain(DOC_GENERATED_START);
+    expect(renderWelcomeHtm(input, null, [], null, {})).toBe(renderWelcomeHtm(input, null));
+    expect(renderHelpPhp(input, null, null, {})).toBe(renderHelpPhp(input, null));
+  });
+
+  for (const [label, render] of [
+    ["welcome", (i: HelpDocsRenderInput, start: string | null, o?: { markGenerated?: boolean }) => renderWelcomeHtm(i, start, [], null, o)],
+    ["help", (i: HelpDocsRenderInput, start: string | null, o?: { markGenerated?: boolean }) => renderHelpPhp(i, start, null, o)],
+  ] as const) {
+    it(`${label}: the marked page keeps its introduction outside the block and holds each generated section once`, () => {
+      const page = render(input, null, { markGenerated: true });
+      expect(page.split(DOC_GENERATED_START)).toHaveLength(2);
+      const before = page.slice(0, page.indexOf(DOC_GENERATED_START));
+      expect(before).toContain("<h1>Tiny</h1>");
+      expect(sectionOf(page)).not.toContain("<h1>");
+      expect(page.split("<td>ŋ</td>")).toHaveLength(2);
+      expect(page.split("Characters on This Keyboard")).toHaveLength(2);
+    });
+
+    it(`${label}: rendering again with the created page as the start text yields the same generated block`, () => {
+      const created = render(input, null, { markGenerated: true });
+      const reopened = render(input, created);
+      expect(sectionOf(reopened)).toBe(sectionOf(created));
+      expect(reopened.split("<td>ŋ</td>")).toHaveLength(2);
+    });
+  }
+});

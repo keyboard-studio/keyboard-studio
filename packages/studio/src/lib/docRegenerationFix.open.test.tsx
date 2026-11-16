@@ -289,7 +289,7 @@ describe("the Criteria screen's documentation fixes", () => {
       </I18nProvider>,
     );
   }
-  const fixItems = () => screen.queryAllByTestId("suggested-fix").filter((li) => /help/i.test(li.textContent ?? ""));
+  const fixItems = () => screen.queryAllByTestId("suggested-fix").filter((li) => /^Regenerate .*help/i.test(li.textContent ?? ""));
   const accepted = () => useDecisionLogStore.getState().record.entries.filter((e) => e.payload.kind === "decision" && e.payload.decisionId.startsWith("suggestion:docs:regenerate:") && JSON.stringify(e.payload.value).includes("accepted"));
 
   beforeEach(() => useDecisionLogStore.getState().reset());
