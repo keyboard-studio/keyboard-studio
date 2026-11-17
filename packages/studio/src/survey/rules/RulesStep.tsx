@@ -30,6 +30,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useBasicKeyboardOpen } from "../../hooks/useBasicKeyboardOpen.ts";
 import { completeRulesStep } from "../../lib/mechanismStepCompletion.ts";
 import { isExcludedScript } from "../../lib/excludedScriptFamilies.ts";
 import { UnsupportedScriptStub } from "../../components/UnsupportedScriptStub.tsx";
@@ -46,6 +47,10 @@ import { selectStepOwnedFindings } from "../../lint/lintToQuestion.ts";
 const RulesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
   const { t } = useLingui();
   const script = useWorkingCopyStore((s) => s.startKeyboard?.script);
+  // A basic keyboard opened for update: every rule this step writes fires on the physical keys, so
+  // the step only shows the keyboard's rules (lib/basicKeyboard.ts). Touch-only rules go in the
+  // Code tab, which accepts them.
+  const readOnly = useBasicKeyboardOpen();
   // The LDML findings this step owns (spec 108 FR-015): rules the export approximates or
   // leaves out. Informational; they gate nothing.
   const validatorFindings = useWorkingCopyStore((s) => s.validatorFindings);
@@ -63,7 +68,8 @@ const RulesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: Edito
   const complete = () => {
     if (completedRef.current) return;
     completedRef.current = true;
-    completeRulesStep();
+    // Read-only: nothing was built, so there is no `rule-set` to record.
+    if (!readOnly) completeRulesStep();
     onComplete(undefined);
   };
 
@@ -100,13 +106,24 @@ const RulesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: Edito
       <h2 style={phaseHeading}>
         <Trans id="survey.rules.heading">Rules</Trans>
       </h2>
-      <p style={leadParagraph}>
-        <Trans id="survey.rules.lede">
-          Your keyboard&apos;s rules decide what each keypress produces — which character it
-          types, which combinations change it, and which keys stay silent. Try them below,
-          review the rule list, and add rules of your own.
-        </Trans>
-      </p>
+      {readOnly ? (
+        <p style={leadParagraph} role="status" data-testid="rules-read-only">
+          <Trans id="survey.rules.basicReadOnlyLede">
+            Your keyboard&apos;s rules decide what each keypress produces. This keyboard&apos;s
+            physical keys match the Windows layout, so its rules are shown here but can&apos;t be
+            changed. Try them below. Rules for touch keys can be written in the Code tab of
+            Mechanisms.
+          </Trans>
+        </p>
+      ) : (
+        <p style={leadParagraph}>
+          <Trans id="survey.rules.lede">
+            Your keyboard&apos;s rules decide what each keypress produces — which character it
+            types, which combinations change it, and which keys stay silent. Try them below,
+            review the rule list, and add rules of your own.
+          </Trans>
+        </p>
+      )}
       {ownedFindings.length > 0 && (
         <section style={rulesSection} aria-labelledby="rules-ldml-findings-heading" data-testid="rules-ldml-findings">
           <h3 id="rules-ldml-findings-heading" style={rulesSectionHeading}>
@@ -120,10 +137,10 @@ const RulesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: Edito
         <h3 id="rules-list-heading" style={rulesSectionHeading}>
           <Trans id="survey.rules.listHeading">Rules in this keyboard</Trans>
         </h3>
-        <RuleListMount />
-        <GuardSuggestions />
+        <RuleListMount readOnly={readOnly} />
+        {!readOnly && <GuardSuggestions />}
       </section>
-      <RuleBuilderMount />
+      {!readOnly && <RuleBuilderMount />}
     </FullStepPage>
   );
 };

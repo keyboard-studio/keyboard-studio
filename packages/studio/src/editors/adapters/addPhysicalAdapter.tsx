@@ -39,6 +39,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { usePlacementPriors } from "../../hooks/usePlacementPriors.ts";
+import { useBasicKeyboardOpen } from "../../hooks/useBasicKeyboardOpen.ts";
 import { completePhysicalLayoutStep } from "../../lib/mechanismStepCompletion.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { MechanismGallery } from "../assignLoop/MechanismGallery.tsx";
@@ -78,6 +79,10 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   // FR-007: placement priors loaded here (moved from SurveyView.corpusPlacementMap).
   const placementMap = usePlacementPriors();
+  // A basic keyboard opened for update: its physical keys are shown in every tab but never
+  // change (lib/basicKeyboard.ts), and finishing the step records nothing. The Code tab still
+  // takes touch-only edits.
+  const readOnly = useBasicKeyboardOpen();
   const [activeTab, setActiveTab] = useState<EditorTab>("assign");
   const [layoutVisited, setLayoutVisited] = useState(false);
   const [revealNodeId, setRevealNodeId] = useState<string | undefined>(undefined);
@@ -145,7 +150,9 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
   };
 
   function handleComplete() {
-    completePhysicalLayoutStep();
+    // Read-only: nothing was placed, so there is no `physical-layout` to record and no
+    // completion effect (lock, touch re-propagation) to run.
+    if (!readOnly) completePhysicalLayoutStep();
     onComplete(undefined);
   }
 
@@ -220,6 +227,7 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
               <MechanismGallery
                 selectedStartKeyboard={startKeyboard}
                 onComplete={handleComplete}
+                readOnly={readOnly}
                 {...(placementMap ? { placementMap } : {})}
                 {...(onBack ? { onBack } : {})}
               />
@@ -240,7 +248,7 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
                   value={codeReview.value}
                   onViewInCode={handleViewInCode}
                 />
-                <KmnCodePane {...(revealNodeId !== undefined ? { revealNodeId } : {})} />
+                <KmnCodePane physicalLocked={readOnly} {...(revealNodeId !== undefined ? { revealNodeId } : {})} />
               </Suspense>
             )}
             {tab === "layout" && layoutVisited && (
@@ -254,7 +262,7 @@ export function AddPhysicalAdapter({ onComplete, onBack }: EditorStepProps) {
                   </div>
                 }
               >
-                <LayoutPane onViewInCode={handleViewInCode} />
+                <LayoutPane onViewInCode={handleViewInCode} readOnly={readOnly} />
               </Suspense>
             )}
           </div>

@@ -218,6 +218,21 @@ describe("LayoutPane", () => {
     expect(cell("K_A").getAttribute("aria-label")).toContain("read-only");
   });
 
+  it("renders a read-only layout (a basic keyboard opened for update) with no way to change it", async () => {
+    load(KMN);
+    render(<LayoutPane onViewInCode={vi.fn()} readOnly />);
+    publish();
+    await settle();
+    expect(screen.getByTestId("layout-banner-read-only").textContent).toContain("match the Windows layout");
+    expect(screen.queryByTestId("layout-banner-locked")).toBeNull();
+    expect(cell("K_A").getAttribute("aria-readonly")).toBe("true");
+    expect(screen.queryByTestId("layout-add-layer")).toBeNull();
+    expect(screen.queryByTestId("layout-undo")).toBeNull();
+    // Selecting a key shows its details but no editor.
+    fireEvent.click(cell("K_A"));
+    expect(screen.getByTestId("key-detail-heading").textContent).toBe("Key A, layer Default");
+  });
+
   describe("Add layer (FR-010a)", () => {
     async function openDialog() {
       load(KMN);

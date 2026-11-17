@@ -93,6 +93,15 @@ describe("FamilyCardList", () => {
     expect(useGuardIntentStore.getState().openedFamilyIds.has(familyId)).toBe(true);
   });
 
+  it("read-only: shows the rules and Test, without Bundle or Disable", () => {
+    render(<FamilyCardList readOnly />);
+    const familyId = familyIdOf("guard-1");
+    expect(screen.getByTestId(`family-card-${familyId}`).textContent).toContain("any(diablock)");
+    expect(screen.getByTestId(`family-card-test-${familyId}`)).toBeTruthy();
+    expect(screen.queryByTestId(`family-card-bundle-${familyId}`)).toBeNull();
+    expect(screen.queryByTestId(`family-card-disable-${familyId}`)).toBeNull();
+  });
+
   it("Disable group toggles the working-copy disabled set and shows the badge", () => {
     render(<FamilyCardList />);
     const familyId = familyIdOf("guard-1");

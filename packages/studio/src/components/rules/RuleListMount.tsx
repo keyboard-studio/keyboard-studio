@@ -11,7 +11,8 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { FamilyCardList } from "./FamilyCardList.tsx";
 import { rulesNote } from "./rulesStyles.ts";
 
-export function RuleListMount() {
+/** `readOnly`: the list is shown without the actions that change the keyboard. */
+export function RuleListMount({ readOnly = false }: { readOnly?: boolean } = {}) {
   const ir = useWorkingCopyStore((s) => s.ir);
   if (ir === null) {
     return (
@@ -22,5 +23,5 @@ export function RuleListMount() {
       </p>
     );
   }
-  return <FamilyCardList />;
+  return <FamilyCardList readOnly={readOnly} />;
 }

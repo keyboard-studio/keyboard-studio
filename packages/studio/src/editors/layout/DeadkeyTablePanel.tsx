@@ -30,13 +30,15 @@ export interface DeadkeyTablePanelProps {
   onShowAfter: (deadkeyId: string) => void;
   /** The deadkey was just made: propose its space row. */
   proposeSpaceRow?: boolean;
+  /** Show the table without letting it change: inputs and edit buttons are disabled, nothing can be added. */
+  readOnly?: boolean;
   /** Close the table. When omitted the panel renders with no close button. */
   onClose?: () => void;
   /** The author explicitly declined the proposed space row ("Do not add it"). */
   onSpaceDismissed?: () => void;
 }
 
-export function DeadkeyTablePanel({ deadkeyId, layers, onViewInCode, onShowAfter, proposeSpaceRow = false, onClose, onSpaceDismissed }: DeadkeyTablePanelProps) {
+export function DeadkeyTablePanel({ deadkeyId, layers, onViewInCode, onShowAfter, proposeSpaceRow = false, readOnly = false, onClose, onSpaceDismissed }: DeadkeyTablePanelProps) {
   const { t } = useLingui();
   const copy = useLayoutCopy();
   const ids = { base: useId(), result: useId(), key: useId(), layer: useId(), keyResult: useId() };
@@ -66,7 +68,7 @@ export function DeadkeyTablePanel({ deadkeyId, layers, onViewInCode, onShowAfter
   const display = info.displayChar ?? "";
   const hasSpacePair = table.fanout.some((r) => r.base === " ");
   const showSpace =
-    proposeSpaceRow && !spaceDismissed && !hasSpacePair && display !== "" && numericId !== null && info.baseStore !== null;
+    !readOnly && proposeSpaceRow && !spaceDismissed && !hasSpacePair && display !== "" && numericId !== null && info.baseStore !== null;
 
   function after(result: CommitKmnEditResult): void {
     setProblem(result.ok ? null : result.reason);
@@ -247,13 +249,14 @@ export function DeadkeyTablePanel({ deadkeyId, layers, onViewInCode, onShowAfter
                   value={value}
                   aria-label={t({ id: "editor.layout.deadkey.table.resultAria", message: `Result for ${{ base: baseName }}` })}
                   onChange={(e) => setEdits((p) => ({ ...p, [key]: e.target.value }))}
+                  disabled={readOnly}
                   data-testid="deadkey-table-fanout-result"
                   className="ks-focus-ring"
                   style={inputStyle}
                 />
                 <button
                   type="button"
-                  disabled={value === "" || value === row.result}
+                  disabled={readOnly || value === "" || value === row.result}
                   onClick={() => changePair(row.index, row.base, value.normalize("NFC"))}
                   data-testid="deadkey-table-fanout-change"
                   className="ks-focus-ring ks-hit-target ks-press"
@@ -263,6 +266,7 @@ export function DeadkeyTablePanel({ deadkeyId, layers, onViewInCode, onShowAfter
                 </button>
                 <button
                   type="button"
+                  disabled={readOnly}
                   onClick={() => removePair(row.index)}
                   data-testid="deadkey-table-fanout-remove"
                   className="ks-focus-ring ks-hit-target ks-press"
@@ -294,13 +298,14 @@ export function DeadkeyTablePanel({ deadkeyId, layers, onViewInCode, onShowAfter
                       value={value}
                       aria-label={t({ id: "editor.layout.deadkey.table.keystrokeResultAria", message: `Result for key ${{ key: keyName }}` })}
                       onChange={(e) => setEdits((p) => ({ ...p, [key]: e.target.value }))}
+                      disabled={readOnly}
                       data-testid="deadkey-table-keystroke-result"
                       className="ks-focus-ring"
                       style={inputStyle}
                     />
                     <button
                       type="button"
-                      disabled={value === row.result}
+                      disabled={readOnly || value === row.result}
                       onClick={() => setRow(row.vkey, row.layer, value.normalize("NFC"))}
                       data-testid="deadkey-table-keystroke-change"
                       className="ks-focus-ring ks-hit-target ks-press"
@@ -317,6 +322,7 @@ export function DeadkeyTablePanel({ deadkeyId, layers, onViewInCode, onShowAfter
                 {row.editable && (
                   <button
                     type="button"
+                    disabled={readOnly}
                     onClick={() => removeRow(row.vkey, row.layer)}
                     data-testid="deadkey-table-keystroke-remove"
                     className="ks-focus-ring ks-hit-target ks-press"
@@ -358,7 +364,7 @@ export function DeadkeyTablePanel({ deadkeyId, layers, onViewInCode, onShowAfter
         </ul>
       )}
 
-      {info.baseStore !== null && numericId !== null ? (
+      {readOnly ? null : info.baseStore !== null && numericId !== null ? (
         <div style={rowStyle} role="group" aria-label={t({ id: "editor.layout.deadkey.table.addAria", message: "Add a combination" })}>
           <label htmlFor={ids.base} style={labelStyle}>
             {t({ id: "editor.layout.deadkey.table.addBase", message: "Character typed after the deadkey" })}
