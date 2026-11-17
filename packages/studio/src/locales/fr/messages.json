@@ -600,6 +600,7 @@
   "editor.assignLoop.html.php.fragmentsUnpreserved": "Le PHP intégré à cette page d'aide ne peut pas être conservé exactement ; elle est donc en code seul.",
   "editor.assignLoop.html.php.headerUnpreserved": "L'en-tête PHP de cette page d'aide ne peut pas être conservé exactement ; elle est donc en code seul.",
   "editor.assignLoop.html.preview.empty": "Rien à prévisualiser pour l'instant.",
+  "editor.assignLoop.html.preview.frameTitle": "Aperçu de {fileLabel}, tel qu'installé",
   "editor.assignLoop.html.preview.label": "Aperçu",
   "editor.assignLoop.html.readOnly.history": "L'historique des versions est rédigé à partir de l'entrée d'historique à chaque téléchargement ; il est affiché ici mais se modifie par sa propre décision.",
   "editor.assignLoop.html.readOnly.license": "La licence est reprise du clavier de base (ou générée avec ses titulaires) ; elle est affichée ici mais ne se modifie pas à cette étape.",

@@ -600,6 +600,7 @@
   "editor.assignLoop.html.php.fragmentsUnpreserved": "This help page's embedded PHP cannot be preserved exactly, so it is code-only.",
   "editor.assignLoop.html.php.headerUnpreserved": "This help page's PHP header cannot be preserved exactly, so it is code-only.",
   "editor.assignLoop.html.preview.empty": "Nothing to preview yet.",
+  "editor.assignLoop.html.preview.frameTitle": "Preview of {fileLabel}, as installed",
   "editor.assignLoop.html.preview.label": "Preview",
   "editor.assignLoop.html.readOnly.history": "Version history is written from the history entry on every download, so it is shown here but edited through its own decision.",
   "editor.assignLoop.html.readOnly.license": "The license is carried from the base keyboard (or generated with its holders), so it is shown here but not edited in this step.",

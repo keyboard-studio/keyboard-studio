@@ -139,6 +139,7 @@ import { DecisionTrailView } from "./decisions/DecisionTrailView.tsx";
 import { resolveImpact, resolveImpactAsync } from "./decisions/impact.ts";
 import { buildPathOverlay } from "./dashboard/pathOverlay.ts";
 import { projectWorkingCopyForOutput } from "./lib/serializeWorkingCopy.ts";
+import { DocPreviewProjectionContext } from "./lib/docPreviewProjection.ts";
 import { StepHost } from "./components/StepHost.tsx";
 import { ResumeDraftBanner } from "./components/ResumeDraftBanner.tsx";
 import {
@@ -2090,6 +2091,9 @@ function StudioShellContent() {
     message: "Finish every inventory character before you can access Output",
   });
   return (
+    // The Documentation step's preview needs the output projection but cannot
+    // import it (see lib/docPreviewProjection.ts); the shell supplies it.
+    <DocPreviewProjectionContext.Provider value={projectWorkingCopyForOutput}>
     <div
       style={{
         display: "flex",
@@ -2167,5 +2171,6 @@ function StudioShellContent() {
           place to keep that rule, and the two would drift. */}
       <StudioFooter activeRoute={route} />
     </div>
+    </DocPreviewProjectionContext.Provider>
   );
 }
