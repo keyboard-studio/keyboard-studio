@@ -56,6 +56,14 @@ export const INVENTORY: readonly InventoryEntry[] = [
   { fn: "createStudioReducerDeps", module: "lib/studioReducerDeps.ts", callers: ["StudioShell.tsx"] },
   { fn: "completeOskStep", module: "lib/oskStepCompletion.ts", callers: ["editors/adapters/oskAdapter.tsx"] },
   { fn: "completeHtmlStep", module: "lib/htmlStepCompletion.ts", callers: ["editors/assignLoop/HtmlEditor.tsx"] },
+  {
+    // The icon step driver's Copy-vs-Open branch mirrors IconEditor's
+    // Continue (spec 111 FR-041, #2927): on Copy the value is held in the
+    // store field, on live Open the file is the truth.
+    fn: "isLiveOpen",
+    module: "lib/openMode.ts",
+    callers: ["editors/assignLoop/IconEditor.tsx"],
+  },
   { fn: "completeFallbackPolicyStep", module: "lib/fallbackPolicyStepCompletion.ts", callers: ["editors/adapters/fallbackPolicyAdapter.tsx"] },
   { fn: "oskContinueResult", module: "@keyboard-studio/engine", callers: ["editors/assignLoop/OskEditor.tsx"] },
   { fn: "generateKvksFromIR", module: "@keyboard-studio/engine", callers: ["editors/assignLoop/OskEditor.tsx"] },

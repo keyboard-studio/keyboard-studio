@@ -376,6 +376,18 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
     ],
   },
   {
+    id: "icon",
+    label: "Icon step (edited .ico bytes)",
+    phase: 6,
+    status: "pending",
+    storeActions: ["setIconIco"],
+    fields: ["iconIcoBase64"],
+    decisionIds: ["icon"],
+    evidence: [
+      "IconEditor's Continue writes the icon bytes to workingCopyStore.iconIcoBase64, which projectWorkingCopyVfs step 4c projects into the VFS; the icon decision records the step's completion but its apply is a no-op — the bytes have no decision source yet (NO-DECISION-SOURCE)",
+    ],
+  },
+  {
     id: "authored-docs",
     label: "Documentation step (authored doc-member overrides)",
     phase: 6,
@@ -396,10 +408,10 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
 
 /**
  * Every member of WorkingCopyState, classified by its backbone source.
- * Transcribed exactly from inventory-store-backbone.md §1 (138 members:
- * 60 fields + 78 actions; class counts STARTING-POINT 33,
- * DECISION-DERIVED 26, OVERLAY-CHANNEL 8, EDITOR-AUTHORED 32,
- * SURVEY-SLOT 15, EPHEMERAL 18, UNCLASSIFIED 6). The gate's census arm
+ * Transcribed exactly from inventory-store-backbone.md §1 (158 members:
+ * 68 fields + 90 actions; class counts STARTING-POINT 39,
+ * DECISION-DERIVED 19, OVERLAY-CHANNEL 8, EDITOR-AUTHORED 51,
+ * SURVEY-SLOT 15, EPHEMERAL 20, UNCLASSIFIED 6). The gate's census arm
  * verifies these keys against the live interface, so a transcription
  * slip — or a new store member — fails loudly.
  */
@@ -458,6 +470,7 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   sequenceFlaggedChars: { kind: "field", class: "SURVEY-SLOT" },
   touchLayoutJson: { kind: "field", class: "SURVEY-SLOT" },
   customCss: { kind: "field", class: "EDITOR-AUTHORED" },
+  iconIcoBase64: { kind: "field", class: "EDITOR-AUTHORED" },
   authoredWelcomeHtm: { kind: "field", class: "EDITOR-AUTHORED" },
   authoredReadmeHtm: { kind: "field", class: "EDITOR-AUTHORED" },
   authoredReadmeMd: { kind: "field", class: "EDITOR-AUTHORED" },
@@ -503,6 +516,7 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   unlockDesktop: { kind: "action", class: "SURVEY-SLOT" },
   setTouchLayoutJson: { kind: "action", class: "SURVEY-SLOT" },
   setCustomCss: { kind: "action", class: "EDITOR-AUTHORED" },
+  setIconIco: { kind: "action", class: "EDITOR-AUTHORED" },
   setAuthoredWelcomeHtm: { kind: "action", class: "EDITOR-AUTHORED" },
   setAuthoredReadmeHtm: { kind: "action", class: "EDITOR-AUTHORED" },
   setAuthoredReadmeMd: { kind: "action", class: "EDITOR-AUTHORED" },
