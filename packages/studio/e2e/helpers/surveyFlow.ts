@@ -1092,6 +1092,16 @@ export async function driveTouchGallery(page: Page): Promise<void> {
     await startButton.click();
   }
 
+  // The gallery opens on Manage Layout (the key grid); this walk places each
+  // letter through the by-character view, so switch to Place Letters first.
+  const placeLettersTab = page.getByTestId("touch-mode-tab-character");
+  if (
+    (await placeLettersTab.isVisible().catch(() => false)) &&
+    (await placeLettersTab.getAttribute("aria-selected")) !== "true"
+  ) {
+    await placeLettersTab.click();
+  }
+
   // A ui/SelectMenu like the target-script field above — its options are
   // portalled to document.body, so they go through selectMenuOption.
   const baseKeySelect = page.getByRole("button", { name: "Host key for long-press" });
