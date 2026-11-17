@@ -30,7 +30,6 @@ import { OutputSectionList } from "../../components/OutputSectionList.tsx";
 import { TestBuildPanel } from "../../components/TestBuildPanel.tsx";
 import { OutputGateBanners } from "../../components/OutputGateBanners.tsx";
 import { SourceDownloads } from "../../components/output/SourceDownloads.tsx";
-import { ReformatConsentDialog } from "../../components/ReformatConsentDialog.tsx";
 import { resolveOutputKeyboardId } from "../../lib/outputKeyboardId.ts";
 
 export function TrialStep({ onComplete, onBack }: EditorStepProps) {
@@ -187,7 +186,6 @@ export function TrialStep({ onComplete, onBack }: EditorStepProps) {
         {...(attributionBlockerStep !== undefined ? { attributionBlockerStep } : {})}
         resolveStartHolder={resolveStartHolder}
       />
-      <ReformatConsentDialog {...artifact.reformatConsent} />
     </div>
   );
 }

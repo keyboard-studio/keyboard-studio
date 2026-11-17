@@ -21,6 +21,8 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 import { deriveSurveyContext } from "../../decisions/identitySelectors.ts";
+import { useOpenUndoStore } from "../../stores/openUndoStore.ts";
+import { isLiveOpen } from "../../lib/openMode.ts";
 import { deriveCasedKeys, capsFloorFor } from "../../lib/casedKeysDerivation.ts";
 import { alphabetOf, capsModesOffered, isCasedAlphabet } from "./capsLogic.ts";
 
@@ -40,6 +42,8 @@ export interface CapsHandlingViewProps {
   floor: readonly string[];
   /** True while the shown value is the studio's default, not an author answer. */
   isDefault?: boolean;
+  /** Open only: an earlier answer wrote rules this session and the shown answer is `explicit-rules`. */
+  keptWrittenRules?: boolean;
 }
 
 const KEYS_STYLE = { fontFamily: "monospace", color: TEXT_MAIN } as const;
@@ -53,6 +57,7 @@ export function CapsHandlingView({
   bcp47,
   floor,
   isDefault = false,
+  keptWrittenRules = false,
 }: CapsHandlingViewProps) {
   const { t } = useLingui();
   const set = useMemo(
@@ -104,6 +109,15 @@ export function CapsHandlingView({
         ariaLabelledby="caps-handling-heading"
         onChange={(m) => onChange({ mode: m as CapsHandlingValue["mode"] })}
       />
+      {/* Always mounted so a screen reader announces the text when it appears. */}
+      <p role="status" data-testid="caps-kept-rules" style={keptWrittenRules ? NOTE_STYLE : undefined}>
+        {keptWrittenRules
+          ? t({
+              id: "survey.caps.keptWrittenRules",
+              message: "The rules already written stay in the keyboard. Use Undo to take them out.",
+            })
+          : ""}
+      </p>
       {(value === undefined || value.mode === "cased-keys") && extra.length > 0 && (
         <p data-testid="caps-also-covers" style={NOTE_STYLE}>
           {t({ id: "survey.caps.alsoCovers", message: "Also covers these keys:" })}{" "}
@@ -134,6 +148,14 @@ export const CapsHandlingRenderer: ComponentType<DecisionRendererProps<CapsHandl
   const alphabet = useMemo(() => alphabetOf(inventory), [inventory]);
   const floor = useMemo(() => (ir === null ? [] : capsFloorFor(ir)), [ir]);
   const cased = isCasedAlphabet(alphabet, bcp47);
+  // Open: the earlier answer is already in the files (written when answered).
+  const startKeyboardId = useWorkingCopyStore((s) => s.startKeyboard?.id);
+  const liveOpen = useWorkingCopyStore((s) => isLiveOpen(s));
+  const undoRecords = useOpenUndoStore((s) => s.records);
+  const keptWrittenRules =
+    liveOpen &&
+    value?.mode === "explicit-rules" &&
+    undoRecords.some((r) => r.labelKey === "caps" && r.keyboardId === startKeyboardId);
 
   // A caseless alphabet is not asked (FR-004): the pass is recorded once, so
   // a later alphabet that gains case reads as a shape change, not silence.
@@ -155,6 +177,7 @@ export const CapsHandlingRenderer: ComponentType<DecisionRendererProps<CapsHandl
       {...(bcp47 !== undefined ? { bcp47 } : {})}
       floor={floor}
       isDefault={provenance === "default"}
+      keptWrittenRules={keptWrittenRules}
     />
   );
 };

@@ -62,6 +62,9 @@ import { applyCarveMutate } from "../../steps/editorMutate.ts";
 import { physicalAssignmentsOf } from "../../lib/physicalAssignments.ts";
 import { findKmnPath } from "../../lib/findKmnPath.ts";
 import { getPatternByIdSync } from "../../lib/services.ts";
+import { isLiveOpen, isOpenMode } from "../../lib/openMode.ts";
+import { useUnappliedText } from "../../hooks/useUnappliedText.ts";
+import { useApplyOnOpen } from "../../components/OpenApplyHost.tsx";
 import { compileCandidateKmn } from "../../lib/compileCandidateKmn.ts";
 import { nextCodeEdit } from "../../lib/nextCodeEdit.ts";
 import { loadAssignedKeys } from "../../lib/assignedKeys.ts";
@@ -75,9 +78,9 @@ import {
 } from "../../lib/builtKmnView.ts";
 import type { KmnStage } from "../../lib/projectWorkingCopyVfs.ts";
 import { ConfirmDialog } from "./parts/ConfirmDialog.tsx";
-import { isOpenMode } from "../../lib/openMode.ts";
 import { readVfsText } from "../../lib/vfsText.ts";
 import {
+  CODE_VIEW_EDIT_LABEL,
   replaceStartingPointAndReplay,
   startingPointPath,
 } from "../../lib/replaceStartingPoint.ts";
@@ -175,8 +178,10 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
   const mode = useWorkingCopyStore((s) => s.instantiationMode);
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  const applyOnOpen = useApplyOnOpen();
   // Open mode (spec 111 FR-009): the pane shows the file's own text and Apply
   // replaces the starting point with it.
+  // isOpenMode here (the Open VIEW, also for a descriptor-less older draft); the live-files apply below is gated on isLiveOpen.
   const openPath =
     isOpenMode(mode) && startKeyboard !== null
       ? startingPointPath(startKeyboard.id, "kmn")
@@ -399,6 +404,30 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appliedTick]);
 
+  // Leave guard (spec 111 FR-046): on a keyboard opened for update, text typed here and not applied
+  // is asked about when the author leaves the Code tab (or the step). Apply is this pane's own
+  // Apply (`applyForLeaveRef`, set below the early return); discard shows the file's text again.
+  const applyForLeaveRef = useRef<() => Promise<boolean>>(() => Promise.resolve(false));
+  // The one definition of "unapplied": on Open the text differs from the file's text; otherwise
+  // from what the draft was last synced to. The Apply badge and the leave guard both read it.
+  const isDirtyNow = (): boolean => {
+    const cur = textRef.current;
+    if (cur === null) return false;
+    if (openText !== undefined) return canonicalRef.current !== null && cur !== canonicalRef.current;
+    return cur !== lastAppliedRef.current;
+  };
+  // Set by the live-files branch of Apply when the files took the text; read by the leave guard.
+  const liveApplyOkRef = useRef(false);
+  useUnappliedText({
+    label: t({ id: "open.unapplied.view.kmn", message: "the keyboard source (Code tab)" }),
+    hasUnapplied: isDirtyNow,
+    apply: () => applyForLeaveRef.current(),
+    discard: () => {
+      const c = canonicalRef.current;
+      if (c !== null) snapToCanonical(c);
+    },
+  });
+
   // Reveal once the editor is mounted and holds text. The lines come from the
   // canonical text: they match the editor while the draft is clean, and are the
   // best available guess for a dirty one.
@@ -455,7 +484,7 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
     );
   }
 
-  const dirty = text !== null && text !== lastAppliedRef.current;
+  const dirty = isDirtyNow();
   // A dirty draft whose built text moved on (an assignment, a Layout-tab edit): the draft was made
   // against text that is no longer what is built, so Apply refuses until the author reloads.
   const draftStale = dirty && openText === undefined && canonical !== null && canonical !== lastAppliedRef.current;
@@ -555,11 +584,16 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
   const handleApply = async () => {
     if (applyingRef.current) return;
     applyingRef.current = true;
+    liveApplyOkRef.current = false;
     try {
       await runApply();
     } finally {
       applyingRef.current = false;
     }
+  };
+  applyForLeaveRef.current = async () => {
+    await handleApply();
+    return liveApplyOkRef.current;
   };
 
   const runApply = async () => {
@@ -594,7 +628,39 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
     }
     if (openText !== undefined && openPath !== null) {
       // Open: a formatting-only change is still a change to the file.
-      if (current === canonical) return;
+      if (current === canonical) {
+        // Already the file's text: nothing to write, and nothing left unapplied.
+        liveApplyOkRef.current = true;
+        return;
+      }
+      if (isLiveOpen({ instantiationMode: mode, startVfs, startKeyboard })) {
+        // Live files (spec 111 FR-041/FR-045): the text goes into the file
+        // through the apply seam, so it is one undo step and gets the same
+        // post-checks as every other change. Nothing is replayed over it.
+        // The flag is raised BEFORE the write: the store update re-renders the
+        // pane and the canonical-text effect consumes it; it is lowered again
+        // when nothing was written.
+        justAppliedRef.current = true;
+        await applyOnOpen({
+          kind: "files",
+          files: { [openPath]: current },
+          label: CODE_VIEW_EDIT_LABEL,
+          labelKey: "code-view",
+        }).then((result) => {
+          if (result.status === "applied") {
+            liveApplyOkRef.current = true;
+            // The file now holds this text; the next render confirms it. Read by the leave guard before then.
+            canonicalRef.current = current;
+            setApplyError(null);
+            return;
+          }
+          justAppliedRef.current = false;
+          if (result.status === "unchanged") liveApplyOkRef.current = true;
+          if (result.status === "failed") setApplyError(result.reason);
+        });
+        return;
+      }
+      // A keyboard opened without its descriptor (an older draft): the earlier behaviour.
       const result = replaceStartingPointAndReplay(openPath, current);
       if (!result.ok) {
         setApplyError(result.error);

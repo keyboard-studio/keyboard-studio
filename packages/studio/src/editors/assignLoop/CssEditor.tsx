@@ -11,6 +11,9 @@
  *   recompiles with it exactly as the zip will carry it.
  * - Continue records the result in the working copy (`customCss`); a step left
  *   untouched leaves the start keyboard's stylesheet alone.
+ * - On a keyboard opened for update Apply writes the stylesheet (and its
+ *   `&KMW_EMBEDCSS` line) into the files at once, one undo step per Apply; the
+ *   editor reads the file, so an undo reseeds it. Nothing is held in the store.
  * - The editor shows `.kmw-keyboard-` selectors under the author's keyboard id,
  *   as the output will; the working copy keeps them under the start id, as the
  *   start files do, so the projection can relink them to whatever id is current.
@@ -25,6 +28,9 @@ import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
 import { rewriteKmwKeyboardSelectors } from "@keyboard-studio/engine";
 import { readKeyboardCss } from "../../lib/customCss.ts";
+import { commitStylesheetOnOpen } from "../../lib/cssOpenCommit.ts";
+import { isLiveOpen } from "../../lib/openMode.ts";
+import { useApplyOnOpen } from "../../components/OpenApplyHost.tsx";
 import { galleryGhostBtn, TEXT_DIM } from "../../lib/galleryTheme.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
@@ -41,6 +47,10 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const identity = useWorkingCopyStore((s) => s.identity);
   const committedCss = useWorkingCopyStore((s) => s.customCss);
+  const liveOpen = useWorkingCopyStore((s) => isLiveOpen(s));
+  const applyOnOpen = useApplyOnOpen();
+  // Set when an Apply could not be written because the keyboard source has no place for the store line.
+  const [noStoreLine, setNoStoreLine] = useState(false);
   const setCustomCss = useWorkingCopyStore((s) => s.setCustomCss);
 
   const startId = startKeyboard?.id ?? "";
@@ -65,7 +75,8 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
         : null,
     [identity?.keyboardId, identity?.displayName],
   );
-  const vfsTransform = useWorkingCopyTransform(applied !== null ? { liveCss: applied } : undefined);
+  // On Open the applied text is already in the file the preview reads, so no live overlay is passed.
+  const vfsTransform = useWorkingCopyTransform(applied !== null && !liveOpen ? { liveCss: applied } : undefined);
   const { stage, retry } = useKeyboardArtifact(startKeyboard, scaffoldSpec, vfsTransform);
 
   // The preview's own VFS is the other place the stylesheet shows up: whatever styles the preview is what the editor should open
@@ -78,7 +89,23 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
 
   // What the editor opens on: this step's earlier result, else the keyboard's own stylesheet. Null while the preview has yet to say.
   // The preview's text is already relinked (it is the projected VFS); the other two are stored under the start id.
-  const seedText = toDisplay(committedCss ?? startCssText) ?? previewCssText ?? (stage.kind === "error" ? "" : null);
+  const seedText = liveOpen
+    ? (startCssText ?? "")
+    : (toDisplay(committedCss ?? startCssText) ?? previewCssText ?? (stage.kind === "error" ? "" : null));
+
+  // On Open: write the text into the files; the editor then reseeds from the file.
+  // Resolves false when the files did not take the text, so the pane keeps it as unapplied.
+  const handleApply = (css: string): void | Promise<boolean> => {
+    if (!liveOpen) {
+      setApplied(css);
+      return;
+    }
+    setNoStoreLine(false);
+    return commitStylesheetOnOpen(css, applyOnOpen).then((outcome) => {
+      if (outcome === "no-store-line") setNoStoreLine(true);
+      return outcome === "written" || outcome === "unchanged";
+    });
+  };
 
   // Back to what the step opened on: the preview and the editor both drop this visit's edits.
   const handleDiscard = () => {
@@ -88,6 +115,14 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
 
   // Clearing the editor and applying it removes the keyboard's stylesheet; an untouched step leaves it as it was.
   const handleContinue = () => {
+    if (liveOpen) {
+      // The file as it is now: an Apply answered just before this (the leave question) has
+      // written it after this handler's render, so the render-time `seedText` may be one apply old.
+      const wc = useWorkingCopyStore.getState();
+      const fileCss = wc.startVfs === null || wc.startKeyboard === null ? null : readKeyboardCss(wc.startVfs, wc.startKeyboard.id)?.text;
+      onComplete({ css: fileCss ?? "" });
+      return;
+    }
     if (applied !== null) setCustomCss(rewriteKmwKeyboardSelectors(applied, keyboardId, startId));
     onComplete({ css: applied ?? seedText ?? "" });
   };
@@ -123,6 +158,16 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
         })}
       </p>
 
+      {noStoreLine ? (
+        <p role="alert" style={{ margin: 0, fontSize: 13 }}>
+          {t({
+            id: "editor.assignLoop.css.noStoreLine",
+            message:
+              "The stylesheet was not saved: the keyboard source has no place for the line that links it. Nothing was written.",
+          })}
+        </p>
+      ) : null}
+
       {/* The editor takes every pixel the pane has; a flex column gives Monaco's height:100% a definite box to resolve against. */}
       <div style={{ flex: 1, minHeight: 300, display: "flex", flexDirection: "column" }}>
         <Suspense
@@ -137,11 +182,17 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
               {t({ id: "editor.assignLoop.css.code.loading", message: "Loading editor…" })}
             </div>
           ) : (
-            <CssCodePane key={editorGeneration} initialText={seedText} onApply={setApplied} />
+            <CssCodePane
+              key={liveOpen ? `file:${seedText}` : editorGeneration}
+              initialText={seedText}
+              onApply={handleApply}
+            />
           )}
         </Suspense>
       </div>
 
+      {/* On Open an Apply is already in the files; the footer Undo takes it back. */}
+      {liveOpen ? null : (
       <button
         type="button"
         onClick={handleDiscard}
@@ -150,6 +201,7 @@ export function CssEditor({ onComplete, onBack }: EditorStepProps) {
       >
         {t({ id: "editor.assignLoop.css.discard", message: "Discard changes" })}
       </button>
+      )}
     </div>
   );
 

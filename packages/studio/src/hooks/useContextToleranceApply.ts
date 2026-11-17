@@ -19,6 +19,7 @@ import { useEffect, useRef, useState } from "react";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { isLiveOpen } from "../lib/openMode.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { applyToleranceDecision, commitOverlay } from "../lib/contextToleranceCommit.ts";
@@ -35,9 +36,42 @@ export function useContextToleranceApply(): ContextToleranceApplyNotes | null {
   const analysis = useWorkingCopyStore((s) => s.contextTolerance);
   const applied = useWorkingCopyStore((s) => s.contextToleranceOverlay);
   const [notes, setNotes] = useState<ContextToleranceApplyNotes | null>(null);
+  const openLive = useWorkingCopyStore((s) => isLiveOpen(s));
   const inFlight = useRef<string | null>(null);
+  // Open: nothing is held to tell "already applied", so the decision stamped
+  // applied (`appliedFingerprint`) says so, and a try that did not land (refused,
+  // or waiting for the author's agreement) is not repeated for the same decision.
+  const triedOnOpen = useRef<string | null>(null);
 
   useEffect(() => {
+    if (openLive) {
+      // Spec 111 FR-042: an earlier answer changing leaves the files alone, so a
+      // decline or a stale fix removes nothing; the undo log takes a fix back.
+      if (decision === undefined || decision.decision === "decline") {
+        setNotes(null);
+        return;
+      }
+      const want = decisionKey(decision);
+      if (decision.appliedFingerprint === decision.fingerprint) return;
+      if (analysis.status !== "ready" || inFlight.current === want || triedOnOpen.current === want) return;
+      triedOnOpen.current = want;
+      inFlight.current = want;
+      let liveRun = true;
+      void (async () => {
+        try {
+          const notes = await applyToleranceDecision(decision, analysis, () => liveRun);
+          if (liveRun) setNotes(notes);
+        } catch (err: unknown) {
+          devLog.warn("[useContextToleranceApply] apply failed:", err);
+          if (liveRun) setNotes({ staleRuleIds: [], refusal: err instanceof Error ? err.message : String(err) });
+        } finally {
+          if (inFlight.current === want) inFlight.current = null;
+        }
+      })();
+      return () => {
+        liveRun = false;
+      };
+    }
     if (decision === undefined || decision.decision === "decline") {
       // FR-009: a decline leaves the keyboard as it is — including undoing a
       // fix an earlier accept applied.
@@ -76,7 +110,7 @@ export function useContextToleranceApply(): ContextToleranceApplyNotes | null {
     return () => {
       live = false;
     };
-  }, [decision, analysis, applied]);
+  }, [decision, analysis, applied, openLive]);
 
   return notes;
 }

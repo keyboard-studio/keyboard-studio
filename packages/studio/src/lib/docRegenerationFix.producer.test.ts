@@ -39,10 +39,10 @@ describe("documentation regeneration producer and accept", () => {
         "readme-htm": "<body>no markers</body>",
       },
     });
-    expect(fixes.map((f) => f.id)).toEqual(["docs:regenerate:help-php"]);
+    expect(fixes.map((f) => f.id.replace(/:[0-9a-f]{8}$/, ""))).toEqual(["docs:regenerate:help-php"]);
   });
 
-  it("accepting writes the previewed text into the working copy and the decision is recorded", () => {
+  it("accepting writes the previewed text into the working copy and the decision is recorded", async () => {
     const vfs = createVirtualFS();
     const current = `<body>mine\n${S}\nold\n${E}\n</body>`;
     vfs.set("source/help/kb_x.php", current);
@@ -57,7 +57,7 @@ describe("documentation regeneration producer and accept", () => {
     expect(useWorkingCopyStore.getState().startVfs?.get("source/help/kb_x.php")?.content).toBe(current);
 
     expect(recordSuggestionDisposition(fix!, "accepted")).toBe(true);
-    expect(applyDocRegeneration(fix!)).toBe(true);
+    expect(await applyDocRegeneration(fix!)).toBe(true);
     expect(useWorkingCopyStore.getState().startVfs?.get("source/help/kb_x.php")?.content).toBe(
       `<body>mine\n${S}\nnew\n${E}\n</body>`,
     );

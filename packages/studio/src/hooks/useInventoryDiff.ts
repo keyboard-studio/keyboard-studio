@@ -98,8 +98,8 @@
 import { useMemo } from "react";
 import type { KmnEdit, KmnEditsValue } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useSessionAssignments } from "./useSessionAssignments.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
-import { selectDesktopAssignments } from "../lib/unimplementedInventory.ts";
 import {
   baseProducedSetForWalk as computeBaseProducedSetForWalk,
   orphanedProducedSet,
@@ -138,17 +138,13 @@ export function useInventoryDiff(): InventoryDiff {
   );
   const startIr = useMemo(() => withCodeEdits(rawStartIr, kmnEntries), [rawStartIr, kmnEntries]);
   const inventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
-  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
 
   // This session's physical (desktop) assignments — the same selector
   // MechanismGallery/the coverage gate already use, so a mismatch between
   // "what this diff considers produced" and "what the gallery/gate consider
   // produced" can't arise from a different filter. Only feeds `producedSet`
   // (session-aware) below, never `baseProducedSetForWalk`.
-  const sessionAssignments = useMemo(
-    () => selectDesktopAssignments(phaseResults),
-    [phaseResults],
-  );
+  const sessionAssignments = useSessionAssignments();
 
   // STATIC (base-only) — drives lettersToAdd/alreadyProduced. See module doc:
   // must NOT depend on sessionAssignments.

@@ -109,6 +109,7 @@ import {
   expectedBackTarget,
   type ActiveStepId,
 } from "../stores/surveySessionStore.ts";
+import { holdAfterRouteChange, navigationIsDirty, routeChangedSinceAccepted, runGuardedNavigation } from "../lib/navigationGuard.ts";
 
 function readKsStep(state: unknown): string | undefined {
   if (typeof state !== "object" || state === null) return undefined;
@@ -210,8 +211,19 @@ export function useSurveyBrowserHistorySync(draftRestoreSettledRef?: RefObject<b
       // to is treated as a genuine Back; anything else (Forward, a stale tag,
       // cross-session drift) degrades to a silent no-op.
       if (expected === null || expected !== ksStep) return;
-      performManifestBack(current.activeStepId);
-      prevStepRef.current = expected;
+      const back = (): void => {
+        performManifestBack(current.activeStepId);
+        prevStepRef.current = expected;
+      };
+      // Spec 111 FR-046: a Back that leaves a step with unapplied code-view text asks first. When the
+      // route itself changed, the hash guard (lib/navigate.ts) is the one that asks, so not twice.
+      if (routeChangedSinceAccepted()) {
+        // Dirty: the hash guard asks, and the step pop follows its answer so step and route agree.
+        if (navigationIsDirty()) holdAfterRouteChange(back);
+        else back();
+        return;
+      }
+      runGuardedNavigation(back);
     }
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);

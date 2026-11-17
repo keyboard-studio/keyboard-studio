@@ -13,6 +13,7 @@
 //     host passes `activeStepId` (#2528), fixes owned by a LATER survey step
 //     are withheld until the author reaches that step.
 
+import { useRef } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 
 import type { SuggestedFix } from "../lib/consistencySuggestions.ts";
@@ -159,8 +160,13 @@ export function SuggestedFixes({ fixes, onAccept, onSkip, testId, mode = "accept
 export interface SuggestedFixesPanelProps {
   /** Fixes the host derives itself (e.g. from criterion 18.6 findings). */
   extra?: readonly SuggestedFix[];
-  /** What accepting does: the host routes to where the change is made. */
-  onAccept: (fix: SuggestedFix) => void;
+  /**
+   * What accepting does: the host routes to where the change is made. A docs fix
+   * may answer with a promise: it is recorded accepted (and settled) only when
+   * that resolves true, so a failed, busy or declined apply leaves it on offer.
+   * A repeat press while it is pending is ignored.
+   */
+  onAccept: (fix: SuggestedFix) => void | Promise<boolean>;
   testId?: string;
   /**
    * Active survey step id (#2528): when set, only fixes whose owning step
@@ -184,10 +190,13 @@ export function SuggestedFixesPanel({ extra = [], onAccept, testId, activeStepId
   const decided = decidedSuggestions(record);
   // A basic keyboard's physical layout never changes: no suggestion may route to the physical keys.
   const basicOpen = useBasicKeyboardOpen();
+  const pending = useRef<Set<string>>(new Set());
 
   const seen = new Set<string>();
   const fixes = withoutPhysicalFixes([...offered, ...extra], basicOpen).filter((f) => {
-    if (decided.has(f.id) || seen.has(f.id)) return false;
+    // A docs fix is hidden only when skipped: after a write the proposal vanishes on
+    // its own (the file matches), and an undo makes the same proposal current again.
+    if (seen.has(f.id) || (f.kind === "docs" ? decided.get(f.id) === "declined" : decided.has(f.id))) return false;
     seen.add(f.id);
     // #2528: never show a follow-up for a step the author has not reached.
     if (
@@ -204,6 +213,27 @@ export function SuggestedFixesPanel({ extra = [], onAccept, testId, activeStepId
       fixes={fixes}
       {...(testId !== undefined ? { testId } : {})}
       onAccept={(fix) => {
+        if (fix.kind === "docs") {
+          // A docs fix is a write that can fail: the disposition follows the outcome.
+          if (pending.current.has(fix.id)) return;
+          pending.current.add(fix.id);
+          let attempt: Promise<boolean | void>;
+          try {
+            attempt = Promise.resolve(onAccept(fix));
+          } catch {
+            attempt = Promise.resolve(false);
+          }
+          void attempt
+            .then((ok) => {
+              if (ok === true) {
+                recordSuggestionDisposition(fix, "accepted");
+                settle(fix.id);
+              }
+            })
+            .catch(() => undefined)
+            .finally(() => pending.current.delete(fix.id));
+          return;
+        }
         recordSuggestionDisposition(fix, "accepted");
         settle(fix.id);
         onAccept(fix);

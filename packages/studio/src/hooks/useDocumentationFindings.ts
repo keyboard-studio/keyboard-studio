@@ -35,6 +35,8 @@ import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
 import { findKmnPath } from "../lib/findKmnPath.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
 import { readVfsText } from "../lib/vfsText.ts";
+import { isLiveOpen } from "../lib/openMode.ts";
+import { IMG_RULE_TEXT, KB_CSS } from "../lib/docImageWidthFix.ts";
 
 const EMPTY: LintFinding[] = [];
 
@@ -116,13 +118,16 @@ export function useDocumentationFindings(): LintFinding[] {
     // actually in the working copy: resident in the VFS, or carried by
     // the startDocCssTexts slice (the loader's fetch-don't-write path,
     // issue 2139) at a kb.css path.
+    // On a keyboard opened for update the fix is written into the file when accepted, so the
+    // check reads the file and the recorded answer adds nothing.
     if (
       isAdaptation &&
+      !isLiveOpen({ instantiationMode, startVfs, startKeyboard }) &&
       docFixProposals?.imageWidth === "accepted" &&
-      (startVfs.list("source/").some((p) => /^source\/(?:help|welcome)\/kb\.css$/i.test(p)) ||
-        (startDocCssTexts ?? []).some((entry) => /^source\/(?:help|welcome)\/kb\.css$/i.test(entry.path)))
+      (startVfs.list("source/").some((p) => KB_CSS.test(p)) ||
+        (startDocCssTexts ?? []).some((entry) => KB_CSS.test(entry.path)))
     ) {
-      cssTexts.push("img { max-width: 100%; }");
+      cssTexts.push(IMG_RULE_TEXT);
     }
 
     const findings = runDocChecks(

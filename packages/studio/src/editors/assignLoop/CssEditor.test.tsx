@@ -1,11 +1,13 @@
 // CssEditor — opens on the keyboard's own stylesheet, previews through the shared pane, and records the result in the working copy.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen, fireEvent, cleanup } from "@testing-library/react";
+import { screen, fireEvent, cleanup, waitFor, act } from "@testing-library/react";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { render } from "../../test/renderWithI18n.tsx";
 import { CssEditor } from "./CssEditor.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { clearOpenSession, useOpenUndoStore } from "../../stores/openUndoStore.ts";
+import { undoLastOpenApply } from "../../lib/openApply.ts";
 
 // Monaco cannot load under vitest; a stub stands in for the pane's contract (initialText in, onApply out).
 vi.mock("./CssCodePane.tsx", () => ({
@@ -144,5 +146,84 @@ describe("CssEditor", () => {
     fireEvent.click(await screen.findByTestId("apply-relinked"));
     fireEvent.click(screen.getByTestId("css-continue"));
     expect(useWorkingCopyStore.getState().customCss).toBe(".kmw-keyboard-t .kmw-key { top: 0; }");
+  });
+});
+
+describe("CssEditor on a keyboard opened for update", () => {
+  beforeEach(() => {
+    clearOpenSession();
+    artifact.stage = { kind: "idle" };
+    seedStore(null);
+    useWorkingCopyStore.getState().startVfs?.set("source/t.kps", "<Package/>", false);
+    useWorkingCopyStore.setState({ instantiationMode: "adapt-existing" });
+  });
+  afterEach(() => {
+    cleanup();
+    useWorkingCopyStore.setState({ instantiationMode: null });
+  });
+  const file = (path: string) => useWorkingCopyStore.getState().startVfs!.get(path)?.content;
+
+  it("Apply writes the file at once, holds nothing in the store, and offers no Discard", async () => {
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    expect(screen.queryByText("Discard changes")).toBeNull();
+    fireEvent.click(await screen.findByTestId("apply-new"));
+    await waitFor(() => expect(file("source/kb.css")).toBe(".new { color: blue; }"));
+    expect(useWorkingCopyStore.getState().customCss).toBeNull();
+    expect((await screen.findByTestId("seed")).textContent).toBe(".new { color: blue; }");
+  });
+
+  it("the footer Undo reseeds the editor with the old text", async () => {
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("apply-new"));
+    await waitFor(() => expect(screen.getByTestId("seed").textContent).toBe(".new { color: blue; }"));
+    act(() => {
+      expect(undoLastOpenApply().ok).toBe(true);
+    });
+    await waitFor(() => expect(screen.getByTestId("seed").textContent).toBe(".kmw-key { color: red; }"));
+  });
+
+  it("Apply of empty text removes the file", async () => {
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("apply-empty"));
+    await waitFor(() => expect(file("source/kb.css")).toBeUndefined());
+    expect(String(file("source/t.kmn"))).not.toContain("KMW_EMBEDCSS");
+  });
+
+  it("Apply of the text the file already holds is silent: no record, no alert", async () => {
+    useWorkingCopyStore.getState().startVfs!.set("source/kb.css", ".new { color: blue; }", false);
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("apply-new"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(useOpenUndoStore.getState().records).toHaveLength(0);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("a keyboard source with no place for the store line is not written, and the author is told", async () => {
+    const vfs = useWorkingCopyStore.getState().startVfs!;
+    vfs.delete("source/kb.css");
+    vfs.set("source/t.kmn", "store(&NAME) 'T'\n", false);
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("apply-new"));
+    expect((await screen.findByRole("alert")).textContent).toContain("not saved");
+    expect(file("source/kb.css")).toBeUndefined();
+    expect(useOpenUndoStore.getState().records).toHaveLength(0);
+  });
+});
+
+describe("CssEditor on the Copy track with a held stylesheet", () => {
+  afterEach(cleanup);
+  it("an adapt-track draft without a descriptor keeps the held-text behaviour: Apply is not written to the files", async () => {
+    artifact.stage = { kind: "idle" };
+    seedStore(".held { top: 0; }");
+    useWorkingCopyStore.setState({ instantiationMode: "adapt-existing" });
+    render(<CssEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    expect((await screen.findByTestId("seed")).textContent).toBe(".held { top: 0; }");
+    fireEvent.click(screen.getByTestId("apply-new"));
+    fireEvent.click(screen.getByTestId("css-continue"));
+    expect(useWorkingCopyStore.getState().customCss).toBe(".new { color: blue; }");
+    expect(useWorkingCopyStore.getState().startVfs!.get("source/kb.css")?.content).toBe(".kmw-key { color: red; }");
+    useWorkingCopyStore.setState({ instantiationMode: null });
   });
 });

@@ -25,7 +25,8 @@ import { OUTPUT_FORM_SEAM_PATTERN_IDS } from "@keyboard-studio/engine";
 import { getToZip, getPatternLibraryService } from "./services.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
-import { capsHandlingFromDecisions, projectionInputFromState } from "./projectionInput.ts";
+import { conformTouchText } from "./touchLayoutText.ts";
+import { capsHandlingFromDecisions, openModeProjection, projectionInputFromState } from "./projectionInput.ts";
 import { selectKmnEdits } from "./projectionInput.ts";
 import { getMarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
@@ -50,7 +51,6 @@ import {
   parseKvks,
   parseTouchLayout,
   ensurePackageFiles,
-  conformTouchLayoutToKeymanSchema,
 } from "@keyboard-studio/engine";
 import type { HelpDocsRenderInput } from "@keyboard-studio/engine";
 import type { KeyboardIR, KvksIR, LayoutChartFile, TouchLayoutIR } from "@keyboard-studio/contracts";
@@ -64,6 +64,7 @@ import {
   welcomePagePath,
 } from "./welcomeFolder.ts";
 import { readVfsText } from "./vfsText.ts";
+import { KB_CSS, withImageWidthRule } from "./docImageWidthFix.ts";
 import { applyAuthoredDocsToVfs, type AuthoredDocs } from "./authoredDocs.ts";
 import { isOpenedWithDescriptor } from "./openMode.ts";
 import { applyOutputHygiene } from "./outputHygiene.ts";
@@ -127,12 +128,6 @@ export interface ProjectWorkingCopyForOutputResult {
    * welcome row without parsing prose.
    */
   missingInheritedImages: string[];
-  /**
-   * Open mode: the `.kmn` files a change could not be placed into precisely.
-   * They were left as they were, awaiting the author's agreement to a full
-   * re-emit (`ReformatConsentDialog`). Absent when there are none.
-   */
-  reformatRequired?: string[];
 }
 
 /**
@@ -157,11 +152,6 @@ export interface ProjectForOutputOptions {
    * overlay, which is how "what if the author had left this blank?" is expressed.
    */
   identityOverride?: Partial<IdentityOverlay>;
-  /**
-   * Open mode: the author agreed to a full re-emit of the files named in an
-   * earlier result's `reformatRequired` (spec 111 FR-009).
-   */
-  consentedReemit?: boolean;
   /**
    * spec 094 (contracts C2): produce test build `number` at `version` — the
    * version replaces the publish version everywhere it ships, and the package
@@ -398,7 +388,9 @@ export async function projectWorkingCopyForOutput(
   // spec 061 FR-012: thread the project link (home-page line only, research
   // D-06) through the SAME single descriptor writer every other identity
   // field reaches, rather than a second `<WebSite>` writer.
-  const websiteUrl = helpDocs?.projectHomeUrl;
+  // Open (spec 111 FR-041): the link is written into the descriptor when the author
+  // answers it (lib/openIdentityCommit), so output carries the file's own `<WebSite>`.
+  const websiteUrl = isOpenedWithDescriptor(instantiationMode, startVfs, keyboardId) ? undefined : helpDocs?.projectHomeUrl;
   let identityForProjection: IdentityOverlay = identity !== null ? {
     ...(identity.displayName !== undefined ? { displayName: identity.displayName } : {}),
     ...(identity.bcp47 !== undefined ? { bcp47: identity.bcp47 } : {}),
@@ -574,18 +566,20 @@ export async function projectWorkingCopyForOutput(
   const {
     warnings: projectionWarnings,
     effectiveKeyboardId,
-    reformatRequired,
   } = projectWorkingCopyVfs(
     projectionInputFromState({ ...state, startIr }, {
       vfs: clonedVfs,
       keyboardId,
       targetKeyboardId: outputKeyboardId,
+      // Open (spec 111 FR-042): assignments are written to the files when applied, and
+      // the Open output row has no `assignments` step, so none is replayed here.
       assignments: sessionAssignments,
       getPattern: (id) => patternCache.get(id),
       identity: identityForProjection,
       marksTreatment: getMarksTreatmentValue(),
       kmnEdits: withCandidateEdit(selectKmnEdits(getDecisionSnapshot()), opts?.candidateKmnEdit),
-      capsHandling: capsHandlingFromDecisions(getDecisionSnapshot()),
+      // Open: an answered caps decision is written into the files when answered, never replayed here.
+      capsHandling: isOpen ? undefined : capsHandlingFromDecisions(getDecisionSnapshot()),
       welcomeFolderFiles,
       ...(state.startPackageFonts !== null ? { packageFonts: state.startPackageFonts } : {}),
       // Anchor for step 3's "is the display name an EDIT?" test. The no-identity
@@ -594,14 +588,11 @@ export async function projectWorkingCopyForOutput(
       baseDisplayName: startKeyboard.displayName,
       ...(isOpen
         ? {
-            openMode: {
-              kps: {
-                nameEdited:
-                  identity?.displayName !== undefined && identity.displayName !== startKeyboard.displayName,
-                ...(identity?.languages !== undefined ? { languages: identity.languages } : {}),
-              },
-              ...(opts?.consentedReemit === true ? { consentedReemit: true } : {}),
-            },
+            openMode: openModeProjection({
+              kind: "output",
+              identity,
+              startDisplayName: startKeyboard.displayName,
+            }),
           }
         : {}),
     }),
@@ -812,12 +803,16 @@ export async function projectWorkingCopyForOutput(
     authoredReadmeMd,
     authoredHelpPhp,
   };
-  applyAuthoredDocsToVfs(
-    clonedVfs,
-    resolvedKeyboardId,
-    authoredDocs,
-    welcomePagePath(isOpen, state.startWelcomeConvention),
-  );
+  // On a keyboard opened for update the pages are written into their files when
+  // edited (lib/docsOpenCommit), so nothing is held to apply here.
+  if (!isOpen) {
+    applyAuthoredDocsToVfs(
+      clonedVfs,
+      resolvedKeyboardId,
+      authoredDocs,
+      welcomePagePath(isOpen, state.startWelcomeConvention),
+    );
+  }
 
   // Issue 1908 (criterion 11.8), accepted image-width proposal: the shipped
   // kb.css gains the constraining rule. This engages only when a kb.css is
@@ -830,23 +825,21 @@ export async function projectWorkingCopyForOutput(
   // output, exactly as the loader left it out of the start VFS.
   if (isAdaptation && !isOpen && docFixProposals?.imageWidth === "accepted") {
     for (const path of clonedVfs.list()) {
-      if (!/^source\/(?:help|welcome)\/kb\.css$/i.test(path)) continue;
+      if (!KB_CSS.test(path)) continue;
       const css = readVfsText(clonedVfs, path);
       if (css === undefined) continue;
-      if (/\bimg\s*\{[^}]*\bmax-width\s*:/i.test(css)) continue;
-      clonedVfs.set(path, `${css.replace(/\s+$/, "")}\nimg { max-width: 100%; }\n`, false);
+      const amended = withImageWidthRule(css);
+      if (amended === null) continue;
+      clonedVfs.set(path, amended, false);
     }
     // A slice-carried kb.css is not in the clone yet: write it at its own
     // path with the rule appended, so the shipped package carries the
     // stylesheet its pages link. A path the clone already carries was
     // amended in place above and is not overwritten by the slice text.
     for (const entry of startDocCssTexts ?? []) {
-      if (!/^source\/(?:help|welcome)\/kb\.css$/i.test(entry.path)) continue;
+      if (!KB_CSS.test(entry.path)) continue;
       if (readVfsText(clonedVfs, entry.path) !== undefined) continue;
-      const css = /\bimg\s*\{[^}]*\bmax-width\s*:/i.test(entry.text)
-        ? entry.text
-        : `${entry.text.replace(/\s+$/, "")}\nimg { max-width: 100%; }\n`;
-      clonedVfs.set(entry.path, css, false);
+      clonedVfs.set(entry.path, withImageWidthRule(entry.text) ?? entry.text, false);
     }
   }
 
@@ -941,7 +934,7 @@ export async function projectWorkingCopyForOutput(
     if (!path.endsWith(".keyman-touch-layout")) continue;
     const text = readVfsText(clonedVfs, path);
     if (text === undefined) continue;
-    const { json, removed } = conformTouchLayoutToKeymanSchema(text);
+    const { json, removed } = conformTouchText(text);
     if (removed.length > 0) clonedVfs.set(path, json, false);
   }
 
@@ -971,7 +964,6 @@ export async function projectWorkingCopyForOutput(
     version,
     warnings,
     missingInheritedImages,
-    ...(reformatRequired !== undefined ? { reformatRequired } : {}),
   };
 }
 

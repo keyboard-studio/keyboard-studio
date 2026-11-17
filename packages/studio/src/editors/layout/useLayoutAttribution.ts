@@ -27,6 +27,7 @@ import { extractFiredRule } from "../../components/rules/demoSimulation.ts";
 import { buildFiredRuleResolver } from "../../components/rules/firedRuleMapping.ts";
 import { useRulesDemoArtifactStore, type RulesDemoArtifact } from "../../stores/rulesDemoArtifactStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { selectLayoutIr } from "./layoutIr.ts";
 
 /** The simulator entry the hook needs: each input simulated independently from the same seed. */
 export type SimulateEach = (
@@ -328,7 +329,7 @@ export function useLayoutAttribution(
 ): LayoutAttribution {
   const storeArtifact = useRulesDemoArtifactStore((s) => s.artifact);
   const artifact = opts.artifact ?? storeArtifact;
-  const storeIr = useWorkingCopyStore((s) => s.ir);
+  const storeIr = useWorkingCopyStore(selectLayoutIr);
   const ir = opts.ir !== undefined ? opts.ir : storeIr;
   const vkeys = opts.vkeys ?? DESKTOP_VKEYS;
   const layerId = layer.join("+");

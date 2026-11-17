@@ -36,7 +36,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import { settlesForStep } from "./screenSettles.ts";
 import type { DecisionSet } from "./decisionTypes.ts";
-import { selectDesktopAssignments } from "../lib/unimplementedInventory.ts";
+import { selectSessionAssignments } from "../lib/sessionAssignments.ts";
 import { deriveProjectKeyFromWorkingCopy } from "../lib/draftPersistence.ts";
 import { createDecisionRecorder, type DecisionRecorder, type DecisionRecorderDeps } from "./createDecisionRecorder.ts";
 import type { InstantiatedMode } from "./recordStartContribution.ts";
@@ -147,7 +147,7 @@ export function createStudioDecisionRecorder(
     // documented selector every other reader of this filter also uses
     // (unimplementedInventory.ts's `selectDesktopAssignments` docstring) —
     // recordEditorStep must never fork this definition (research D-01).
-    getMechanismAssignments: () => selectDesktopAssignments(getWorkingCopyState().phaseResults),
+    getMechanismAssignments: () => selectSessionAssignments(getWorkingCopyState()),
     // The base IR the working copy was instantiated from (research D-05) —
     // `null` before instantiation.
     getStartIr: () => getWorkingCopyState().startIr,

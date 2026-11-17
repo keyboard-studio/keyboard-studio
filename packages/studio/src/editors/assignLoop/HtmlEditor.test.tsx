@@ -5,11 +5,14 @@
 // onChange/onApply out.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen, fireEvent, cleanup } from "@testing-library/react";
+import { screen, fireEvent, cleanup, act, waitFor } from "@testing-library/react";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { render } from "../../test/renderWithI18n.tsx";
 import { HtmlEditor } from "./HtmlEditor.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { applyOpenChange, undoLastOpenApply } from "../../lib/openApply.ts";
+import { useOpenUndoStore } from "../../stores/openUndoStore.ts";
+import { readVfsText } from "../../lib/vfsText.ts";
 
 // TipTap and Monaco cannot load under vitest; stubs stand in for the panes'
 // contracts (value/initialText in, onChange/onApply out).
@@ -50,6 +53,11 @@ vi.mock("./HtmlCodePane.tsx", () => ({
       </button>
     </div>
   ),
+}));
+// The apply host is mounted by the shell; here a controllable stand-in (default: the real apply).
+const host = vi.hoisted(() => ({ apply: undefined as undefined | ((c: unknown) => Promise<unknown>) }));
+vi.mock("../../components/OpenApplyHost.tsx", () => ({
+  useApplyOnOpen: () => (c: unknown) => host.apply!(c),
 }));
 // The live preview is deterministic in these tests: fixed generated text.
 const preview = vi.hoisted(() => ({
@@ -250,5 +258,230 @@ describe("HtmlEditor", () => {
     expect(screen.getByText("Updated via keyboard-studio.", { exact: false })).toBeTruthy();
     fireEvent.click(license);
     expect(screen.getByText("MIT License", { exact: false })).toBeTruthy();
+  });
+});
+
+describe("HtmlEditor on a keyboard opened for update", () => {
+  const WELCOME = "<!DOCTYPE html><html><head><title>T</title></head><body><p>FILE-WELCOME</p></body></html>";
+  beforeEach(() => {
+    host.apply = (c) => Promise.resolve(applyOpenChange(c as Parameters<typeof applyOpenChange>[0]));
+    useWorkingCopyStore.getState().reset();
+    useOpenUndoStore.getState().replace([]);
+    const startVfs = createVirtualFS();
+    startVfs.set("source/t.kps", "<Package></Package>", false);
+    startVfs.set("source/welcome/welcome.htm", WELCOME, false);
+    startVfs.set("README.md", "FILE-README", false);
+    seedStore({ instantiationMode: "adapt-existing", startVfs });
+  });
+  afterEach(cleanup);
+
+  it("switching file writes the page into its file, one undo record, nothing held in the store", async () => {
+    render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("rich-edit"));
+    fireEvent.click(screen.getByTestId("html-file-readme-md"));
+    await waitFor(() => expect(useOpenUndoStore.getState().records).toHaveLength(1));
+    const wc = useWorkingCopyStore.getState();
+    expect(readVfsText(wc.startVfs!, "source/welcome/welcome.htm")).toContain("Edited paragraph.");
+    expect(wc.authoredWelcomeHtm).toBeNull();
+    const records = useOpenUndoStore.getState().records;
+    expect(records).toHaveLength(1);
+    expect(records[0]?.labelKey).toBe("docs-edit");
+  });
+
+  it("an undo restores the file and the editor reseeds from it", async () => {
+    render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("rich-edit"));
+    fireEvent.click(screen.getByTestId("html-file-readme-md"));
+    await waitFor(() => expect(useOpenUndoStore.getState().records).toHaveLength(1));
+    fireEvent.click(screen.getByTestId("html-file-welcome-htm"));
+    expect((await screen.findByTestId("rich-seed")).textContent).toContain("Edited paragraph.");
+    act(() => {
+      expect(undoLastOpenApply().ok).toBe(true);
+    });
+    const seed = (await screen.findByTestId("rich-seed")).textContent ?? "";
+    expect(seed).toContain("FILE-WELCOME");
+    expect(seed).not.toContain("Edited paragraph.");
+  });
+
+  it("Continue writes the page, records only its name, and holds no text", async () => {
+    const onComplete = vi.fn();
+    render(<HtmlEditor onComplete={onComplete} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("rich-edit"));
+    fireEvent.click(screen.getByTestId("html-continue"));
+    await waitFor(() => expect(onComplete).toHaveBeenCalled());
+    const wc = useWorkingCopyStore.getState();
+    expect(readVfsText(wc.startVfs!, "source/welcome/welcome.htm")).toContain("Edited paragraph.");
+    expect(wc.authoredWelcomeHtm).toBeNull();
+  });
+
+  it("a refused write keeps the text and Continue does not complete", async () => {
+    host.apply = () => Promise.resolve({ status: "failed", reason: "no" });
+    const onComplete = vi.fn();
+    render(<HtmlEditor onComplete={onComplete} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("rich-edit"));
+    fireEvent.click(screen.getByTestId("html-continue"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(readVfsText(useWorkingCopyStore.getState().startVfs!, "source/welcome/welcome.htm")).toBe(WELCOME);
+    expect((await screen.findByTestId("rich-seed")).textContent).toContain("Edited paragraph.");
+  });
+
+  it("a page with no file is not editable: a note, no editor, nothing written", async () => {
+    render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    expect(screen.getByTestId("html-file-readme-htm").hasAttribute("disabled")).toBe(true);
+    expect((screen.getByTestId("html-file-help-php") as HTMLButtonElement).disabled).toBe(true);
+    // The welcome page is selected and present: no note. Remove it and the note shows.
+    expect(screen.queryByTestId("html-absent-note")).toBeNull();
+    cleanup();
+    const noWelcome = createVirtualFS();
+    noWelcome.set("source/t.kps", "<Package></Package>", false);
+    noWelcome.set("README.md", "FILE-README", false);
+    seedStore({ instantiationMode: "adapt-existing", startVfs: noWelcome, startWelcomeHtmText: "<p>slice</p>" });
+    render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    // The note points at the suggested fix that creates the page; nothing is editable until then.
+    expect((await screen.findByTestId("html-absent-note")).textContent).toMatch(/suggested fix.*creates it/);
+    expect(screen.queryByTestId("rich-seed")).toBeNull();
+    expect(useOpenUndoStore.getState().records).toHaveLength(0);
+  });
+
+  it("a flat-convention welcome page seeds from, and writes to, the flat file", async () => {
+    const flat = createVirtualFS();
+    flat.set("source/t.kps", "<Package></Package>", false);
+    flat.set("source/welcome.htm", WELCOME.replace("FILE-WELCOME", "FLAT-WELCOME"), false);
+    seedStore({ instantiationMode: "adapt-existing", startVfs: flat, startWelcomeConvention: "flat" });
+    render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    expect((await screen.findByTestId("rich-seed")).textContent).toContain("FLAT-WELCOME");
+    fireEvent.click(screen.getByTestId("rich-edit"));
+    fireEvent.click(screen.getByTestId("html-file-history-md"));
+    await waitFor(() => expect(useOpenUndoStore.getState().records).toHaveLength(1));
+    const vfs = useWorkingCopyStore.getState().startVfs!;
+    expect(readVfsText(vfs, "source/welcome.htm")).toContain("Edited paragraph.");
+    expect(vfs.get("source/welcome/welcome.htm")).toBeUndefined();
+  });
+
+  it("an edit goes stale when the file changes underneath it, with a note naming the page", async () => {
+    render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("rich-edit"));
+    act(() => {
+      useWorkingCopyStore.getState().replaceStartingPointFiles({ "source/welcome/welcome.htm": WELCOME.replace("FILE-WELCOME", "CHANGED-UNDER") });
+    });
+    const seed = (await screen.findByTestId("rich-seed")).textContent ?? "";
+    expect(seed).toContain("CHANGED-UNDER");
+    expect(seed).not.toContain("Edited paragraph.");
+    await waitFor(() => expect(screen.getByTestId("html-dropped-note").textContent).toContain("Welcome page"));
+    // Nothing is written from the dropped edit.
+    fireEvent.click(screen.getByTestId("html-file-readme-md"));
+    expect(useOpenUndoStore.getState().records).toHaveLength(0);
+  });
+
+  it("no dropped-edit note after a good write on a switch or on Continue", async () => {
+    const onComplete = vi.fn();
+    render(<HtmlEditor onComplete={onComplete} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("rich-edit"));
+    fireEvent.click(screen.getByTestId("html-file-readme-md"));
+    await waitFor(() => expect(useOpenUndoStore.getState().records).toHaveLength(1));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("html-dropped-note").textContent).toBe("");
+    fireEvent.click(screen.getByTestId("rich-edit"));
+    fireEvent.click(screen.getByTestId("html-continue"));
+    await waitFor(() => expect(onComplete).toHaveBeenCalled());
+    expect(screen.getByTestId("html-dropped-note").textContent).toBe("");
+  });
+
+  it("a refused write on a file switch keeps the text, marks the page unsaved, and shows it on return", async () => {
+    host.apply = () => Promise.resolve({ status: "failed", reason: "no" });
+    render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("rich-edit"));
+    fireEvent.click(screen.getByTestId("html-file-readme-md"));
+    await waitFor(() => expect(screen.getByTestId("html-file-welcome-htm").textContent).toContain("unsaved"));
+    fireEvent.click(screen.getByTestId("html-file-welcome-htm"));
+    expect((await screen.findByTestId("rich-seed")).textContent).toContain("Edited paragraph.");
+    expect(readVfsText(useWorkingCopyStore.getState().startVfs!, "source/welcome/welcome.htm")).toBe(WELCOME);
+  });
+
+  it("Continue right after a switch waits for that write and does not send the page twice", async () => {
+    let inFlight = false;
+    const applied: unknown[] = [];
+    host.apply = async (c) => {
+      // The host refuses a second apply while one is waiting.
+      if (inFlight) return { status: "failed", reason: "busy" };
+      inFlight = true;
+      applied.push(c);
+      await Promise.resolve();
+      await Promise.resolve();
+      const r = applyOpenChange(c as Parameters<typeof applyOpenChange>[0]);
+      inFlight = false;
+      return r;
+    };
+    const onComplete = vi.fn();
+    render(<HtmlEditor onComplete={onComplete} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("rich-edit"));
+    fireEvent.click(screen.getByTestId("html-file-readme-md"));
+    fireEvent.click(screen.getByTestId("html-continue"));
+    await waitFor(() => expect(onComplete).toHaveBeenCalled());
+    expect(applied).toHaveLength(1);
+    expect(useOpenUndoStore.getState().records).toHaveLength(1);
+    expect(screen.getByTestId("html-dropped-note").textContent).toBe("");
+  });
+
+  it("an edit typed while its page is being written is kept, rebased, and written by Continue", async () => {
+    let release: () => void = () => undefined;
+    let first = true;
+    host.apply = async (c) => {
+      if (first) {
+        first = false;
+        await new Promise<void>((r) => {
+          release = r;
+        });
+      }
+      return applyOpenChange(c as Parameters<typeof applyOpenChange>[0]);
+    };
+    const onComplete = vi.fn();
+    render(<HtmlEditor onComplete={onComplete} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("rich-edit"));
+    fireEvent.click(screen.getByTestId("html-file-readme-md"));
+    await waitFor(() => expect(first).toBe(false));
+    // Back on the welcome page while its write is pending, the author types again.
+    fireEvent.click(screen.getByTestId("html-file-welcome-htm"));
+    fireEvent.click(await screen.findByTestId("code-apply").catch(() => screen.getByTestId("rich-edit")));
+    await act(async () => {
+      release();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(useOpenUndoStore.getState().records.length).toBeGreaterThanOrEqual(1));
+    expect(screen.getByTestId("html-dropped-note").textContent).toBe("");
+    fireEvent.click(screen.getByTestId("html-continue"));
+    await waitFor(() => expect(onComplete).toHaveBeenCalled());
+    const file = readVfsText(useWorkingCopyStore.getState().startVfs!, "source/welcome/welcome.htm")!;
+    expect(file.match(/Edited paragraph\./g)?.length).toBe(2);
+  });
+
+  it("a host that throws is a refusal: Continue stays and the text is kept", async () => {
+    host.apply = () => Promise.reject(new Error("boom"));
+    const onComplete = vi.fn();
+    render(<HtmlEditor onComplete={onComplete} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("rich-edit"));
+    fireEvent.click(screen.getByTestId("html-continue"));
+    await waitFor(() => expect(screen.getByTestId("html-file-welcome-htm").textContent).toContain("unsaved"));
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it("the unsaved marker shows on the tab row of a narrow viewport", async () => {
+    Object.defineProperty(window, "innerWidth", { value: 400, configurable: true });
+    try {
+      host.apply = () => Promise.resolve({ status: "failed", reason: "no" });
+      render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+      expect(screen.getByRole("tablist")).toBeTruthy();
+      fireEvent.click(await screen.findByTestId("rich-edit"));
+      fireEvent.click(screen.getByTestId("html-file-readme-md"));
+      await waitFor(() => expect(screen.getByTestId("html-file-welcome-htm").textContent).toContain("unsaved"));
+    } finally {
+      Object.defineProperty(window, "innerWidth", { value: 1024, configurable: true });
+      window.dispatchEvent(new Event("resize"));
+    }
   });
 });

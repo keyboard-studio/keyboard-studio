@@ -6,6 +6,7 @@
 import { docMemberPath, type DocMemberId, type LintFinding } from "@keyboard-studio/contracts";
 
 import { docMemberForPath } from "./collectDocLintInput.ts";
+import { openDocPath } from "./openDocPath.ts";
 
 /**
  * The members the help step fills. LICENSE.md is excluded: the identity step
@@ -30,7 +31,9 @@ export interface OpenHelpGapsInput {
 export function deriveOpenHelpGaps(input: OpenHelpGapsInput): ReadonlySet<DocMemberId> {
   const gaps = new Set<DocMemberId>();
   for (const member of HELP_FED_MEMBERS) {
-    if (input.vfs.get(docMemberPath(member, input.keyboardId)) === undefined) gaps.add(member);
+    // A flat-convention welcome page (source/welcome.htm) is the page, not a missing one.
+    const path = member === "welcome-htm" ? openDocPath("welcome-htm", input.keyboardId, input.vfs, null) : docMemberPath(member, input.keyboardId);
+    if (input.vfs.get(path) === undefined) gaps.add(member);
   }
   for (const f of input.baselineFindings ?? []) {
     const member = docMemberForPath(f.location?.file, input.keyboardId);

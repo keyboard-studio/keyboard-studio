@@ -9,13 +9,16 @@
 // row renders even while the 11.9 finding is live, and that a recorded
 // legacy bodySync answer renders no row either.
 
-import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { screen, fireEvent, cleanup, within } from "@testing-library/react";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { screen, fireEvent, cleanup, within, renderHook } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useDocumentationFindings } from "../hooks/useDocumentationFindings.ts";
 import { DocumentationFixProposals } from "./DocumentationFixProposals.tsx";
+import { applyOpenChange, undoLastOpenApply } from "../lib/openApply.ts";
+import { clearOpenSession } from "../stores/openUndoStore.ts";
 
 const CAMEROON_HELP =
   "<?php\n  $pagename = 'Cameroon QWERTY (SIL) Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<html><body><p>Copyright SIL Cameroon</p></body></html>";
@@ -37,6 +40,7 @@ function instantiateAdaptation() {
 }
 
 beforeEach(() => {
+  clearOpenSession();
   useWorkingCopyStore.getState().reset();
 });
 
@@ -104,6 +108,70 @@ describe("DocumentationFixProposals (issue #1908)", () => {
     expect(row.textContent).toContain("source/help/kb.css");
     fireEvent.click(within(row).getByText("Add the width rule"));
     expect(useWorkingCopyStore.getState().docFixProposals).toEqual({ imageWidth: "accepted" });
+  });
+
+  function openWithWidthFinding(): void {
+    instantiateAdaptation();
+    const wc = useWorkingCopyStore.getState();
+    wc.startVfs!.set(`source/${wc.startKeyboard!.id}.kps`, "<Package/>", false);
+    wc.setStartHelpPhpText(
+      "<?php\n  $pagename = 'Cameroon QWERTY (SIL) Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<html><body><p><img src=\"globe.png\"></p></body></html>",
+    );
+    wc.setStartDocCssTexts([{ path: "source/help/kb.css", text: ".full { width: 98%; }" }]);
+  }
+  const kbCss = () => useWorkingCopyStore.getState().startVfs!.get("source/help/kb.css")?.content;
+
+  it("on a keyboard opened for update, accepting the width fix writes kb.css; the row's Undo takes it back", async () => {
+    openWithWidthFinding();
+    render(<DocumentationFixProposals />);
+    fireEvent.click(within(screen.getByTestId("doc-fix-image-width")).getByText("Add the width rule"));
+    expect(await screen.findByText(/Applied/)).toBeTruthy();
+    expect(kbCss()).toBe(".full { width: 98%; }\nimg { max-width: 100%; }\n");
+    fireEvent.click(within(screen.getByTestId("doc-fix-image-width")).getByText("Undo"));
+    expect(kbCss()).toBeUndefined();
+    expect(useWorkingCopyStore.getState().docFixProposals).toBeNull();
+  });
+
+  it("on Open the footer Undo brings the finding and the offer back (the row reads the file, not the record)", async () => {
+    openWithWidthFinding();
+    render(<DocumentationFixProposals />);
+    fireEvent.click(within(screen.getByTestId("doc-fix-image-width")).getByText("Add the width rule"));
+    await screen.findByText(/Applied/);
+    expect(undoLastOpenApply().ok).toBe(true);
+    const row = await screen.findByTestId("doc-fix-image-width");
+    expect(within(row).getByText("Add the width rule")).toBeTruthy();
+    // The finding is judged on the file again, so it is back even though the answer is "accepted".
+    const found = renderHook(() => useDocumentationFindings());
+    expect(found.result.current.some((f) => f.code === "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED")).toBe(true);
+    expect(within(row).queryByText(/Applied/)).toBeNull();
+    expect(useWorkingCopyStore.getState().docFixProposals).toEqual({ imageWidth: "accepted" });
+  });
+
+  it("on Open a width fix that was not applied records no answer", async () => {
+    openWithWidthFinding();
+    const spy = vi
+      .spyOn(useWorkingCopyStore.getState(), "replaceStartingPointFiles")
+      .mockReturnValue({ ok: false, error: "disk" });
+    render(<DocumentationFixProposals />);
+    fireEvent.click(within(screen.getByTestId("doc-fix-image-width")).getByText("Add the width rule"));
+    await new Promise((r) => setTimeout(r, 0));
+    spy.mockRestore();
+    expect(useWorkingCopyStore.getState().docFixProposals).toBeNull();
+    expect(kbCss()).toBeUndefined();
+  });
+
+  it("on Open, once a later change is made the row's Undo points at the footer and clears nothing", async () => {
+    openWithWidthFinding();
+    render(<DocumentationFixProposals />);
+    fireEvent.click(within(screen.getByTestId("doc-fix-image-width")).getByText("Add the width rule"));
+    await screen.findByText(/Applied/);
+    const wc = useWorkingCopyStore.getState();
+    expect(applyOpenChange({ kind: "files", files: { "source/loose.txt": "x" }, label: "Other" }).status).toBe("applied");
+    expect(wc.startVfs).not.toBeNull();
+    const row = await screen.findByTestId("doc-fix-image-width");
+    expect(within(row).queryByText("Undo")).toBeNull();
+    expect(within(row).getByText(/Use Undo in the footer/)).toBeTruthy();
+    expect(kbCss()).toContain("max-width");
   });
 
   it("renders nothing on the copy track, even with the same store texts set", () => {

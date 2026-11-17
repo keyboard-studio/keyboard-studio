@@ -13,6 +13,7 @@ import { Trans, Plural, useLingui } from "@lingui/react/macro";
 import { msg } from "@lingui/core/macro";
 import type { MessageDescriptor } from "@lingui/core";
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
+import { useIsLiveOpen, useOpenRemovals, useRemovalActions } from './useRemovalActions.ts';
 import { partitionRemovalKeys, suggestionFingerprintOf } from '../../survey/carve/carveValue.ts';
 import {
   applyCarveSkip,
@@ -768,20 +769,28 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const startIrForReview = useWorkingCopyStore((s) => s.startIr);
   const [reviewOpen, setReviewOpen] = useState(false);
+  // Copy: the store's overlay actions, unchanged. Open: the removal is written
+  // into the files (useRemovalActions), so removed items are gone from `ir`
+  // and the Removed list, count and review read the session's removals.
+  const { cascadeDelete, cascadeRestore, restoreAll } = useRemovalActions();
+  const liveOpen = useIsLiveOpen();
+  const openRemovals = useOpenRemovals();
   const carvedCombos = useMemo(
     () =>
-      startIrForReview === null
-        ? []
-        : resolveCarvedCombos(startIrForReview, [...deletedNodeIds, ...deletedItemIds]),
-    [startIrForReview, deletedNodeIds, deletedItemIds],
+      liveOpen
+        ? openRemovals.flatMap((e) => e.combos)
+        : startIrForReview === null
+          ? []
+          : resolveCarvedCombos(startIrForReview, [...deletedNodeIds, ...deletedItemIds]),
+    [liveOpen, openRemovals, startIrForReview, deletedNodeIds, deletedItemIds],
   );
-  const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
-  const cascadeRestore = useWorkingCopyStore((s) => s.cascadeRestore);
-  const restoreAll = useWorkingCopyStore((s) => s.restoreAll);
   // FR-006: a carved character a listed language needs gets a dismissable
   // warning; the carve itself is never blocked.
   const carveChars = useWorkingCopyStore((s) => s.carveChars);
-  const carvedCharList = useMemo(() => [...carveChars], [carveChars]);
+  const carvedCharList = useMemo(
+    () => (liveOpen ? openRemovals.flatMap((e) => e.chars) : [...carveChars]),
+    [liveOpen, openRemovals, carveChars],
+  );
   const { warnings: removalWarnings, dismiss: dismissRemovalWarning } = useRemovalWarning(carvedCharList);
 
   // irToCharacterView's `confirmedInventory` param drives ONLY the "in your
@@ -1122,7 +1131,11 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     }
     return { kept: k, total: cells.length };
   }, [cells, isItemDeleted, deletedItemIds]);
-  const removedCount = total - kept;
+  const openRemovedChars = useMemo(
+    () => [...new Set(openRemovals.flatMap((e) => e.chars))],
+    [openRemovals],
+  );
+  const removedCount = total - kept + openRemovedChars.length;
 
   // Recommended characters (cell.reco) live in the suggested groups above the
   // grid, not here too — no character should appear twice.
@@ -1139,18 +1152,26 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   // producers), the SAME source kept/total above counts over, so this list
   // and the "N discarded" text never disagree.
   const removedList = useMemo<RemovedItem[]>(
-    () => cells
-      .filter((cell) => isCellDiscarded(cell, isItemDeleted))
-      .map((cell) => ({ type: 'item', id: cell.ch, ch: cell.ch, keys: cell.keys })),
-    [cells, isItemDeleted, deletedItemIds],
+    () => [
+      ...cells
+        .filter((cell) => isCellDiscarded(cell, isItemDeleted))
+        .map((cell): RemovedItem => ({ type: 'item', id: cell.ch, ch: cell.ch, keys: cell.keys })),
+      // Open: removed items are gone from the keyboard; the session's removals name them.
+      ...openRemovedChars.map((ch): RemovedItem => ({ type: 'item', id: ch, ch, keys: [] })),
+    ],
+    [cells, isItemDeleted, deletedItemIds, openRemovedChars],
   );
   const restoreRemovedItem = useCallback((item: RemovedItem) => {
     if (item.type !== 'item') return;
+    if (liveOpen) {
+      cascadeRestore([], [item.ch]);
+      return;
+    }
     const cell = cellsByCh.get(item.ch);
     if (cell === undefined) return;
     // Issue #1809 ruling §1: keep the aggregated-R carve set in sync.
     cascadeRestore(characterCellIds(cell), [cell.ch]);
-  }, [cellsByCh, cascadeRestore]);
+  }, [liveOpen, cellsByCh, cascadeRestore]);
 
   // cellsByCh (not cells) is the lookup here: selectedCh may be a
   // block-candidate character that's absent from cells but present in

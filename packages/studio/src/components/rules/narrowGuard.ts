@@ -33,6 +33,9 @@ import type {
 import type { OverBroadGuard } from "@keyboard-studio/engine/kmAssist";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useGuardIntentStore } from "../../stores/guardIntentStore.ts";
+import { useOpenUndoStore } from "../../stores/openUndoStore.ts";
+import { undoLastOpenApply } from "../../lib/openApply.ts";
+import type { ApplyOnOpen } from "../OpenApplyHost.tsx";
 import { familyOfRule, groupRules } from "./ruleFamilies.ts";
 
 /**
@@ -105,8 +108,11 @@ export interface NarrowOutcome {
  * record. Returns null when the guard rule is gone or has an unrecognized
  * shape — the card should report stale, not guess.
  */
-export function narrowOverBroadGuard(guard: OverBroadGuard): NarrowOutcome | null {
-  const { ir, setWorkingIR } = useWorkingCopyStore.getState();
+/** The IR with the exception inserted immediately before its guard, or null when stale. */
+function planNarrow(
+  guard: OverBroadGuard,
+): { ir: KeyboardIR; nextIr: KeyboardIR; exception: IRRule } | null {
+  const { ir } = useWorkingCopyStore.getState();
   if (ir === null) return null;
   const found = findGuardRule(ir, guard.guardRuleId);
   if (found === null) return null;
@@ -114,8 +120,7 @@ export function narrowOverBroadGuard(guard: OverBroadGuard): NarrowOutcome | nul
   const guardRule = group?.rules[found.index];
   const exception = guardRule === undefined ? null : buildNarrowException(guard, guardRule);
   if (exception === null) return null;
-
-  setWorkingIR({
+  const nextIr: KeyboardIR = {
     ...ir,
     groups: ir.groups.map((g) =>
       g.nodeId === found.groupNodeId
@@ -129,7 +134,54 @@ export function narrowOverBroadGuard(guard: OverBroadGuard): NarrowOutcome | nul
           }
         : g,
     ),
-  });
+  };
+  return { ir, nextIr, exception };
+}
+
+/**
+ * Open (spec 111 live files): the same Narrow, written into the opened
+ * keyboard's file when applied. The exception is inserted before its guard in
+ * the IR handed to the apply, whose splice anchors on the nearest rule it
+ * shares with the file, so it lands before the guard in the text too. Nothing
+ * is held as an overlay; the intent store keeps the question (not a rule id,
+ * which the re-read shifts). `undoId` names the apply's undo step.
+ */
+export async function narrowOverBroadGuardOnOpen(
+  guard: OverBroadGuard,
+  applyOnOpen: ApplyOnOpen,
+): Promise<(NarrowOutcome & { undoId?: string }) | null> {
+  const plan = planNarrow(guard);
+  if (plan === null) return null;
+  const { ir, nextIr, exception } = plan;
+  const families = groupRules(ir.groups.flatMap((g) => g.rules));
+  const family = familyOfRule(families, guard.guardRuleId);
+  const result = await applyOnOpen({ kind: "ir", nextIr });
+  if (result.status !== "applied") return null;
+  const intent = useGuardIntentStore.getState();
+  if (family !== undefined) intent.noteFamilyEdited(family.id);
+  intent.noteQuestionNarrowed(guard.question);
+  return {
+    ruleId: exception.nodeId,
+    familyId: family?.id,
+    ...(result.undoId !== undefined ? { undoId: result.undoId } : {}),
+  };
+}
+
+/** Open: undo a Narrow written to the file, only while it is still the latest applied change. */
+export function undoNarrowOnOpen(undoId: string, question: string): boolean {
+  const last = useOpenUndoStore.getState().records.at(-1);
+  if (last === undefined || last.id !== undoId) return false;
+  const undone = undoLastOpenApply();
+  if (!undone.ok) return false;
+  useGuardIntentStore.getState().liftQuestionNarrowed(question);
+  return true;
+}
+
+export function narrowOverBroadGuard(guard: OverBroadGuard): NarrowOutcome | null {
+  const plan = planNarrow(guard);
+  if (plan === null) return null;
+  const { ir, nextIr, exception } = plan;
+  useWorkingCopyStore.getState().setWorkingIR(nextIr);
 
   const families = groupRules(ir.groups.flatMap((g) => g.rules));
   const family = familyOfRule(families, guard.guardRuleId);

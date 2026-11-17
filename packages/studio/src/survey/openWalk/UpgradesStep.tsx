@@ -21,7 +21,7 @@ import { offerUpgrades, type UpgradeOffer } from "../../criteria/upgradePairs.ts
 import { loadCapsEngine } from "../../lib/capsEngine.ts";
 import { findKmnPath } from "../../lib/findKmnPath.ts";
 import { readVfsText } from "../../lib/vfsText.ts";
-import { replaceStartingPointAndReplay } from "../../lib/replaceStartingPoint.ts";
+import { useApplyOnOpen } from "../../components/OpenApplyHost.tsx";
 import { decidedSuggestions, recordSuggestionDisposition } from "../../lib/suggestionDispositions.ts";
 import type { SuggestedFix } from "../../lib/consistencySuggestions.ts";
 import { TEXT_DIM } from "../../ui/theme.ts";
@@ -39,6 +39,7 @@ function failingRuleKey(ruleIds: readonly string[]): string {
 
 export function UpgradesRenderer({ onChange }: DecisionRendererProps<boolean>) {
   const { onComplete } = useGalleryStepContext();
+  const applyOnOpen = useApplyOnOpen();
   const { result } = useOpenWalkCriteria();
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
@@ -100,14 +101,22 @@ export function UpgradesRenderer({ onChange }: DecisionRendererProps<boolean>) {
   const apply = (fix: SuggestedFix): void => {
     const offer = pending.find((o) => o.fix.id === fix.id);
     if (offer === undefined) return;
-    const outcome = replaceStartingPointAndReplay(offer.file, offer.afterText);
-    if (!outcome.ok) {
-      setError(outcome.error);
-      return;
-    }
-    setError(null);
-    if (offer.inventoryAdditions !== undefined) addToInventory(offer.inventoryAdditions);
-    recordSuggestionDisposition(fix, "accepted");
+    // Live files (spec 111 FR-041/FR-045): the upgrade is written into the file
+    // through the apply seam, so it is one undo step with the same post-checks.
+    void applyOnOpen({
+      kind: "files",
+      files: { [offer.file]: offer.afterText },
+      label: offer.fix.title,
+    }).then((outcome) => {
+      if (outcome.status === "failed") {
+        setError(outcome.reason);
+        return;
+      }
+      if (outcome.status === "declined") return;
+      setError(null);
+      if (offer.inventoryAdditions !== undefined) addToInventory(offer.inventoryAdditions);
+      recordSuggestionDisposition(fix, "accepted");
+    });
   };
 
   // Same composition as the survey steps (Prefill): left-aligned column,

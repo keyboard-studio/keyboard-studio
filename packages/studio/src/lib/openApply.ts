@@ -1,0 +1,366 @@
+// openApply -- writes one change into an opened keyboard's files when the
+// author applies it (spec 111, "Amendment 2026-11-13: live files").
+//
+// On Open the files are the truth: an applied change is spliced into the
+// source text now, through the same splice the output uses
+// (`projectWorkingCopyVfs` -> `writeKmn` -> `projectKmnText`), so the code
+// view, the preview and the download read one text. Nothing is kept as an
+// overlay to be replayed later. Copy never comes through here.
+//
+// One synchronous call: it projects the change onto a clone of the
+// starting-point files, checks the result, and writes every changed file in
+// ONE store update (`replaceStartingPointFiles`). A change that cannot be
+// placed precisely writes nothing and asks for consent (FR-009); the caller
+// asks the author and calls again with it. Every applied change is one record
+// in the undo log (`stores/openUndoStore`). No timers.
+//
+// The shared projection run and undo record are in `openApply/core.ts`; the
+// assignment and marks kinds are in `openApply/assign.ts`.
+
+import { emitKmn, isKeyboardSource, parseKmn } from "@keyboard-studio/engine";
+import { useWorkingCopyStore, type WorkingCopyState } from "../stores/workingCopyStore.ts";
+import type { RemovedRuleRecord } from "../stores/openRemovalStore.ts";
+import { useOpenUndoStore, type OpenUndoRecord, type OpenUndoView } from "../stores/openUndoStore.ts";
+import { isLiveOpen } from "./openMode.ts";
+import { readVfsText } from "./vfsText.ts";
+import {
+  beforeFrom,
+  failure,
+  findAnchor,
+  spliceKmnIntended,
+  nextUndoId,
+  recordUndo,
+  reinsertRules,
+  textOrNull,
+  applyRemoveOrIr,
+} from "./openApply/core.ts";
+import { applyAssign, applyMarks } from "./openApply/assign.ts";
+import { applyTouch } from "./openApply/touch.ts";
+import { applyCaps } from "./openApply/caps.ts";
+import { scopeToWrites } from "./openApply/scopeToWrites.ts";
+import { setOpenChangeApplier } from "./openApplyNotifier.ts";
+
+export type {
+  OpenApplyOptions,
+  OpenApplyResult,
+  OpenChange,
+  RefusalCode,
+  TouchReplacementSummary,
+} from "./openApply/types.ts";
+import type { OpenApplyOptions, OpenApplyResult, OpenChange } from "./openApply/types.ts";
+
+function applyFiles(change: Extract<OpenChange, { kind: "files" }>, opts: OpenApplyOptions = {}): OpenApplyResult {
+  const { startVfs, startKeyboard } = useWorkingCopyStore.getState();
+  if (startVfs === null || startKeyboard === null) {
+    return { status: "failed", reason: "No keyboard is open." };
+  }
+  const keyboardId = startKeyboard.id;
+  const changed: Record<string, string | null> = {};
+  for (const [path, text] of Object.entries(change.files)) {
+    const current = textOrNull(startVfs, path);
+    if (text === current) continue;
+    changed[path] = text;
+  }
+  const changedPaths = Object.keys(changed);
+  if (changedPaths.length === 0) return { status: "unchanged" };
+  // Asked first (FR-009): nothing is written until the author has agreed.
+  if (change.askFirst !== undefined && opts.consentedReemit !== true) {
+    return { status: "needs-consent", files: changedPaths, touchReplacement: change.askFirst };
+  }
+  if (change.askReformat === true && opts.consentedReemit !== true) {
+    return { status: "needs-consent", files: changedPaths };
+  }
+  for (const path of changedPaths) {
+    const text = changed[path];
+    if (typeof text !== "string" || !path.endsWith(".kmn")) continue;
+    // A `.kmn` that no longer parses as a keyboard is not written.
+    const parsed = parseKmn(text, keyboardId).ir;
+    if (!isKeyboardSource(parsed)) {
+      return { status: "failed", reason: `${path} is not a keyboard source.` };
+    }
+  }
+  const undoId = nextUndoId();
+  const record = recordUndo(undoId, change.label, keyboardId, beforeFrom(startVfs, {}), changed, { kind: "files" }, change.labelKey);
+  const written = useWorkingCopyStore.getState().replaceStartingPointFiles(changed);
+  if (!written.ok) return { status: "failed", reason: written.error };
+  useOpenUndoStore.getState().push(record);
+  return { status: "applied", changedPaths, undoId };
+}
+
+function applyModel(change: Extract<OpenChange, { kind: "model" }>, opts: OpenApplyOptions): OpenApplyResult {
+  const { startVfs, startKeyboard, startIr } = useWorkingCopyStore.getState();
+  if (startVfs === null || startKeyboard === null || startIr === null) {
+    return { status: "failed", reason: "No keyboard is open." };
+  }
+  const keyboardId = startKeyboard.id;
+  const kmnPath = `source/${keyboardId}.kmn`;
+  const current = readVfsText(startVfs, kmnPath);
+  if (current === undefined) return { status: "failed", reason: `${kmnPath} is missing.` };
+  const consented = opts.consentedReemit === true;
+  // Only what the change declared it writes is diffed against the file.
+  const intended = scopeToWrites(startIr, change.nextIr, change.writes);
+  const spliced = spliceKmnIntended(current, startIr, intended, keyboardId, consented);
+  if (!spliced.ok) return { status: "needs-consent", files: [kmnPath] };
+  const next = spliced.text;
+  return applyFiles({
+    kind: "files",
+    files: { [kmnPath]: next },
+    label: change.label,
+    ...(change.labelKey !== undefined ? { labelKey: change.labelKey } : {}),
+  });
+}
+
+/** Insert `rules` back into `text` at their recorded places; undefined when one cannot be placed. */
+function reinsertRulesReformatting(
+  text: string,
+  keyboardId: string,
+  rules: readonly RemovedRuleRecord[],
+): string | undefined {
+  try {
+    const ir = parseKmn(text, keyboardId).ir;
+    const groups = ir.groups.map((g) => ({ ...g, rules: [...g.rules] }));
+    let n = 0;
+    let lastKey = "";
+    let lastId = "";
+    for (const rec of rules) {
+      const group = groups[rec.groupIndex];
+      if (group === undefined) return undefined;
+      const wrapper = parseKmn(
+        `begin Unicode > use(main)\r\ngroup(main) using keys\r\n${rec.text}\r\n`,
+        keyboardId,
+      ).ir;
+      const parsed = wrapper.groups.flatMap((g) => g.rules)[0];
+      if (parsed === undefined) return undefined;
+      const placed = { ...parsed, nodeId: `reinserted#${(n += 1)}` };
+      delete (placed as { sourceLine?: number }).sourceLine;
+      const key = `${rec.groupIndex}|${rec.prevText}|${rec.prevOrdinal}`;
+      let index = 0;
+      if (key === lastKey) {
+        index = group.rules.findIndex((r) => r.nodeId === lastId) + 1;
+      } else if (rec.prevText !== null) {
+        const anchor = findAnchor(group, rec);
+        index = anchor === undefined ? 0 : group.rules.findIndex((r) => r.nodeId === anchor) + 1;
+      }
+      group.rules.splice(index, 0, placed);
+      lastKey = key;
+      lastId = placed.nodeId;
+    }
+    const out = emitKmn({ ...ir, groups });
+    return isKeyboardSource(parseKmn(out, keyboardId).ir) ? out : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function applyReinsert(
+  change: Extract<OpenChange, { kind: "reinsert" }>,
+  opts: OpenApplyOptions,
+): OpenApplyResult {
+  const consented = opts.consentedReemit === true;
+  const st = useWorkingCopyStore.getState();
+  const { startVfs, startKeyboard } = st;
+  if (startVfs === null || startKeyboard === null) {
+    return { status: "failed", reason: "No keyboard is open." };
+  }
+  const keyboardId = startKeyboard.id;
+  const kmnPath = `source/${keyboardId}.kmn`;
+  const work = new Map<string, string>();
+  const current = (path: string): string | undefined => work.get(path) ?? readVfsText(startVfs, path);
+
+  const restored = new Set<string>();
+  const notRestored = new Set<string>();
+  let needsConsent = false;
+  // Atomic: if any entry cannot be put back, nothing is written and the
+  // result says so; the author is never told "done" for a partial restore.
+  // Newest first: each undone removal leaves the files as the one before it
+  // left them, so the whole-file path stays exact down the stack.
+  for (const entry of [...change.entries].reverse()) {
+    const paths = Object.keys(entry.files);
+    if (paths.length > 0 && paths.every((p) => current(p) === entry.files[p]!.after)) {
+      for (const p of paths) work.set(p, entry.files[p]!.before);
+      restored.add(entry.id);
+      continue;
+    }
+    // The files moved on since (a later removal or an edit): put back only
+    // the rules this removal deleted, each after the rule that preceded it.
+    const text = current(kmnPath);
+    if (text === undefined) {
+      return { status: "failed", reason: `${kmnPath} is missing; the removed items cannot be put back.` };
+    }
+    if (entry.rules.length === 0) {
+      return { status: "failed", reason: "The removed items cannot be put back precisely." };
+    }
+    // Other files this removal touched: put each back only while it still holds
+    // what the removal wrote; one that changed since is reported, not overwritten.
+    for (const p of paths) {
+      if (p === kmnPath) continue;
+      if (current(p) === entry.files[p]!.after) work.set(p, entry.files[p]!.before);
+      else notRestored.add(p);
+    }
+    let next = reinsertRules(text, keyboardId, entry.rules);
+    if (next === undefined) {
+      if (!consented) {
+        needsConsent = true;
+        continue;
+      }
+      next = reinsertRulesReformatting(text, keyboardId, entry.rules);
+    }
+    if (next === undefined) {
+      return { status: "failed", reason: "The removed items cannot be put back precisely." };
+    }
+    work.set(kmnPath, next);
+    restored.add(entry.id);
+  }
+  // Nothing is written until the author has agreed to every reformat.
+  if (needsConsent) return { status: "needs-consent", files: [kmnPath] };
+  if (restored.size === 0) {
+    return { status: "failed", reason: "The removed items cannot be put back precisely." };
+  }
+  const changed: Record<string, string | null> = {};
+  for (const [path, text] of work) {
+    if (readVfsText(startVfs, path) !== text) changed[path] = text;
+  }
+  // The restore is one step; undoing it puts the removals back on the list.
+  const record = recordUndo(
+    nextUndoId(),
+    "Restore removed items",
+    keyboardId,
+    beforeFrom(startVfs, {}),
+    changed,
+    { kind: "restore", entries: change.entries.filter((e) => restored.has(e.id)) },
+  );
+  const written = useWorkingCopyStore.getState().replaceStartingPointFiles(changed);
+  if (!written.ok) return { status: "failed", reason: written.error };
+  // Always logged: the restored removals leave the Removed list because of it.
+  useOpenUndoStore.getState().push(record);
+  return {
+    status: "applied",
+    changedPaths: Object.keys(changed),
+    ...(notRestored.size > 0 ? { notRestored: [...notRestored] } : {}),
+  };
+}
+
+/**
+ * Apply one change to the opened keyboard's files.
+ *
+ * `applied`: the files are written and `startIr` re-parsed. `needs-consent`:
+ * nothing was written; a file cannot be placed precisely and the author must
+ * agree to a reformat (call again with `consentedReemit`). `unchanged`: the
+ * change altered no file. `failed`: nothing was written.
+ */
+export function applyOpenChange(change: OpenChange, opts: OpenApplyOptions = {}): OpenApplyResult {
+  const st: Pick<WorkingCopyState, "instantiationMode" | "startVfs" | "startKeyboard"> =
+    useWorkingCopyStore.getState();
+  if (!isLiveOpen(st)) {
+    return { status: "failed", reason: "The working copy was not opened from an existing keyboard." };
+  }
+  // Any throw (a parse, a splice, a store write) is a failed apply with the
+  // files as they were: the store is only written as the last step, in one update.
+  try {
+    if (change.kind === "reinsert") return applyReinsert(change, opts);
+    if (change.kind === "files") return applyFiles(change, opts);
+    if (change.kind === "model") return applyModel(change, opts);
+    if (change.kind === "assign") return applyAssign(change, opts);
+    if (change.kind === "marks") return applyMarks(opts);
+    if (change.kind === "caps") return applyCaps(change, opts);
+    if (change.kind === "touch") return applyTouch(change, opts);
+    return applyRemoveOrIr(change, opts);
+  } catch (err) {
+    return failure(err);
+  }
+}
+
+/** The per-kind part of an undo. Every kind's cache is derived from the log, so none has work to do. */
+function revertView(view: OpenUndoView): void {
+  switch (view.kind) {
+    case "removal": // leaves the Removed list with its record
+    case "restore": // its entries return to the Removed list with its record
+    case "assign": // the session is the previous assign record's `after`
+    case "marks":
+    case "files":
+      return;
+    case "touch": {
+      // The key-edit overlay holds a RECORD of each applied op: take back the ones
+      // this step recorded (the file text itself is restored by the caller).
+      if (view.edit.type !== "ops") return;
+      const taken = view.edit.ops;
+      const same = (a: { seq: number; kind: string; address: string }, b: { seq: number; kind: string; address: string }) =>
+        a.seq === b.seq && a.kind === b.kind && a.address === b.address;
+      useWorkingCopyStore.setState((st) => ({
+        keyEditOverlay: { ops: st.keyEditOverlay.ops.filter((o) => !taken.some((t) => same(o, t))) },
+      }));
+      return;
+    }
+  }
+}
+
+/**
+ * Undo the most recent applied change of this session: put each file's
+ * `before` text back, but only while every file still holds the `after` the
+ * change wrote. Otherwise nothing is written and the reason says why.
+ */
+export type OpenUndoRefusalCode = "not-open" | "nothing" | "stale" | "changed-since" | "write-failed";
+
+export type OpenUndoResult =
+  | { ok: true; id: string }
+  | {
+      ok: false;
+      /** What the UI words in the author's language. */
+      code: OpenUndoRefusalCode;
+      /** Plain English detail, for logs and tests. */
+      reason: string;
+      /** Set with `changed-since`: the files that changed. */
+      changedSince?: string[];
+    };
+
+/** The step an undo would take back now: the latest record of the open keyboard. */
+export function lastUndoableRecord(): OpenUndoRecord | undefined {
+  const st = useWorkingCopyStore.getState();
+  if (!isLiveOpen(st)) return undefined;
+  const keyboardId = st.startKeyboard!.id;
+  return [...useOpenUndoStore.getState().records].reverse().find((r) => r.keyboardId === keyboardId);
+}
+
+/**
+ * `expectedId` is the record the caller showed the author; if the log has
+ * moved on, nothing is undone (`stale`), so the label never lies.
+ */
+export function undoLastOpenApply(expectedId?: string): OpenUndoResult {
+  const st = useWorkingCopyStore.getState();
+  if (!isLiveOpen(st)) {
+    return { ok: false, code: "not-open", reason: "The working copy was not opened from an existing keyboard." };
+  }
+  const last = lastUndoableRecord();
+  if (last === undefined) return { ok: false, code: "nothing", reason: "Nothing to undo." };
+  if (expectedId !== undefined && last.id !== expectedId) {
+    return { ok: false, code: "stale", reason: "The change to undo is no longer the latest." };
+  }
+  const startVfs = st.startVfs!;
+  const moved = Object.entries(last.files).filter(
+    ([path, f]) => textOrNull(startVfs, path) !== f.after,
+  );
+  if (moved.length > 0) {
+    return {
+      ok: false,
+      code: "changed-since",
+      reason: `${moved.map(([p]) => p).join(", ")} changed since; it cannot be undone.`,
+      changedSince: moved.map(([p]) => p),
+    };
+  }
+  const restore: Record<string, string | null> = {};
+  for (const [path, f] of Object.entries(last.files)) restore[path] = f.before;
+  try {
+    const written = st.replaceStartingPointFiles(restore);
+    if (!written.ok) return { ok: false, code: "write-failed", reason: written.error };
+  } catch (err) {
+    return { ok: false, code: "write-failed", reason: err instanceof Error ? err.message : String(err) };
+  }
+  // The Removed list and the assignment session are derived from the log, so
+  // taking the record out of it is the whole per-kind revert.
+  revertView(last.view);
+  useOpenUndoStore.getState().drop(new Set([last.id]));
+  return { ok: true, id: last.id };
+}
+
+// The patch sinks reach this seam through a registration (see openApplyNotifier.ts).
+setOpenChangeApplier(applyOpenChange);

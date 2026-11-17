@@ -28,6 +28,9 @@ import type {
 } from "../languageChooser/resolveTypedTag.ts";
 import { useGalleryStepContext } from "../../steps/galleryHost.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { commitDescriptorOnOpen } from "../../lib/descriptorOpenCommit.ts";
+import { isLiveOpen } from "../../lib/openMode.ts";
+import { useApplyOnOpen } from "../../components/OpenApplyHost.tsx";
 import { Button } from "../../ui/Button.tsx";
 import { TextField } from "../../ui/TextField.tsx";
 import { CSS_WARNING_TEXT, ERROR_TEXT, TEXT_DIM } from "../../ui/theme.ts";
@@ -149,9 +152,16 @@ export function LanguageListRenderer({ value, onChange }: DecisionRendererProps<
   const identity = useWorkingCopyStore((s) => s.identity);
   const setIdentity = useWorkingCopyStore((s) => s.setIdentity);
   const identityLanguages = identity?.languages;
+  const live = useWorkingCopyStore((s) => isLiveOpen(s));
+  const applyOnOpen = useApplyOnOpen();
+  const [blocked, setBlocked] = useState(false);
+  // A list that changed (a later write, an undo) makes an earlier refusal stale.
+  useEffect(() => setBlocked(false), [identityLanguages]);
+  // On a keyboard opened for update the files are the truth (FR-042): the list shown is the
+  // `.kps`'s own (identity follows it, undo included), never the decision record.
   const list: LanguageListValue = useMemo(
-    () => value ?? identityLanguages ?? [],
-    [value, identityLanguages],
+    () => (live ? (identityLanguages ?? value ?? []) : (value ?? identityLanguages ?? [])),
+    [live, value, identityLanguages],
   );
   const [tag, setTag] = useState("");
   const [name, setName] = useState("");
@@ -263,10 +273,16 @@ export function LanguageListRenderer({ value, onChange }: DecisionRendererProps<
         ? `${typedHeadline} (${typedSuffixes.join("; ")})`
         : typedHeadline;
 
-  const commit = (next: LanguageListValue): void => {
-    onChange(next);
-    setIdentity({ ...identity, languages: next });
-  };
+  const commit = (next: LanguageListValue): Promise<boolean> =>
+    commitDescriptorOnOpen({ languages: next }, applyOnOpen).then((outcome) => {
+      setBlocked(outcome === "no-descriptor");
+      if (outcome === "no-descriptor" || outcome === "not-applied") return false;
+      onChange(next);
+      if (outcome === "off-open") {
+        setIdentity({ ...(useWorkingCopyStore.getState().identity ?? {}), languages: next });
+      }
+      return true;
+    });
 
   function openBrowse(): void {
     searchMatchBeforeRef.current =
@@ -336,6 +352,14 @@ export function LanguageListRenderer({ value, onChange }: DecisionRendererProps<
             message: "These are written to the keyboard's package exactly as listed. Add, remove or reorder them.",
           })}
         </p>
+        {blocked && (
+          <p role="alert" style={{ fontSize: 13, color: ERROR_TEXT, margin: "0 0 12px" }}>
+            {t({
+              id: "open.languages.writeBlocked",
+              message: "The language list could not be written to the keyboard's package, so it was not changed.",
+            })}
+          </p>
+        )}
         {list.length === 0 ? (
           <p style={{ fontSize: 13, color: TEXT_DIM }}>
             {t({ id: "open.languages.empty", message: "No languages are listed yet." })}
@@ -351,7 +375,7 @@ export function LanguageListRenderer({ value, onChange }: DecisionRendererProps<
                     type="button"
                     size="compact"
                     disabled={i === 0}
-                    onClick={() => commit(moveLanguage(list, i, -1))}
+                    onClick={() => void commit(moveLanguage(list, i, -1))}
                     aria-label={t({ id: "open.languages.moveUp", message: `Move ${{ tag: l.tag }} up` })}
                   >
                     {"↑"}
@@ -360,7 +384,7 @@ export function LanguageListRenderer({ value, onChange }: DecisionRendererProps<
                     type="button"
                     size="compact"
                     disabled={i === list.length - 1}
-                    onClick={() => commit(moveLanguage(list, i, 1))}
+                    onClick={() => void commit(moveLanguage(list, i, 1))}
                     aria-label={t({ id: "open.languages.moveDown", message: `Move ${{ tag: l.tag }} down` })}
                   >
                     {"↓"}
@@ -368,7 +392,7 @@ export function LanguageListRenderer({ value, onChange }: DecisionRendererProps<
                   <Button
                     type="button"
                     size="compact"
-                    onClick={() => commit(removeLanguage(list, i))}
+                    onClick={() => void commit(removeLanguage(list, i))}
                     aria-label={t({ id: "open.languages.remove", message: `Remove ${{ tag: l.tag }}` })}
                   >
                     {t({ id: "open.languages.removeButton", message: "Remove" })}
@@ -397,7 +421,7 @@ export function LanguageListRenderer({ value, onChange }: DecisionRendererProps<
                             disabled={list.some(
                               (o, k) => k !== i && o.tag.toLowerCase() === replacement.toLowerCase(),
                             )}
-                            onClick={() => commit(replaceLanguageTag(list, i, replacement))}
+                            onClick={() => void commit(replaceLanguageTag(list, i, replacement))}
                             aria-label={t({
                               id: "open.languages.useReplacement",
                               message: `Use ${{ replacement }} instead`,
@@ -421,9 +445,17 @@ export function LanguageListRenderer({ value, onChange }: DecisionRendererProps<
           onSubmit={(e) => {
             e.preventDefault();
             const next = addLanguage(list, tag, name);
-            if (next !== list) commit(next);
-            setTag("");
-            setName("");
+            if (next === list) {
+              setTag("");
+              setName("");
+              return;
+            }
+            // The form is cleared only once the list took the new language.
+            void commit(next).then((done) => {
+              if (!done) return;
+              setTag("");
+              setName("");
+            });
           }}
           style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end", marginBottom: 12 }}
         >

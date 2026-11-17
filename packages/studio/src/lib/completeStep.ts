@@ -25,6 +25,7 @@ import {
   recordStepCompletion,
   type ReducerDeps,
 } from "../steps/reducer.ts";
+import { commitOpenProjectLink } from "./openIdentityCommit.ts";
 import { advance, STEPS_WITH_APPLY_COMPLETION, type AdvanceOutcome } from "../steps/advance.ts";
 
 type CompletedStepId = Parameters<typeof advance>[0];
@@ -65,6 +66,11 @@ export function completeStep(
     // Spec 089 FR-001/FR-002: run each answered module's apply()
     // unconditionally through the checked patch sink.
     applyDecisionEffects(result, reducerDeps);
+    // Spec 111 FR-041/FR-042: on a keyboard opened for update the project link the
+    // author answered is written into the descriptor now. Its own decision drives
+    // it, so a blank welcome paragraph (no help-docs patch) does not stop it. Off
+    // Open, or with the link unanswered, this does nothing.
+    if (stepId === "help") commitOpenProjectLink();
     // Spec 093 T009: the recorded change recalculates its downstream
     // closure and the working copy is rebuilt by replay from the
     // checkpoint before the first changed decision — the rebuilt

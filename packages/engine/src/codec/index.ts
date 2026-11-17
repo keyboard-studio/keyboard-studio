@@ -9,7 +9,7 @@ export { isKeyboardSource, NOT_A_KEYBOARD_SOURCE_MESSAGE } from "./keyboard-sour
 
 export { emit, emitRule, emitStore } from "./emit.js";
 
-export { parseKvks } from "./parse-kvks.js";
+export { parseKvks, unescapeXml } from "./parse-kvks.js";
 export { emitKvks } from "./emit-kvks.js";
 
 export {

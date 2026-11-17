@@ -25,7 +25,7 @@ import {
 import { loadPlacementMap } from "../../../lib/placementMapLoader.ts";
 import { deriveInventoryDiff } from "../../../lib/inventoryDiff.ts";
 import { derivePlacementInventory, loanwordSetOf } from "../../../lib/placementInventory.ts";
-import { selectDesktopAssignments } from "../../../lib/unimplementedInventory.ts";
+import { selectSessionAssignments } from "../../../lib/sessionAssignments.ts";
 import { buildSlotOccupancy } from "../../../survey/slotOccupancy.ts";
 import type { PlacementSeedEntry } from "../../../survey/placementSeeds.ts";
 import { preselectMethod } from "../../../editors/assignLoop/suggestionOrder.ts";
@@ -91,7 +91,7 @@ function resolveCompanion(ctx: DriverContext, proposal: CasePairProposal): void 
     ...(choice.proposalSource !== undefined ? { proposalSource: choice.proposalSource } : {}),
   });
   if (choice.value !== "confirm") return;
-  const next = companionConfirmAssignments(proposal, selectDesktopAssignments(store().phaseResults));
+  const next = companionConfirmAssignments(proposal, selectSessionAssignments(store()));
   if (next !== null) store().recordAssignments(next);
 }
 
@@ -120,7 +120,7 @@ function pendingProposalsAfter(
 function applyRecord(ctx: DriverContext, rec: PlacementRecord): void {
   const before = store();
   const bcp47 = before.identity?.bcp47;
-  const steps = placementSequence(rec, selectDesktopAssignments(before.phaseResults));
+  const steps = placementSequence(rec, selectSessionAssignments(before));
   for (const step of steps) {
     if (step.kind === "record") before.recordAssignments(step.next);
   }
@@ -139,7 +139,7 @@ function applyRecord(ctx: DriverContext, rec: PlacementRecord): void {
 function placeCharacter(ctx: DriverContext, char: string, placementMap: PlacementMap, dismissed: Set<string>): void {
   for (let attempt = 0; attempt < 8; attempt++) {
     const st = store();
-    const sessionAssignments = selectDesktopAssignments(st.phaseResults);
+    const sessionAssignments = selectSessionAssignments(st);
     const mechanismAssignments = excludeSequenceMechanisms(sessionAssignments);
     // An already-covered character needs no action: Next is enabled as it stands.
     if (canGoNextFor(char, mechanismAssignments, sessionAssignments, new Set<string>())) return;

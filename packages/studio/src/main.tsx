@@ -26,6 +26,8 @@ import { installConsoleBreadcrumbs, pushBreadcrumb } from "./crash/breadcrumbs.t
 import { installGlobalCrashHandlers } from "./crash/globalHandlers.ts";
 import { handleStaleChunkFailure, setStaleChunkReload } from "./crash/staleChunk.ts";
 import { handlePreMountCrash } from "./crash/preMount.ts";
+import { installHashGuard } from "./lib/navigationGuard.ts";
+import "./stores/unappliedTextStore.ts";
 import { safeCollectCrashContext } from "./lib/crashCallerContext.ts";
 
 // Crash capture, installed FIRST and synchronously — before the locale await,
@@ -222,6 +224,9 @@ async function mountCallbackScreen(provider: OAuthProvider): Promise<void> {
 // screen were they on" is usually the first thing a maintainer wants from a
 // report. Registered here rather than in a component so it survives a render
 // crash.
+// The leave guard for unapplied code-view text (spec 111 FR-046) sees the hash first: a change it
+// holds is put back (and re-announced) before the app reads it.
+installHashGuard();
 window.addEventListener("hashchange", () => {
   pushBreadcrumb("route", window.location.hash || "#");
 });

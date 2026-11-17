@@ -63,9 +63,6 @@ import {
 import { readVfsText } from "../lib/vfsText.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { replacesCuratedCopy } from "../lib/openSourceChoice.ts";
-import { useReformatConsent } from "../hooks/useReformatConsent.ts";
-import { ReformatConsentRequiredError } from "../lib/reformatConsentError.ts";
-import { ReformatConsentDialog } from "./ReformatConsentDialog.tsx";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -402,8 +399,6 @@ export function ManagedPRSubmitPanel({
   );
   const prBodyDraft = prBodyEdited ?? generatedBody;
 
-  const reformatConsent = useReformatConsent();
-
   const handleSubmit = useCallback(async () => {
     if (!submitEnabled) return;
     setSubmitState({ kind: "submitting" });
@@ -413,21 +408,8 @@ export function ManagedPRSubmitPanel({
 
     try {
       // Project the working copy at submit time — identical to the download path.
-      // Open (spec 111 FR-009): a file that cannot be updated in place waits
-      // for the author's agreement; declining cancels the submission.
-      const projected = await reformatConsent.guard(async (consented) => {
-        const out = consented
-          ? await projectWorkingCopyForOutput({ consentedReemit: true })
-          : await projectWorkingCopyForOutput();
-        if (out?.reformatRequired !== undefined && !consented) {
-          throw new ReformatConsentRequiredError(out.reformatRequired);
-        }
-        return out;
-      });
-      if (projected === undefined) {
-        setSubmitState({ kind: "idle" });
-        return;
-      }
+      // Open output never asks the author to agree to a reformat: that is asked when the change is applied.
+      const projected = await projectWorkingCopyForOutput();
       if (projected === null) {
         setSubmitState({
           kind: "error",
@@ -569,7 +551,7 @@ export function ManagedPRSubmitPanel({
     } finally {
       useTestingStore.getState().setSubmitInFlight(false);
     }
-  }, [submitEnabled, authorName, email, t, i18n, accessToken, authToken, ownRoute, ghLogin, prBodyDraft, openRatchet, reformatConsent.guard]);
+  }, [submitEnabled, authorName, email, t, i18n, accessToken, authToken, ownRoute, ghLogin, prBodyDraft, openRatchet]);
 
   // ---------------------------------------------------------------------------
   // Success state — show PR link, no git jargon.
@@ -622,7 +604,6 @@ export function ManagedPRSubmitPanel({
       aria-label={t({ id: "output.submit.sectionAriaLabel", message: "Submit to community repository" })}
       style={sectionStyle}
     >
-      <ReformatConsentDialog {...reformatConsent.dialog} />
       <div style={labelStyle}>
         <Trans id="output.submit.sectionLabel">Submit to community repository</Trans>
       </div>

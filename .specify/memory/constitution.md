@@ -46,25 +46,28 @@ cannot parse fails the whole scaffold — no try/catch around `parse()`.
 
 ### III. State model — one working copy, decisions as live truth, drafts save the envelope
 One working copy exists per project (Track 1 `instantiateFromBase`, Track 2
-`instantiateFromExisting`). Within a session it is **recalculated from the
-project's decisions**: a changed decision recalculates its downstream closure
-and replays from the checkpoint before it (spec 093); incremental `apply` at a
-step's completion and replay MUST agree, and replay installs the result.
+`instantiateFromExisting`). On a new keyboard made from a base (Copy) the working
+copy is **recalculated from the project's decisions** within a session: a
+changed decision recalculates its downstream closure and replays from the
+checkpoint before it (spec 093); incremental `apply` at a step's completion and
+replay MUST agree, and replay installs the result. A keyboard opened for update
+(Open) works differently and is described below: its files are the working copy,
+and decisions are not replayed.
 Persistence is the **draft envelope**, and it saves more than the decisions:
 the starting point, a working-copy snapshot, the decision set, the spec-053
 decision record, and per-feature slices (survey answers, testing, criteria).
 A reload restores from that envelope; decisions-only drafts are **not** the
 shipped model, and no plan may assume them. On a keyboard opened for update,
-the starting point is the current file text and its parse: an applied code
-edit or accepted text-level fix replaces the starting point, and decisions
-replay on top of it (the starting-point switch of Article X). File text,
-including review notes, is never stored as a decision. Scoped truths, to end the
+the working copy is the current file text and its parse. Every applied change
+(a code edit, a tool change or an accepted fix) is written into the text when
+it is applied. Decisions are a record of what was done and are not replayed.
+File text, including review notes, is never stored as a decision. Scoped truths, to end the
 collisions of unscoped ones:
 
 | Question | Source of truth |
 |---|---|
-| What renders / emits | The KeyboardIR working copy; **on Open, the starting text plus spliced changes** |
-| What the author decided (live) | The decision set (spec 088) |
+| What renders / emits | The KeyboardIR working copy; **on Open, the current file text** |
+| What the author decided (live) | The decision set (spec 088); **on Open, a record only, never replayed** |
 | What is saved | The draft envelope (this Article) |
 | What happened, in order | The decision record (spec 053) — audit, not live state |
 | Where the author is | The survey session store (spec 026) — traversal only |
@@ -149,8 +152,11 @@ Concretely:
 - Choices with consequences (allow/block and its kin) MUST be visible and
   demonstrable before the author chooses, per-combination where the
   combination is what's affected — never a silent bulk disposition.
-- Switching the starting point RETAINS the author's decisions and recalculates;
-  answers that no longer fit are re-proposed, never silently dropped.
+- On Copy, switching the starting point RETAINS the author's decisions and
+  recalculates; answers that no longer fit are re-proposed, never silently
+  dropped. On Open the files stand: the starting point is the keyboard being
+  updated, it is not switched, and decisions are not replayed over it
+  (Article III, spec 111 FR-042).
 - Where the generator's own closed manifest settles a check, certify it at
   generation time (**precertification**); do not re-derive it post hoc, and
   never claim it for a keyboard the studio did not generate.
@@ -213,4 +219,4 @@ existing text MUST edit that text. Append-only amendments — a new paragraph
 that silently reverses an old one while both stand — are the failure this
 version exists to end, and a reviewer MUST reject one on sight.
 
-**Version**: 2.3.0 | **Ratified**: 2026-10-14 | **Last amended**: 2026-11-03 (Art II/III: text-sourced starting point for keyboards opened for update, spec 111; earlier: 2026-11-01 Art VII: LDML export in scope, spec 108; compiled LDML desktop package, spec 108 Story 5) | **Supersedes**: 1.4.0 (ratified 2026-06-15, last amended 2026-10-07)
+**Version**: 2.4.0 | **Ratified**: 2026-10-14 | **Last amended**: 2026-11-14 (Art III: live files on Open, spec 111; earlier: 2026-11-03 Art II/III: text-sourced starting point for keyboards opened for update, spec 111; 2026-11-01 Art VII: LDML export in scope, spec 108; compiled LDML desktop package, spec 108 Story 5) | **Supersedes**: 1.4.0 (ratified 2026-06-15, last amended 2026-10-07) 2026-11-01 Art VII: LDML export in scope, spec 108; compiled LDML desktop package, spec 108 Story 5) | **Supersedes**: 1.4.0 (ratified 2026-06-15, last amended 2026-10-07)

@@ -16,24 +16,30 @@
  *   (tabs on narrow viewports, via `useIsNarrow(tabletMax)` — a two-pane
  *   layout that needs the room); the tree groups the `source/` files and
  *   lists the root files below.
- * - Per-file seeding: copy/adapt seed from the live preview
- *   (`useDocsPreview`), open seeds from the carried VFS text, else the
- *   `start*` slice, else the preview. Never blank on adapt/open; copy
- *   never inherits base prose (ruling A).
+ * - Per-file seeding: copy seeds from the live preview (`useDocsPreview`);
+ *   open seeds from the file only (the `start*Text` slices are read-only
+ *   seeds for the render paths), and a page with no file is not editable until its suggested fix creates it.
+ *   Copy never inherits base prose (ruling A).
  * - HISTORY.md and LICENSE.md always ship (serialize steps 5c/5d +
  *   `ensurePackageFiles`), so they never render "(absent)" even on Open,
  *   where the loader keeps them out of the VFS — their preview falls back
  *   to the start slice, then to the generated render (`renderHistoryMd` /
  *   `licenseMd`, the same renderers the download uses).
- * - Edits are written to the working-copy store's authored-* fields on
+ * - Copy: edits are written to the working-copy store's authored-* fields on
  *   Continue (and when switching files), and recorded as the `welcome-htm`
  *   decision — the output pipeline applies them at projection step 0b
  *   and again at serialize step 5c, so they survive into the download.
  *   A Continue with no edits records nothing, so the golden-walk trace
  *   is unchanged for an untouched step.
+ * - On a keyboard opened for update the file is the truth: the editor seeds
+ *   from it only, each edited page is written into its file (one undo record
+ *   per page, through the apply host) on file switch and Continue; Continue
+ *   waits and stays if a write is refused. The decision keeps only the page
+ *   names (lib/docsOpenCommit). An edit typed over text the file no longer
+ *   holds is dropped with a note.
  */
 
-import { lazy, Suspense, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useLingui } from "@lingui/react/macro";
 import {
   licenseMd,
@@ -47,7 +53,9 @@ import { BREAKPOINTS } from "../../ui/breakpoints.ts";
 import { useDocsPreview } from "../../hooks/useDocsPreview.ts";
 import { useDocMemberStates } from "../../hooks/useDocMemberStates.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import { isOpenedWithDescriptor } from "../../lib/openMode.ts";
+import { isLiveOpen } from "../../lib/openMode.ts";
+import { useApplyOnOpen } from "../../components/OpenApplyHost.tsx";
+import { guardLeave } from "../../stores/unappliedTextStore.ts";
 import { resolveOutputKeyboardId } from "../../lib/outputKeyboardId.ts";
 import { readVfsText } from "../../lib/vfsText.ts";
 import {
@@ -61,8 +69,8 @@ import {
   splitPhpPage,
   type EditableDocMember,
 } from "../../lib/authoredDocs.ts";
-import { WELCOME_PAGE_PATH, FLAT_WELCOME_PATH } from "../../lib/welcomeFolder.ts";
 import { completeHtmlStep, type HtmlContinueResult } from "../../lib/htmlStepCompletion.ts";
+import { commitDocPagesOnOpen, readOpenDocText, type DocsCommitResult } from "../../lib/docsOpenCommit.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import type { DocMemberId } from "@keyboard-studio/contracts";
 
@@ -122,9 +130,6 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
   const identity = useWorkingCopyStore((s) => s.identity);
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   const startWelcomeConvention = useWorkingCopyStore((s) => s.startWelcomeConvention);
-  const startWelcomeHtmText = useWorkingCopyStore((s) => s.startWelcomeHtmText);
-  const startHelpPhpText = useWorkingCopyStore((s) => s.startHelpPhpText);
-  const startReadmeMdText = useWorkingCopyStore((s) => s.startReadmeMdText);
   const startHistoryMdText = useWorkingCopyStore((s) => s.startHistoryMdText);
   const startLicenseText = useWorkingCopyStore((s) => s.startLicenseText);
   const historyEntryState = useWorkingCopyStore((s) => s.historyEntryState);
@@ -143,57 +148,72 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
   // This visit's edits, per member (null = not edited this visit; the seed
   // below is shown until the author types). Switching back to an edited
   // file shows the edited text, never the seed again.
-  const [texts, setTexts] = useState<Partial<Record<EditableDocMember, string>>>({});
+  // Each entry remembers the seed it was typed over: on Open the file is the truth,
+  // so an edit made over text that has since changed (an undo, an accepted fix) is dropped.
+  const [texts, setTexts] = useState<Partial<Record<EditableDocMember, { text: string; base: string }>>>({});
   // Remount key for the panes: bumped when a rich edit is refused (a
   // deleted opaque placeholder), restoring the last good text.
   const [generation, setGeneration] = useState(0);
   const [richWarning, setRichWarning] = useState<string | null>(null);
+  // Pages whose in-progress edit was dropped because the file changed underneath it (Open).
+  const [dropped, setDropped] = useState<EditableDocMember[]>([]);
+  // Pages whose last write the host refused: the text is kept here and marked unsaved.
+  const [unsaved, setUnsaved] = useState<EditableDocMember[]>([]);
+  // Writes in flight (Open). The apply swaps the file's text before the page's in-progress entry
+  // is cleared, so a page being written is never judged stale; writes run one after another.
+  const inFlightRef = useRef<Set<EditableDocMember>>(new Set());
+  const pendingRef = useRef<Promise<unknown>>(Promise.resolve());
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   // The latest edits for the event handlers (member switch, Continue), which
   // the footer nav may hold from an earlier render. Synced after commit, not
   // during render.
   const textsRef = useRef(texts);
+  const seedsRef = useRef<Record<EditableDocMember, string> | null>(null);
+  const openRef = useRef(false);
   useLayoutEffect(() => {
     textsRef.current = texts;
   }, [texts]);
 
-  const keyboardId = resolveOutputKeyboardId(identity, startKeyboard);
-  const isOpen = isOpenedWithDescriptor(instantiationMode, startVfs, keyboardId);
+  const applyOnOpen = useApplyOnOpen();
+  // A keyboard opened for update: the files are the truth (the id is the opened keyboard's own).
+  const isOpen = useWorkingCopyStore((s) => isLiveOpen(s));
+  const keyboardId = isOpen ? (startKeyboard?.id ?? "") : resolveOutputKeyboardId(identity, startKeyboard);
+  const openText = (member: EditableDocMember): string | undefined =>
+    readOpenDocText(member, keyboardId, startVfs, startWelcomeConvention);
 
   // -- Seeding (specs/html-editor §3) ---------------------------------------
   // Copy/adapt seed from the live preview (track guards + inheritance
-  // already applied there); open seeds from the carried VFS text, else the
-  // start* slice, else the preview. An authored override always wins.
+  // already applied there), an authored override winning. Open seeds from the
+  // file only (the start*Text slices are read-only seeds for the render paths).
   const seeds = useMemo(() => {
-    const openText = (path: string): string | undefined =>
-      startVfs === null ? undefined : readVfsText(startVfs, path);
-    const welcomeOpen =
-      openText(WELCOME_PAGE_PATH) ??
-      (startWelcomeConvention === "flat" ? openText(FLAT_WELCOME_PATH) : undefined);
-    const result: Record<EditableDocMember, string> = {
-      "welcome-htm":
-        authoredWelcomeHtm ??
-        (isOpen ? (welcomeOpen ?? startWelcomeHtmText ?? preview.welcomeHtm) : preview.welcomeHtm),
-      "readme-htm":
-        authoredReadmeHtm ?? (isOpen ? (openText("source/readme.htm") ?? preview.readmeHtm) : preview.readmeHtm),
-      "readme-md":
-        authoredReadmeMd ??
-        // eslint-disable-next-line lingui/no-unlocalized-strings -- VFS path, not UI copy.
-        (isOpen ? (openText("README.md") ?? startReadmeMdText ?? preview.readmeMd) : preview.readmeMd),
-      "help-php":
-        authoredHelpPhp ??
-        (isOpen
-          ? (openText(`source/help/${keyboardId}.php`) ?? startHelpPhpText ?? preview.helpPhp)
-          : preview.helpPhp),
-    };
+    // On Open each page is its file's text (a page with no file is not edited, so its seed is
+    // never used); the start*Text slices are read-only seeds for the render paths only.
+    const fromFile = (member: EditableDocMember): string => readOpenDocText(member, keyboardId, startVfs, startWelcomeConvention) ?? "";
+    const result: Record<EditableDocMember, string> = isOpen
+      ? {
+          "welcome-htm": fromFile("welcome-htm"),
+          "readme-htm": fromFile("readme-htm"),
+          "readme-md": fromFile("readme-md"),
+          "help-php": fromFile("help-php"),
+        }
+      : {
+          "welcome-htm": authoredWelcomeHtm ?? preview.welcomeHtm,
+          "readme-htm": authoredReadmeHtm ?? preview.readmeHtm,
+          "readme-md": authoredReadmeMd ?? preview.readmeMd,
+          "help-php": authoredHelpPhp ?? preview.helpPhp,
+        };
     return result;
     // Preview object identity changes per render; its members are the seed inputs.
   }, [
     isOpen,
     startVfs,
     startWelcomeConvention,
-    startWelcomeHtmText,
-    startHelpPhpText,
-    startReadmeMdText,
     keyboardId,
     authoredWelcomeHtm,
     authoredReadmeHtm,
@@ -205,10 +225,54 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
     preview.helpPhp,
   ]);
 
-  const currentText = (member: EditableDocMember): string => texts[member] ?? seeds[member];
+  useLayoutEffect(() => {
+    seedsRef.current = seeds;
+    openRef.current = isOpen;
+  }, [seeds, isOpen]);
+
+  const currentText = (member: EditableDocMember): string => {
+    const entry = texts[member];
+    return entry !== undefined && (!isOpen || entry.base === seeds[member]) ? entry.text : seeds[member];
+  };
 
   const setMemberText = (member: EditableDocMember, text: string) => {
-    setTexts((prev) => ({ ...prev, [member]: text }));
+    setDropped([]);
+    setTexts((prev) => ({ ...prev, [member]: { text, base: seeds[member] } }));
+  };
+
+  // This visit's edits that still stand, as plain text (on Open, only those typed over the file as it is now).
+  const standingEdits = (): Partial<Record<EditableDocMember, string>> => {
+    const out: Partial<Record<EditableDocMember, string>> = {};
+    for (const [member, entry] of Object.entries(textsRef.current) as Array<[EditableDocMember, { text: string; base: string }]>) {
+      if (openRef.current && seedsRef.current?.[member] !== entry.base) continue;
+      out[member] = entry.text;
+    }
+    return out;
+  };
+
+  // On Open an edit typed over text the file no longer holds (an undo, an accepted fix) is dropped,
+  // and the author is told which page it was.
+  useEffect(() => {
+    if (!isOpen) return;
+    const stale = (Object.keys(texts) as EditableDocMember[]).filter(
+      (m) => texts[m]?.base !== seeds[m] && !inFlightRef.current.has(m),
+    );
+    if (stale.length === 0) return;
+    setTexts((prev) => {
+      const next = { ...prev };
+      for (const m of stale) delete next[m];
+      return next;
+    });
+    setDropped((prev) => [...new Set([...prev, ...stale])]);
+    setUnsaved((prev) => prev.filter((m) => !stale.includes(m)));
+  }, [isOpen, seeds, texts]);
+
+  // The panes reseed when the file's text changes under them on Open (an undo).
+  const fileStamp = (member: EditableDocMember): string => {
+    if (!isOpen) return "";
+    let h = 2166136261;
+    for (let i = 0; i < seeds[member].length; i++) h = Math.imul(h ^ seeds[member].charCodeAt(i), 16777619);
+    return String(h >>> 0);
   };
 
   // -- Presence (projected VFS) ----------------------------------------------
@@ -230,20 +294,8 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
       return true; // generated render — serialize steps 5c/5d
     }
     if (!isOpen) return true;
-    if (startVfs === null) return false;
-    const path =
-      member === "welcome-htm"
-        ? startWelcomeConvention === "flat"
-          ? FLAT_WELCOME_PATH
-          : WELCOME_PAGE_PATH
-        : member === "help-php"
-          ? `source/help/${keyboardId}.php`
-          : MEMBER_PATH[member];
-    if (readVfsText(startVfs, path) !== undefined) return true;
-    if (member === "welcome-htm") return startWelcomeHtmText !== null;
-    if (member === "help-php") return startHelpPhpText !== null;
-    if (member === "readme-md") return startReadmeMdText !== null;
-    return false;
+    // On Open a page is present when the keyboard has its file; a slice alone is not a page here.
+    return isEditable(member) && openText(member) !== undefined;
   };
 
   const memberName = (member: SelectorMember): string => {
@@ -340,6 +392,62 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
     setMemberText(member, full);
   };
 
+  // Open: each page goes into its file through the apply host (one undo record per page);
+  // nothing is held in the store. A page the host refused keeps its text here.
+  // Each run waits for the one before it and works out its edits when it starts, so a switch
+  // followed at once by Continue never sends the same page twice (the host refuses a second
+  // apply while one is waiting).
+  const flushOpen = (): Promise<DocsCommitResult> => {
+    const run = pendingRef.current.then(async (): Promise<DocsCommitResult> => {
+      const snapshot = standingEdits();
+      const pages = Object.keys(snapshot) as EditableDocMember[];
+      if (pages.length === 0) return { written: [], refused: [] };
+      for (const m of pages) inFlightRef.current.add(m);
+      try {
+        const wc = useWorkingCopyStore.getState();
+        let result: DocsCommitResult;
+        try {
+          result = await commitDocPagesOnOpen({
+            edits: snapshot,
+            keyboardId: wc.startKeyboard?.id ?? "",
+            startVfs: wc.startVfs,
+            convention: wc.startWelcomeConvention,
+            applyOnOpen,
+          });
+        } catch {
+          // A throw is a refusal: nothing is known to be written, and the text stays.
+          result = { written: [], refused: pages };
+        }
+        // A written page is the file's now: its in-progress text goes, so an undo reseeds from the file.
+        // Text typed while the write was in flight differs from what was written: it is kept and
+        // rebased onto the new file text, so it is not judged stale and goes out on the next flush.
+        // The ref is updated at once so the next run does not see the page's old text.
+        if (result.written.length > 0) {
+          const settle = (
+            prev: Partial<Record<EditableDocMember, { text: string; base: string }>>,
+          ): Partial<Record<EditableDocMember, { text: string; base: string }>> => {
+            const next = { ...prev };
+            for (const m of result.written) {
+              const written = snapshot[m];
+              const entry = prev[m];
+              if (entry === undefined || written === undefined || entry.text === written) delete next[m];
+              else next[m] = { text: entry.text, base: written };
+            }
+            return next;
+          };
+          textsRef.current = settle(textsRef.current);
+          setTexts(settle);
+        }
+        setUnsaved((prev) => [...prev.filter((m) => !pages.includes(m)), ...result.refused]);
+        return result;
+      } finally {
+        for (const m of pages) inFlightRef.current.delete(m);
+      }
+    });
+    pendingRef.current = run.catch(() => undefined);
+    return run;
+  };
+
   const flushToStore = (snapshot: Partial<Record<EditableDocMember, string>>) => {
     if (snapshot["welcome-htm"] !== undefined) setAuthoredWelcomeHtm(snapshot["welcome-htm"]);
     if (snapshot["readme-htm"] !== undefined) setAuthoredReadmeHtm(snapshot["readme-htm"]);
@@ -347,16 +455,40 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
     if (snapshot["help-php"] !== undefined) setAuthoredHelpPhp(snapshot["help-php"]);
   };
 
-  const selectMember = (member: SelectorMember) => {
-    flushToStore(textsRef.current);
-    setRichWarning(null);
-    setSelected(member);
-    if (!isEditable(member)) setMode("preview");
-    else if (mode === "preview" && codeOnlyReason(member) === null) setMode("rich");
+  // Switching page unmounts the code pane: text typed there and not applied is asked about first
+  // (spec 111 FR-046; the staged text is written here, as before).
+  const selectMember = (member: SelectorMember) =>
+    guardLeave(() => {
+      if (openRef.current) void flushOpen();
+      else flushToStore(standingEdits());
+      setDropped([]);
+      setRichWarning(null);
+      setSelected(member);
+      if (!isEditable(member)) setMode("preview");
+      else if (mode === "preview" && codeOnlyReason(member) === null) setMode("rich");
+    });
+
+  // Open: stage the page's text and write it now; true when the file took it.
+  const applyCodeForLeave = async (member: EditableDocMember, next: string): Promise<boolean> => {
+    setMemberText(member, next);
+    textsRef.current = { ...textsRef.current, [member]: { text: next, base: seeds[member] } };
+    const result = await flushOpen();
+    return result.refused.length === 0;
   };
 
-  const handleContinue = () => {
-    const snapshot = textsRef.current;
+  const handleContinue = async () => {
+    if (openRef.current) {
+      // Wait for the writes: if the host refused a page the author keeps the text and stays here.
+      let result = await flushOpen();
+      // An edit typed while a write was in flight is still standing: write that too.
+      for (let i = 0; i < 3 && result.refused.length === 0 && Object.keys(standingEdits()).length > 0; i++) {
+        result = await flushOpen();
+      }
+      if (result.refused.length > 0 || !mountedRef.current) return;
+      onComplete({});
+      return;
+    }
+    const snapshot = standingEdits();
     flushToStore(snapshot);
     const payload: HtmlContinueResult = {
       ...(snapshot["welcome-htm"] !== undefined ? { welcomeHtm: snapshot["welcome-htm"] } : {}),
@@ -383,7 +515,7 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
       : {}),
     forward: {
       label: t({ id: "editor.assignLoop.html.continue", message: "Continue" }),
-      onClick: handleContinue,
+      onClick: () => void handleContinue(),
       testId: "html-continue",
     },
   });
@@ -391,6 +523,8 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
   const selectedState = memberStates.find((s) => s.member === (selected as DocMemberId));
   const codeOnly = isEditable(selected) ? codeOnlyReason(selected) : null;
   const effectiveMode: EditorMode = codeOnly !== null && mode === "rich" ? "code" : mode;
+  // Open: a page the keyboard has no file for is not edited here (the Help step's suggestion covers it).
+  const absentOnOpen = isOpen && isEditable(selected) && !present(selected);
 
   // -- Read-only text (HISTORY.md / LICENSE.md) -------------------------------
   // Carried VFS text first, then the start slice (the loader's
@@ -458,6 +592,7 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
   // finding them.
   const showTree = !useIsNarrow(BREAKPOINTS.tabletMax);
   const readOnlyLabel = t({ id: "editor.assignLoop.html.files.readOnly", message: "read-only" });
+  const unsavedLabel = t({ id: "editor.assignLoop.html.files.unsaved", message: "unsaved" });
   const absentLabel = t({ id: "editor.assignLoop.html.files.absent", message: "absent" });
   const filesLabel = t({ id: "editor.assignLoop.html.files.label", message: "Documentation files" });
 
@@ -519,6 +654,7 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
     <>
       {!isEditable(member) && ` (${readOnlyLabel})`}
       {!present(member) && ` (${absentLabel})`}
+      {isEditable(member) && unsaved.includes(member) && ` (${unsavedLabel})`}
     </>
   );
 
@@ -623,11 +759,27 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
         </p>
       )}
 
-      {codeOnly !== null && <p style={{ margin: 0, fontSize: 13, color: "var(--app-warning)" }}>{codeOnly}</p>}
+      {absentOnOpen && (
+        <p style={{ margin: 0, fontSize: 13, color: "var(--app-text-muted)" }} data-testid="html-absent-note">
+          {t({
+            id: "editor.assignLoop.html.openAbsentSuggested",
+            message: `This keyboard has no ${{ page: memberName(selected) }} file yet. A suggested fix on the Criteria screen creates it from the generated text and lists it in the package; once it exists you can edit it here.`,
+          })}
+        </p>
+      )}
+      <p role="status" aria-live="polite" style={{ margin: 0, fontSize: 13, color: "var(--app-warning)" }} data-testid="html-dropped-note">
+        {dropped.length > 0
+          ? t({
+              id: "editor.assignLoop.html.editDropped",
+              message: `The file changed, so your unsaved edit to ${{ pages: dropped.map(memberName).join(", ") }} was dropped.`,
+            })
+          : ""}
+      </p>
+      {!absentOnOpen && codeOnly !== null && <p style={{ margin: 0, fontSize: 13, color: "var(--app-warning)" }}>{codeOnly}</p>}
       {richWarning !== null && <p style={{ margin: 0, fontSize: 13, color: "var(--app-warning)" }}>{richWarning}</p>}
 
       {/* Mode toggle */}
-      {isEditable(selected) && (
+      {isEditable(selected) && !absentOnOpen && (
         <div style={{ display: "flex", gap: 8 }}>
           {(
             [
@@ -639,7 +791,7 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
             <button
               key={m}
               type="button"
-              onClick={() => setMode(m)}
+              onClick={() => (m === effectiveMode ? undefined : guardLeave(() => setMode(m)))}
               aria-pressed={effectiveMode === m}
               disabled={m === "rich" && codeOnly !== null}
               style={{
@@ -660,7 +812,7 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
 
       {/* Editor / Preview */}
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-        {isEditable(selected) && effectiveMode === "rich" && (
+        {isEditable(selected) && !absentOnOpen && effectiveMode === "rich" && (
           <Suspense
             fallback={
               <div style={{ padding: 16, color: "var(--app-text-muted)", fontSize: 13 }}>
@@ -669,7 +821,7 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
             }
           >
             <HtmlRichTextPane
-              key={`${selected}:${generation}`}
+              key={`${selected}:${generation}:${isEditable(selected) ? fileStamp(selected) : ""}`}
               value={richValue(selected)}
               format={selected === "readme-md" ? "markdown" : "html"}
               onChange={(next) => handleRichChange(selected, next)}
@@ -677,7 +829,7 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
           </Suspense>
         )}
 
-        {isEditable(selected) && effectiveMode === "code" && (
+        {isEditable(selected) && !absentOnOpen && effectiveMode === "code" && (
           <div style={{ flex: 1, minHeight: 300, display: "flex", flexDirection: "column" }}>
             <Suspense
               fallback={
@@ -687,16 +839,21 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
               }
             >
               <HtmlCodePane
-                key={`${selected}:${generation}`}
+                key={`${selected}:${generation}:${isEditable(selected) ? fileStamp(selected) : ""}`}
                 initialText={currentText(selected)}
                 language={selected === "readme-md" ? "markdown" : "html"}
                 onApply={(next) => setMemberText(selected, next)}
+                guardLabel={t({
+                  id: "open.unapplied.view.pageNamed",
+                  message: `the code of ${{ page: memberName(selected) }}`,
+                })}
+                {...(isOpen ? { onApplyForLeave: (next: string) => applyCodeForLeave(selected, next) } : {})}
               />
             </Suspense>
           </div>
         )}
 
-        {(effectiveMode === "preview" || !isEditable(selected)) && (
+        {!absentOnOpen && (effectiveMode === "preview" || !isEditable(selected)) && (
           <div
             style={{
               border: "1px solid var(--app-border)",

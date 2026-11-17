@@ -76,16 +76,20 @@ import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { KeyEditOperation } from "@keyboard-studio/engine";
 import type { VfsTransform } from "./useKeyboardArtifact.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useOpenUndoStore } from "../stores/openUndoStore.ts";
 import {
   projectWorkingCopyVfs,
   type ProjectWorkingCopyVfsInput,
 } from "../lib/projectWorkingCopyVfs.ts";
 import {
+  applyOpenWorkingCopyFiles,
   capsHandlingFromDecisions,
   marksGuardsFromValue,
+  openModeProjection,
   projectionInputFromState,
   selectKmnEdits,
 } from "../lib/projectionInput.ts";
+import { isLiveOpen, isOpenedWithDescriptor } from "../lib/openMode.ts";
 import { useDecisionStore } from "../stores/decisionStore.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import { physicalAssignmentsOf } from "../lib/physicalAssignments.ts";
@@ -260,6 +264,8 @@ export function useWorkingCopyTransform(
   // only on an Open walk over a flat-convention base, as in the download.
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
+  // Files an applied Open change deleted (T082b): the preview drops them too.
+  const removedPathsKey = useOpenUndoStore((s) => s.removedPaths.join("\n"));
   const startWelcomeConvention = useWorkingCopyStore((s) => s.startWelcomeConvention);
 
   // P1 fix (bug F4 footgun): omitting previewedStartId is legitimate for
@@ -336,8 +342,10 @@ export function useWorkingCopyTransform(
   // spec 112: the caps-handling decision step 2.8 applies. Read through the
   // same gate the download uses (a caseless alphabet is not asked), keyed on
   // the mode so an unrelated re-record never rebuilds the projection.
+  // On Open the answer is in the files (written when answered), so none is replayed.
+  const openWithDescriptor = useWorkingCopyStore((s) => isLiveOpen(s));
   const capsHandlingMode = useDecisionStore(
-    (s) => capsHandlingFromDecisions(s.decisions)?.mode ?? null,
+    (s) => (openWithDescriptor ? null : (capsHandlingFromDecisions(s.decisions)?.mode ?? null)),
   );
   const marksGuardsKey = useMemo(
     () => JSON.stringify(marksGuardsFromValue(marksTreatment)),
@@ -472,6 +480,10 @@ export function useWorkingCopyTransform(
   // spec 059: the descriptor's <Language> display text. Forwarded so the OSK
   // preview sees the same package descriptor the zip does (FR-004/SC-005).
   const identityLanguageName = identity?.languageName ?? null;
+  // Open (spec 111): the descriptor's language list. Keyed by content in the
+  // memo deps so a reference-only change does not rebuild the transform.
+  const identityLanguages = identity?.languages;
+  const identityLanguagesKey = useMemo(() => JSON.stringify(identityLanguages ?? null), [identityLanguages]);
 
   return useMemo<VfsTransform | null>(() => {
     // No startIr → carve step cannot run. The transform is not usable yet.
@@ -522,6 +534,34 @@ export function useWorkingCopyTransform(
         }
         effectiveAssignments = [];
       }
+      // Open (spec 111 FR-042): assignments are already in the files (written when
+      // applied), so the preview replays none, matching the download.
+      if (isOpenedWithDescriptor(instantiationMode, startVfs, keyboardId)) {
+        effectiveAssignments = [];
+      }
+
+      // Open (spec 111 FR-043): the preview reads the working copy's CURRENT
+      // files, not the fetch-time copy the artifact hook restores before each
+      // re-apply. Tools write the author's edits straight into the store's
+      // starting point (replaceStartingPointFromText); overlaying its entries
+      // makes them reach the compile on the first run (including after a draft
+      // restore, where the fetch returns the pristine keyboard) and on every
+      // re-apply. Overlay, not replace: a file only the fetch holds is kept.
+      // Copy is untouched.
+      applyOpenWorkingCopyFiles(
+        vfs,
+        instantiationMode,
+        startVfs,
+        removedPathsKey === "" ? [] : removedPathsKey.split("\n"),
+      );
+      // The same Open options the download passes (splice, in-place descriptor).
+      const openMode = isOpenedWithDescriptor(instantiationMode, startVfs, keyboardId)
+        ? openModeProjection({
+            kind: "output",
+            identity: { displayName: identityDisplayName ?? undefined, languages: identityLanguages },
+            startDisplayName: storeStartDisplayName,
+          })
+        : undefined;
 
       // Delegate to the pure projection helper. The VfsTransform contract is
       // in-place mutation of `vfs`; projectWorkingCopyVfs also mutates in-place.
@@ -588,6 +628,7 @@ export function useWorkingCopyTransform(
             ...(storeStartDisplayName !== null ? { baseDisplayName: storeStartDisplayName } : {}),
             ...(storeStartKeyboardId !== null ? { startKeyboardId: storeStartKeyboardId } : {}),
             ...(liveLayoutOverride !== undefined ? { liveLayoutOverride } : {}),
+            ...(openMode !== undefined ? { openMode } : {}),
             ...(kmnStageTap !== undefined ? { kmnStageTap } : {}),
           },
         ),
@@ -614,6 +655,7 @@ export function useWorkingCopyTransform(
     identityKeyboardId,
     identityBcp47,
     identityLanguageName,
+    identityLanguagesKey,
     patternMap,
     touchLayoutJson,
     keyEditOpsKey,
@@ -630,6 +672,7 @@ export function useWorkingCopyTransform(
     authoredHelpPhp,
     instantiationMode,
     startVfs,
+    removedPathsKey,
     startWelcomeConvention,
   ]);
 }

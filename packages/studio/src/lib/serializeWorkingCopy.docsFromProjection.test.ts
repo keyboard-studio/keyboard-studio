@@ -209,9 +209,10 @@ describe("serializeWorkingCopy — Documentation step overrides survive into the
 });
 
 // A flat-convention base (pre-076 `source/welcome.htm`): an authored welcome
-// edit ships at the one path this production carries the page — the folder
-// path on copy (FR-002 removes the flat copy), the carried flat file on Open
-// (spec 111 FR-010 regenerates nothing) — and never at both.
+// edit ships at the folder path on copy (FR-002 removes the flat copy). On Open
+// a held edit is not replayed: the page is written into its file when edited
+// (lib/docsOpenCommit), so the carried flat file ships (spec 111 FR-010) —
+// and the page is never at both paths.
 // ---------------------------------------------------------------------------
 
 const FLAT_KPS = [
@@ -270,10 +271,10 @@ describe("serializeWorkingCopy — authored welcome on a flat-convention base", 
     expect(out.get("source/welcome.htm")).toBeUndefined();
   });
 
-  it("open: the edit replaces the carried flat page and no folder page is created", async () => {
+  it("open: a held edit is not replayed, the carried flat page ships and no folder page is created", async () => {
     const out = await runFlatBase("open");
-    expect(text("source/welcome.htm")).toContain("AUTHORED-WELCOME-MARKER");
-    expect(text("source/welcome.htm")).not.toContain("CARRIED-FLAT");
+    expect(text("source/welcome.htm")).toContain("CARRIED-FLAT");
+    expect(text("source/welcome.htm")).not.toContain("AUTHORED-WELCOME-MARKER");
     expect(out.get("source/welcome/welcome.htm")).toBeUndefined();
   });
 });

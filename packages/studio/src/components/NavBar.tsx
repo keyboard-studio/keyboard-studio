@@ -206,7 +206,7 @@ export function NavBar({
               <a
                 key={id}
                 href={`#${id}`}
-                aria-current={isActive ? "page" : undefined}
+                      aria-current={isActive ? "page" : undefined}
                 aria-disabled={isBlocked ? "true" : undefined}
                 title={isBlocked ? outputBlockedTitle : undefined}
                 style={{

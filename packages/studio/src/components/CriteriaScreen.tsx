@@ -28,7 +28,7 @@
 // StepNavContext; StudioFooter reads that on `#criteria`. Open walk only: same
 // predicate as the former in-page Continue bar (`isOpenMode`).
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 
 import { CriteriaPage } from "../criteria/CriteriaPage.tsx";
@@ -48,7 +48,10 @@ import { upgradePairFor } from "../criteria/upgradePairs.ts";
 import { useRouteSuggestedFix } from "../hooks/useRouteSuggestedFix.ts";
 import { missingCharacterFixes } from "../criteria/missingCharacterFixes.ts";
 import { useDocRegenerationFixes } from "../hooks/useDocRegenerationFixes.ts";
-import { applyDocRegeneration } from "../lib/docRegenerationFix.ts";
+import { useDocCreatePlans } from "../hooks/useDocCreateFixes.ts";
+import { applyDocCreate, isDocCreateFix, isDocCreateStale } from "../lib/docCreateFix.ts";
+import { applyDocRegeneration, isDocRegenerationStale } from "../lib/docRegenerationFix.ts";
+import { useApplyOnOpen } from "./OpenApplyHost.tsx";
 import { SuggestedFixesPanel } from "./SuggestedFixes.tsx";
 import {
   severityForAuthoredRow,
@@ -147,7 +150,13 @@ function CriteriaScreenBody() {
 
   const ratchet = useOpenRatchet(result, artifact.stage.kind === "error");
   const routeFix = useRouteSuggestedFix();
-  const docFixes = useDocRegenerationFixes();
+  const regenerationFixes = useDocRegenerationFixes();
+  const createPlans = useDocCreatePlans();
+  const docFixes = useMemo(() => [...createPlans.fixes, ...regenerationFixes], [createPlans, regenerationFixes]);
+  const applyOnOpen = useApplyOnOpen();
+  const [docFixStale, setDocFixStale] = useState(false);
+  // The notice belongs to the list it was raised against: a recomputed list clears it.
+  useEffect(() => setDocFixStale(false), [docFixes]);
   const setReviewNote = useCriteriaRecordStore((s) => s.setReviewNote);
   const removeReviewNote = useCriteriaRecordStore((s) => s.removeReviewNote);
 
@@ -225,9 +234,48 @@ function CriteriaScreenBody() {
       <div style={{ flex: "none", padding: "12px 24px 0", maxHeight: "40%", overflowY: "auto" }}>
         <SuggestedFixesPanel
           extra={[...missingFixes, ...docFixes]}
-          onAccept={(fix) => (fix.kind === "docs" ? void applyDocRegeneration(fix) : routeFix(fix))}
+          onAccept={(fix) => {
+            if (fix.kind !== "docs") {
+              routeFix(fix);
+              return;
+            }
+            setDocFixStale(false);
+            if (isDocCreateFix(fix)) {
+              // The page appeared, or the descriptor changed, since the preview: nothing is written.
+              if (isDocCreateStale(fix)) {
+                setDocFixStale(true);
+                return Promise.resolve(false);
+              }
+              return applyDocCreate(fix, applyOnOpen);
+            }
+            if (isDocRegenerationStale(fix)) {
+              // The page changed since the preview: nothing is written; the list recomputes.
+              setDocFixStale(true);
+              return Promise.resolve(false);
+            }
+            return applyDocRegeneration(fix, applyOnOpen);
+          }}
           testId="criteria-suggested-fixes"
         />
+        {createPlans.blocked.length > 0 && (
+          <ul data-testid="criteria-doc-create-blocked" style={{ margin: "4px 0", paddingLeft: 20, fontSize: 13 }}>
+            {createPlans.blocked.map((b) => (
+              <li key={b.member}>
+                {t({
+                  id: "criteria.docCreate.blocked",
+                  message: `${{ path: b.path }} is missing, but it cannot be created because the package descriptor has no place for it (${{ reason: b.reason }}).`,
+                })}
+              </li>
+            ))}
+          </ul>
+        )}
+        <p role="status" aria-live="polite" data-testid="criteria-doc-fix-stale" style={{ margin: "4px 0", fontSize: 13 }}>
+          {docFixStale ? (
+            <Trans id="criteria.docFix.stale">
+              That page changed since the suggestion was made, so it was not updated. The suggestion has been refreshed.
+            </Trans>
+          ) : null}
+        </p>
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
         <CriteriaPage

@@ -389,7 +389,7 @@ export const DERIVED_SURFACES: readonly DerivedSurface[] = [
     fields: ["authoredWelcomeHtm", "authoredReadmeHtm", "authoredReadmeMd", "authoredHelpPhp"],
     decisionIds: ["welcome-htm"],
     evidence: [
-      "HtmlEditor writes the edited doc text to workingCopyStore.authored* fields, which projectWorkingCopyVfs step 0b projects into the VFS and serializeWorkingCopy step 5c re-applies after regeneration (specs/html-editor); the welcome-htm decision records the step's completion (lib/htmlStepCompletion.ts)",
+      "HtmlEditor writes the edited doc text to workingCopyStore.authored* fields, which projectWorkingCopyVfs step 0b projects into the VFS and serializeWorkingCopy step 5c re-applies after regeneration (specs/html-editor); the welcome-htm decision records the step's completion (lib/htmlStepCompletion.ts). On a keyboard opened for update none of that holds: each page is written into its file when edited (lib/docsOpenCommit), authored* stays null, and the decision records only the page names",
     ],
   },
 ];
@@ -526,6 +526,8 @@ export const WORKING_COPY_MEMBER_CLASSIFICATION: Readonly<
   instantiateFromExisting: { kind: "action", class: "STARTING-POINT" },
   // Open mode (spec 111 FR-009): swaps a starting-point file and startIr together.
   replaceStartingPointFromText: { kind: "action", class: "STARTING-POINT" },
+  // Open mode (spec 111 live files): writes the applied change's files and re-parses.
+  replaceStartingPointFiles: { kind: "action", class: "STARTING-POINT" },
   setIdentity: { kind: "action", class: "OVERLAY-CHANNEL" },
   setAttribution: { kind: "action", class: "OVERLAY-CHANNEL" },
   setLicenseUnparseable: { kind: "action", class: "STARTING-POINT" },

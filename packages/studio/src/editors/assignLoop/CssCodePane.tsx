@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { useLingui } from "@lingui/react/macro";
 import { lintCssText, type CssCodeMarker } from "./cssCodeLint.ts";
+import { useUnappliedText } from "../../hooks/useUnappliedText.ts";
 
 const LINT_DEBOUNCE_MS = 300;
 const MARKER_OWNER = "css-editor-lint";
@@ -28,8 +29,11 @@ function monacoSeverity(
 interface CssCodePaneProps {
   /** Initial CSS text (from working copy or empty). */
   initialText: string;
-  /** Called with the CSS text when the user clicks Apply. */
-  onApply: (css: string) => void;
+  /**
+   * Called with the CSS text when the user clicks Apply. On a keyboard opened for update it
+   * returns whether the files took the text (false keeps the text as unapplied).
+   */
+  onApply: (css: string) => void | Promise<boolean>;
   /** Whether Apply is currently disabled (e.g., lint errors). */
   applyDisabled?: boolean;
 }
@@ -44,6 +48,8 @@ export function CssCodePane({ initialText, onApply, applyDisabled }: CssCodePane
   const monacoRef = useRef<Parameters<OnMount>[1] | null>(null);
   const lintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAppliedRef = useRef<string>(initialText);
+  // The draft as a ref too: the leave guard reads it between a Discard or Apply and the next render.
+  const textRef = useRef<string>(initialText);
 
   const isDirty = text !== lastAppliedRef.current;
 
@@ -95,18 +101,39 @@ export function CssCodePane({ initialText, onApply, applyDisabled }: CssCodePane
     }
   };
 
-  const handleApply = () => {
+  const [, bump] = useState(0);
+  // True when the text was applied. A sync `onApply` (Copy) is applied at once; an async one
+  // (the apply host on Open) is applied only when it says so, so a refused apply stays unapplied.
+  const handleApply = async (): Promise<boolean> => {
     // Synchronous lint gate: don't apply with errors
     const next = lintCssText(text);
     if (next.some((m) => m.severity === "error")) {
       setMarkers(next);
       setHasErrors(true);
       applyMarkersToModel(next);
-      return;
+      return false;
     }
-    lastAppliedRef.current = text;
-    onApply(text);
+    const applying = text;
+    const result: unknown = onApply(applying);
+    if (result instanceof Promise) {
+      const ok: unknown = await result;
+      if (ok === false) return false;
+    }
+    lastAppliedRef.current = applying;
+    bump((n) => n + 1);
+    return true;
   };
+
+  // Leave guard (spec 111 FR-046): see stores/unappliedTextStore.ts.
+  useUnappliedText({
+    label: t({ id: "open.unapplied.view.css", message: "the stylesheet" }),
+    hasUnapplied: () => textRef.current !== lastAppliedRef.current,
+    apply: handleApply,
+    discard: () => {
+      textRef.current = lastAppliedRef.current;
+      setText(lastAppliedRef.current);
+    },
+  });
 
   const errorCount = markers.filter((m) => m.severity === "error").length;
   const warningCount = markers.filter((m) => m.severity === "warning").length;
@@ -118,7 +145,10 @@ export function CssCodePane({ initialText, onApply, applyDisabled }: CssCodePane
           height="100%"
           defaultLanguage="css"
           value={text}
-          onChange={(value) => setText(value ?? "")}
+          onChange={(value) => {
+            textRef.current = value ?? "";
+            setText(value ?? "");
+          }}
           onMount={handleMount}
           options={{
             minimap: { enabled: false },
@@ -156,7 +186,7 @@ export function CssCodePane({ initialText, onApply, applyDisabled }: CssCodePane
         )}
         <button
           type="button"
-          onClick={handleApply}
+          onClick={() => void handleApply().catch(() => undefined)}
           disabled={hasErrors || applyDisabled || !isDirty}
           style={{
             padding: "6px 16px",

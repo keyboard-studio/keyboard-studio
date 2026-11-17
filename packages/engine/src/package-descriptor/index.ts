@@ -21,6 +21,7 @@ export {
   buildLanguageElement,
   buildLanguagesBlock,
   parseTargetTokens,
+  KMW_JS_TARGETS,
   kpsMemberRef,
   normaliseKpsFontEntries,
   WELCOME_PAGE_KPS_REF,
@@ -28,8 +29,8 @@ export {
   normaliseWelcomeFolderFiles,
 } from "./build.js";
 export type { PackageDescriptorIdentity, KpsFontDescriptorEntry } from "./build.js";
-export { applyIdentityToKps } from "./patch.js";
-export type { OpenKpsOptions, KpsLanguageEntry } from "./patch.js";
+export { applyIdentityToKps, patchOpenKpsInfo, addOpenKpsFile } from "./patch.js";
+export type { OpenKpsOptions, OpenKpsInfoPatch, OpenKpsFileEntry, OpenKpsOptionTag, KpsLanguageEntry } from "./patch.js";
 export type { ApplyIdentityToKpsResult } from "./patch.js";
 
 /**

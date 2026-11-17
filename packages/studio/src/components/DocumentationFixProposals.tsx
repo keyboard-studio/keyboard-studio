@@ -19,6 +19,12 @@
 // image width) remain as rows; their answers still live in
 // `docFixProposals` beside the question's `bodySync`.
 
+import { commitImageWidthFixOnOpen } from "../lib/cssOpenCommit.ts";
+import { KB_CSS, imageWidthRuleInFiles } from "../lib/docImageWidthFix.ts";
+import { isLiveOpen } from "../lib/openMode.ts";
+import { lastUndoableRecord, undoLastOpenApply } from "../lib/openApply.ts";
+import { useOpenUndoStore } from "../stores/openUndoStore.ts";
+import { useApplyOnOpen } from "./OpenApplyHost.tsx";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { expectedPagename, parsePagename } from "@keymanapp/keyboard-lint";
 import type { DocFixProposals } from "@keyboard-studio/contracts";
@@ -27,8 +33,6 @@ import { useDocumentationFindings } from "../hooks/useDocumentationFindings.ts";
 
 const PAGENAME_CODE = "KM_LINT_PHP_PAGENAME_FORMAT";
 const OSK_IMAGE_CODE = "KM_LINT_PHP_OSK_IMAGE_UNCONSTRAINED";
-
-const KB_CSS_PATH_RE = /^source\/(?:help|welcome)\/kb\.css$/i;
 
 const rowStyle: React.CSSProperties = {
   border: "1px solid var(--app-border)",
@@ -53,6 +57,11 @@ export function DocumentationFixProposals(): React.ReactElement | null {
   const displayName = useWorkingCopyStore(
     (s) => s.identity?.displayName ?? s.startKeyboard?.displayName ?? "",
   );
+  const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
+  const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  const applyOnOpen = useApplyOnOpen();
+  // Subscribed so the row re-renders when the undo log moves (the footer Undo).
+  const undoRecords = useOpenUndoStore((s) => s.records);
   const findings = useDocumentationFindings();
 
   if (!isAdaptation) return null;
@@ -65,8 +74,8 @@ export function DocumentationFixProposals(): React.ReactElement | null {
   // so the slice is where presence and the row's naming come from.
   const kbCssPaths = [
     ...new Set([
-      ...(startVfs?.list("source/") ?? []).filter((p) => KB_CSS_PATH_RE.test(p)),
-      ...(startDocCssTexts ?? []).map((entry) => entry.path).filter((p) => KB_CSS_PATH_RE.test(p)),
+      ...(startVfs?.list("source/") ?? []).filter((p) => KB_CSS.test(p)),
+      ...(startDocCssTexts ?? []).map((entry) => entry.path).filter((p) => KB_CSS.test(p)),
     ]),
   ];
   const showPagename = codes.has(PAGENAME_CODE) || proposals?.pagename !== undefined;
@@ -77,8 +86,39 @@ export function DocumentationFixProposals(): React.ReactElement | null {
     (codes.has(OSK_IMAGE_CODE) && kbCssPaths.length > 0) || proposals?.imageWidth !== undefined;
   if (!showPagename && !showImageWidth) return null;
 
+  const liveOpen = isLiveOpen({ instantiationMode, startVfs, startKeyboard });
+  // On Open the files are the truth: the row is applied when kb.css holds the rule, and the stored
+  // answer is only the record of what the author chose. A stored answer can be stale against the files
+  // (declined but the rule is there; accepted after a footer Undo); nothing reads the record on Open.
+  const imageApplied = liveOpen
+    ? startVfs !== null && imageWidthRuleInFiles(startVfs)
+    : proposals?.imageWidth === "accepted";
+  void undoRecords; // read so a log change re-renders and re-selects
+  const latestIsWidthFix = liveOpen && lastUndoableRecord()?.labelKey === "doc-image-width";
+
   const record = (patch: Partial<DocFixProposals>): void =>
     setProposals({ ...(proposals ?? {}), ...patch });
+  // Accept the width fix. On Open it is written into the stylesheet first (one undo step) and
+  // the answer is recorded only when the file holds the rule.
+  const acceptImageWidth = (): void => {
+    if (!liveOpen) {
+      record({ imageWidth: "accepted" });
+      return;
+    }
+    void commitImageWidthFixOnOpen(applyOnOpen).then((outcome) => {
+      const held = useWorkingCopyStore.getState().startVfs;
+      if (outcome === "written" || (outcome === "unchanged" && held !== null && imageWidthRuleInFiles(held))) {
+        const now = useWorkingCopyStore.getState().docFixProposals;
+        setProposals({ ...(now ?? {}), imageWidth: "accepted" });
+      }
+    });
+  };
+  // Undo of an applied width fix on Open is the footer Undo's step: it is taken only while it is
+  // the latest one, and the answer is cleared only once the file has lost the rule.
+  const undoImageWidthOnOpen = (): void => {
+    if (!latestIsWidthFix || !undoLastOpenApply().ok) return;
+    clear("imageWidth");
+  };
   const clear = (key: keyof DocFixProposals): void => {
     const next: DocFixProposals = { ...(proposals ?? {}) };
     delete next[key];
@@ -168,16 +208,30 @@ export function DocumentationFixProposals(): React.ReactElement | null {
           {imageFinding !== undefined && (
             <span style={{ fontSize: 12 }}>{imageFindingMessage}</span>
           )}
-          {proposals?.imageWidth === "accepted" ? (
+          {imageApplied ? (
             <div style={buttonRowStyle}>
               <span>
                 <Trans id="editor.help.docFixProposals.imageWidth.applied">
                   Applied — the shipped kb.css will carry the image width rule.
                 </Trans>
               </span>
-              <button type="button" onClick={() => clear("imageWidth")}>
-                <Trans id="editor.help.docFixProposals.undo">Undo</Trans>
-              </button>
+              {liveOpen ? (
+                latestIsWidthFix ? (
+                  <button type="button" onClick={undoImageWidthOnOpen}>
+                    <Trans id="editor.help.docFixProposals.undo">Undo</Trans>
+                  </button>
+                ) : (
+                  <span>
+                    <Trans id="editor.help.docFixProposals.imageWidth.undoInFooter">
+                      Use Undo in the footer to take this back after the changes made since.
+                    </Trans>
+                  </span>
+                )
+              ) : (
+                <button type="button" onClick={() => clear("imageWidth")}>
+                  <Trans id="editor.help.docFixProposals.undo">Undo</Trans>
+                </button>
+              )}
             </div>
           ) : proposals?.imageWidth === "declined" ? (
             <div style={buttonRowStyle}>
@@ -192,7 +246,7 @@ export function DocumentationFixProposals(): React.ReactElement | null {
             </div>
           ) : (
             <div style={buttonRowStyle}>
-              <button type="button" onClick={() => record({ imageWidth: "accepted" })}>
+              <button type="button" onClick={acceptImageWidth}>
                 <Trans id="editor.help.docFixProposals.imageWidth.apply">Add the width rule</Trans>
               </button>
               <button type="button" onClick={() => record({ imageWidth: "declined" })}>
