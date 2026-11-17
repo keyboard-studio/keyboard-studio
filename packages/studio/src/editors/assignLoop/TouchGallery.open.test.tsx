@@ -83,6 +83,7 @@ function previewTouchText(): string | undefined {
 describe("TouchGallery on a keyboard opened for update", () => {
   it("the character view's preview keeps a key-grid edit and a placement that are both in the file (a placement is written when applied)", async () => {
     seedOpen(TOUCH);
+    useWorkingCopyStore.getState().setTouchEditorMode("character");
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });

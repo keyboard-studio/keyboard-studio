@@ -75,6 +75,8 @@ function seedOpen(touch: string): void {
     { path: "source/basic_kbdus.keyman-touch-layout", content: touch, isBinary: false },
   ]);
   useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: makeTestIR([]) });
+  // These are Place Letters tests; Manage Layout is the default view.
+  useWorkingCopyStore.getState().setTouchEditorMode("character");
   useWorkingCopyStore.getState().recordPhase({ phase: "B", answers: [], confirmedInventory: ["中"] });
   useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
   useDecisionStore.getState().record({ id: "touch-seed-source", value: "import-adapt", provenance: "asked", step: "touch_seed_source" });

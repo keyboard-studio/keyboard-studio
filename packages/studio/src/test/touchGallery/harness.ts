@@ -37,6 +37,9 @@ export function seedStore(
   ]);
   const ir = opts.ir ?? makeTestIR([]);
   useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
+  // These seeders set up the Place Letters walk, which is no longer the
+  // default view (Manage Layout is); open on it as an author would by its tab.
+  useWorkingCopyStore.getState().setTouchEditorMode("character");
   if (opts.withInventory !== undefined) {
     useWorkingCopyStore.getState().recordPhase({
       phase: "B",
@@ -86,6 +89,7 @@ export function seedWithDesktopAssignment(
   ]);
   const ir = makeTestIR([]);
   useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
+  useWorkingCopyStore.getState().setTouchEditorMode("character");
   useWorkingCopyStore.getState().recordPhase({
     phase: "B",
     answers: [],

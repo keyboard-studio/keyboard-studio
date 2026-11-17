@@ -228,6 +228,11 @@ import {
   type KeyEditInvalidationWarning,
   type KeyEditRejectionNotice,
 } from "./keyGrid/useKeyEditGuards.ts";
+import {
+  touchCoverageByPlatform,
+  touchModePlatformLabel,
+  type TouchPlatformCoverage,
+} from "./touchPlatformCoverage.ts";
 // TIKE touch-builder port (slice-spec): the "Code" tab pane. Phase 0 lands
 // it as a stub; Phase 2 wires in the Monaco editor. Lazy-loaded so the
 // Monaco bundle never lands in the main chunk.
@@ -464,35 +469,6 @@ function isNoOutputLetterCell(cell: KeyGridCellViewModel): boolean {
   if (cell.keycap.startsWith("*")) return false;
   if (KEY_MODE_NON_LETTER_ALLOWLIST.has(cell.id)) return false;
   return cell.producedChars.length === 0;
-}
-
-/** Localized label for a `.keyman-touch-layout` platform id (T072's key-mode
- * platform tabs). Takes an optional i18n + resolves via msg()/resolveMessage()
- * — see touchMechanismLabel's doc comment just below for why a bare `t`
- * parameter would break Lingui's static extraction here. */
-function touchModePlatformLabel(id: string, i18n?: I18n): string {
-  if (id === "phone") {
-    return resolveMessage(
-      i18n,
-      msg({ id: "editor.assignLoop.touch.keyMode.platform.phone", message: "Phone" }),
-    );
-  }
-  if (id === "tablet") {
-    return resolveMessage(
-      i18n,
-      msg({ id: "editor.assignLoop.touch.keyMode.platform.tablet", message: "Tablet" }),
-    );
-  }
-  if (id === "desktop") {
-    return resolveMessage(
-      i18n,
-      msg({
-        id: "editor.assignLoop.touch.keyMode.platform.desktop",
-        message: "Desktop touch",
-      }),
-    );
-  }
-  return id;
 }
 
 /**
@@ -1990,25 +1966,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [keyModeRuleIndex, ir, coverageOptions],
   );
 
-  // Session-aware desktop produced set (shaped-bug fix, diacritic-
-  // implementability) — the SAME `producedSet` MechanismGallery's coverage
-  // gate derives from (base .kmn + this session's physical assignments
-  // injected via applyAssignments/buildSessionProducedSet; see
-  // useInventoryDiff.ts and
-  // packages/engine/src/pattern-apply/sessionProducedSet.ts). Used ONLY by
-  // `handleContinue`'s completion-GATE re-check below (touchCoverage's
-  // `additionalProduced` parameter), so a touch inventory char composable
-  // only because its combining-mark component was assigned a DESKTOP deadkey
-  // this session (e.g. "ж" + a session-assigned diaeresis deadkey composing
-  // "ӝ") doesn't block completion. Deliberately NOT threaded into
-  // `detectedChars`/`touchLettersToAdd` below — those drive the INTERACTIVE
-  // walk (`usePositionalCharNav`'s `list`), which must stay static across a
-  // session for the identical reason useInventoryDiff.ts's own module doc
-  // gives for MechanismGallery's `lettersToAdd`: reflowing it whenever a
-  // session assignment changes coverage would strand/reflow the walk mid-edit
-  // (caught by this fix's own regression pass).
-  const { producedSet: desktopProducedSet, rawProducedSet: desktopRawProducedSet } =
-    useInventoryDiff();
+  // This session's desktop produced set, un-augmented (useInventoryDiff.ts;
+  // packages/engine/src/pattern-apply/sessionProducedSet.ts). It never credits
+  // TOUCH coverage, not even as a composition seed: a mark the desktop types
+  // through a deadkey is not typeable on a phone unless a touch key reaches
+  // it, and a touch key bound to a .kmn rule is already credited through
+  // `keyModeCoverageOptions`' rule index. Read only for `desktopDirectProducedSet`.
+  const { rawProducedSet: desktopRawProducedSet } = useInventoryDiff();
 
   // Draft persistence — read on mount; write on every charTouch change.
   const touchDraft = useWorkingCopyStore((s) => s.touchDraft);
@@ -2435,14 +2399,18 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // same index the completion gate and the edit-time guard use — see that
   // memo's own doc comment. A synthesized touch-key rule must move these
   // figures, the gate, and the inline warning together or not at all.
+  //
+  // Unplaced is per platform (touchPlatformCoverage.ts): a letter on the
+  // tablet layout but not the phone one is still unplaced, on the phone.
   const keyGridProgress = useMemo<{
     unplacedChars: readonly string[];
+    unplacedByPlatform: ReadonlyMap<string, readonly string[]>;
     keysWithNoOutput: readonly string[];
   }>(() => {
     if (effectiveKeyModeLayout === null || keyModeRuleIndex === undefined) {
-      return { unplacedChars: inventory, keysWithNoOutput: [] };
+      return { unplacedChars: inventory, unplacedByPlatform: new Map(), keysWithNoOutput: [] };
     }
-    const { uncovered } = touchCoverage(
+    const { uncovered, byPlatform } = touchCoverageByPlatform(
       effectiveKeyModeLayout,
       inventory,
       keyModeCoverageOptions,
@@ -2464,31 +2432,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         }
       }
     }
-    return { unplacedChars: uncovered, keysWithNoOutput };
+    return { unplacedChars: uncovered, unplacedByPlatform: byPlatform, keysWithNoOutput };
   }, [effectiveKeyModeLayout, keyModeRuleIndex, inventory, keyModeCoverageOptions]);
-
-  // Placement tray for the header bar: unplaced inventory chars + anything
-  // demoted back to it, deduped, in order. Lives in the locked header so it
-  // stays visible while the board scrolls beneath it.
-  const trayLetters = useMemo(() => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const c of [...keyGridProgress.unplacedChars, ...trayReturns]) {
-      if (!seen.has(c)) {
-        seen.add(c);
-        out.push(c);
-      }
-    }
-    return out;
-  }, [keyGridProgress.unplacedChars, trayReturns]);
-
-  // Already-placed letters (inventory minus unplaced), for the "show placed"
-  // checkbox — dotted in the tray so they can be placed in more than one
-  // location.
-  const placedLetters = useMemo(() => {
-    const unplaced = new Set(keyGridProgress.unplacedChars);
-    return inventory.filter((c) => !unplaced.has(c));
-  }, [inventory, keyGridProgress.unplacedChars]);
 
   // Platform catalog for the key-mode grid's platform tabs (T077 already
   // renders the tablist; this just supplies the catalog from the effective
@@ -2538,6 +2483,40 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         : (keyModePlatforms[0]?.id ?? null),
     );
   }, [keyModePlatforms]);
+
+  // What the tray offers is what the platform on screen lacks: a letter placed
+  // on the tablet still sits in the phone's tray. A platform with no figure of
+  // its own (not tracked, or not chosen yet) falls back to the overall list.
+  const activePlatformUnplaced = useMemo(
+    () =>
+      (activeKeyPlatformId !== null
+        ? keyGridProgress.unplacedByPlatform.get(activeKeyPlatformId)
+        : undefined) ?? keyGridProgress.unplacedChars,
+    [activeKeyPlatformId, keyGridProgress],
+  );
+
+  // Placement tray for the header bar: unplaced inventory chars + anything
+  // demoted back to it, deduped, in order. Lives in the locked header so it
+  // stays visible while the board scrolls beneath it.
+  const trayLetters = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const c of [...activePlatformUnplaced, ...trayReturns]) {
+      if (!seen.has(c)) {
+        seen.add(c);
+        out.push(c);
+      }
+    }
+    return out;
+  }, [activePlatformUnplaced, trayReturns]);
+
+  // Already-placed letters (inventory minus unplaced), for the "show placed"
+  // checkbox — dotted in the tray so they can be placed in more than one
+  // location.
+  const placedLetters = useMemo(() => {
+    const unplaced = new Set(activePlatformUnplaced);
+    return inventory.filter((c) => !unplaced.has(c));
+  }, [inventory, activePlatformUnplaced]);
 
   const activeKeyPlatformEntry = useMemo(
     () =>
@@ -2807,11 +2786,23 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // (checked synchronously in handleAssignPanelCommit below, before the
   // commit lands) — never deferred to the Continue gate. Cleared on a new
   // selection so a stale warning from a previous key never lingers.
+  //
+  // A commit can move the selection itself (Delete selects a neighbour; add,
+  // rename and move follow the key), and that move must not wipe the warning
+  // the same commit just raised. `warningsJustSetRef` marks warnings set since
+  // the last render; the selection effect skips one clear for them, and the
+  // effect after it retires the mark either way, so the author's next
+  // selection change clears as before.
   const [keyEditInvalidationWarnings, setKeyEditInvalidationWarnings] =
     useState<readonly KeyEditInvalidationWarning[]>([]);
+  const warningsJustSetRef = useRef(false);
   useEffect(() => {
+    if (warningsJustSetRef.current) return;
     setKeyEditInvalidationWarnings([]);
   }, [selectedKeyAddress]);
+  useEffect(() => {
+    warningsJustSetRef.current = false;
+  }, [keyEditInvalidationWarnings]);
 
   // T106 (FR-062): the characters a KEY EDIT has actually sent back to the
   // unplaced worklist — accumulated across commits, deliberately NOT re-derived
@@ -2960,6 +2951,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
       const warnings = checkKeyEditOperation(op);
       setKeyEditInvalidationWarnings(warnings);
+      if (warnings.length > 0) warningsJustSetRef.current = true;
 
       if (!openTouch) onGuardsPassed?.();
 
@@ -4331,6 +4323,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       setKeyEditRejections([]);
       const warnings = checkKeyEditOperation(result.op);
       setKeyEditInvalidationWarnings(warnings);
+      if (warnings.length > 0) warningsJustSetRef.current = true;
 
       const store = useWorkingCopyStore.getState();
       const outcome = store.commitTouchKeyRename(result.oldId, result.newId);
@@ -4807,12 +4800,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // than currentChar/usePositionalCharNav below — because touchLettersToAdd
   // (the walk list) needs it before either of those can be declared.
   //
-  // Deliberately NOT session-aware (does not take desktopProducedSet): this
-  // memo drives touchLettersToAdd (the interactive walk denominator below),
-  // which must stay static across a session — see this file's
-  // desktopProducedSet declaration comment and useInventoryDiff.ts's module
-  // doc for why. The session-aware completion check lives in handleContinue
-  // below instead.
+  // Deliberately NOT session-aware: this memo drives touchLettersToAdd (the
+  // interactive walk denominator below), which must stay static across a
+  // session — see useInventoryDiff.ts's module doc for why. The live
+  // completion check lives in touchGateCoverage below instead.
   const detectedChars = useMemo<Set<string>>(() => {
     if (detectionSeedLayout === null) return new Set<string>();
     try {
@@ -5050,47 +5041,51 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // T120/key-mode reconciliation note there): `effectiveKeyModeLayout` (which
   // IS `layoutForLintAndGate` whenever the key-edit overlay is empty) +
   // `keyModeCoverageOptions` (the mutable-`ir` rule index both the key-mode
-  // grid and the gate resolve coverage through) + `desktopProducedSet`. Kept
+  // grid and the gate resolve coverage through). Kept
   // as one shared memo — read by BOTH `handleContinue` and the proactive
   // button-disable below — so the two can never disagree about what counts
   // as uncovered.
   const sessionAlphabet = useWorkingCopyStore((s) => s.session.alphabet);
   const sessionMarksWorklist = useWorkingCopyStore((s) => s.session.marksWorklist);
-  const uncoveredTouchChars = useMemo<string[]>(() => {
-    if (effectiveKeyModeLayout === null) return [];
-    const uncovered = [
-      ...touchCoverage(
-        effectiveKeyModeLayout,
-        inventory,
-        keyModeCoverageOptions,
-        desktopProducedSet,
-      ).uncovered,
-    ];
+  //
+  // Judged per platform (touchPlatformCoverage.ts), like the progress figures:
+  // a character the phone layout cannot type keeps the gate closed even when
+  // the tablet types it.
+  const touchGateCoverage = useMemo<TouchPlatformCoverage>(() => {
+    if (effectiveKeyModeLayout === null) return { uncovered: [], byPlatform: new Map() };
     // Composed-treatment mark credit (lib/placementInventory.ts's
     // treatmentCreditedMarks — the same rule the shared coverage gate
     // applies): a lone mark whose treatment is `composed` is not a
     // placement unit, so this walk can never give it a touch mechanism;
     // once every attested combination of it is reachable on the layout
-    // (the inventory-minus-uncovered covered set — touchCoverage has
-    // already folded desktopProducedSet in as its composability seed),
+    // (the inventory-minus-uncovered covered set),
     // the mark's touch obligation is discharged through those
-    // combinations and it must not keep the FR-008 gate closed.
-    if (sessionAlphabet === undefined || sessionMarksWorklist === undefined) return uncovered;
-    const uncoveredSet = new Set(uncovered.map((c) => c.normalize("NFC")));
-    const covered = new Set<string>(
-      inventory.filter((c) => !uncoveredSet.has(c.normalize("NFC"))),
+    // combinations and it must not keep the FR-008 gate closed. Applied to
+    // each platform's own list, since the combinations must be reachable there.
+    const creditMarks = (uncovered: readonly string[]): readonly string[] => {
+      if (sessionAlphabet === undefined || sessionMarksWorklist === undefined) return uncovered;
+      const uncoveredSet = new Set(uncovered.map((c) => c.normalize("NFC")));
+      const covered = new Set<string>(
+        inventory.filter((c) => !uncoveredSet.has(c.normalize("NFC"))),
+      );
+      const credited = treatmentCreditedMarks(sessionAlphabet, sessionMarksWorklist, covered);
+      if (credited.size === 0) return uncovered;
+      return uncovered.filter((c) => !credited.has(c.normalize("NFC")));
+    };
+    return touchCoverageByPlatform(
+      effectiveKeyModeLayout,
+      inventory,
+      keyModeCoverageOptions,
+      creditMarks,
     );
-    const credited = treatmentCreditedMarks(sessionAlphabet, sessionMarksWorklist, covered);
-    if (credited.size === 0) return uncovered;
-    return uncovered.filter((c) => !credited.has(c.normalize("NFC")));
   }, [
     effectiveKeyModeLayout,
     inventory,
     keyModeCoverageOptions,
-    desktopProducedSet,
     sessionAlphabet,
     sessionMarksWorklist,
   ]);
+  const uncoveredTouchChars = useMemo(() => [...touchGateCoverage.uncovered], [touchGateCoverage]);
 
   // Bind this walk to the shared within-step position model — one footer dot per
   // character, and a jump into the middle of the walk lands. Declared AFTER the
@@ -5118,6 +5113,19 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [uncoveredTouchChars, markedTouchSet],
   );
 
+  // The platform tabs' warning badges count exactly what keeps Continue shut
+  // on each platform (the gate's per-platform lists, less letters marked for
+  // later), so a badge shows if and only if that platform blocks the step.
+  const unplacedCountByPlatform = useMemo(
+    () =>
+      new Map(
+        [...touchGateCoverage.byPlatform].map(
+          ([id, chars]) => [id, subtractMarked(chars, markedTouchSet).length] as const,
+        ),
+      ),
+    [touchGateCoverage, markedTouchSet],
+  );
+
   // T120 (FR-036e): the key-edit overlay's half of "committed or explicitly
   // resolved". `true` once the author has been shown the orphaned-edit notice
   // at Continue, so the second Continue completes. Component-local, and NOT a
@@ -5131,13 +5139,22 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
   // Named string local for the FR-008 inline hint rendered near the
   // completion control below — null hides the hint entirely.
-  const unaccountedTouchMessage = useMemo(
-    () =>
-      unaccountedTouchChars.length > 0
-        ? unaccountedTouchChars.map((c) => formatUncoveredTouchMessage(c)).join("; ")
-        : null,
-    [unaccountedTouchChars],
-  );
+  // A character missing on only some platforms names them, so "has no touch
+  // mechanism" is never claimed for a letter the tablet already types.
+  const unaccountedTouchMessage = useMemo(() => {
+    if (unaccountedTouchChars.length === 0) return null;
+    const tracked = [...touchGateCoverage.byPlatform.keys()];
+    return unaccountedTouchChars
+      .map((c) => {
+        const missingOn = tracked.filter((id) => touchGateCoverage.byPlatform.get(id)?.includes(c));
+        if (missingOn.length === 0 || missingOn.length === tracked.length) return formatUncoveredTouchMessage(c);
+        return t({
+          id: "editor.assignLoop.touch.uncoveredOnPlatforms",
+          message: `${{ notation: toUPlusNotation(c) }} ${{ char: c }} has no key on ${{ platforms: missingOn.map((id) => touchModePlatformLabel(id, i18n)).join(", ") }}`,
+        });
+      })
+      .join("; ");
+  }, [unaccountedTouchChars, touchGateCoverage, t, i18n]);
 
   // T120: a NEW orphan is never waived by an earlier acknowledgement. Keyed on
   // the overlay itself rather than on `touchKey` above, because the overlay is
@@ -5173,8 +5190,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // Continue button (`touch-key-mode-continue`) are BOTH disabled proactively
   // while `unaccountedTouchChars` (mark-aware; see that memo above — it
   // re-runs touchCoverage on the effective layout, `effectiveKeyModeLayout`,
-  // using `keyModeCoverageOptions` + the session-aware `desktopProducedSet`,
-  // so it can never disagree with either button's own disabled computation)
+  // using `keyModeCoverageOptions`, so it can never disagree with either button's own disabled computation)
   // is non-empty — so this callback should be unreachable via either control
   // in the ordinary walk. Kept as a guard rather than removed, in case a
   // future button branch omits the same check.
@@ -5347,11 +5363,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
   // Pre-augment, desktop-session-only produced set — mirrors
   // MechanismGallery's `baseProducedSet`: `buildSessionProducedSet` does NOT
-  // call `augmentWithComposable` (contrast with `desktopProducedSet` above,
-  // useInventoryDiff's AUGMENTED `producedSet`, used only by the completion
-  // GATE). `selectDesktopAssignments(phaseResults)` — the SAME unfiltered
-  // (by scope) selector `useInventoryDiff` itself uses internally to build
-  // `desktopProducedSet` — not the narrower `desktopAssignments` above (which
+  // call `augmentWithComposable` (unlike useInventoryDiff's AUGMENTED
+  // `producedSet`). `selectDesktopAssignments(phaseResults)` — the SAME
+  // unfiltered (by scope) selector `useInventoryDiff` itself uses internally
+  // to build its `producedSet` — not the narrower `desktopAssignments` above (which
   // filters to `scope: "individual"` only), so this can't disagree with the
   // gate's own desktop-side produced set over a sequence/character-class-
   // scope assignment. Feeds `directTouchProducedSet` below.
@@ -6968,7 +6983,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           label: touchContinueLabel,
           ariaLabel: touchContinueLabel,
           onClick: handleContinue,
-          disabled: false,
+          // allCovered pools platforms; a letter can count as covered there
+          // while one platform still lacks a key, and handleContinue would
+          // then do nothing. Gate exactly as handleContinue does.
+          disabled: unaccountedTouchChars.length > 0,
         }
       : currentChar !== null && touchLettersToAdd.includes(currentChar)
         ? {
@@ -7351,6 +7369,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                 label: t({ id: "editor.assignLoop.doneButton", message: "Continue" }),
                 onClick: handleContinue,
                 testId: "touch-continue",
+                // The walk can be empty while a letter still lacks a key on one
+                // platform (detection pools platforms; the gate does not), so
+                // this Continue gates exactly as handleContinue does.
+                disabled: unaccountedTouchChars.length > 0,
+                ...(unaccountedTouchMessage !== null
+                  ? { ariaDescribedBy: unaccountedTouchHintId }
+                  : {}),
               },
             }}
           />
@@ -7359,6 +7384,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               No new characters to add.
             </Trans>
           </p>
+          {completionGateNotice}
         </>
       )}
 
@@ -8017,14 +8043,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   );
 
   // ---------------------------------------------------------------------------
-  // Key mode (T072) — the editable schematic grid surface. FR-020h/FR-035:
-  // this MUST read as visually and verbally distinct from the live OSK
-  // preview beside it (labelled "for editing" here vs. "for testing" on the
-  // preview pane below) so the two keyboard-shaped surfaces never look like
-  // two ways to do the same thing. Wrapped in the SAME onKeyDown/style shell
-  // characterModeContent uses, so the pane-level ArrowLeft/Right char-cycle
-  // handler (useCharCycleKeys) still correctly skips past the grid — its
-  // SKIP_SELECTOR already excludes `[role="grid"]`.
+  // Key mode (T072) — the editable schematic grid surface. Wrapped in the
+  // SAME onKeyDown/style shell characterModeContent uses, so the pane-level
+  // ArrowLeft/Right char-cycle handler (useCharCycleKeys) still correctly
+  // skips past the grid — its SKIP_SELECTOR already excludes `[role="grid"]`.
   const keyModeContent = (
     /* eslint-disable-next-line jsx-a11y/no-static-element-interactions --
        same bubbled-keydown rationale as characterModeContent above; this
@@ -8077,53 +8099,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           didn't. */}
       {completionGateNotice}
 
-      {/* The "for editing" verb (FR-020h) — an editable SCHEMATIC layout, not
-          a rendered keyboard you type on. */}
-      <p
-        style={{
-          margin: 0,
-          fontSize: 12,
-          fontWeight: 600,
-          color: TEXT_DIM,
-          fontFamily: FONT,
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-        }}
-      >
-        <Trans id="editor.assignLoop.touch.keyMode.editingLabel">
-          Editable layout — for editing
-        </Trans>
-      </p>
-
       {/* TIKE touch-builder port (slice-spec §3.2): the visual builder pane
           replaces the old "By key" editor surface (layer selector, grid,
           gesture panel, property panel, key dialogs). Step chrome — nav,
           gate notices, find, invalidation warnings, rejections, the
           dead-key repair list — stays: it belongs to the step, not the
           editor surface. */}
-      {/* The one key-mode control that genuinely has no key to hang off:
-          finding a key you cannot yet see. `handleFindJump` sets the
-          platform/layer/selection the builder pane reads, so it keeps
-          working against the new surface. */}
-      <div style={{ display: "flex", gap: 8 }}>
-        <button
-          type="button"
-          onClick={() => setFindPanelOpen((prev) => !prev)}
-          data-testid="touch-key-mode-find-toggle"
-          style={ghostBtn}
-        >
-          {t({ id: "editor.assignLoop.touch.keyMode.findButton", message: "Find a key" })}
-        </button>
-      </div>
-
-      {findPanelOpen && effectiveKeyModeLayout !== null && keyModeRuleIndex !== undefined && (
-        <FindPanel
-          layout={effectiveKeyModeLayout}
-          ruleIndex={keyModeRuleIndex}
-          onJumpToResult={handleFindJump}
-        />
-      )}
-
       {openTouchUnreadable && (
         <p role="alert" data-testid="touch-open-unreadable">
           {t({
@@ -8138,6 +8119,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         layout={effectiveKeyModeLayout}
         activePlatformId={activeKeyPlatformId}
         onSelectPlatform={setActiveKeyPlatformId}
+        unplacedCountByPlatform={unplacedCountByPlatform}
         activeLayerId={activeKeyLayerId}
         onSelectLayer={setActiveKeyLayerId}
         selectedKeyAddress={selectedKeyAddress}
@@ -8156,6 +8138,28 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         }}
         panelDropHover={panelDropHover}
         dropHoverAddress={dropHoverAddress}
+        // The one key-mode control that genuinely has no key to hang off:
+        // finding a key you cannot yet see. It rides the builder's platform
+        // row; `handleFindJump` sets the platform/layer/selection the pane reads.
+        toolbarActions={
+          <button
+            type="button"
+            onClick={() => setFindPanelOpen((prev) => !prev)}
+            data-testid="touch-key-mode-find-toggle"
+            style={ghostBtn}
+          >
+            {t({ id: "editor.assignLoop.touch.keyMode.findButton", message: "Find a key" })}
+          </button>
+        }
+        toolbarPanel={
+          findPanelOpen && effectiveKeyModeLayout !== null && keyModeRuleIndex !== undefined ? (
+            <FindPanel
+              layout={effectiveKeyModeLayout}
+              ruleIndex={keyModeRuleIndex}
+              onJumpToResult={handleFindJump}
+            />
+          ) : null
+        }
       />
 
         {/* FR-036f: warn AT THE MOMENT of the edit when a key-level edit
@@ -8225,12 +8229,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                   message: "Undo this edit",
                 })}
               </button>
-              {keyEditInvalidationWarnings.some((w) => w.returnsToWorklist) && (
+              {keyEditInvalidationWarnings.some((w) => w.lostOnPlatform) && (
                 <span data-testid="key-edit-invalidation-restore-note" style={{ fontFamily: FONT }}>
                   {t({
-                    id: "editor.assignLoop.touch.keyMode.invalidationRestoreNote",
+                    id: "editor.assignLoop.touch.keyMode.invalidationRestoreNoteTray",
                     message:
-                      "Or keep the edit — the affected characters are back in the by-character list, ready to place somewhere else.",
+                      "Or keep the edit — the affected characters are back in Letters to place, ready to put on another key.",
                   })}
                 </span>
               )}
@@ -8354,20 +8358,22 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // Automatic activation (Left/Right/Home/End move AND select, wrapping)
   // mirrors KeyGrid.tsx's own platform-tablist pattern (T077) — the one
   // existing tabs precedent in this codebase.
+  // Manage Layout leads and is the default view; Place Letters stays
+  // available as the secondary one.
   const touchModeTabs: ReadonlyArray<{ id: TouchEditorMode; label: string }> =
     [
-      {
-        id: "character",
-        label: t({
-          id: "editor.assignLoop.touch.mode.characterTab",
-          message: "Place Letters",
-        }),
-      },
       {
         id: "key",
         label: t({
           id: "editor.assignLoop.touch.mode.keyTab",
           message: "Manage Layout",
+        }),
+      },
+      {
+        id: "character",
+        label: t({
+          id: "editor.assignLoop.touch.mode.characterTab",
+          message: "Place Letters",
         }),
       },
       {
@@ -8650,8 +8656,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   );
 
   // FR-020h/FR-035: the live OSK preview's "for testing" verb — this is the
-  // surface you TYPE ON, in contrast with the schematic key-mode grid's
-  // "for editing" label above (keyModeContent). The character-mode wording
+  // surface you TYPE ON, in contrast with the schematic key-mode grid
+  // (keyModeContent). The character-mode wording
   // stays exactly as it was (no id/message change) since that mode never
   // renders anything grid-shaped beside the preview to be confused with.
   // Only character mode renders a preview pane at all as of spec 065 T037

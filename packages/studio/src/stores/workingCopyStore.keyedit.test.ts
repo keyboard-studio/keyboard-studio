@@ -511,16 +511,16 @@ describe("workingCopyStore — key edit undo integration (T057, FR-032)", () => 
 // ---------------------------------------------------------------------------
 
 describe("workingCopyStore — touchEditorMode", () => {
-  it("defaults to 'character' (the character walk is the default per FR-036)", () => {
-    expect(useWorkingCopyStore.getState().touchEditorMode).toBe("character");
+  it("defaults to 'key' (Manage Layout leads; Place Letters is the secondary view)", () => {
+    expect(useWorkingCopyStore.getState().touchEditorMode).toBe("key");
   });
 
-  it("setTouchEditorMode switches to 'key' and back", () => {
-    useWorkingCopyStore.getState().setTouchEditorMode("key");
-    expect(useWorkingCopyStore.getState().touchEditorMode).toBe("key");
-
+  it("setTouchEditorMode switches to 'character' and back", () => {
     useWorkingCopyStore.getState().setTouchEditorMode("character");
     expect(useWorkingCopyStore.getState().touchEditorMode).toBe("character");
+
+    useWorkingCopyStore.getState().setTouchEditorMode("key");
+    expect(useWorkingCopyStore.getState().touchEditorMode).toBe("key");
   });
 
   it("toggling mode does NOT clear touchDraft or keyEditOverlay (FR-036b)", () => {
@@ -532,16 +532,16 @@ describe("workingCopyStore — touchEditorMode", () => {
       sentinelId: "T_none",
     });
 
-    useWorkingCopyStore.getState().setTouchEditorMode("key");
+    useWorkingCopyStore.getState().setTouchEditorMode("character");
 
     const s = useWorkingCopyStore.getState();
     expect(s.touchDraft).toEqual({ charTouchEntries: [], suggestionResolvedChars: ["a"] });
     expect(s.keyEditOverlay.ops).toHaveLength(1);
   });
 
-  it("reset restores touchEditorMode to 'character'", () => {
-    useWorkingCopyStore.getState().setTouchEditorMode("key");
+  it("reset restores touchEditorMode to 'key'", () => {
+    useWorkingCopyStore.getState().setTouchEditorMode("character");
     useWorkingCopyStore.getState().reset();
-    expect(useWorkingCopyStore.getState().touchEditorMode).toBe("character");
+    expect(useWorkingCopyStore.getState().touchEditorMode).toBe("key");
   });
 });

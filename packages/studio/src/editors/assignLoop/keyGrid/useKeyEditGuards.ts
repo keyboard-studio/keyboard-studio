@@ -189,6 +189,7 @@ import {
 import { resolveMessage } from "../../../lib/i18nResolve.ts";
 import { codepointLabel } from "../../../survey/codepointLabel.ts";
 import { useWorkingCopyStore, type PendingKeyEditOperation } from "../../../stores/workingCopyStore.ts";
+import { projectToPlatform, touchModePlatformLabel } from "../touchPlatformCoverage.ts";
 
 // ---------------------------------------------------------------------------
 // Character collection — recursive, interactivity-gated (see module doc for
@@ -348,6 +349,7 @@ export function findCharactersLostForGood(
   ruleIndex: TouchKeyRuleIndex | undefined,
   assignedChars: ReadonlySet<string>,
   ir?: KeyboardIR,
+  scope: "layout" | "platform" = "layout",
 ): readonly string[] {
   const invalidated = findInvalidatedAssignedCharacters(layout, op, ruleIndex, assignedChars);
   if (invalidated.length === 0) return invalidated;
@@ -362,8 +364,15 @@ export function findCharactersLostForGood(
   // whether THESE specific characters remain reachable anywhere in the
   // post-edit layout, so there is no need to thread the full inventory list
   // into this hook as a new dependency.
+  //
+  // `scope: "platform"` narrows "anywhere" to the op's own platform: the touch
+  // step tracks coverage per platform (touchPlatformCoverage.ts), so a phone
+  // key's letter that the tablet still types is lost on the phone all the same.
+  // The default `"layout"` keeps the pooled answer FR-061 needs before a
+  // by-character assignment may be dropped.
+  const platformId = scope === "platform" ? parseTouchKeyAddress(op.address)?.platform : undefined;
   const { uncovered } = touchCoverage(
-    afterLayout,
+    platformId !== undefined ? projectToPlatform(afterLayout, platformId) : afterLayout,
     invalidated,
     ruleIndex !== undefined ? { ruleIndex, ...(ir !== undefined ? { ir } : {}) } : {},
   );
@@ -400,7 +409,17 @@ function composeInvalidationMessage(char: string, i18n?: I18n): string {
  * statement, and splitting it across two surfaces is how an author gets
  * surprised at the gate.
  */
-function composeBlockingInvalidationMessage(char: string, i18n?: I18n): string {
+function composeBlockingInvalidationMessage(char: string, platformId: string | undefined, i18n?: I18n): string {
+  // Coverage is judged per platform, so name the one that lost the letter.
+  if (platformId !== undefined) {
+    return resolveMessage(
+      i18n,
+      msg({
+        id: "editor.assignLoop.keyGrid.keyEditGuards.invalidatesInventoryCharacterOnPlatform",
+        message: `Nothing on the ${{ platform: touchModePlatformLabel(platformId, i18n) }} layout types ${{ character: char }} (${{ notation: codepointLabel(char).title }}) anymore. The edit is kept, but this step cannot be finished until that character has a key there again.`,
+      }),
+    );
+  }
   return resolveMessage(
     i18n,
     msg({
@@ -435,6 +454,13 @@ export interface KeyEditInvalidationWarning {
    * {@link findCharactersLostForGood}.
    */
   readonly returnsToWorklist: boolean;
+  /**
+   * `true` when nothing on the op's own platform types `char` once the op
+   * commits, even if another platform still does (`returnsToWorklist` is then
+   * `false`). The touch step's tray and gate count per platform, so the
+   * character is back among the letters to place on this one.
+   */
+  readonly lostOnPlatform: boolean;
   /**
    * T119 (US5 AS3): `true` when `char` is in the CONFIRMED INVENTORY and has
    * lost its last mechanism — i.e. the FR-008 completion gate will refuse
@@ -597,19 +623,25 @@ export function useKeyEditGuards({
       // when there is something to classify — see findCharactersLostForGood's
       // own doc comment on this short-circuit.
       const lostForGood = new Set(findCharactersLostForGood(layout, op, ruleIndex, watchedChars, ir));
+      const lostOnPlatformSet = new Set(
+        findCharactersLostForGood(layout, op, ruleIndex, watchedChars, ir, "platform"),
+      );
       return invalidated.map((char) => {
         const returnsToWorklist = lostForGood.has(char);
+        const lostOnPlatform = lostOnPlatformSet.has(char);
         // T119: only an INVENTORY character can block the FR-008 gate — a
         // by-character assignment for a character outside the confirmed
         // inventory is not in that gate's denominator at all, so claiming it
-        // blocks Continue would be a lie the author would then chase.
-        const blocksContinue = returnsToWorklist && inventoryCharSet.has(char);
+        // blocks Continue would be a lie the author would then chase. The gate
+        // judges each platform, so a loss on this one platform is enough.
+        const blocksContinue = lostOnPlatform && inventoryCharSet.has(char);
         return {
           char,
           message: blocksContinue
-            ? composeBlockingInvalidationMessage(char, i18n)
+            ? composeBlockingInvalidationMessage(char, parseTouchKeyAddress(op.address)?.platform, i18n)
             : composeInvalidationMessage(char, i18n),
           returnsToWorklist,
+          lostOnPlatform,
           blocksContinue,
         };
       });
