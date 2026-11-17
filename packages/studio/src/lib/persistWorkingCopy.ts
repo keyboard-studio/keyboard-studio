@@ -386,6 +386,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
  */
 const OPEN_UNUSED_HELD_STATE = {
   customCss: null,
+  iconIcoBase64: null,
   authoredWelcomeHtm: null,
   authoredReadmeHtm: null,
   authoredReadmeMd: null,
@@ -410,6 +411,8 @@ export function withOpenRestoreRules(patch: Partial<WorkingCopyData>): Partial<W
   const out: Partial<WorkingCopyData> = {
     ...patch,
     customCss: null,
+    // The icon is in the files on Open (written when applied, #2927).
+    iconIcoBase64: null,
     authoredWelcomeHtm: null,
     authoredReadmeHtm: null,
     authoredReadmeMd: null,
@@ -541,6 +544,7 @@ function buildWorkingCopySnapshot(): WorkingCopySnapshot {
     sequenceFlaggedChars: s.sequenceFlaggedChars,
     touchLayoutJson: s.touchLayoutJson,
     customCss: s.customCss,
+    iconIcoBase64: s.iconIcoBase64,
     authoredWelcomeHtm: s.authoredWelcomeHtm,
     authoredReadmeHtm: s.authoredReadmeHtm,
     authoredReadmeMd: s.authoredReadmeMd,
@@ -730,6 +734,8 @@ function prepareSnapshotPatch(input: WorkingCopySnapshot): Partial<WorkingCopyDa
     touchLayoutJson: snapshot.touchLayoutJson,
     // Drafts saved before the CSS step wrote a value carry no key.
     customCss: snapshot.customCss ?? null,
+    // Drafts saved before the icon step wrote a value carry no key (#2927).
+    iconIcoBase64: snapshot.iconIcoBase64 ?? null,
     // Drafts saved before the Documentation step wrote a value carry no key. A keyboard opened for
     // update ignores these (the pages are in the files; no migration of older Open drafts, spec 111 FR-049).
     authoredWelcomeHtm: snapshot.authoredWelcomeHtm ?? null,

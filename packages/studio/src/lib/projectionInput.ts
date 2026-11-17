@@ -65,6 +65,7 @@ export type ProjectionState = Pick<
   | "contextToleranceOverlay"
   | "touchLayoutJson"
   | "customCss"
+  | "iconIcoBase64"
   | "authoredWelcomeHtm"
   | "authoredReadmeHtm"
   | "authoredReadmeMd"
@@ -268,6 +269,10 @@ export function projectionInputFromState(
     keyEditOps: openOutputWithTouchFile ? [] : (liveLayoutOverride?.keyEditOps ?? []),
     deadkeyOps: state.deadkeyOverlay.ops,
     touchLayoutJson,
+    // #2927: the icon step's edited icon. Open output reads the files (the
+    // icon was written when applied), so a held value there is a bug, not
+    // an overlay — null it the way touchLayoutJson is nulled above.
+    iconIcoBase64: openOutputWithTouchFile ? null : state.iconIcoBase64,
     customCss: liveCssOverride !== undefined ? liveCssOverride : state.customCss,
     authoredDocs: {
       authoredWelcomeHtm: state.authoredWelcomeHtm,

@@ -25,13 +25,15 @@ import { isLiveOpen } from "./openMode.ts";
 import { readVfsText } from "./vfsText.ts";
 import {
   beforeFrom,
+  contentBeforeFrom,
+  contentOrNull,
   failure,
+  fileContentsEqual,
   findAnchor,
   spliceKmnIntended,
   nextUndoId,
   recordUndo,
   reinsertRules,
-  textOrNull,
   applyRemoveOrIr,
 } from "./openApply/core.ts";
 import { applyAssign, applyMarks } from "./openApply/assign.ts";
@@ -55,11 +57,13 @@ function applyFiles(change: Extract<OpenChange, { kind: "files" }>, opts: OpenAp
     return { status: "failed", reason: "No keyboard is open." };
   }
   const keyboardId = startKeyboard.id;
-  const changed: Record<string, string | null> = {};
-  for (const [path, text] of Object.entries(change.files)) {
-    const current = textOrNull(startVfs, path);
-    if (text === current) continue;
-    changed[path] = text;
+  const changed: Record<string, string | Uint8Array | null> = {};
+  for (const [path, content] of Object.entries(change.files)) {
+    // Byte-wise for binary (#2927): a `Uint8Array` is never `===` the file's
+    // bytes, and `textOrNull` reads binary as null (absent) — either would
+    // report every icon apply as changed and every undo as "changed since".
+    if (fileContentsEqual(contentOrNull(startVfs, path), content)) continue;
+    changed[path] = content;
   }
   const changedPaths = Object.keys(changed);
   if (changedPaths.length === 0) return { status: "unchanged" };
@@ -80,7 +84,7 @@ function applyFiles(change: Extract<OpenChange, { kind: "files" }>, opts: OpenAp
     }
   }
   const undoId = nextUndoId();
-  const record = recordUndo(undoId, change.label, keyboardId, beforeFrom(startVfs, {}), changed, { kind: "files" }, change.labelKey);
+  const record = recordUndo(undoId, change.label, keyboardId, contentBeforeFrom(startVfs, {}), changed, { kind: "files" }, change.labelKey);
   const written = useWorkingCopyStore.getState().replaceStartingPointFiles(changed);
   if (!written.ok) return { status: "failed", reason: written.error };
   useOpenUndoStore.getState().push(record);
@@ -337,7 +341,7 @@ export function undoLastOpenApply(expectedId?: string): OpenUndoResult {
   }
   const startVfs = st.startVfs!;
   const moved = Object.entries(last.files).filter(
-    ([path, f]) => textOrNull(startVfs, path) !== f.after,
+    ([path, f]) => !fileContentsEqual(contentOrNull(startVfs, path), f.after),
   );
   if (moved.length > 0) {
     return {
@@ -347,7 +351,7 @@ export function undoLastOpenApply(expectedId?: string): OpenUndoResult {
       changedSince: moved.map(([p]) => p),
     };
   }
-  const restore: Record<string, string | null> = {};
+  const restore: Record<string, string | Uint8Array | null> = {};
   for (const [path, f] of Object.entries(last.files)) restore[path] = f.before;
   try {
     const written = st.replaceStartingPointFiles(restore);

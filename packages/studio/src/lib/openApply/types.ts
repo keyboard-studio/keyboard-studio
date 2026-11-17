@@ -93,10 +93,11 @@ export type OpenChange =
       /**
        * A precomputed multi-file write (`null` deletes a file). It skips the
        * projection; a `.kmn` among the files is re-parsed and must still be a
-       * keyboard. Later phases' editors use it.
+       * keyboard. Later phases' editors use it. A `Uint8Array` value writes
+       * a binary file (#2927: the edited `.ico`); text values stay text.
        */
       kind: "files";
-      files: Record<string, string | null>;
+      files: Record<string, string | Uint8Array | null>;
       /** Plain label recorded on the undo step. */
       label: string;
       /**
