@@ -4,10 +4,16 @@
 // A narrow strip, present from the moment the journey starts, absent — not an
 // empty shell — before it (Q6, FR-040). It names the project (FR-041,
 // `deriveProjectLabel` — the ONE precedence, not a fourth derivation) and
-// renders the whole-journey dot row `decisions/progressDots` assembles
-// (FR-042). Activating a reached dot uses `jumpToLocation` — the SAME
-// primitive the decision trail's deep links use (FR-045); there is no second
-// jump implementation and no second router (FR-006).
+// opens the whole-journey marks `decisions/progressDots` assembles (FR-042)
+// as a labelled Contents list (JourneyContents) on every viewport; the bare
+// dot row it once showed on desktop is gone. Activating a reached mark uses
+// `jumpToLocation` — the SAME primitive the decision trail's deep links use
+// (FR-045); there is no second jump implementation and no second router
+// (FR-006).
+//
+// The list holds only steps this author's walk includes: the resolve context
+// carries the manifest's screen gates, so a step the track skips is left out
+// (FR-049a) even when answers for it were recorded earlier.
 //
 // WHY THE GATE IS NOT "a project exists" ANY MORE (author's call, 2026-08-05).
 // As shipped, the strip appeared only once `deriveProjectLabel` returned a
@@ -40,7 +46,7 @@
 // `deriveProjectLabel` returns `null`), so StudioShell can mount it
 // unconditionally as a layout sibling without a route-by-route check.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
@@ -62,7 +68,7 @@ import {
 } from "../stores/stepNavStore.ts";
 import { useWorkToDo } from "../hooks/useWorkToDo.ts";
 import { stepPositionIds } from "../lib/stepWalk.ts";
-import { manifest } from "../steps/manifest.ts";
+import { manifest, screenGates } from "../steps/manifest.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import { deriveProjectLabel } from "../lib/projectLabel.ts";
 import { jumpToLocation, peekPendingJump } from "../lib/jumpToLocation.ts";
@@ -72,7 +78,6 @@ import {
   unreachableReasonLabel,
   type ProgressDot as ProgressDotData,
 } from "../decisions/progressDots.ts";
-import { ProgressDot } from "./ProgressDot.tsx";
 import { JourneyContents } from "./JourneyContents.tsx";
 import { useJourneyContentsStore } from "../stores/journeyContentsStore.ts";
 import { useIsNarrow } from "../hooks/useViewport.ts";
@@ -82,9 +87,8 @@ import type { RouteId } from "../lib/navigate.ts";
 
 export function StudioFooter({ activeRoute = "survey" }: { activeRoute?: RouteId }) {
   const { t, i18n } = useLingui();
-  // Narrow viewports: the dot row gives way to a "Contents" button that opens
-  // the same marks as a labelled, scrollable list (JourneyContents) — a
-  // phone has no hover to name a bare dot. Back / Next stay in the footer.
+  // A "Contents" button opens the journey's marks as a labelled, scrollable
+  // list (JourneyContents). Back / Next stay in the footer.
   const isNarrow = useIsNarrow();
   const setContentsAvailable = useJourneyContentsStore((s) => s.setAvailable);
   const setContentsOpen = useJourneyContentsStore((s) => s.setOpen);
@@ -170,6 +174,9 @@ export function StudioFooter({ activeRoute = "survey" }: { activeRoute?: RouteId
       } as unknown as ResolveContext["traversal"],
       // Spec 088 C-3.2: the gate view over the decision store, seed omitted.
       decisions: decisionsWithoutTouchSeed(decisions),
+      // The same gates jumpToLocation resolves with, so a step this track
+      // skips is absent from the list rather than offered as "not reached".
+      screenGates,
       hasProject,
       // Without this, a dot naming a gallery character would refuse itself as
       // `question-not-in-build` — a character has no questionRegistry entry.
@@ -271,23 +278,6 @@ export function StudioFooter({ activeRoute = "survey" }: { activeRoute?: RouteId
     return false;
   }
 
-  // Auto-scroll the current mark into view on every dot-row change (FR-047:
-  // "the current position MUST remain visible without the author having to
-  // scroll to find it"). `inline: "nearest"` is a no-op when it is already
-  // visible, so this never fights a manual scroll the author just made.
-  const rowRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const row = rowRef.current;
-    if (row === null) return;
-    const currentEl = row.querySelector('[data-progress-dot-kind="current"]');
-    // jsdom (the component-test environment) has no `scrollIntoView`
-    // implementation at all — guard rather than let a test-only
-    // environment gap throw in every render. Real browsers always have it.
-    if (typeof currentEl?.scrollIntoView === "function") {
-      currentEl.scrollIntoView({ inline: "nearest", block: "nearest" });
-    }
-  }, [dots]);
-
   // Q6 / FR-040: absent, not an empty shell, until the journey exists — see
   // the module header for why this is no longer `projectLabel !== null`.
   // Welcome is covered because `WelcomeScreen` resets the walk store and no
@@ -340,8 +330,7 @@ export function StudioFooter({ activeRoute = "survey" }: { activeRoute?: RouteId
         color: CSS_TEXT,
         fontSize: 13,
         // FR-047: no horizontal overflow of the page body — the footer's own
-        // box never exceeds its flex parent's width; the SCROLLING happens
-        // inside the dot row below.
+        // box never exceeds its flex parent's width.
         overflowX: "clip",
         width: "100%",
         boxSizing: "border-box",
@@ -352,11 +341,11 @@ export function StudioFooter({ activeRoute = "survey" }: { activeRoute?: RouteId
           focus never carries over from the previous step's buttons. The
           buttons never shrink, wrap or clip; at constrained widths the cluster
           itself scrolls horizontally (StepNavCluster) while the project label
-          and then the dot row give way first. */}
+          gives way first. */}
       <StepNavCluster key={`nav-${stepIdForFooterNav}`} stepId={stepIdForFooterNav} />
 
       {/* Omitted entirely, not placeholdered, while the project has no name —
-          see the module header. The dot row simply takes the full width. */}
+          see the module header. */}
       {!isNarrow && projectLabel !== null && (
         <span
           className="ks-studio-footer-project"
@@ -378,105 +367,49 @@ export function StudioFooter({ activeRoute = "survey" }: { activeRoute?: RouteId
         </span>
       )}
 
-      {isNarrow ? (
-        <>
-          <button
-            type="button"
-            // Press feedback via the shared .ks-press utility (index.css): the
-            // inline styles pin no transform, so the class stays additive.
-            // `.ks-hit-target`: 44 px under a coarse pointer only. A fixed
-            // 44 px min-height would overflow the 40 px fine-pointer bar.
-            className="ks-focus-ring ks-hit-target ks-press"
-            aria-haspopup="dialog"
-            // Hand the sheet the trigger point so its enter/exit animation
-            // anchors at the button that opened it (see JourneyContents).
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              setContentsOpen(true, {
-                x: rect.left + rect.width / 2,
-                y: rect.top,
-              });
-            }}
-            data-testid="journey-contents-open"
-            style={{
-              marginLeft: "auto",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "3px 12px",
-              flexShrink: 0,
-              border: `1px solid ${CSS_BORDER}`,
-              borderRadius: 8,
-              background: "transparent",
-              color: CSS_TEXT,
-              fontFamily: "var(--app-font)",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            <span aria-hidden="true">☰</span>
-            {t({ id: "journeyContents.open", message: "Contents" })}
-          </button>
-          <JourneyContents
-            dots={dots}
-            onActivate={handleActivate}
-            statusMessage={statusMessage ?? reproposalNotice}
-          />
-        </>
-      ) : (
-      <div
-        // spec 079 T062/T063: keyed on the active step. The two-tier strip
-        // collapses/expands a section's whole set of children every time the
-        // author moves between steps — a heavier structural change than
-        // spec 057's single-tier row ever made (that row only ever APPENDED
-        // dots; nothing changed KIND wholesale for many children at once).
-        // Keying the row on `activeStepId` forces a full remount of every
-        // mark on that transition, which is the one guarantee this feature
-        // actually needs: no mark published while a step was active (and
-        // whose underlying data a NON-active step's own async effects may
-        // still be settling — e.g. a step's walk-publish effect committing
-        // slightly out of step with this row's own re-render) can ever
-        // survive as a stale sibling once the author has moved on. Losing
-        // DOM-node identity (and therefore focus) across an ACTIVE STEP
-        // change is an acceptable trade — the author's focus was already
-        // moving to the new step's own content at that exact moment.
-        key={`dots-${activeStepId}`}
-        ref={rowRef}
-        data-testid="progress-dot-row"
+      <button
+        type="button"
+        // Press feedback via the shared .ks-press utility (index.css): the
+        // inline styles pin no transform, so the class stays additive.
+        // `.ks-hit-target`: 44 px under a coarse pointer only. A fixed
+        // 44 px min-height would overflow the 40 px fine-pointer bar.
+        className="ks-focus-ring ks-hit-target ks-press"
+        aria-haspopup="dialog"
+        // Hand the sheet the trigger point so its enter/exit animation
+        // anchors at the button that opened it (see JourneyContents).
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setContentsOpen(true, {
+            x: rect.left + rect.width / 2,
+            y: rect.top,
+          });
+        }}
+        data-testid="journey-contents-open"
         style={{
-          display: "flex",
-          alignItems: "center",
-          flex: 1,
-          // Right-aligned after the nav cluster and label. Shrinks after the
-          // label does, down to a viewport that still shows the current mark
-          // (spec 081 FR-022); below that it scrolls, as before.
           marginLeft: "auto",
-          minWidth: 48,
-          // FR-047's overflow degrade: horizontal scroll rather than wrap or
-          // silent truncation. Every mark stays reachable — by mouse drag,
-          // by trackpad/wheel, or simply by Tab (focusing an off-screen
-          // button scrolls it into view natively).
-          overflowX: "auto",
-          overflowY: "hidden",
-          flexWrap: "nowrap",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "3px 12px",
+          flexShrink: 0,
+          border: `1px solid ${CSS_BORDER}`,
+          borderRadius: 8,
+          background: "transparent",
+          color: CSS_TEXT,
+          fontFamily: "var(--app-font)",
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: "pointer",
         }}
       >
-        {dots.map((dot) => (
-          // Keyed by STEP + stop, not by kind + stop. Two reasons, both now real:
-          // the mechanisms and touch walks address the same characters, so the
-          // same token id appears twice in one row and `kind:id` alone would
-          // collide; and a stop's kind CHANGES as the author answers it
-          // (upcoming -> completed -> current), which under a kind-bearing key
-          // unmounts and remounts the button — throwing away focus mid-Tab.
-          <ProgressDot
-            key={`${dot.location.step ?? "-"}:${dot.id}`}
-            dot={dot}
-            onActivate={handleActivate}
-          />
-        ))}
-      </div>
-      )}
+        <span aria-hidden="true">☰</span>
+        {t({ id: "journeyContents.open", message: "Contents" })}
+      </button>
+      <JourneyContents
+        dots={dots}
+        onActivate={handleActivate}
+        statusMessage={statusMessage ?? reproposalNotice}
+      />
 
       <span role="status" aria-live="polite" style={{ flexShrink: 0, color: CSS_TEXT_MUTED, maxWidth: "25%" }}>
         {statusMessage ?? reproposalNotice}
