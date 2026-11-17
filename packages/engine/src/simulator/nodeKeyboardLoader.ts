@@ -16,7 +16,16 @@ import type { KeyboardLoader, SandboxGlobals } from './keyboardLoader.js';
 
 export const nodeKeyboardLoader: KeyboardLoader = {
   createSandbox(): SandboxGlobals {
-    const sandbox: SandboxGlobals = {};
+    const sandbox: SandboxGlobals = {
+      // Browsers provide alert(); a bare vm context does not — and kmc-kmn
+      // emits an alert() stub for every call() whose .call_js sibling was
+      // absent at compile time (e.g. korean_rr's jamo_combine). Without this
+      // the stub throws `ReferenceError: alert is not defined` the first
+      // time a rule calls it, and simulation cannot measure the keyboard at
+      // all. The stub is a no-op: in a browser the dialog is dismissed and
+      // execution continues, which is the observable behaviour modelled here.
+      alert: () => {},
+    };
     vm.createContext(sandbox);
     return sandbox;
   },

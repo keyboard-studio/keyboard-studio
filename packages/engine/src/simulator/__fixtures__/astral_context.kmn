@@ -1,0 +1,16 @@
+c astral_context.kmn — minimal astral-context keyboard for the simulate() caret regression test (main-CI run 43933968353).
+c U+114BC (TIRHUTA VOWEL SIGN O) is astral: one code point, two UTF-16 units.
+c Seeding it must place the caret at code-point offset 1, so a rule matching it deletes its context.
+c The second rule mirrors the context-tolerance generator's decomposed-context variant shape.
+
+store(&NAME) 'AstralContext'
+store(&VERSION) '14.0'
+store(&KEYBOARDVERSION) '1.0'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+group(main) using keys
+
+U+114BC + [K_BKSLASH] > U+114BD
+U+114B9 U+114B0 + [K_BKSLASH] > U+114BD
