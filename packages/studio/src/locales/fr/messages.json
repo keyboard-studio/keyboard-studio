@@ -2480,6 +2480,7 @@
   "phaseStepper.phase.f": "Finaliser",
   "phaseStepper.phase.g": "Essai",
   "phaseStepper.phase.h": "Publier",
+  "phaseStepper.phase.review": "Révision",
   "phaseStepper.phase.starting": "Clavier de démarrage",
   "phaseStepper.state.current": "étape actuelle",
   "phaseStepper.state.done": "terminé",

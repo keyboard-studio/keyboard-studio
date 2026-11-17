@@ -1782,6 +1782,8 @@ function StudioShellContent() {
   // here (where every other cross-cutting NavBar/StudioShell signal is read)
   // and is passed down as a plain prop.
   const surveyActiveStepId = useSurveySessionStore((s) => s.activeStepId);
+  // The stepper leaves out the phases this track's walk never visits.
+  const stepperDecisions = useDecisionStore((s) => s.decisions);
 
   // ---------------------------------------------------------------------------
   // Completeness report — T042/US3.
@@ -2138,7 +2140,7 @@ function StudioShellContent() {
         {...(isNarrow && route === "survey"
           ? {
               narrowCenter: (
-                <PhaseStepper activeStepId={surveyActiveStepId} inline />
+                <PhaseStepper activeStepId={surveyActiveStepId} decisions={stepperDecisions} inline />
               ),
             }
           : {})}
@@ -2152,7 +2154,7 @@ function StudioShellContent() {
       {/* Narrow viewports fold the compact stepper into the NavBar row
           (narrowCenter above) rather than spending a second row on it. */}
       {route === "survey" && !isNarrow && (
-        <PhaseStepper activeStepId={surveyActiveStepId} />
+        <PhaseStepper activeStepId={surveyActiveStepId} decisions={stepperDecisions} />
       )}
       {/* Spec 111 US5: consistency suggestions raised by an applied change.
           Always mounted (it watches the working copy); the list shows only

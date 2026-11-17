@@ -2480,6 +2480,7 @@
   "phaseStepper.phase.f": "Finalize",
   "phaseStepper.phase.g": "Trial",
   "phaseStepper.phase.h": "Publish",
+  "phaseStepper.phase.review": "Review",
   "phaseStepper.phase.starting": "Starting keyboard",
   "phaseStepper.state.current": "current step",
   "phaseStepper.state.done": "completed",
