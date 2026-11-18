@@ -157,6 +157,7 @@ import {
 } from "../steps/editorMutate.ts";
 
 import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
+import { withLayoutFileStore, withScriptFileEntry } from "./layoutFileStore.ts";
 import { surfaceLayerCombos, syncCapsLayer } from "./touchLayoutText.ts";
 import { readVfsText } from "./vfsText.ts";
 import { markAttachmentsFromWorklist } from "./markAttachments.ts";
@@ -1730,6 +1731,53 @@ export function projectWorkingCopyVfs(
     const written = applyIconToVfs(vfs, effectiveKeyboardId ?? keyboardId, iconIcoBase64);
     if (written === null) {
       warnings.push("[project-working-copy] icon: the edited icon could not be decoded; the start icon ships as-is");
+    }
+  }
+
+  // Step 4d: Name a built touch layout in the `.kmn` (issue #2924) — Copy only.
+  // The author built a touch layout in the studio (Phase E `touchLayoutJson`,
+  // injected at step 0), so the projected VFS carries
+  // `source/<id>.keyman-touch-layout`; but the `.kmn` only names it when the
+  // copied keyboard already had one, because no Copy step adds
+  // `store(&LAYOUTFILE)`. kmc compiles the layout into the KeymanWeb `.js`
+  // only when the `.kmn` names it, so an unnamed layout never reaches the
+  // compiled keyboard. Reuse the Open path's helpers (`lib/layoutFileStore.ts`,
+  // spec 111 T087b) rather than duplicating them: `withLayoutFileStore`
+  // inserts the store after the last header store and `withScriptFileEntry`
+  // lists the compiled `.js` in the `.kps` when the targets emit one. Both
+  // are no-ops when there is nothing to add, so a keyboard that already names
+  // its layout is byte-identical.
+  // Runs after the id rename (step 4), the CSS repair (step 4b) and the icon write (step 4c): the last
+  // `.kmn` writers in this projection. A text-level insert any earlier would
+  // be dropped by the next IR re-emit (see step 0b's note).
+  // Gated on `touchLayoutJson`, not on the file's presence: step 5b stubs an
+  // empty layout file for a keyboard whose author built none, and naming that
+  // stub would ship an empty touch layout to mobile. Open never runs this
+  // step (it is in no Open row): on Open the author's file text is
+  // authoritative and the reseed change already adds the store when it
+  // creates the file.
+  if (runs("layoutFileStore") && touchLayoutJson !== null && touchLayoutJson !== undefined) {
+    const touchPath = findTouchLayoutPath(vfs);
+    if (touchPath !== undefined) {
+      const finalId = effectiveKeyboardId ?? keyboardId;
+      const kmnPath = `source/${finalId}.kmn`;
+      const kmnText = readVfsText(vfs, kmnPath);
+      let kmnAfter = kmnText;
+      if (kmnText !== undefined) {
+        const named = withLayoutFileStore(kmnText, touchPath.slice(touchPath.lastIndexOf("/") + 1), finalId);
+        if (named !== undefined) {
+          kmnAfter = named;
+          vfs.set(kmnPath, named, false);
+        }
+      }
+      const kpsPath = `source/${finalId}.kps`;
+      const kpsText = readVfsText(vfs, kpsPath);
+      if (kpsText !== undefined && kmnAfter !== undefined) {
+        const listed = withScriptFileEntry(kpsText, kmnAfter, finalId);
+        if (listed !== undefined) {
+          vfs.set(kpsPath, listed, false);
+        }
+      }
     }
   }
 
