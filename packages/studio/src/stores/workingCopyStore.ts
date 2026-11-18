@@ -866,6 +866,15 @@ export interface WorkingCopyState {
    */
   customCss: string | null;
   /**
+   * The icon step's edited icon as base64 `.ico` bytes (#2927). Null =
+   * untouched (the start keyboard's own icon file, if any, ships as-is).
+   * Projected into the VFS by projectWorkingCopyVfs step 4c, so the OSK
+   * preview and the zip carry the edited icon. Copy only: on Open the
+   * icon is written to its file when applied (lib/iconOpenCommit) and
+   * this field stays null.
+   */
+  iconIcoBase64: string | null;
+  /**
    * The Documentation step's authored overrides (specs/html-editor), one
    * nullable string per editable doc member, mirroring `customCss`:
    * null = untouched (the generated/carried text ships as-is);
@@ -1193,6 +1202,8 @@ export interface WorkingCopyState {
   setTouchLayoutJson: (json: string | null) => void;
   /** Record the CSS step's result (null = untouched, "" = cleared). */
   setCustomCss: (css: string | null) => void;
+  /** Record the icon step's edited icon (base64 `.ico` bytes; null = untouched). */
+  setIconIco: (base64: string | null) => void;
   /** Record the Documentation step's authored welcome.htm (null = untouched, "" = cleared). */
   setAuthoredWelcomeHtm: (text: string | null) => void;
   /** Record the Documentation step's authored readme.htm (null = untouched, "" = cleared). */
@@ -1472,7 +1483,7 @@ export interface WorkingCopyState {
    * returns `{ ok: false }`. Only `lib/openApply.ts` calls this.
    */
   replaceStartingPointFiles: (
-    files: Readonly<Record<string, string | null>>,
+    files: Readonly<Record<string, string | Uint8Array | null>>,
   ) => ReplaceStartingPointResult;
 
   /**
@@ -1831,6 +1842,7 @@ function freshInstantiationTail() {
     sequenceFlaggedChars: [],
     touchLayoutJson: null,
     customCss: null,
+    iconIcoBase64: null,
     authoredWelcomeHtm: null,
     authoredReadmeHtm: null,
     authoredReadmeMd: null,
@@ -1962,6 +1974,7 @@ export type WorkingCopyData = Omit<
   | "unlockDesktop"
   | "setTouchLayoutJson"
   | "setCustomCss"
+  | "setIconIco"
   | "setAuthoredWelcomeHtm"
   | "setAuthoredReadmeHtm"
   | "setAuthoredReadmeMd"
@@ -2074,6 +2087,7 @@ const INITIAL_STATE: WorkingCopyData = {
   sequenceFlaggedChars: [],
   touchLayoutJson: null,
   customCss: null,
+  iconIcoBase64: null,
   authoredWelcomeHtm: null,
   authoredReadmeHtm: null,
   authoredReadmeMd: null,
@@ -2895,7 +2909,13 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       const models = modelsFromKmnText(
         kmnText,
         startKeyboard.id,
-        touchPath === undefined ? undefined : files[touchPath],
+        // A binary entry can never be the touch layout (text JSON); a
+        // binary value for that path reads as "no touch change".
+        touchPath === undefined
+          ? undefined
+          : files[touchPath] instanceof Uint8Array
+            ? undefined
+            : files[touchPath],
         priorStartIr?.touchLayout,
       );
       if (!models.ok) return { ok: false, error: models.error };
@@ -2909,7 +2929,12 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     let touchOnly: { layout: TouchLayoutIR | undefined } | null = null;
     if (nextIr === null) {
       const touchPath = findTouchLayoutPath(startVfs);
-      const touchChange = touchPath === undefined ? undefined : files[touchPath];
+      const touchChange =
+        touchPath === undefined
+          ? undefined
+          : files[touchPath] instanceof Uint8Array
+            ? undefined
+            : files[touchPath];
       if (touchChange !== undefined) {
         let layout: TouchLayoutIR | undefined;
         if (touchChange !== null) {
@@ -2930,10 +2955,13 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     // A fresh VFS object so subscribers see the change; file text is verbatim.
     const nextVfs = createVirtualFS(startVfs.entries());
     let nextTouchJson: string | undefined;
-    for (const [path, text] of Object.entries(files)) {
-      if (text === null) nextVfs.delete(path);
-      else nextVfs.set(path, text, false);
-      if (path.endsWith(".keyman-touch-layout") && text !== null) nextTouchJson = text;
+    for (const [path, content] of Object.entries(files)) {
+      if (content === null) nextVfs.delete(path);
+      // A binary entry (an applied `.ico`, #2927) is stored as bytes;
+      // text stays text. The `.kmn`/touch/`.kps` derivations above only
+      // read string entries, so a binary value passes through untouched.
+      else nextVfs.set(path, content, typeof content !== "string");
+      if (path.endsWith(".keyman-touch-layout") && typeof content === "string") nextTouchJson = content;
     }
     // Node ids are positional: a re-parse shifts them, so anything keyed by a
     // node id is stale the moment `startIr` changes.
@@ -3000,6 +3028,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setTouchLayoutJson: (json) => set({ touchLayoutJson: json }),
 
   setCustomCss: (css) => set({ customCss: css }),
+
+  setIconIco: (base64) => set({ iconIcoBase64: base64 }),
 
   setAuthoredWelcomeHtm: (text) => set({ authoredWelcomeHtm: text }),
 

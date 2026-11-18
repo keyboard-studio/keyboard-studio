@@ -2,7 +2,8 @@
 // files this session (spec 111 FR-045, "live files").
 //
 // Every successful apply (`lib/openApply`) records one step: a label, per file
-// it wrote the text before and just after (`null` = absent), and a `view`
+// it wrote the content before and just after (`null` = absent; a `Uint8Array`
+// is a binary file, #2927), and a `view`
 // saying what kind of step it was. Undo puts `before` back when every file
 // still equals `after` (`undoLastOpenApply`) and pops the step.
 //
@@ -20,8 +21,8 @@ import { useOpenRemovalStore, type OpenRemovalEntry } from "./openRemovalStore.t
 import { useOpenAssignStore, type OpenAssignSession } from "./openAssignStore.ts";
 
 export interface OpenUndoFile {
-  before: string | null;
-  after: string | null;
+  before: string | Uint8Array | null;
+  after: string | Uint8Array | null;
 }
 
 /** One touch key a deletion changed: where it is, as it was, and as the deletion left it (lib/openApply/touchRestore). */
@@ -58,7 +59,7 @@ export type OpenUndoView =
   | { kind: "files" };
 
 /** Which known step a record is, so the UI can word it in the author's language. */
-export type OpenUndoLabelKey = "code-view" | "context-tolerance" | "take-back" | "layout-edit" | "languages" | "stylesheet" | "doc-image-width" | "docs-edit" | "docs-regenerate" | "docs-create" | "osk" | "copyright" | "project-link" | "caps";
+export type OpenUndoLabelKey = "code-view" | "context-tolerance" | "take-back" | "layout-edit" | "languages" | "stylesheet" | "doc-image-width" | "docs-edit" | "docs-regenerate" | "docs-create" | "osk" | "copyright" | "project-link" | "caps" | "icon";
 
 export interface OpenUndoRecord {
   id: string;

@@ -52,23 +52,40 @@ export const nextUndoId = (): string => `open-undo-${(undoSeq += 1)}`;
 
 export const textOrNull = (vfs: VirtualFS, path: string): string | null => readVfsText(vfs, path) ?? null;
 
+/** Two file contents are the same: byte-wise for binary, `===` for text. */
+export function fileContentsEqual(
+  a: string | Uint8Array | null,
+  b: string | Uint8Array | null,
+): boolean {
+  if (a === null || b === null) return a === b;
+  if (typeof a === "string" || typeof b === "string") return a === b;
+  return a.length === b.length && a.every((byte, i) => byte === b[i]);
+}
+
+/** The content a path has in `vfs` (`null` = absent), text or binary. */
+export const contentOrNull = (vfs: VirtualFS, path: string): string | Uint8Array | null => {
+  const entry = vfs.get(path);
+  if (entry === undefined) return null;
+  return entry.content;
+};
+
 /**
- * Build one undo step. `beforeOf` gives a path's text as it was before the
- * step; a path whose text did not change is left out. Call BEFORE the write.
+ * Build one undo step. `beforeOf` gives a path's content as it was before
+ * the step; a path whose content did not change is left out. Call BEFORE the write.
  */
 export function recordUndo(
   id: string,
   label: string,
   keyboardId: string,
-  beforeOf: (path: string) => string | null,
-  changed: Record<string, string | null>,
+  beforeOf: (path: string) => string | Uint8Array | null,
+  changed: Record<string, string | Uint8Array | null>,
   view: OpenUndoView,
   labelKey?: OpenUndoLabelKey,
 ): OpenUndoRecord {
   const files: OpenUndoRecord["files"] = {};
   for (const [path, after] of Object.entries(changed)) {
     const before = beforeOf(path);
-    if (before !== after) files[path] = { before, after };
+    if (!fileContentsEqual(before, after)) files[path] = { before, after };
   }
   return { id, keyboardId, label, ...(labelKey !== undefined ? { labelKey } : {}), files, view };
 }
@@ -78,6 +95,12 @@ export const beforeFrom =
   (vfs: VirtualFS, overrides: Record<string, string | null>) =>
   (path: string): string | null =>
     path in overrides ? overrides[path]! : textOrNull(vfs, path);
+
+/** The content a path had in `vfs`, unless `overrides` (an earlier step's result) says otherwise. */
+export const contentBeforeFrom =
+  (vfs: VirtualFS, overrides: Record<string, string | Uint8Array | null>) =>
+  (path: string): string | Uint8Array | null =>
+    path in overrides ? overrides[path]! : contentOrNull(vfs, path);
 
 export const failure = (err: unknown): OpenApplyResult => ({
   status: "failed",
@@ -100,6 +123,24 @@ export function diffFiles(before: VirtualFS, after: VirtualFS): Record<string, s
     // Only text files are projected on Open; a binary change is not expected
     // and is left out rather than written as text.
     if (typeof e.content === "string") out[e.path] = e.content;
+  }
+  for (const e of before.entries()) {
+    if (after.get(e.path) === undefined) out[e.path] = null;
+  }
+  return out;
+}
+
+/**
+ * Paths whose content differs between two file sets, `null` for a deleted
+ * file — the binary arm of `diffFiles` (#2927). A changed binary entry is
+ * carried as its bytes, never re-encoded as text. The icon builder uses it:
+ * the stylesheet's text-only `diffFiles` would drop the `.ico`.
+ */
+export function diffFilesBinary(before: VirtualFS, after: VirtualFS): Record<string, string | Uint8Array | null> {
+  const out: Record<string, string | Uint8Array | null> = {};
+  for (const e of after.entries()) {
+    if (sameContent(before, after, e.path)) continue;
+    out[e.path] = e.content;
   }
   for (const e of before.entries()) {
     if (after.get(e.path) === undefined) out[e.path] = null;
@@ -285,6 +326,8 @@ export function projectChange(
     contextToleranceOverlay: null,
     touchLayoutJson: touchJson,
     customCss: null,
+    // Nothing held on Open: the icon is in the files (written when applied).
+    iconIcoBase64: null,
     authoredWelcomeHtm: null,
     authoredReadmeHtm: null,
     authoredReadmeMd: null,

@@ -95,6 +95,7 @@
 
 import { ruleContextElements } from "@keyboard-studio/contracts";
 import { applyCustomCssToVfs } from "./customCss.ts";
+import { applyIconToVfs } from "./iconWrite.ts";
 import { applyAuthoredDocsToVfs, type AuthoredDocs } from "./authoredDocs.ts";
 import {
   ruleConditions,
@@ -346,6 +347,16 @@ export interface ProjectWorkingCopyVfsInput {
    * it (and its `&KMW_EMBEDCSS` store line).
    */
   customCss?: string | null;
+  /**
+   * The icon step's edited icon as base64 `.ico` bytes (#2927), written at
+   * step 4c — after the id rename, so the file takes the effective id, and
+   * after step 4b, the last `.kmn` writer, so the `&BITMAP` line it ensures
+   * cannot be dropped by a later re-emit. Omit or pass `null` to leave the
+   * start keyboard's own icon file as-is. Copy only: on Open the icon is
+   * written to its file when applied (lib/iconOpenCommit), never replayed
+   * here — the step is in no Open row (lib/projectionSteps).
+   */
+  iconIcoBase64?: string | null;
   /**
    * The Documentation step's authored overrides (specs/html-editor), written
    * at step 0b beside the custom CSS. Omit or pass all-null to leave the
@@ -618,6 +629,7 @@ export function projectWorkingCopyVfs(
     identity,
     touchLayoutJson,
     customCss = null,
+    iconIcoBase64 = null,
     authoredDocs,
     welcomePath,
     startKeyboardId,
@@ -1702,6 +1714,23 @@ export function projectWorkingCopyVfs(
         startKeyboardId ?? keyboardId,
       ),
     );
+  }
+
+  // Step 4c: Edited icon (#2927) — write the icon step's `.ico` bytes into
+  // the working copy, AFTER the id rename and AFTER step 4b, the last
+  // `.kmn` writer: any earlier text-level `&BITMAP` insert risks being
+  // dropped by a later IR re-emit (the step-0b lesson, above). The file
+  // takes the effective (post-rename) id when nothing names it yet; a
+  // `&BITMAP` line already in the `.kmn` keeps its filename. Idempotent:
+  // Keep passes the source bytes through, so a keyboard whose icon the
+  // author kept writes the same bytes over the file they came from.
+  // An apply run leaves it out with step 0b: on Open the icon is written
+  // to its file when applied (lib/iconOpenCommit), never replayed here.
+  if (runs("icon") && iconIcoBase64 !== null && iconIcoBase64 !== "") {
+    const written = applyIconToVfs(vfs, effectiveKeyboardId ?? keyboardId, iconIcoBase64);
+    if (written === null) {
+      warnings.push("[project-working-copy] icon: the edited icon could not be decoded; the start icon ships as-is");
+    }
   }
 
   return {
