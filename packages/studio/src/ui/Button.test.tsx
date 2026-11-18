@@ -64,9 +64,25 @@ describe("Button — back variant", () => {
 describe("Button — secondary variant (default)", () => {
   it("secondary is the default variant", () => {
     const { container } = render(<Button>Plain</Button>);
-    // No baked background — style.background should be empty string
+    // Themed, never the UA ButtonFace (a white slab on the navy theme).
     const btn = container.querySelector("button") as HTMLButtonElement;
-    expect(btn.style.background).toBe("");
+    expect(btn.style.background).toBe("var(--app-accent-subtle)");
+    expect(btn.style.borderColor).toBe("var(--app-accent)");
+    expect(btn.style.color).toBe("var(--app-text)");
+  });
+
+  it("disabled secondary uses the disabled text colour with no tint", () => {
+    const { container } = render(<Button disabled>Plain</Button>);
+    const btn = container.querySelector("button") as HTMLButtonElement;
+    expect(btn.style.background).toBe("transparent");
+    expect(btn.style.color).toBe("var(--app-text-disabled)");
+    expect(btn.style.cursor).toBe("not-allowed");
+  });
+
+  it("a caller's border shorthand replaces the base border longhands", () => {
+    const { container } = render(<Button style={{ border: "1px dashed red" }}>Plain</Button>);
+    const btn = container.querySelector("button") as HTMLButtonElement;
+    expect(btn.style.borderStyle).toBe("dashed");
   });
 
   it("renders without crashing with no variant specified", () => {

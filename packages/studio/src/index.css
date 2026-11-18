@@ -10,6 +10,17 @@
 * {
   box-sizing: border-box;
 }
+/* Native controls (radios, checkboxes, scrollbars, selects) follow the theme:
+ * without a color-scheme they render light on the navy theme. */
+html {
+  color-scheme: light;
+  accent-color: var(--app-accent);
+}
+
+html[data-theme="navy"] {
+  color-scheme: dark;
+}
+
 html,
 body {
   margin: 0;

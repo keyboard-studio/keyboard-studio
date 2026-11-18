@@ -99,3 +99,6 @@ lib/ucd/*
 
 # ProjectAtlas local index + generated MCP configs (machine-local state)
 .projectatlas/
+
+# speckit_rounds.py session transcripts (raw Claude output, per-machine)
+specs/*/rounds/

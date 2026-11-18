@@ -17,6 +17,7 @@ import type { PhysicalLayoutValue } from "./physicalLayoutValue.ts";
 import { currentPhysicalLayoutValue } from "./physicalLayoutValue.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { usePlacementPriors } from "../../hooks/usePlacementPriors.ts";
+import { useBasicKeyboardOpen } from "../../hooks/useBasicKeyboardOpen.ts";
 import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
 import { isLdmlLintCode } from "../../lint/ldmlFindings.ts";
 import { LintSummary } from "../../lint/LintSummary.tsx";
@@ -27,6 +28,8 @@ export function PhysicalLayoutDecisionRenderer({
 }: DecisionRendererProps<PhysicalLayoutValue>) {
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
   const placementMap = usePlacementPriors();
+  // A basic keyboard opened for update shows its physical keys read-only (lib/basicKeyboard.ts).
+  const readOnly = useBasicKeyboardOpen();
   // The LDML export notes this decision owns (spec 108 FR-015), grouped by code.
   const findings = (useValidatorFindings()["physical-layout"] ?? []).filter((f) => isLdmlLintCode(f.code));
 
@@ -40,6 +43,7 @@ export function PhysicalLayoutDecisionRenderer({
       <MechanismGallery
         selectedStartKeyboard={startKeyboard}
         onComplete={() => onChange(currentPhysicalLayoutValue())}
+        readOnly={readOnly}
         {...(placementMap ? { placementMap } : {})}
       />
     </>

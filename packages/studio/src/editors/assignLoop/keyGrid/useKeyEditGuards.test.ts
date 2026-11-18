@@ -284,6 +284,18 @@ describe("findCharactersLostForGood", () => {
     expect(lostForGood).toEqual([]);
   });
 
+  it("a letter the tablet still types is lost on the phone (platform scope) but not lost for good (layout scope)", () => {
+    const phone = touchLayout({ keys: [touchKey({ id: "K_X", text: "ɛ", output: "ɛ" })] });
+    const tablet = touchLayout({ platform: "tablet", keys: [touchKey({ id: "K_X", text: "ɛ", output: "ɛ" })] });
+    const layout = { ...phone, platforms: [...tablet.platforms, ...phone.platforms] };
+    const op: PendingKeyEditOperation = { kind: "remove", address: ADDR("K_X"), outcome: "reflow" };
+
+    // Pooled: the by-character assignment survives on the tablet (FR-061).
+    expect(findCharactersLostForGood(layout, op, undefined, new Set(["ɛ"]))).toEqual([]);
+    // Per platform: nothing on the phone types it any more.
+    expect(findCharactersLostForGood(layout, op, undefined, new Set(["ɛ"]), undefined, "platform")).toEqual(["ɛ"]);
+  });
+
   it("short-circuits to [] when nothing is invalidated (no extra layout apply/coverage pass needed)", () => {
     const layout = touchLayout({ keys: [touchKey({ id: "K_E", text: "e", output: "e" })] });
     const op: PendingKeyEditOperation = {

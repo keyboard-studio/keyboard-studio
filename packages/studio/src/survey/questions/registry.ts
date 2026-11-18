@@ -24,7 +24,7 @@
 import type { GalleryModule, QuestionModule } from "../types.ts";
 import type { DecisionId, DecisionSet } from "../../decisions/decisionTypes.ts";
 import { indexProviders } from "../../decisions/orderDecisions.ts";
-import { hasOpenIssue, openIssueGate, openLettersGate, openMechanismsGate } from "../../decisions/openIssues.ts";
+import { hasOpenIssue, openIssueGate, openLettersGate } from "../../decisions/openIssues.ts";
 
 import windowsLayoutModule from "./gallery/windowsLayout.ts";
 import capsHandlingModule from "./gallery/capsHandling.ts";
@@ -318,9 +318,8 @@ export const openScreenGates: ReadonlyMap<string, (decisions: DecisionSet) => bo
     ["open_languages", (d) => !notOpen(d)],
     ["open_missing_letters", openLettersGate],
     ["open_upgrades", openIssueGate("upgrades")],
-    // Spec 111 (Open walk): the Mechanisms gallery is walked on Open unless the keyboard
-    // is basic, whose physical layout is fixed. Copy always walks it.
-    ["mechanisms", openMechanismsGate],
+    // Mechanisms has no gate: it is walked on both tracks, a basic keyboard included
+    // (spec 111 FR-032, amended 2026-11-16), so the author can always change a placement.
     // Spec 111 FR-029/FR-032: on Open the help step is asked only when the baseline
     // recorded a help document that is missing or fails its criteria. Copy always asks it.
     ["help", (d) => notOpen(d) || hasOpenIssue(d, "docs")],

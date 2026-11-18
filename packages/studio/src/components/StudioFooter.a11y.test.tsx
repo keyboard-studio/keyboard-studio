@@ -26,6 +26,7 @@ import { useReproposalNoticeStore } from "../stores/reproposalNoticeStore.ts";
 import { useStepNavStore, type StepNavSpec } from "../stores/stepNavStore.ts";
 import { charToPositionToken } from "../lib/stepWalk.ts";
 import { useJourneyContentsStore } from "../stores/journeyContentsStore.ts";
+import { useDecisionStore } from "../stores/decisionStore.ts";
 import { StudioFooter } from "./StudioFooter.tsx";
 
 const BASE = makeStartKeyboard({
@@ -83,10 +84,25 @@ beforeEach(() => {
   window.location.hash = "#survey";
 });
 
+/**
+ * Open the Contents list from the footer and return its marks. The journey's
+ * marks live only in that list; the footer itself shows the Contents button.
+ */
+function openDots(): HTMLElement[] {
+  if (!useJourneyContentsStore.getState().open) {
+    fireEvent.click(screen.getByTestId("journey-contents-open"));
+  }
+  const sheet = screen.getByRole("dialog", { name: "Contents" });
+  return within(sheet)
+    .getAllByRole("button")
+    .filter((b) => b.hasAttribute("data-progress-dot-kind"));
+}
+
 afterEach(() => {
   cleanup();
-  // No reset() on this store — global test-setup only clears stores with reset().
+  // No reset() on these stores — global test-setup only clears stores with reset().
   useReproposalNoticeStore.getState().clear();
+  useJourneyContentsStore.setState({ available: false, open: false, origin: null });
   window.location.hash = "";
 });
 
@@ -158,7 +174,7 @@ describe("StudioFooter — visibility gate (FR-040)", () => {
 describe("StudioFooter — keyboard operability (SC-010)", () => {
   it("renders one real <button> per dot, each with a non-empty accessible name", () => {
     render(<StudioFooter />);
-    const buttons = screen.getAllByRole("button");
+    const buttons = openDots();
     expect(buttons.length).toBeGreaterThan(0);
     for (const button of buttons) {
       expect(button.tagName).toBe("BUTTON");
@@ -167,7 +183,7 @@ describe("StudioFooter — keyboard operability (SC-010)", () => {
     }
   });
 
-  it("every dot is reachable by Tab, in document order", async () => {
+  it("every footer button is reachable by Tab, in document order", async () => {
     const user = userEvent.setup();
     render(<StudioFooter />);
     const buttons = screen.getAllByRole("button");
@@ -179,8 +195,7 @@ describe("StudioFooter — keyboard operability (SC-010)", () => {
 
   it("the current dot carries aria-current=\"step\" and a distinct accessible name", () => {
     render(<StudioFooter />);
-    const current = screen
-      .getAllByRole("button")
+    const current = openDots()
       .find((b) => b.getAttribute("aria-current") === "step");
     expect(current).toBeDefined();
     expect(current!.getAttribute("aria-label")).toMatch(/you are here/i);
@@ -188,8 +203,7 @@ describe("StudioFooter — keyboard operability (SC-010)", () => {
 
   it("an upcoming dot's accessible name announces it is not yet reached", () => {
     render(<StudioFooter />);
-    const upcoming = screen
-      .getAllByRole("button")
+    const upcoming = openDots()
       .find((b) => b.getAttribute("data-progress-dot-kind") === "upcoming");
     expect(upcoming).toBeDefined();
     expect(upcoming!.getAttribute("aria-label")).toMatch(/not yet reached/i);
@@ -198,8 +212,7 @@ describe("StudioFooter — keyboard operability (SC-010)", () => {
   it("activating a completed (reached) dot with Enter navigates the wizard there", async () => {
     const user = userEvent.setup();
     render(<StudioFooter />);
-    const completed = screen
-      .getAllByRole("button")
+    const completed = openDots()
       .find((b) => b.getAttribute("data-progress-dot-kind") === "completed");
     expect(completed).toBeDefined();
 
@@ -214,8 +227,7 @@ describe("StudioFooter — keyboard operability (SC-010)", () => {
   it("activating a completed (reached) dot with Space also navigates the wizard there", async () => {
     const user = userEvent.setup();
     render(<StudioFooter />);
-    const completed = screen
-      .getAllByRole("button")
+    const completed = openDots()
       .find((b) => b.getAttribute("data-progress-dot-kind") === "completed");
     completed!.focus();
     await user.keyboard(" ");
@@ -225,8 +237,7 @@ describe("StudioFooter — keyboard operability (SC-010)", () => {
   it("activating the current dot is a no-op (FR-061 — not a jump target to itself)", async () => {
     const user = userEvent.setup();
     render(<StudioFooter />);
-    const current = screen
-      .getAllByRole("button")
+    const current = openDots()
       .find((b) => b.getAttribute("data-progress-dot-kind") === "current");
     current!.focus();
     await user.keyboard("{Enter}");
@@ -236,8 +247,7 @@ describe("StudioFooter — keyboard operability (SC-010)", () => {
   it("activating an upcoming dot behind a gate is refused and states why, without moving the walk", async () => {
     const user = userEvent.setup();
     render(<StudioFooter />);
-    const upcoming = screen
-      .getAllByRole("button")
+    const upcoming = openDots()
       .find((b) => b.getAttribute("data-progress-dot-kind") === "upcoming");
     expect(upcoming).toBeDefined();
 
@@ -277,7 +287,7 @@ describe("StudioFooter — within-step walk dots", () => {
     useSurveyAnswerStore.getState().setPosition("mechanisms", charToPositionToken("é"));
 
     render(<StudioFooter />);
-    const names = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? "");
+    const names = openDots().map((b) => b.getAttribute("aria-label") ?? "");
     // One dot for the gallery, none per letter — the author navigates to the
     // character they want inside the gallery itself.
     expect(names.some((n) => n.startsWith("á (U+00E1)"))).toBe(false);
@@ -305,13 +315,50 @@ describe("StudioFooter — within-step walk dots", () => {
     // gap §4 closes). Two stops still yield two QUESTION-tier marks — that is
     // what this case is actually pinning, via the structural
     // `data-progress-dot-tier` hook rather than the (now-collapsed) label text.
-    const marksDots = screen
-      .getAllByRole("button")
+    const marksDots = openDots()
       .filter((b) => b.getAttribute("data-progress-dot-tier") === "question");
     expect(marksDots).toHaveLength(2);
     for (const dot of marksDots) {
       expect(dot.getAttribute("aria-label") ?? "").not.toMatch(/ms_series_/);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Only steps this track walks are listed (FR-049a).
+// ---------------------------------------------------------------------------
+
+describe("StudioFooter — Contents lists only the walk's steps", () => {
+  function labels(): string[] {
+    return openDots().map((b) => b.getAttribute("aria-label") ?? "");
+  }
+
+  it("on Open, leaves out the Copy-only steps and keeps Mechanisms, even for a basic keyboard", () => {
+    useDecisionStore.getState().record({ id: "authoring-track", value: "adapt", provenance: "asked" });
+    useDecisionStore.getState().record({ id: "open-basic-keyboard", value: true, provenance: "derived" });
+    useSurveySessionStore.setState({
+      activeStepId: "open_languages",
+      history: [],
+      visited: ["identity", "layout", "choose_base", "attribution"],
+    });
+
+    render(<StudioFooter />);
+    const names = labels();
+    // The seeded identity answer does not bring its step back on Open.
+    for (const skipped of ["Identity", "Keyboard layout", "Choose a starting keyboard", "Characters", "Carve", "Deadkeys", "Rules"]) {
+      expect(names.some((n) => n.startsWith(skipped)), skipped).toBe(false);
+    }
+    expect(names.some((n) => n.startsWith("Languages"))).toBe(true);
+    expect(names.some((n) => n.startsWith("Mechanisms"))).toBe(true);
+  });
+
+  it("on Copy, lists the character steps and none of Open's pages", () => {
+    useDecisionStore.getState().record({ id: "authoring-track", value: "copy", provenance: "asked" });
+
+    render(<StudioFooter />);
+    const names = labels();
+    expect(names.some((n) => n.startsWith("Mechanisms"))).toBe(true);
+    expect(names.some((n) => n.startsWith("Languages"))).toBe(false);
   });
 });
 
@@ -346,8 +393,7 @@ describe("StudioFooter — jumping back and forward again (FR-045/FR-063)", () =
 
     // FR-063: jumping back truncates history, not progress — mechanisms is
     // still in the row even though it is now ahead of where the author stands.
-    const mechanisms = screen
-      .getAllByRole("button")
+    const mechanisms = openDots()
       .find((b) => (b.getAttribute("aria-label") ?? "").startsWith("Mechanisms"));
     expect(mechanisms).toBeDefined();
     // ...and it is reported as finished work, not as an unvisited stage.
@@ -437,8 +483,7 @@ describe("StudioFooter — jumping back and forward again (FR-045/FR-063)", () =
     });
 
     render(<StudioFooter />);
-    const mechanisms = screen
-      .getAllByRole("button")
+    const mechanisms = openDots()
       .find((b) => (b.getAttribute("aria-label") ?? "").startsWith("Mechanisms"));
     expect(mechanisms).toBeDefined();
     expect(mechanisms!.getAttribute("data-progress-dot-kind")).toBe("upcoming");
@@ -470,8 +515,7 @@ describe("StudioFooter — two-tier strip (spec 079)", () => {
       ]);
 
     render(<StudioFooter />);
-    const partial = screen
-      .getAllByRole("button")
+    const partial = openDots()
       .find((b) => (b.getAttribute("aria-label") ?? "").match(/partly answered/i));
     expect(partial).toBeDefined();
     expect(partial!.getAttribute("data-progress-dot-fill")).toBe("partial");
@@ -487,8 +531,7 @@ describe("StudioFooter — two-tier strip (spec 079)", () => {
     ]);
 
     render(<StudioFooter />);
-    const skipped = screen
-      .getAllByRole("button")
+    const skipped = openDots()
       .find((b) => (b.getAttribute("aria-label") ?? "").match(/optional, left blank/i));
     expect(skipped).toBeDefined();
     expect(skipped!.getAttribute("data-progress-dot-fill")).toBe("skipped");
@@ -527,8 +570,7 @@ describe("StudioFooter — two-tier strip (spec 079)", () => {
     });
 
     render(<StudioFooter />);
-    const passed = screen
-      .getAllByRole("button")
+    const passed = openDots()
       .find((b) => (b.getAttribute("aria-label") ?? "").match(/passed —/i));
     expect(passed).toBeDefined();
     expect(passed!.getAttribute("aria-label") ?? "").not.toMatch(/completed/i);
@@ -588,8 +630,7 @@ describe("StudioFooter — §5 jump target (badged vs. unbadged collapsed sectio
   }
 
   function findMarksButton(): HTMLElement {
-    const button = screen
-      .getAllByRole("button")
+    const button = openDots()
       .find((b) => (b.getAttribute("aria-label") ?? "").startsWith("Accents & marks"));
     expect(button).toBeDefined();
     return button!;
@@ -662,7 +703,7 @@ describe("StudioFooter — step nav cluster (spec 081)", () => {
     expect(group.querySelectorAll("button")).toHaveLength(3);
   });
 
-  it("orders back, forward, secondary, then the project label, then the dot row", () => {
+  it("orders back, forward, secondary, then the project label, then the Contents button", () => {
     publishNav(FULL_SPEC);
     const { container } = render(<StudioFooter />);
     const footer = container.querySelector("footer")!;
@@ -673,7 +714,7 @@ describe("StudioFooter — step nav cluster (spec 081)", () => {
       screen.getByTestId("demo-continue"),
       screen.getByTestId("demo-skip"),
       screen.getByText(/^Project: French$/),
-      screen.getByTestId("progress-dot-row"),
+      screen.getByTestId("journey-contents-open"),
     ];
     for (let i = 1; i < order.length; i++) {
       const relation = order[i - 1]!.compareDocumentPosition(order[i]!);
@@ -744,7 +785,7 @@ describe("StudioFooter — step nav cluster (spec 081)", () => {
     expect(forward.style.flexShrink).toBe("0");
   });
 
-  it("Tab reaches the nav buttons before any dot", async () => {
+  it("Tab reaches the nav buttons before the Contents button", async () => {
     publishNav(FULL_SPEC);
     const user = userEvent.setup();
     render(<StudioFooter />);
@@ -755,8 +796,7 @@ describe("StudioFooter — step nav cluster (spec 081)", () => {
     await user.tab();
     expect(document.activeElement).toBe(screen.getByTestId("demo-skip"));
     await user.tab();
-    const row = screen.getByTestId("progress-dot-row");
-    expect(row.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).toBe(screen.getByTestId("journey-contents-open"));
   });
 
   it("keeps exactly one role=status region and adds no other live region", () => {
@@ -799,9 +839,9 @@ describe("StudioFooter — step nav cluster (spec 081)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Narrow viewports: the dot row gives way to a "Contents" button that opens the
-// labelled journey list (JourneyContents), and publishes availability for
-// NavBar's menu.
+// Every viewport: a "Contents" button opens the labelled journey list
+// (JourneyContents). Narrow viewports also publish availability for NavBar's
+// menu.
 // ---------------------------------------------------------------------------
 
 describe("StudioFooter — narrow viewport contents button", () => {
@@ -820,12 +860,13 @@ describe("StudioFooter — narrow viewport contents button", () => {
     useJourneyContentsStore.setState({ available: false, open: false, origin: null });
   });
 
-  it("desktop: keeps the dot row and shows no Contents button", () => {
+  it("desktop: shows the Contents button, not a dot row", () => {
     setWidth(1024);
     render(<StudioFooter />);
-    expect(screen.getByTestId("progress-dot-row")).toBeTruthy();
-    expect(screen.queryByTestId("journey-contents-open")).toBeNull();
+    expect(screen.queryByTestId("progress-dot-row")).toBeNull();
+    expect(screen.getByTestId("journey-contents-open")).toBeTruthy();
     expect(useJourneyContentsStore.getState().available).toBe(false);
+    expect(openDots().length).toBeGreaterThan(0);
   });
 
   it("narrow: replaces the dot row with a Contents button that opens the sheet", () => {

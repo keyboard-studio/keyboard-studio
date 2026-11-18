@@ -82,6 +82,11 @@ export interface PhaseDef {
   letter: PhaseLetter;
   /** Display label only — never a step id, route token, or state id. */
   label: MessageDescriptor;
+  /**
+   * Label shown instead of `label` on the Open walk (spec 111,
+   * `authoring-track = "adapt"`), where the phase holds different pages.
+   */
+  openLabel?: MessageDescriptor;
   stepIds: readonly StepId[];
 }
 
@@ -99,6 +104,9 @@ export const PHASES: readonly PhaseDef[] = [
   {
     letter: "B",
     label: msg({ id: "phaseStepper.phase.starting", message: "Starting keyboard" }),
+    // On Open no keyboard is chosen: this phase holds the opened keyboard's
+    // review pages (languages, missing letters, upgrades).
+    openLabel: msg({ id: "phaseStepper.phase.review", message: "Review" }),
     // attribution (#1901): the author/copyright step walks between
     // the base choice and project_name — same "Base keyboard" phase as its
     // neighbours (it settles who the base-derived keyboard belongs to).

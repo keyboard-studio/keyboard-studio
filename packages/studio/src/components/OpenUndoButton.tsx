@@ -122,7 +122,17 @@ export function OpenUndoButton() {
         // Enabled: the name says what is undone. Empty: the name is the visible text.
         aria-label={empty ? undefined : describe(last)}
         title={empty ? undefined : describe(last)}
-        style={empty ? { color: "var(--app-text-disabled)", cursor: "not-allowed" } : undefined}
+        // aria-disabled, not disabled, so Button can't pick its disabled look: match it here.
+        style={
+          empty
+            ? {
+                background: "transparent",
+                borderColor: "var(--app-border)",
+                color: "var(--app-text-disabled)",
+                cursor: "not-allowed",
+              }
+            : undefined
+        }
         onClick={() => {
           if (last === undefined) return;
           // Spec 111 FR-046: Undo reseeds the code views, so unapplied text there is asked about first.

@@ -95,7 +95,7 @@ function expectDependencyOrder(steps: readonly string[]): void {
 }
 
 const OPEN_PAGES = ["open_languages", "open_missing_letters", "open_upgrades"] as const;
-const WALKED_ON_OPEN_BY_GATE = [...OPEN_PAGES, "mechanisms", "help", "html"] as const;
+const WALKED_ON_OPEN_BY_GATE = [...OPEN_PAGES, "help", "html"] as const;
 const COPY_ONLY = ["project_name", ...openHiddenScreens] as const;
 
 describe("gates", () => {
@@ -137,12 +137,8 @@ describe("gates", () => {
     expect(help(decisionsFor("copy"))).toBe(true);
   });
 
-  it("Mechanisms: walked on Open unless the keyboard is basic; Copy always walks it", () => {
-    const gate = screenGates.get("mechanisms")!;
-    expect(gate(decisionsFor("adapt", [], false))).toBe(true);
-    expect(gate(decisionsFor("adapt", [], true))).toBe(false);
-    expect(gate(decisionsFor("copy"))).toBe(true);
-    expect(gate(decisionsFor(null))).toBe(true);
+  it("Mechanisms: walked on both tracks, a basic keyboard included", () => {
+    expect(screenGates.get("mechanisms")).toBeUndefined();
   });
 
   it("the language list is an Open page", () => {
@@ -198,8 +194,9 @@ describe.each(OPEN_CASES)("the Open walk (issues $issues, basic $basic)", ({ iss
     for (const id of COPY_ONLY) expect(steps, id).not.toContain(id);
   });
 
-  it("starts with the language list, always reaches the OSK and Touch, and ends at Review", () => {
+  it("starts with the language list, always reaches Mechanisms, the OSK and Touch, and ends at Review", () => {
     expect(steps[1]).toBe("open_languages");
+    expect(steps).toContain("mechanisms");
     expect(steps).toContain("osk");
     expect(steps).toContain("touch");
     expect(steps.at(-1)).toBe("done");

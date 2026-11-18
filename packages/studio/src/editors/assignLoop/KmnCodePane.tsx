@@ -63,6 +63,7 @@ import { physicalAssignmentsOf } from "../../lib/physicalAssignments.ts";
 import { findKmnPath } from "../../lib/findKmnPath.ts";
 import { getPatternByIdSync } from "../../lib/services.ts";
 import { isLiveOpen, isOpenMode } from "../../lib/openMode.ts";
+import { physicalCodeChanges } from "../../lib/basicKeyboard.ts";
 import { useUnappliedText } from "../../hooks/useUnappliedText.ts";
 import { useApplyOnOpen } from "../../components/OpenApplyHost.tsx";
 import { compileCandidateKmn } from "../../lib/compileCandidateKmn.ts";
@@ -163,6 +164,13 @@ export function lineForNode(
   return group === undefined ? undefined : lineByNodeId.get(group.nodeId);
 }
 
+/** The 1-based line a change's node sits on, for its marker (line 1 when the node has none). */
+function changeLine(change: IRChange): number {
+  const node = change.change === "insert" || change.change === "replace" ? change.node : change.change === "remove" ? change.old : undefined;
+  const line = node !== undefined && "sourceLine" in node ? node.sourceLine : undefined;
+  return typeof line === "number" && line > 0 ? line : 1;
+}
+
 export interface KmnCodePaneProps {
   /**
    * Scroll to, and select, the source line of this IR node (a rule, store,
@@ -170,9 +178,15 @@ export interface KmnCodePaneProps {
    * tab's "view in code". Re-applied when the id changes.
    */
   readonly revealNodeId?: string;
+  /**
+   * The physical keys may not change (a basic keyboard opened for update, lib/basicKeyboard.ts):
+   * Apply refuses any edit that could change what a physical key types, and accepts edits to
+   * touch-only rules (T_ and U_ keys, platform('touch') gates), comments and header fields.
+   */
+  readonly physicalLocked?: boolean;
 }
 
-export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
+export function KmnCodePane({ revealNodeId, physicalLocked = false }: KmnCodePaneProps = {}) {
   const { t } = useLingui();
   const ir = useWorkingCopyStore((s) => s.ir);
   const mode = useWorkingCopyStore((s) => s.instantiationMode);
@@ -626,6 +640,40 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
       showBlocked(layerA.map(findingMarker));
       return;
     }
+    // A basic keyboard's physical keys: only touch-only changes may be applied (lib/basicKeyboard.ts).
+    if (physicalLocked) {
+      let physical: number[];
+      let diffed: IRChange[];
+      try {
+        diffed = diffIR(parseKmn(canonical, id).ir, after.ir);
+        physical = physicalCodeChanges(diffed, after.ir);
+      } catch (err) {
+        setApplyError(err instanceof Error ? err.message : String(err));
+        return;
+      }
+      if (physical.length > 0) {
+        const message = t({
+          id: "editor.assignLoop.mechanisms.code.physicalLocked",
+          message:
+            "This keyboard's physical keys match the Windows layout and can't be changed. Only rules on touch keys (T_ or U_) or behind platform('touch') can be edited here.",
+        });
+        showBlocked(
+          physical.map((index) => {
+            const line = changeLine(diffed[index]!);
+            return {
+              code: "kmn-code-physical-locked",
+              severity: "error" as const,
+              message,
+              startLineNumber: line,
+              startColumn: 1,
+              endLineNumber: line,
+              endColumn: 2,
+            };
+          }),
+        );
+        return;
+      }
+    }
     if (openText !== undefined && openPath !== null) {
       // Open: a formatting-only change is still a change to the file.
       if (current === canonical) {
@@ -961,6 +1009,15 @@ export function KmnCodePane({ revealNodeId }: KmnCodePaneProps = {}) {
           {t({
             id: "editor.assignLoop.mechanisms.code.revealMissing",
             message: "That rule is not in the keyboard as it will be built, so no line matches it. Another step replaced it.",
+          })}
+        </div>
+      )}
+      {physicalLocked && (
+        <div data-testid="kmn-code-physical-locked" role="status">
+          {t({
+            id: "editor.assignLoop.mechanisms.code.physicalLockedNote",
+            message:
+              "This keyboard's physical keys match the Windows layout, so only touch behaviour can change here: rules on T_ or U_ keys, or rules behind platform('touch').",
           })}
         </div>
       )}

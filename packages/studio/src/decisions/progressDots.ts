@@ -608,6 +608,11 @@ function buildSectionMark(
   return null;
 }
 
+function isSkippedByTrack(stepId: string, ctx: ResolveContext): boolean {
+  const resolution = resolveLocation({ route: "survey", step: stepId as StepId }, ctx);
+  return resolution.kind !== "reachable" && resolution.reason === "skipped-by-track";
+}
+
 function sectionJumpLocation(
   stepId: string,
   badge: readonly WorkKind[] | undefined,
@@ -700,6 +705,10 @@ export function buildProgressDots(input: ProgressDotsInput): readonly ProgressDo
     const step = ctx.manifest[i];
     if (step === undefined) continue;
     const isActiveStep = step.id === activeStepId;
+    // A step this author's track skips earns no mark (FR-049a), even when
+    // answers were recorded for it before the track was chosen. Only the
+    // active step is exempt: a menu entry can open a step the walk skips.
+    if (!isActiveStep && isSkippedByTrack(step.id, ctx)) continue;
     const entries = entriesByStep.get(step.id) ?? [];
     const positions = walks[step.id];
     const stepWorkToDo = workToDo[step.id];

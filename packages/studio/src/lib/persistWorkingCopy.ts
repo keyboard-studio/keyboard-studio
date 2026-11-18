@@ -766,7 +766,7 @@ function prepareSnapshotPatch(input: WorkingCopySnapshot): Partial<WorkingCopyDa
     // spec 083: tolerant read, same idiom as keyEditOverlay above — a
     // pre-083 snapshot has no key, which reads as "no deadkey edits".
     deadkeyOverlay: snapshot.deadkeyOverlay ?? { ops: [] },
-    touchEditorMode: snapshot.touchEditorMode ?? "character",
+    touchEditorMode: snapshot.touchEditorMode ?? "key",
     contextToleranceOverlay: snapshot.contextToleranceOverlay ?? null,
     contextNormalizationStep: snapshot.contextNormalizationStep ?? null,
     // spec 090 T063: a pre-090 snapshot may still carry the retired

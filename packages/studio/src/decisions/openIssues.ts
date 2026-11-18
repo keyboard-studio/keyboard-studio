@@ -46,14 +46,6 @@ export function openLettersGate(decisions: DecisionSet): boolean {
   return !isOpenBasicKeyboard(decisions) || hasOpenIssue(decisions, "missing-letters");
 }
 
-/**
- * The Mechanisms gallery on Open: walked for a keyboard that is not basic. A basic
- * keyboard's physical layout never changes, so its added characters can only go on touch.
- */
-export function openMechanismsGate(decisions: DecisionSet): boolean {
-  return !isOpen(decisions) || !isOpenBasicKeyboard(decisions);
-}
-
 /** The gate of a walk page that shows on Open only, and only when the baseline found `kind`. */
 export function openIssueGate(kind: OpenIssueKind): (decisions: DecisionSet) => boolean {
   return (decisions) => isOpen(decisions) && hasOpenIssue(decisions, kind);

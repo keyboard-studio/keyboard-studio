@@ -8,8 +8,14 @@
 // directory: the store read happens once, near the top of the tree, and the
 // presentational piece takes plain props.
 //
-// Display mapping is `steps/phases.ts`'s fixed PHASES table — six phases,
-// A-F, never re-derived here (see that file's header for why).
+// Display mapping is `steps/phases.ts`'s fixed PHASES table — eight phases,
+// A-H, never re-derived here (see that file's header for why).
+//
+// Track filtering: when the caller passes `decisions`, a phase none of whose
+// steps this walk visits is left out (the same screen gates the advance
+// policy skips by), and the remaining pills are lettered A, B, C... in order.
+// On Open (spec 111) that drops Survey, Characters and Discard, which the
+// Open walk never visits, and shows phase B under its Open label.
 //
 // Mobile adaptation (Phase 1): on narrow viewports (< 479px) the six
 // pills don't fit, so the stepper renders a compact single-line button —
@@ -32,10 +38,12 @@
 //     here rather than reaching for a shared class that doesn't exist yet.)
 import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import type { MessageDescriptor } from "@lingui/core";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { resolveMessage } from "../lib/i18nResolve.ts";
-import { PHASES, type PhaseDef } from "../steps/phases.ts";
-import { manifest } from "../steps/manifest.ts";
+import { PHASES, UNPHASED_STEP_IDS, type PhaseDef } from "../steps/phases.ts";
+import { manifest, screenGates } from "../steps/manifest.ts";
+import type { DecisionSet } from "../decisions/decisionTypes.ts";
 import { useIsNarrow } from "../hooks/useViewport.ts";
 import { Dialog } from "../ui/Dialog.tsx";
 
@@ -49,6 +57,13 @@ export interface PhaseStepperProps {
    * unrecognized string would.
    */
   activeStepId: string | null;
+  /**
+   * The recorded decisions. When given, phases this walk never visits (by
+   * the manifest's screen gates) are left out and the step count covers
+   * only the steps the walk visits. Omitted, every phase and every manifest
+   * step is shown.
+   */
+  decisions?: DecisionSet;
   /**
    * Narrow viewports only: render the compact summary as a borderless,
    * left-aligned button that sits inside the top NavBar row (see NavBar's
@@ -210,41 +225,87 @@ const INLINE_TEXT_STYLE: CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-/** Find the phase (if any) `activeStepId` belongs to, without requiring the
- * caller's loosely-typed id to satisfy `StepId` — `phaseOfStep` in
- * `steps/phases.ts` takes a real `StepId`; this is the same membership check
- * against an arbitrary string, for ids that may be "done", "unsupported",
- * "package", or unrecognized. */
-function findActivePhaseIndex(activeStepId: string | null): number {
+/** A phase as this walk displays it: possibly re-lettered and relabelled. */
+interface ShownPhase {
+  phase: PhaseDef;
+  letter: string;
+  label: MessageDescriptor;
+}
+
+/**
+ * Whether the walk visits `stepId`: its screen gate (the one `advance.ts`
+ * skips by) passes, or it is where the author is now (a menu entry can open
+ * a step the walk itself skips).
+ */
+function isWalked(
+  stepId: string,
+  activeStepId: string | null,
+  decisions: DecisionSet | undefined,
+): boolean {
+  if (decisions === undefined || stepId === activeStepId) return true;
+  const gate = screenGates.get(stepId);
+  return gate === undefined || gate(decisions);
+}
+
+function shownPhases(
+  activeStepId: string | null,
+  decisions: DecisionSet | undefined,
+): ShownPhase[] {
+  const isOpen = decisions?.["authoring-track"]?.value === "adapt";
+  return PHASES.filter((phase) =>
+    phase.stepIds.some((id) => isWalked(id, activeStepId, decisions)),
+  ).map((phase, index) => ({
+    phase,
+    letter: decisions === undefined ? phase.letter : String.fromCharCode(65 + index),
+    label: isOpen && phase.openLabel !== undefined ? phase.openLabel : phase.label,
+  }));
+}
+
+/** Find the shown phase (if any) `activeStepId` belongs to, as a membership
+ * check against an arbitrary string: the id may be "done", "unsupported",
+ * "package", or unrecognized (`phaseOfStep` in `steps/phases.ts` takes a
+ * real `StepId`). */
+function findActivePhaseIndex(phases: readonly ShownPhase[], activeStepId: string | null): number {
   if (activeStepId === null) return -1;
-  return PHASES.findIndex((phase) =>
+  return phases.findIndex(({ phase }) =>
     (phase.stepIds as readonly string[]).includes(activeStepId),
   );
 }
 
 /**
- * Position of `activeStepId` on the manifest spine (1-based), or -1 when the
- * id isn't a manifest step. The manifest order is the survey's real step
- * order, so "step N of M" in the compact label always matches what the
- * author walks through.
+ * The manifest steps "step N of M" counts, in the survey's real step order.
+ * With `decisions`, only the steps this walk visits, without the unphased
+ * `package` stub; otherwise the whole manifest.
  */
-function findStepNumber(activeStepId: string | null): number {
-  if (activeStepId === null) return -1;
-  const index = manifest.findIndex((step) => step.id === activeStepId);
-  return index === -1 ? -1 : index + 1;
+function countedStepIds(
+  activeStepId: string | null,
+  decisions: DecisionSet | undefined,
+): string[] {
+  const ids = manifest.map((step) => step.id);
+  if (decisions === undefined) return ids;
+  // The Open walk starts at its Languages page (OpenKeyboardEntry seeds the
+  // session there), so the attribution screen before it, which no gate
+  // hides, is never walked.
+  const start =
+    decisions["authoring-track"]?.value === "adapt" ? ids.indexOf("open_languages") : 0;
+  const unphased = UNPHASED_STEP_IDS as readonly string[];
+  return ids
+    .slice(Math.max(start, 0))
+    .filter((id) => !unphased.includes(id) && isWalked(id, activeStepId, decisions));
 }
 
 interface PhasePillListProps {
   activeStepId: string | null;
+  phases: readonly ShownPhase[];
   /** "row" is the desktop pill strip; "column" stacks the pills for the
    * narrow-viewport dialog, where six pills plus connectors can't fit side
    * by side. */
   direction: "row" | "column";
 }
 
-function PhasePillList({ activeStepId, direction }: PhasePillListProps) {
+function PhasePillList({ activeStepId, phases, direction }: PhasePillListProps) {
   const { i18n, t } = useLingui();
-  const activeIndex = findActivePhaseIndex(activeStepId);
+  const activeIndex = findActivePhaseIndex(phases, activeStepId);
 
   const doneLabel = t({ id: "phaseStepper.state.done", message: "completed" });
   const currentLabel = t({
@@ -258,7 +319,7 @@ function PhasePillList({ activeStepId, direction }: PhasePillListProps) {
 
   return (
     <ol style={direction === "row" ? LIST_STYLE : LIST_COLUMN_STYLE}>
-      {PHASES.map((phase: PhaseDef, index: number) => {
+      {phases.map(({ phase, letter, label }, index) => {
         const isActive = index === activeIndex;
         // Only meaningful relative to a KNOWN current position — with no
         // match (activeIndex === -1: unphased step, terminal state, or
@@ -270,7 +331,7 @@ function PhasePillList({ activeStepId, direction }: PhasePillListProps) {
           : isDone
             ? doneLabel
             : upcomingLabel;
-        const isLast = index === PHASES.length - 1;
+        const isLast = index === phases.length - 1;
 
         return (
           <li
@@ -291,9 +352,9 @@ function PhasePillList({ activeStepId, direction }: PhasePillListProps) {
                   ...(isActive ? BADGE_ACTIVE_STYLE : BADGE_INACTIVE_STYLE),
                 }}
               >
-                {phase.letter}
+                {letter}
               </span>
-              <span>{resolveMessage(i18n, phase.label)}</span>
+              <span>{resolveMessage(i18n, label)}</span>
               <span style={VISUALLY_HIDDEN_STYLE}>{stateLabel}</span>
             </span>
             {direction === "row" && !isLast && (
@@ -306,7 +367,7 @@ function PhasePillList({ activeStepId, direction }: PhasePillListProps) {
   );
 }
 
-export function PhaseStepper({ activeStepId, inline = false }: PhaseStepperProps) {
+export function PhaseStepper({ activeStepId, decisions, inline = false }: PhaseStepperProps) {
   const { i18n, t } = useLingui();
   const isNarrow = useIsNarrow();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -318,25 +379,24 @@ export function PhaseStepper({ activeStepId, inline = false }: PhaseStepperProps
     id: "phaseStepper.ariaLabel",
     message: "Survey phase progress",
   });
+  const phases = shownPhases(activeStepId, decisions);
 
   if (!isNarrow) {
     return (
       <nav aria-label={ariaLabel} style={ROW_STYLE} data-testid="phase-stepper">
-        <PhasePillList activeStepId={activeStepId} direction="row" />
+        <PhasePillList activeStepId={activeStepId} phases={phases} direction="row" />
       </nav>
     );
   }
 
   // Narrow viewport: compact single-line summary. The pill list moves into
   // the shared Dialog, opened by tapping the summary.
-  const activeIndex = findActivePhaseIndex(activeStepId);
-  const stepNumber = findStepNumber(activeStepId);
-  const totalSteps = manifest.length;
-  const hasPosition = activeIndex !== -1 && stepNumber !== -1;
-  const activePhase: PhaseDef | null =
-    hasPosition && activeIndex >= 0 && activeIndex < PHASES.length
-      ? PHASES[activeIndex]!
-      : null;
+  const activeIndex = findActivePhaseIndex(phases, activeStepId);
+  const stepIds = countedStepIds(activeStepId, decisions);
+  const stepNumber = activeStepId === null ? -1 : stepIds.indexOf(activeStepId) + 1;
+  const totalSteps = stepIds.length;
+  const hasPosition = activeIndex !== -1 && stepNumber > 0;
+  const activePhase: ShownPhase | null = hasPosition ? phases[activeIndex] ?? null : null;
 
   return (
     <>
@@ -380,7 +440,7 @@ export function PhaseStepper({ activeStepId, inline = false }: PhaseStepperProps
           message: "Close phase list",
         })}
       >
-        <PhasePillList activeStepId={activeStepId} direction="column" />
+        <PhasePillList activeStepId={activeStepId} phases={phases} direction="column" />
       </Dialog>
     </>
   );

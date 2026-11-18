@@ -381,6 +381,8 @@ function seedWithShippedTouchLayout(opts: {
   ]);
   const ir = makeTestIR([]);
   useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
+  // The Place Letters walk is no longer the default view.
+  useWorkingCopyStore.getState().setTouchEditorMode("character");
   useWorkingCopyStore.getState().recordPhase({
     phase: "B",
     answers: [],
@@ -484,6 +486,8 @@ describe("TouchGallery — detectionSeedLayout/layoutForLintAndGate fallback on 
     ]);
     const ir = makeTestIR([]);
     useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
+    // The Place Letters walk is no longer the default view.
+    useWorkingCopyStore.getState().setTouchEditorMode("character");
     useWorkingCopyStore.getState().recordPhase({
       phase: "B",
       answers: [],

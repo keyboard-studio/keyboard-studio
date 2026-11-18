@@ -1,8 +1,8 @@
-// JourneyContents — the narrow-viewport table of contents for the journey.
+// JourneyContents — the table of contents for the journey, on every viewport.
 //
-// On a phone the footer's bare dot row does not work: there is no hover to
-// reveal what a dot is, and 8px marks are hard to hit. So under the narrow
-// breakpoint the footer shows a "Contents" button instead, and this sheet
+// It began as the phone's replacement for the footer's bare dot row (no hover
+// to reveal what a dot is, 8px marks hard to hit) and replaced that row on
+// desktop too. The footer shows a "Contents" button, and this sheet
 // lists the SAME marks `buildProgressDots` assembles, each beside its label
 // (ProgressDot layout="row"). The data's own collapse rule carries over: a
 // stage the author is not in is one row; the current stage expands into its

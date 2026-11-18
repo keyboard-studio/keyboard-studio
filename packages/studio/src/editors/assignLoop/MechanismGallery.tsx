@@ -1339,6 +1339,17 @@ function MethodChooser({
 // MechanismGallery — main component
 // ---------------------------------------------------------------------------
 
+/** The editing region's fieldset: no chrome of its own, laid out like the pane around it. */
+const EDIT_REGION_STYLE: CSSProperties = {
+  border: 0,
+  margin: 0,
+  padding: 0,
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: 16,
+};
+
 export interface MechanismGalleryProps {
   selectedStartKeyboard: StartKeyboard | null;
   onComplete?: () => void;
@@ -1350,6 +1361,13 @@ export interface MechanismGalleryProps {
    * No kbgen data => no row; gallery behaves exactly as today.
    */
   placementMap?: PlacementMap;
+  /**
+   * The physical keys may be looked at but not changed (a basic keyboard
+   * opened for update, lib/basicKeyboard.ts). The character strip and the
+   * preview stay usable; every editing control is disabled, and Continue is
+   * always offered and calls `onComplete` without the unplaced-letters gate.
+   */
+  readOnly?: boolean;
 }
 
 export function MechanismGallery({
@@ -1357,6 +1375,7 @@ export function MechanismGallery({
   onComplete,
   onBack,
   placementMap,
+  readOnly = false,
 }: MechanismGalleryProps) {
   const { t, i18n } = useLingui();
   // Narrow-viewport branch (mobile adaptation, Phase 4): the
@@ -3237,6 +3256,8 @@ export function MechanismGallery({
   // below); it is cleared on the next character change, not by a timer (D3 —
   // no new debounce/timer is introduced here).
   const handleUnlock = useCallback(() => {
+    // Nothing on a read-only layout may unlock it (or flag the touch layout).
+    if (readOnly) return;
     unlockDesktop();
     if (touchLayoutJson !== null) {
       markStale(TOUCH_STEP_ID);
@@ -3255,7 +3276,7 @@ export function MechanismGallery({
         }),
       );
     }
-  }, [unlockDesktop, markStale, touchLayoutJson, t]);
+  }, [readOnly, unlockDesktop, markStale, touchLayoutJson, t]);
 
   // ---------------------------------------------------------------------------
   // Shared styles
@@ -3300,7 +3321,8 @@ export function MechanismGallery({
   // Intro splash — first entry to the desktop mechanism gallery only
   // ---------------------------------------------------------------------------
 
-  if (showIntro) {
+  // A read-only layout skips the splash: it introduces building, which is not on offer.
+  if (showIntro && !readOnly) {
     return (
       <GalleryIntroSplash
         eyebrow={t({
@@ -3385,7 +3407,17 @@ export function MechanismGallery({
   // incomplete gallery where the author wants to move on without editing.
   const continueLabel = t({ id: "editor.assignLoop.doneButton", message: "Continue" });
   const forwardButton: ForwardButtonSpec | null =
-    // TOP PRIORITY (bug fix): once every inventory character has count >= 1
+    // A read-only layout cannot be completed by placing letters, so Continue
+    // is always offered and moves on as it is.
+    readOnly && onComplete !== undefined
+      ? {
+          label: continueLabel,
+          onClick: onComplete,
+          testId: "mechanisms-continue",
+          disabled: false,
+          style: forwardBtnStyle,
+        }
+      : // TOP PRIORITY (bug fix): once every inventory character has count >= 1
     // (allCovered, the SAME badge computation CharScrollStrip/currentCharBadge
     // use) OR every character is implemented-or-marked (unaccountedChars —
     // mark-aware, see below), the "Continue" button is ALWAYS rendered —
@@ -3552,7 +3584,7 @@ export function MechanismGallery({
             ...(forwardButton.ariaLabel !== undefined
               ? { ariaLabel: forwardButton.ariaLabel }
               : {}),
-            ...(unaccountedChars.length > 0
+            ...(unaccountedChars.length > 0 && !readOnly
               ? { ariaDescribedBy: unaccountedHintId }
               : {}),
           },
@@ -3595,7 +3627,24 @@ export function MechanismGallery({
           blocking role="alert" banner+button with a quiet, always-visible
           note while locked — role="status" (not "alert"), same convention as
           the coverage line below, so it never interrupts. */}
-      {locked && (
+      {readOnly && (
+        <p
+          role="status"
+          data-testid="mechanisms-read-only"
+          style={{
+            margin: 0,
+            fontSize: 13,
+            color: TEXT_DIM,
+            fontFamily: FONT,
+          }}
+        >
+          <Trans id="editor.assignLoop.basicReadOnlyNote">
+            This keyboard&rsquo;s physical keys match the Windows layout, so they
+            can&rsquo;t be changed here. You can look through them and continue.
+          </Trans>
+        </p>
+      )}
+      {locked && !readOnly && (
         <p
           role="status"
           aria-live="polite"
@@ -3664,7 +3713,7 @@ export function MechanismGallery({
               same re-render that recomputes unaccountedChars. Its id is
               referenced by the footer forward button's aria-describedby
               (spec 081) only while this hint is mounted. */}
-        {unaccountedChars.length > 0 && (
+        {unaccountedChars.length > 0 && !readOnly && (
           <p
             id={unaccountedHintId}
             role="status"
@@ -3734,6 +3783,13 @@ export function MechanismGallery({
           </div>
         )}
 
+        {/* Everything below edits the layout: disabled as a whole when read-only,
+              so the controls stay visible but cannot change anything. */}
+        <fieldset
+          disabled={readOnly}
+          data-testid="mechanisms-edit-region"
+          style={EDIT_REGION_STYLE}
+        >
         {/* Per-char UI */}
         {currentChar !== null && (
           <>
@@ -4603,6 +4659,7 @@ export function MechanismGallery({
             }))}
           />
         )}
+        </fieldset>
       </>
 
       {/* Load error for patterns (non-blocking; preview won't show transform) */}

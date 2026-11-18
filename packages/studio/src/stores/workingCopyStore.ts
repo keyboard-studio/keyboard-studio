@@ -945,7 +945,7 @@ export interface WorkingCopyState {
    * assignment walk) or `"key"` (the key-grid editor). A view toggle, not a
    * fork (FR-036b): switching modes never clears the other mode's
    * in-progress state (`touchDraft` or `keyEditOverlay`). Defaults to
-   * `"character"` per FR-036; reset on reset and on a new instantiation
+   * `"key"` (Manage Layout leads; the character walk is the secondary view); reset on reset and on a new instantiation
    * (each fresh working copy re-evaluates the propose-on-entry condition,
    * T073, from this same default).
    */
@@ -1843,7 +1843,7 @@ function freshInstantiationTail() {
     deadkeyOverlay: { ops: [] },
     // Annotated, not inferred: without it the literal widens to string and
     // the spread no longer matches TouchEditorMode ("character" | "key" | "code").
-    touchEditorMode: "character" as TouchEditorMode,
+    touchEditorMode: "key" as TouchEditorMode,
     staleSteps: new Set<string>(),
     // A new working copy has no default-fill provenance yet (#890) — the
     // pattern-loading effect re-runs defaultFillAxes and republishes it.
@@ -2080,11 +2080,11 @@ const INITIAL_STATE: WorkingCopyData = {
   authoredHelpPhp: null,
   touchDraft: null,
   galleryIntrosSeen: { mechanism: false, touch: false },
-  // key edit overlay + touch editor mode (spec 063) — empty log, character
-  // walk default (FR-036)
+  // key edit overlay + touch editor mode (spec 063) — empty log; Manage
+  // Layout (the key grid) is the default view, the character walk secondary
   keyEditOverlay: { ops: [] },
   deadkeyOverlay: { ops: [] },
-  touchEditorMode: "character",
+  touchEditorMode: "key",
   // staleness slice (US3) — default empty ("fresh", FR-019)
   staleSteps: new Set<string>(),
   // validator findings slice (US5, T034) — default empty (structural proxy)
@@ -3211,7 +3211,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // Set/Map re-creations above.
       keyEditOverlay: { ops: [] },
       deadkeyOverlay: { ops: [] },
-      touchEditorMode: "character",
+      touchEditorMode: "key",
       staleSteps: new Set<string>(),
       // instantiationMode is null in INITIAL_STATE; explicit for clarity.
       instantiationMode: null,

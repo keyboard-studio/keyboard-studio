@@ -11,7 +11,7 @@
  * Not `.skip`-ped, ever (FR-083, mirrored from footer-progress.spec.ts).
  */
 
-import { test, expect, type Page } from "playwright/test";
+import { test, expect, type Locator, type Page } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
@@ -30,6 +30,7 @@ import {
   driveHelpPhase,
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
+import { contentsSheet, openContents, withContents } from "./helpers/journeyContents";
 
 const FIXTURE = {
   startKeyboardId: "basic_kbdfr",
@@ -38,12 +39,13 @@ const FIXTURE = {
   targetScript: "other",
 };
 
+// The marks live in the footer's Contents sheet; each locator takes the open sheet.
 const footer = (page: Page) => page.locator("footer");
-const questionMarks = (page: Page) => footer(page).locator('[data-progress-dot-tier="question"]');
-const marksButton = (page: Page) =>
-  footer(page).locator('button[aria-label^="Accents & marks"]').first();
-const invisiblesButtons = (page: Page) =>
-  footer(page).locator('button[aria-label^="Invisible characters"]');
+const questionMarks = (sheet: Locator) => sheet.locator('[data-progress-dot-tier="question"]');
+const marksButton = (sheet: Locator) =>
+  sheet.locator('button[aria-label^="Accents & marks"]').first();
+const invisiblesButtons = (sheet: Locator) =>
+  sheet.locator('button[aria-label^="Invisible characters"]');
 
 async function startToCharacters(page: Page): Promise<void> {
   await seedReturningVisitor(page);
@@ -86,14 +88,15 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     // back to the stage name today, since MarksSeriesStep's stops publish no
     // per-station label of their own), never a single collapsed SECTION mark.
     await expect(footer(page)).toBeVisible({ timeout: 10_000 });
-    const activeMarksButtons = footer(page).locator('button[aria-label^="Accents & marks"]');
-    const activeCount = await activeMarksButtons.count();
-    expect(activeCount).toBeGreaterThan(0);
-    for (let i = 0; i < activeCount; i++) {
-      await expect(activeMarksButtons.nth(i)).toHaveAttribute("data-progress-dot-tier", "question");
-    }
-    const activeQuestionMarks = await questionMarks(page).count();
-    expect(activeQuestionMarks).toBeGreaterThan(0);
+    await withContents(page, async (sheet) => {
+      const activeMarksButtons = sheet.locator('button[aria-label^="Accents & marks"]');
+      const activeCount = await activeMarksButtons.count();
+      expect(activeCount).toBeGreaterThan(0);
+      for (let i = 0; i < activeCount; i++) {
+        await expect(activeMarksButtons.nth(i)).toHaveAttribute("data-progress-dot-tier", "question");
+      }
+      expect(await questionMarks(sheet).count()).toBeGreaterThan(0);
+    });
 
     // Walk the whole series to completion (accepting every proposal).
     await driveMarksSeries(page);
@@ -104,8 +107,10 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     // Leaving marks collapses it back to exactly ONE section-tier mark —
     // never left mid-expanded, and never duplicated.
     await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
-    await expect(marksButton(page)).toHaveCount(1);
-    await expect(marksButton(page)).toHaveAttribute("data-progress-dot-tier", "section");
+    await withContents(page, async (sheet) => {
+      await expect(marksButton(sheet)).toHaveCount(1);
+      await expect(marksButton(sheet)).toHaveAttribute("data-progress-dot-tier", "section");
+    });
   });
 
   test("completing Invisible characters with several candidates checked adds exactly one mark, not one per candidate", async ({
@@ -141,15 +146,14 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
 
     // Exactly one mark for the whole invisibles screen, whatever tier it
     // rendered at, however many candidates were accepted.
-    await expect(invisiblesButtons(page)).toHaveCount(1);
+    await withContents(page, (sheet) => expect(invisiblesButtons(sheet)).toHaveCount(1));
   });
 
   test("overflow: a long walk still keeps the current mark visible and every mark reachable", async ({
     page,
   }) => {
-    // A narrow viewport makes the two-tier row (wider than 057's single-tier
-    // one, per journey-strip-contract.md §6) actually overflow, rather than
-    // relying on however many marks happen to fit the default window.
+    // A small window makes the Contents list (one row per mark) longer than
+    // its sheet, rather than relying on however many marks happen to fit.
     await page.setViewportSize({ width: 480, height: 720 });
     await startToCharacters(page);
     await buildOneCharacterList(page, "é");
@@ -166,24 +170,18 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     await driveMechanismsGallery(page);
     await driveTouchGallery(page);
 
-    // Still walking "help" — the row has accumulated every earlier stage's
-    // section mark plus "help"'s own current position. The scroll-into-view
-    // effect (StudioFooter.tsx, keyed on `[data-progress-dot-kind="current"]`)
-    // must have kept the current mark inside the row's visible scroll area,
-    // not scrolled past it — checked via Playwright's own viewport-relative
+    // Still walking "help" — the list has accumulated every earlier stage's
+    // section mark plus "help"'s own current position. Opening the list
+    // scrolls the current mark into view (JourneyContents, keyed on
+    // `aria-current="step"`) — checked via Playwright's own viewport-relative
     // visibility, which fails if the element is scrolled out of its
     // clipping ancestor.
-    const current = footer(page).locator('[data-progress-dot-kind="current"]');
-    await expect(current).toBeVisible({ timeout: 15_000 });
-    // Every mark — not just the current one — stays reachable by Tab
-    // regardless of scroll position (native focus-scroll).
-    // Scoped to the dot row: the footer's first button is now the step's Back
-    // (spec 081), not a dot.
-    const row = footer(page)
-      .getByTestId("progress-dot-row")
-      .locator('[role="button"], button')
-      .first();
-    expect(await row.isVisible()).toBe(true);
+    await withContents(page, async (sheet) => {
+      const current = sheet.locator('[data-progress-dot-kind="current"]');
+      await expect(current).toBeVisible({ timeout: 15_000 });
+      // Every mark stays reachable: the first one is a real button in the list.
+      await expect(sheet.locator("[data-progress-dot-kind]").first()).toBeAttached();
+    });
 
     await driveHelpPhase(page);
     await expect(page.getByRole("heading", { name: "Survey complete" })).toBeVisible({ timeout: 30_000 });
@@ -219,11 +217,14 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     await driveConvenienceStep(page);
     await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
 
-    // Back to Characters via the journey strip's own "Characters" section
+    // Back to Characters via the journey list's own "Characters" section
     // mark (a plain jump — no return target, per the note above).
-    const charactersButton = footer(page).locator('button[aria-label^="Characters"]').first();
+    const charactersButton = (await openContents(page)).locator('button[aria-label^="Characters"]').first();
     await expect(charactersButton).toBeVisible({ timeout: 10_000 });
     await charactersButton.click();
+    // The arrival closes the list; let its exit (and focus return) settle
+    // before typing, or the hand-back of focus lands mid-fill.
+    await expect(contentsSheet(page)).toBeHidden({ timeout: 10_000 });
 
     // Add a SECOND mark-bearing character — new evidence for the marks
     // series' attachment/treatment proposals.
@@ -242,19 +243,21 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
       timeout: 15_000,
     });
     await expect(page.getByText(/needs reconfirming/i).first()).toBeVisible({ timeout: 10_000 });
-    // The active marks question mark(s) carry the badge live, while the
-    // author is right there looking at the flagged station.
-    const badgedQuestionMark = footer(page).locator(
-      '[data-progress-dot-tier="question"][aria-label*="work waiting"]',
-    );
-    await expect(badgedQuestionMark.first()).toBeVisible({ timeout: 10_000 });
-    // Each station renders once (walk and record never double up), so the
-    // row has exactly one "you are here".
-    await expect(footer(page).locator('[data-progress-dot-kind="current"]')).toHaveCount(1);
-    // The same Next badged the later gallery too — without moving the author.
-    await expect(
-      footer(page).locator('button[aria-label^="Mechanisms"][aria-label*="work waiting: assign a key"]'),
-    ).toHaveCount(1);
+    await withContents(page, async (sheet) => {
+      // The active marks question mark(s) carry the badge live, while the
+      // author is right there looking at the flagged station.
+      const badgedQuestionMark = sheet.locator(
+        '[data-progress-dot-tier="question"][aria-label*="work waiting"]',
+      );
+      await expect(badgedQuestionMark.first()).toBeVisible({ timeout: 10_000 });
+      // Each station renders once (walk and record never double up), so the
+      // list has exactly one "you are here".
+      await expect(sheet.locator('[data-progress-dot-kind="current"]')).toHaveCount(1);
+      // The same Next badged the later gallery too — without moving the author.
+      await expect(
+        sheet.locator('button[aria-label^="Mechanisms"][aria-label*="work waiting: assign a key"]'),
+      ).toHaveCount(1);
+    });
 
     // Next is blocked while an EARLIER station is flagged (FR-013) — the
     // re-entry lands on the saved position, past the flagged attachment rows.
@@ -278,7 +281,9 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     await driveInvisiblesStep(page);
     await driveConvenienceStep(page);
     await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
-    await expect(marksButton(page)).not.toHaveAttribute("aria-label", /work waiting/i);
+    await withContents(page, (sheet) =>
+      expect(marksButton(sheet)).not.toHaveAttribute("aria-label", /work waiting/i),
+    );
   });
 
   test("the Mechanisms 'assign a key' badge shows on arrival at the gallery and clears once every key is assigned (US3 scenario 5)", async ({
@@ -296,14 +301,18 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     // Spec 082: the rules step sits between deadkeys and mechanisms.
     await page.getByTestId("rules-continue").click();
 
-    const mechanismsMark = footer(page).locator('button[aria-label^="Mechanisms"]');
-    await expect(mechanismsMark).toHaveCount(1, { timeout: 15_000 });
-    await expect(mechanismsMark).toHaveAttribute("aria-label", /work waiting: assign a key/);
+    const mechanismsMark = (sheet: Locator) => sheet.locator('button[aria-label^="Mechanisms"]');
+    await withContents(page, async (sheet) => {
+      await expect(mechanismsMark(sheet)).toHaveCount(1, { timeout: 15_000 });
+      await expect(mechanismsMark(sheet)).toHaveAttribute("aria-label", /work waiting: assign a key/);
+    });
 
     await driveMechanismsGallery(page);
 
     // Past the gallery with every character placed: the badge is gone.
-    await expect(mechanismsMark).toHaveCount(1, { timeout: 15_000 });
-    await expect(mechanismsMark).not.toHaveAttribute("aria-label", /work waiting: assign a key/);
+    await withContents(page, async (sheet) => {
+      await expect(mechanismsMark(sheet)).toHaveCount(1, { timeout: 15_000 });
+      await expect(mechanismsMark(sheet)).not.toHaveAttribute("aria-label", /work waiting: assign a key/);
+    });
   });
 });

@@ -333,7 +333,7 @@ describe("StudioShell — journey footer mount (T052, FR-040)", () => {
 
     const footer = document.querySelector("footer");
     expect(footer).not.toBeNull();
-    expect(footer!.querySelectorAll("[data-progress-dot-kind]").length).toBeGreaterThan(0);
+    expect(footer!.querySelector('[data-testid="journey-contents-open"]')).not.toBeNull();
   });
 
   it("does not mount the footer on the welcome screen", async () => {
