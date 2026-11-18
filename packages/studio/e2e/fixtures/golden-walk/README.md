@@ -226,3 +226,43 @@ This supersedes the baseline committed in `3e7b3e60`, whose `README.md`
 also carried a "Marks are typed after the letter they belong to." tip.
 The walk never records a `mark-input-order` answer, so it does not emit
 that line, and verify failed on it.
+
+## 2026-11-18 — Re-capture for the per-platform touch gate (PR #2934)
+
+**Re-capture: 2026-11-18 (UTC), from main `91c1f1f9` (merge of PR #2931)
+plus this branch's TouchGallery forward-button fix (main-CI run
+`44232583534`).** Taken in-sandbox (Playwright desktop, keyboards corpus
+at pinned `435f82d6`, vite dev server); verify mode passes against it
+locally with the fix in place.
+
+PR #2934 (`a7f9a583`) made the touch completion gate per-platform and
+stopped crediting letters the desktop types, so the walk now places
+sixteen characters on touch that the old pooled gate excused — the walk's
+own fixed answer, long-press on K_A, landing in the emitted touch layout
+for the first time. The old baseline (2026-11-13, #2657) differed in
+exactly five byte-compared entries, all downstream of that one change:
+
+- `source/test.keyman-touch-layout`: K_A gains long-press subkeys — 12
+  on the default layer (‐ ‑ – — … † ‡ æ œ ◌̀ ◌̂ ◌̈) and 4 on shift
+  (Æ Ç É Œ) — plus a `tablet.defaultHint: "dot"` field.
+- `build/test.js`: the compiled JS embeds the touch layout, so it gains
+  exactly those same subkey arrays (plus `defaultHint`).
+- `README.md`: the "How to type" sample swaps its touch example from
+  `long-press " (touch) | “` to `long-press q (touch) | æ`, and the
+  Letters/Marks design-note lines gain "touch long-press or flick".
+- `source/help/test.php` and `source/welcome/welcome.htm`: the "On Phones
+  and Tablets" long-press list gains the same 16 "Hold q/Q for …" entries.
+  The “/” long-press entries are unchanged (they live on the symbol
+  layer, not K_A).
+
+Every other entry is byte-identical to the old baseline. `HISTORY.md`
+carries the 2026-11-18 capture date (verify normalises it) and
+`.studio/decision-record.json` its wall-clock timestamps
+(presence-checked only). This is expected drift from #2934's intended
+gate change, not a regression: the walk completes, all other entries
+match, and the new placements are the walk's own recorded answers.
+The same run's build and e2e-desktop lanes failed on the same #2934
+change for different reasons (a stale unit test still looking for the
+removed dot row; the touch walk deadlocking on a pooled-`allCovered`
+Continue — see the PR body); this branch fixes those too, and the
+re-capture above is from the fixed tree.

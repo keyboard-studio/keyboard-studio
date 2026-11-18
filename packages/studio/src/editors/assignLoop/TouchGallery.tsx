@@ -6933,79 +6933,102 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
   const touchContinueLabel = t({ id: "editor.assignLoop.doneButton", message: "Continue" });
   const touchForwardButton: TouchForwardButtonSpec | null =
-    // TOP PRIORITY (bug fix): once every inventory character has count >= 1
-    // (allCovered, the SAME badge computation CharScrollStrip/currentCharBadge
-    // use) OR every character is implemented-or-marked (unaccountedTouchChars
-    // — mark-aware, see below), the "Continue" button is ALWAYS rendered —
-    // regardless of currentChar or its walk (touchLettersToAdd) membership.
-    // Previously this button was hidden entirely for a currentChar outside
-    // touchLettersToAdd (e.g. an already-detected character reached via the
-    // SHOW-ALL CharScrollStrip), which could strand an author who had, in
-    // fact, finished every character — there was no visible way to advance.
-    // Falls through to the existing branch unchanged whenever any character
-    // is still count 0 AND unaccounted-for. `onComplete` is a required
-    // TouchGalleryProps field (always defined), unlike MechanismGallery's
-    // optional one, so there is no separate undefined check here.
-    //
-    // RECONCILIATION (mechanism-gallery-progression follow-up): a marked
-    // character is NEVER excluded from touchLettersToAdd (marking never
-    // changes detection/suggestion status, only the mark set), so it can
-    // never itself be "the out-of-walk char currentChar jumped to" — but a
-    // DIFFERENT, already-covered character elsewhere in the inventory CAN be
-    // reached via the SHOW-ALL strip while the marked character sits
-    // untouched further down the walk. In that shape, `allCovered` reads
-    // false forever (the marked character's producer-badge count is, and
-    // stays, 0 — marks are authoring metadata, never a `MechanismAssignment`,
-    // so they never move the badge), and the per-char branch below is
-    // unreachable (currentChar is outside touchLettersToAdd) — so, before
-    // this fix, NO Continue button rendered at all, even though every character
-    // was genuinely implemented-or-marked. Hence the `||
-    // unaccountedTouchChars.length === 0` added below: `unaccountedTouchChars`
-    // is mark-aware AND is the exact signal `handleContinue` itself checks
-    // before calling `finalizeCompletion` (see that callback above) — so
-    // "Continue becomes visible" and "Continue, if clicked, actually
-    // completes" are the SAME condition on this path; OR-ing it in adds no
-    // case where a visible enabled Continue could still no-op.
-    //
-    // `allCovered` is kept as an alternate (not replaced) rather than the
-    // sole source of truth: it is derived from LIVE, non-mocked signals in
-    // production (touchBaseDirectSet ultimately reads the real seed
-    // layout/session edits), whereas `unaccountedTouchChars` reads
-    // `layoutForLintAndGate`, which in THIS TEST SUITE's harness is rebuilt
-    // by a simplified mocked `buildTouchLayoutJson` that does not replay
-    // `baseTouchJson`/`mods` the way the real engine does (see the "Done
-    // button forced visible" test suite's own doc comments) — a harness gap,
-    // not a production one, but keeping `allCovered` alongside means neither
-    // the pre-existing shipped/mirrored-content test scenario nor this fix's
-    // new marked-character scenario needs the other's signal to be correct.
-    (allCovered || unaccountedTouchChars.length === 0)
+    // Per-character navigation FIRST when the walk is on one of its own
+    // characters: the TOP PRIORITY branch below must never swallow the
+    // walk's "Next" mid-walk. `allCovered` pools platforms (a letter counts
+    // as covered when ANY platform — or the desktop — types it) while the
+    // completion gate is per-platform, so the two can disagree: every
+    // inventory character badge-covered, yet letters still unplaced on one
+    // platform. In that shape the old order rendered a single "Continue"
+    // disabled until ALL per-platform gaps closed — but the only way to
+    // close them in character mode is to step through the walk with
+    // "Next", which no longer existed. The Bafut walk deadlocked on its
+    // first unplaced character exactly this way (U+2013 – placed via
+    // long-press, Continue still disabled by the four remaining tablet
+    // gaps; main CI run 44232583534, e2e desktop). The out-of-walk case
+    // the TOP PRIORITY branch exists for is untouched: when currentChar is
+    // outside touchLettersToAdd, the per-character branch is null and the
+    // branch below applies exactly as before.
+    currentChar !== null && touchLettersToAdd.includes(currentChar)
       ? {
-          label: touchContinueLabel,
-          ariaLabel: touchContinueLabel,
-          onClick: handleContinue,
-          // allCovered pools platforms; a letter can count as covered there
-          // while one platform still lacks a key, and handleContinue would
-          // then do nothing. Gate exactly as handleContinue does.
-          disabled: unaccountedTouchChars.length > 0,
+          label: hasAnotherCharAfterCurrent
+            ? t({
+                id: "editor.assignLoop.nextCharacterButton",
+                message: "Next character →",
+              })
+            : touchContinueLabel,
+          ariaLabel: hasAnotherCharAfterCurrent
+            ? t({
+                id: "editor.assignLoop.nextCharacterAriaLabel",
+                message: "Next character",
+              })
+            : touchContinueLabel,
+          onClick: handleNext,
+          disabled:
+            !canGoNext ||
+            (!hasAnotherCharAfterCurrent && unaccountedTouchChars.length > 0),
         }
-      : currentChar !== null && touchLettersToAdd.includes(currentChar)
+      : (allCovered || unaccountedTouchChars.length === 0)
         ? {
-            label: hasAnotherCharAfterCurrent
-              ? t({
-                  id: "editor.assignLoop.nextCharacterButton",
-                  message: "Next character →",
-                })
-              : touchContinueLabel,
-            ariaLabel: hasAnotherCharAfterCurrent
-              ? t({
-                  id: "editor.assignLoop.nextCharacterAriaLabel",
-                  message: "Next character",
-                })
-              : touchContinueLabel,
-            onClick: handleNext,
-            disabled:
-              !canGoNext ||
-              (!hasAnotherCharAfterCurrent && unaccountedTouchChars.length > 0),
+            // TOP PRIORITY for an out-of-walk currentChar (bug fix): once
+            // every inventory character has count >= 1 (allCovered, the SAME
+            // badge computation CharScrollStrip/currentCharBadge use) OR
+            // every character is implemented-or-marked (unaccountedTouchChars
+            // — mark-aware, see below), the "Continue" button is ALWAYS
+            // rendered — regardless of currentChar or its walk
+            // (touchLettersToAdd) membership. Previously this button was
+            // hidden entirely for a currentChar outside touchLettersToAdd
+            // (e.g. an already-detected character reached via the SHOW-ALL
+            // CharScrollStrip), which could strand an author who had, in
+            // fact, finished every character — there was no visible way to
+            // advance. `onComplete` is a required TouchGalleryProps field
+            // (always defined), unlike MechanismGallery's optional one, so
+            // there is no separate undefined check here.
+            //
+            // RECONCILIATION (mechanism-gallery-progression follow-up): a
+            // marked character is NEVER excluded from touchLettersToAdd
+            // (marking never changes detection/suggestion status, only the
+            // mark set), so it can never itself be "the out-of-walk char
+            // currentChar jumped to" — but a DIFFERENT, already-covered
+            // character elsewhere in the inventory CAN be reached via the
+            // SHOW-ALL strip while the marked character sits untouched
+            // further down the walk. In that shape, `allCovered` reads false
+            // forever (the marked character's producer-badge count is, and
+            // stays, 0 — marks are authoring metadata, never a
+            // `MechanismAssignment`, so they never move the badge), and the
+            // per-char branch above is unreachable (currentChar is outside
+            // touchLettersToAdd) — so, before this fix, NO Continue button
+            // rendered at all, even though every character was genuinely
+            // implemented-or-marked. Hence the `||
+            // unaccountedTouchChars.length === 0` below:
+            // `unaccountedTouchChars` is mark-aware AND is the exact signal
+            // `handleContinue` itself checks before calling
+            // `finalizeCompletion` (see that callback above) — so "Continue
+            // becomes visible" and "Continue, if clicked, actually
+            // completes" are the SAME condition on this path; OR-ing it in
+            // adds no case where a visible enabled Continue could still
+            // no-op.
+            //
+            // `allCovered` is kept as an alternate (not replaced) rather
+            // than the sole source of truth: it is derived from LIVE,
+            // non-mocked signals in production (touchBaseDirectSet
+            // ultimately reads the real seed layout/session edits), whereas
+            // `unaccountedTouchChars` reads `layoutForLintAndGate`, which
+            // in THIS TEST SUITE's harness is rebuilt by a simplified
+            // mocked `buildTouchLayoutJson` that does not replay
+            // `baseTouchJson`/`mods` the way the real engine does (see the
+            // "Done button forced visible" test suite's own doc comments) —
+            // a harness gap, not a production one, but keeping `allCovered`
+            // alongside means neither the pre-existing shipped/mirrored-
+            // content test scenario nor this fix's new marked-character
+            // scenario needs the other's signal to be correct.
+            label: touchContinueLabel,
+            ariaLabel: touchContinueLabel,
+            onClick: handleContinue,
+            // allCovered pools platforms; a letter can count as covered there
+            // while one platform still lacks a key, and handleContinue would
+            // then do nothing. Gate exactly as handleContinue does.
+            disabled: unaccountedTouchChars.length > 0,
           }
         : null;
 
