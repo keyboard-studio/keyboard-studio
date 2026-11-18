@@ -105,6 +105,65 @@ function seedShippedPlusSwapped(opts: {
   useDecisionStore.getState().record({ id: "touch-seed-source", value: "import-adapt", provenance: "asked", step: "touch_seed_source" });
 }
 
+/**
+ * Two swapped chars plus a shipped one — the per-platform-gate regression
+ * shape (main CI 44232583534): every inventory character is badge-covered
+ * (the swaps mirror onto the touch seed, the shipped char is detected via
+ * the seed layout), so `allCovered` is true, while the mocked gate still
+ * finds a letter without a touch key. Both swapped chars stay in the walk
+ * as actionable suggestion targets, so the walk has a first AND a next
+ * character to step between.
+ */
+function seedShippedPlusTwoSwapped(opts: {
+  shippedChar: string;
+  swappedChars: [string, string];
+}) {
+  const shippedLayoutJson = JSON.stringify({
+    phone: {
+      layer: [
+        {
+          id: "default",
+          row: [{ id: 1, key: [{ id: "T_shipped", output: opts.shippedChar }] }],
+        },
+      ],
+    },
+  });
+  const vfs = createVirtualFS([
+    { path: "source/basic_kbdus.kmn", content: "c test\\n", isBinary: false },
+    { path: "source/basic_kbdus.keyman-touch-layout", content: shippedLayoutJson, isBinary: false },
+  ]);
+  const ir = makeTestIR([]);
+  useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
+  // The Place Letters walk is no longer the default view.
+  useWorkingCopyStore.getState().setTouchEditorMode("character");
+  const keyFor = (c: string) => `K_${c.toUpperCase()}`;
+  const swaps: MechanismAssignment[] = opts.swappedChars.map((target) => ({
+    scope: "individual",
+    target,
+    modality: "physical",
+    mechanisms: [
+      {
+        patternId: "simple_swap",
+        strategyId: "S-01",
+        slotValues: { kmnRules: `+ [${keyFor(target)}] > '${target}'` },
+      },
+    ],
+    source: "user",
+  }));
+  useWorkingCopyStore.getState().recordPhase({
+    phase: "B",
+    answers: [],
+    confirmedInventory: [...opts.swappedChars, opts.shippedChar],
+  });
+  useWorkingCopyStore.getState().recordPhase({
+    phase: "C",
+    answers: [],
+    assignments: swaps,
+  });
+  useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
+  useDecisionStore.getState().record({ id: "touch-seed-source", value: "import-adapt", provenance: "asked", step: "touch_seed_source" });
+}
+
 // ---------------------------------------------------------------------------
 // touchBaseDirectSet — LIVE base-direct signal (a) regression (P1 bug fix,
 // km-validator finding: "touch base-direct staleness"). Before the fix,
@@ -355,6 +414,42 @@ describe("TouchGallery — Continue button forced visible when the whole invento
     // works" agree on this path — no harness caveat needed.
     fireEvent.click(doneBtn);
     expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  it("does NOT swallow the walk's Next with a disabled Continue when the whole inventory is badge-covered but letters are still unplaced on one platform (per-platform gate regression, main CI 44232583534)", async () => {
+    // Two swapped chars ("x", "y") plus the shipped "€": every inventory
+    // character is badge-covered (count >= 1) with zero explicit author
+    // action, so `allCovered` is true — but the mocked gate still finds a
+    // letter without a touch key (`unaccountedTouchChars` non-empty), the
+    // pooled-badge vs per-platform-gate disagreement the Bafut walk hit in
+    // production: the touch layout types these letters on one platform only,
+    // so the per-platform gate still owes them a key. The walk's first
+    // character ("x") is mid-walk with another after it.
+    seedShippedPlusTwoSwapped({ shippedChar: "€", swappedChars: ["x", "y"] });
+
+    const onComplete = vi.fn();
+    await act(async () => {
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />, { withStepNav: true });
+    });
+
+    expectCurrentChar("x");
+
+    // The forward button is the per-character Next — enabled via the
+    // detected character — NOT the pooled `allCovered` Continue, which
+    // would sit disabled until every per-platform gap closes while the
+    // walk itself has no way to advance past this character (the pre-fix
+    // deadlock: the driver placed the character, then waited forever on
+    // the disabled Continue).
+    const nextBtn = screen.getByTestId("touch-continue");
+    expect(nextBtn.textContent).toMatch(/Next character/i);
+    expect((nextBtn as HTMLButtonElement).disabled).toBe(false);
+
+    // And Next actually advances the walk instead of completing.
+    fireEvent.click(nextBtn);
+    await waitFor(() => {
+      expectCurrentChar("y");
+    });
+    expect(onComplete).not.toHaveBeenCalled();
   });
 });
 
