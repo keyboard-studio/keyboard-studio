@@ -18,6 +18,11 @@
 // `layoutEdits` (the Layout-tab `kmn-edits` entries) is in NO Open row either: on
 // Open a Layout-tab edit is written into the file through the apply seam when the
 // author confirms it (lib/layoutOpenCommit), and its entry is only the record.
+// `layoutFileStore` is in NO Open row either: on Open the author's file text is
+// authoritative and the reseed change adds the store when it creates the file,
+// so only Copy names a built layout in the projection.
+// `icon` is in NO Open row either: on Open the icon is written when applied,
+// so only Copy writes it in the projection.
 //
 // A step listed for a kind may still have nothing to do (an empty overlay); a
 // step left out never runs for that kind.
@@ -45,6 +50,7 @@ export type ProjectionStep =
   | "descriptor" // 3.6: the package descriptor
   | "rename" // 4: keyboard id rename
   | "icon" // 4c: the edited icon (Copy only; on Open the file is written when applied)
+  | "layoutFileStore" // 4d: name a built touch layout in the .kmn/.kps (issue #2924; Copy only)
   | "intendedCheck"; // apply runs only: the written text must match the IR the change meant
 
 /** What a run is for: an apply kind (`OpenChange["kind"]`) or the output. */

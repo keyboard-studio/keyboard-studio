@@ -2,6 +2,7 @@
 store(dk_bases)  'aeiouAEIOU'
 store(dk_output) 'áéíóúÁÉÍÓÚ'
 store(&TARGETS) 'any'
+store(&LAYOUTFILE) 'kb.keyman-touch-layout'
 begin Unicode > use(main)
 
 group(main) using keys
