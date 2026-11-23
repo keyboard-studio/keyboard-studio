@@ -123,6 +123,17 @@ test.describe("Preview touch height", () => {
       await startButton.click();
     }
 
+    // The gallery opens on Manage Layout, whose key grid renders no live
+    // OSK preview — only Place Letters does (spec 065 T037). Switch first,
+    // as driveTouchGallery does.
+    const placeLettersTab = page.getByTestId("touch-mode-tab-character");
+    if (
+      (await placeLettersTab.isVisible().catch(() => false)) &&
+      (await placeLettersTab.getAttribute("aria-selected")) !== "true"
+    ) {
+      await placeLettersTab.click();
+    }
+
     // The live preview: wait for the OSK to render real keys.
     const oskFrame = page.frameLocator(OSK_FRAME_SELECTOR);
     await oskFrame.locator(".kmw-key:not(.kmw-key-hidden)").first().waitFor({ timeout: 120_000 });

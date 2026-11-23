@@ -1,7 +1,7 @@
 // Nav transition test — spec 081 US3 (SC-005).
 //
 // Walks the copy track through StepHost with the real StudioFooter beside it,
-// forward, then back, then by a footer dot jump. After every hop:
+// forward, then back, then by a footer Contents jump. After every hop:
 //   - the nav store holds an entry for the active step only, so no button of
 //     the step just left can render (a stale entry is the defect US3 names);
 //   - there is at most one Back button in the whole document;
@@ -207,7 +207,7 @@ function Harness({ onSurvey }: { onSurvey: boolean }) {
 }
 
 describe("footer nav across step transitions (spec 081 US3)", () => {
-  it("never shows a previous step's buttons or a second Back — forward, back, and by dot jump", async () => {
+  it("never shows a previous step's buttons or a second Back — forward, back, and by Contents jump", async () => {
     let view!: ReturnType<typeof render>;
     await act(async () => {
       view = render(<Harness onSurvey />);
@@ -235,16 +235,21 @@ describe("footer nav across step transitions (spec 081 US3)", () => {
       expectCleanNav(`back from ${before}`);
     }
 
-    // By dot jump: any reached dot in the footer's row.
-    const row = screen.getByTestId("progress-dot-row");
-    const reached = within(row)
+    // By Contents jump: any reached mark in the footer's Contents list
+    // (the desktop dot row is gone — #2934 replaced it with the Contents
+    // list, which carries the SAME marks `buildProgressDots` assembles).
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("journey-contents-open"));
+    });
+    const list = await screen.findByTestId("journey-contents-list", {}, { timeout: 15000 });
+    const reached = within(list)
       .queryAllByRole("button")
       .filter((b) => b.getAttribute("data-progress-dot-kind") === "completed");
     if (reached.length > 0) {
       await act(async () => {
         fireEvent.click(reached.at(-1)!);
       });
-      expectCleanNav("dot jump");
+      expectCleanNav("contents jump");
     }
 
     // Leaving the survey (the output route unmounts the step) leaves no cluster.
