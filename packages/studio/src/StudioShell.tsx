@@ -139,6 +139,7 @@ import { DecisionTrailView } from "./decisions/DecisionTrailView.tsx";
 import { resolveImpact, resolveImpactAsync } from "./decisions/impact.ts";
 import { buildPathOverlay } from "./dashboard/pathOverlay.ts";
 import { projectWorkingCopyForOutput } from "./lib/serializeWorkingCopy.ts";
+import { DocPreviewProjectionContext } from "./lib/docPreviewProjection.ts";
 import { StepHost } from "./components/StepHost.tsx";
 import { OpenApplyHost } from "./components/OpenApplyHost.tsx";
 import { noteAccepted } from "./lib/navigationGuard.ts";
@@ -2096,6 +2097,9 @@ function StudioShellContent() {
     message: "Finish every inventory character before you can access Output",
   });
   return (
+    // The Documentation step's preview needs the output projection but cannot
+    // import it (see lib/docPreviewProjection.ts); the shell supplies it.
+    <DocPreviewProjectionContext.Provider value={projectWorkingCopyForOutput}>
     <OpenApplyHost>
     <UnappliedTextDialog />
     <div
@@ -2176,5 +2180,6 @@ function StudioShellContent() {
       <StudioFooter activeRoute={route} />
     </div>
     </OpenApplyHost>
+    </DocPreviewProjectionContext.Provider>
   );
 }

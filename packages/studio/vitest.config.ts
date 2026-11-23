@@ -46,5 +46,9 @@ export default defineConfig({
     testTimeout: 30_000,
     // Same cost lands in a beforeEach that dynamically imports the stores.
     hookTimeout: 30_000,
+    // Vitest blanks CSS files by default. The Documentation preview loads
+    // markdownPreview.css as text (?raw) to style the previewed page, so let
+    // that one file through; every other stylesheet stays blanked.
+    css: { include: [/markdownPreview\.css/] },
   },
 });

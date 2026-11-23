@@ -180,7 +180,7 @@ describe("the stylesheet editor leave guard", () => {
     render(<WithHost><HtmlEditor onComplete={() => undefined} onBack={() => undefined} /><LeaveProbe onLeave={() => undefined} /></WithHost>);
     await ready();
     typeInto(EDITED);
-    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+    fireEvent.click(screen.getByRole("button", { name: "Write" }));
     expect(askedQuestion()).toBe(true);
     await answer("cancel");
     expect((screen.getByTestId("mock-editor") as HTMLTextAreaElement).value).toBe(EDITED);

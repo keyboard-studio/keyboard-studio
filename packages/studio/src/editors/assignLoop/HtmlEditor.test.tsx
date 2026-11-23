@@ -74,6 +74,15 @@ vi.mock("../../hooks/useDocsPreview.ts", () => ({
 vi.mock("../../hooks/useDocMemberStates.ts", () => ({
   useDocMemberStates: () => [],
 }));
+// The preview's assets come from the output projection; none are needed here.
+vi.mock("../../hooks/useDocPreviewAssets.ts", () => ({
+  useDocPreviewAssets: () => ({ lookup: () => undefined, welcomePath: null, helpCssPaths: [], ready: true }),
+}));
+
+/** The "as installed" preview document the frame renders. */
+function previewDoc(): string {
+  return screen.getByTestId("html-preview-frame").getAttribute("srcdoc") ?? "";
+}
 
 function seedStore(overrides: Record<string, unknown> = {}) {
   const startVfs = createVirtualFS();
@@ -164,8 +173,55 @@ describe("HtmlEditor", () => {
     fireEvent.click(await screen.findByTestId("html-file-history-md"));
     expect(screen.queryByTestId("rich-seed")).toBeNull();
     expect(screen.queryByTestId("code-seed")).toBeNull();
-    expect(screen.getByText("Version history here", { exact: false })).toBeTruthy();
+    expect(previewDoc()).toContain("Version history here");
     expect(screen.queryByRole("button", { name: "Write" })).toBeNull();
+  });
+
+  it("desktop: editor and preview frame are shown together, with no Preview toggle", async () => {
+    render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("html-file-welcome-htm"));
+    expect(screen.getByRole("button", { name: "Write" })).toBeTruthy();
+    expect(await screen.findByTestId("rich-seed")).toBeTruthy();
+    const frame = screen.getByTestId("html-preview-frame");
+    expect(frame.getAttribute("title")).toContain("welcome.htm");
+    expect(frame.getAttribute("sandbox")).toBe("");
+    expect(previewDoc()).toContain("Generated welcome.");
+    expect(screen.queryByRole("button", { name: "Preview" })).toBeNull();
+  });
+
+  it("desktop: the preview follows an edit", async () => {
+    render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("rich-edit"));
+    // The preview reloads once typing pauses (DocPreviewFrame's settle delay).
+    await waitFor(() => expect(previewDoc()).toContain("Edited paragraph."));
+  });
+
+  it("desktop: README.md previews as rendered Markdown", async () => {
+    render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("html-file-readme-md"));
+    expect(previewDoc()).toMatch(/<h1[^>]*>Test KB<\/h1>/);
+  });
+
+  it("desktop: read-only files show only the preview frame", async () => {
+    render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+    fireEvent.click(await screen.findByTestId("html-file-history-md"));
+    expect(screen.getByTestId("html-preview-frame")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Write" })).toBeNull();
+  });
+
+  it("narrow: the Write / Code / Preview toggle is unchanged", async () => {
+    Object.defineProperty(window, "innerWidth", { value: 400, configurable: true });
+    try {
+      render(<HtmlEditor onComplete={() => undefined} onBack={() => undefined} />, { withStepNav: true });
+      expect(await screen.findByTestId("rich-seed")).toBeTruthy();
+      expect(screen.queryByTestId("html-preview-frame")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+      expect(previewDoc()).toContain("Generated welcome.");
+      expect(screen.queryByTestId("rich-seed")).toBeNull();
+    } finally {
+      Object.defineProperty(window, "innerWidth", { value: 1024, configurable: true });
+      window.dispatchEvent(new Event("resize"));
+    }
   });
 
   it("on the open track the welcome seed comes from the carried VFS text", async () => {
@@ -238,9 +294,9 @@ describe("HtmlEditor", () => {
     expect(history.textContent).not.toContain("absent");
     expect(license.textContent).not.toContain("absent");
     fireEvent.click(history);
-    expect(screen.getByText("# History from slice", { exact: false })).toBeTruthy();
+    expect(previewDoc()).toContain("History from slice");
     fireEvent.click(license);
-    expect(screen.getByText("License from slice", { exact: false })).toBeTruthy();
+    expect(previewDoc()).toContain("License from slice");
   });
 
   it("on the open track with nothing carried, history and license preview the generated render", async () => {
@@ -255,9 +311,9 @@ describe("HtmlEditor", () => {
     expect(history.textContent).not.toContain("absent");
     expect(license.textContent).not.toContain("absent");
     fireEvent.click(history);
-    expect(screen.getByText("Updated via keyboard-studio.", { exact: false })).toBeTruthy();
+    expect(previewDoc()).toContain("Updated via keyboard-studio.");
     fireEvent.click(license);
-    expect(screen.getByText("MIT License", { exact: false })).toBeTruthy();
+    expect(previewDoc()).toContain("MIT License");
   });
 });
 

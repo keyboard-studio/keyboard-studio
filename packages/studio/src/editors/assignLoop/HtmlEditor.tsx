@@ -11,7 +11,9 @@
  *
  * Features:
  * - TipTap WYSIWYG as primary mode (lazy-loaded, never in the main chunk)
- * - Monaco code as secondary mode; read-only preview as a third view
+ * - Monaco code as secondary mode
+ * - "As installed" preview (DocPreviewFrame): beside the editor on desktop,
+ *   a third Preview view on narrow viewports
  * - File chooser: a narrow folder-grouped tree at the left on desktop
  *   (tabs on narrow viewports, via `useIsNarrow(tabletMax)` — a two-pane
  *   layout that needs the room); the tree groups the `source/` files and
@@ -75,6 +77,8 @@ import type { EditorStepProps } from "../../steps/types.ts";
 import type { DocMemberId } from "@keyboard-studio/contracts";
 
 // Lazy-load both panes so neither TipTap nor Monaco lands in the main chunk.
+import { DocPreviewFrame } from "./DocPreviewFrame.tsx";
+
 const HtmlCodePane = lazy(() =>
   import("./HtmlCodePane.tsx").then((m) => ({ default: m.HtmlCodePane })),
 );
@@ -522,7 +526,13 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
 
   const selectedState = memberStates.find((s) => s.member === (selected as DocMemberId));
   const codeOnly = isEditable(selected) ? codeOnlyReason(selected) : null;
-  const effectiveMode: EditorMode = codeOnly !== null && mode === "rich" ? "code" : mode;
+  // Desktop (wider than tabletMax) shows the preview beside the editor, so
+  // there is no Preview view there; narrow viewports keep the three-way
+  // toggle. A "preview" mode left over from a read-only file falls back to
+  // the editor the file allows.
+  const sideBySide = !useIsNarrow(BREAKPOINTS.tabletMax);
+  const requestedMode: EditorMode = sideBySide && mode === "preview" ? "rich" : mode;
+  const effectiveMode: EditorMode = codeOnly !== null && requestedMode === "rich" ? "code" : requestedMode;
   // Open: a page the keyboard has no file for is not edited here (the Help step's suggestion covers it).
   const absentOnOpen = isOpen && isEditable(selected) && !present(selected);
 
@@ -577,12 +587,10 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
     publishVersion,
   ]);
 
-  const previewHtml = (): string => {
-    if (!isEditable(selected)) return readOnlyText ?? "";
-    if (selected === "help-php") return splitPhpPage(currentText(selected)).body;
-    if (selected === "readme-md") return currentText(selected);
-    return splitHtmlDocument(currentText(selected)).body;
-  };
+  // The whole file (head included): the preview renders it as installed.
+  const previewText = isEditable(selected) ? currentText(selected) : (readOnlyText ?? "");
+  // eslint-disable-next-line lingui/no-unlocalized-strings -- MEMBER_PATH's placeholder token, not UI text
+  const previewFileLabel = MEMBER_PATH[selected].replace("<keyboard id>", keyboardId);
 
   // -- File chooser -----------------------------------------------------------
   // Desktop: a narrow folder-grouped tree at the left. Narrow viewports
@@ -590,7 +598,7 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
   // `useViewport` vocabulary): the tab row, unchanged. Both render the same
   // buttons (`data-testid="html-file-<member>"`), so tests and e2e keep
   // finding them.
-  const showTree = !useIsNarrow(BREAKPOINTS.tabletMax);
+  const showTree = sideBySide;
   const readOnlyLabel = t({ id: "editor.assignLoop.html.files.readOnly", message: "read-only" });
   const unsavedLabel = t({ id: "editor.assignLoop.html.files.unsaved", message: "unsaved" });
   const absentLabel = t({ id: "editor.assignLoop.html.files.absent", message: "absent" });
@@ -787,7 +795,9 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
               ["code", t({ id: "editor.assignLoop.html.mode.code", message: "Code" })],
               ["preview", t({ id: "editor.assignLoop.html.mode.preview", message: "Preview" })],
             ] as Array<[EditorMode, string]>
-          ).map(([m, label]) => (
+          )
+            .filter(([m]) => !(sideBySide && m === "preview"))
+            .map(([m, label]) => (
             <button
               key={m}
               type="button"
@@ -810,79 +820,61 @@ export function HtmlEditor({ onComplete, onBack, hasTestBuilds = false }: Editor
         </div>
       )}
 
-      {/* Editor / Preview */}
-      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-        {isEditable(selected) && !absentOnOpen && effectiveMode === "rich" && (
-          <Suspense
-            fallback={
-              <div style={{ padding: 16, color: "var(--app-text-muted)", fontSize: 13 }}>
-                {t({ id: "editor.assignLoop.html.rich.loading", message: "Loading editor…" })}
-              </div>
-            }
-          >
-            <HtmlRichTextPane
-              key={`${selected}:${generation}:${isEditable(selected) ? fileStamp(selected) : ""}`}
-              value={richValue(selected)}
-              format={selected === "readme-md" ? "markdown" : "html"}
-              onChange={(next) => handleRichChange(selected, next)}
-            />
-          </Suspense>
-        )}
+      {/* Editor and preview: side by side on desktop, one at a time when narrow */}
+      <div
+        style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: sideBySide ? "row" : "column", gap: 16 }}
+      >
+        {isEditable(selected) && !absentOnOpen && effectiveMode !== "preview" && (
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            {effectiveMode === "rich" && (
+              <Suspense
+                fallback={
+                  <div style={{ padding: 16, color: "var(--app-text-muted)", fontSize: 13 }}>
+                    {t({ id: "editor.assignLoop.html.rich.loading", message: "Loading editor…" })}
+                  </div>
+                }
+              >
+                <HtmlRichTextPane
+                  key={`${selected}:${generation}:${isEditable(selected) ? fileStamp(selected) : ""}`}
+                  value={richValue(selected)}
+                  format={selected === "readme-md" ? "markdown" : "html"}
+                  onChange={(next) => handleRichChange(selected, next)}
+                />
+              </Suspense>
+            )}
 
-        {isEditable(selected) && !absentOnOpen && effectiveMode === "code" && (
-          <div style={{ flex: 1, minHeight: 300, display: "flex", flexDirection: "column" }}>
-            <Suspense
-              fallback={
-                <div style={{ padding: 16, color: "var(--app-text-muted)", fontSize: 13 }}>
-                  {t({ id: "editor.assignLoop.html.code.loading", message: "Loading editor…" })}
-                </div>
-              }
-            >
-              <HtmlCodePane
-                key={`${selected}:${generation}:${isEditable(selected) ? fileStamp(selected) : ""}`}
-                initialText={currentText(selected)}
-                language={selected === "readme-md" ? "markdown" : "html"}
-                onApply={(next) => setMemberText(selected, next)}
-                guardLabel={t({
-                  id: "open.unapplied.view.pageNamed",
-                  message: `the code of ${{ page: memberName(selected) }}`,
-                })}
-                {...(isOpen ? { onApplyForLeave: (next: string) => applyCodeForLeave(selected, next) } : {})}
-              />
-            </Suspense>
+            {effectiveMode === "code" && (
+              <div style={{ flex: 1, minHeight: 300, display: "flex", flexDirection: "column" }}>
+                <Suspense
+                  fallback={
+                    <div style={{ padding: 16, color: "var(--app-text-muted)", fontSize: 13 }}>
+                      {t({ id: "editor.assignLoop.html.code.loading", message: "Loading editor…" })}
+                    </div>
+                  }
+                >
+                  <HtmlCodePane
+                    key={`${selected}:${generation}:${isEditable(selected) ? fileStamp(selected) : ""}`}
+                    initialText={currentText(selected)}
+                    language={selected === "readme-md" ? "markdown" : "html"}
+                    onApply={(next) => setMemberText(selected, next)}
+                    guardLabel={t({
+                      id: "open.unapplied.view.pageNamed",
+                      message: `the code of ${{ page: memberName(selected) }}`,
+                    })}
+                    {...(isOpen ? { onApplyForLeave: (next: string) => applyCodeForLeave(selected, next) } : {})}
+                  />
+                </Suspense>
+              </div>
+            )}
           </div>
         )}
 
-        {!absentOnOpen && (effectiveMode === "preview" || !isEditable(selected)) && (
-          <div
-            style={{
-              border: "1px solid var(--app-border)",
-              borderRadius: 8,
-              background: "var(--app-background)",
-              overflow: "auto",
-              minHeight: 300,
-              padding: 16,
-            }}
-          >
-            <div style={{ fontSize: 12, color: "var(--app-text-muted)", marginBottom: 12 }}>
+        {!absentOnOpen && (sideBySide || effectiveMode === "preview" || !isEditable(selected)) && (
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ fontSize: 12, color: "var(--app-text-muted)" }}>
               {t({ id: "editor.assignLoop.html.preview.label", message: "Preview" })}
             </div>
-            {previewHtml().trim() === "" ? (
-              <div style={{ color: "var(--app-text-muted)", fontSize: 13, fontStyle: "italic" }}>
-                {t({
-                  id: "editor.assignLoop.html.preview.empty",
-                  message: "Nothing to preview yet.",
-                })}
-              </div>
-            ) : selected === "readme-md" || !isEditable(selected) ? (
-              <pre style={{ whiteSpace: "pre-wrap", fontSize: 13, color: "var(--app-text)", margin: 0 }}>
-                {previewHtml()}
-              </pre>
-            ) : (
-              // The file is HTML by definition — render it directly.
-              // This is the author's own document preview, not untrusted content.
-              <div dangerouslySetInnerHTML={{ __html: previewHtml() }} />
-            )}
+            <DocPreviewFrame member={selected} text={previewText} fileLabel={previewFileLabel} />
           </div>
         )}
       </div>
