@@ -12,7 +12,7 @@ export type ButtonVariant = "primary" | "secondary" | "back";
 export type ButtonSize = "default" | "compact";
 
 export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  /** Visual treatment. Defaults to "secondary". */
+  /** Visual treatment. Defaults to "secondary" (tinted, accent-edged). */
   variant?: ButtonVariant;
   /**
    * "compact" fits the 40 px footer (spec 081): tighter padding, no wrapping,
@@ -52,6 +52,32 @@ const STYLE_PRIMARY_DISABLED: React.CSSProperties = {
   borderRadius: "var(--app-radius-sm)",
   color: "var(--app-text-disabled)",
   fontSize: 13,
+  cursor: "not-allowed",
+  fontFamily: FONT,
+};
+
+// The crash-notice button's reviewed pairing (index.css): a tinted fill, an
+// accent edge and body text, so it reads as a button on either theme without
+// competing with the solid primary. With no style at all it fell back to the
+// UA ButtonFace, a white slab on the navy theme.
+const STYLE_SECONDARY_ENABLED: React.CSSProperties = {
+  background: "var(--app-accent-subtle)",
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: BLUE_ACTION,
+  borderRadius: "var(--app-radius-sm)",
+  color: "var(--app-text)",
+  cursor: "pointer",
+  fontFamily: FONT,
+};
+
+const STYLE_SECONDARY_DISABLED: React.CSSProperties = {
+  background: "transparent",
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: BORDER,
+  borderRadius: "var(--app-radius-sm)",
+  color: "var(--app-text-disabled)",
   cursor: "not-allowed",
   fontFamily: FONT,
 };
@@ -96,12 +122,19 @@ export function Button({
   } else if (variant === "back") {
     baseStyle = STYLE_BACK;
   } else {
-    baseStyle = {};
+    baseStyle = disabled ? STYLE_SECONDARY_DISABLED : STYLE_SECONDARY_ENABLED;
   }
 
   if (size === "compact") {
     const { marginTop: _dropped, ...rest } = baseStyle;
     baseStyle = { ...rest, ...STYLE_COMPACT };
+  }
+
+  // A caller's `border` shorthand replaces the base longhands outright: React
+  // warns on, and can mis-apply, a shorthand and its longhands set together.
+  if (style?.border !== undefined) {
+    const { borderWidth: _w, borderStyle: _s, borderColor: _c, ...rest } = baseStyle;
+    baseStyle = rest;
   }
 
   return (

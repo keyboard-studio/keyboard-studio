@@ -111,6 +111,7 @@ import {
   touchLayerForChar,
   enumerateTouchMethodsForChar,
   applyTouchKeycapRemovalsToLayout,
+  applyTouchAssignmentsToRawJson,
   applyTouchKeycapRemovalsToRawJson,
   collectCompositionMethod,
   collectLayerCombosInUse,
@@ -159,6 +160,15 @@ import {
 } from "../../lib/touchKeyIdentity.ts";
 import { TouchKeyIdentityList } from "../../components/TouchKeyIdentityList.tsx";
 import { resolveStartTouchJson } from "../../lib/resolveStartTouchJson.ts";
+import { isLiveOpen } from "../../lib/openMode.ts";
+import { findTouchLayoutPath } from "../../lib/findTouchLayoutPath.ts";
+import { readVfsText } from "../../lib/vfsText.ts";
+import { useApplyOnOpen } from "../../components/OpenApplyHost.tsx";
+import { guardLeave } from "../../stores/unappliedTextStore.ts";
+import { buildTouchReseedChange } from "../../lib/openApply/touchReseed.ts";
+import { commitTouchEditOnOpen, commitTouchOpOnOpen, groupTouchCommitsOnOpen, installRulesOnOpen } from "./touchOpenCommit.ts";
+import { useOpenUndoStore, type TouchKeyRestoreEntry } from "../../stores/openUndoStore.ts";
+import { pendingTouchDeletions, putKeysBack } from "../../lib/openApply/touchRestore.ts";
 import { TOUCH_STEP_ID } from "../../steps/stepIds.ts";
 import { useCharWalkPosition } from "../../hooks/useCharWalkPosition.ts";
 import { cursorCharIn } from "../../lib/stepWalk.ts";
@@ -218,6 +228,11 @@ import {
   type KeyEditInvalidationWarning,
   type KeyEditRejectionNotice,
 } from "./keyGrid/useKeyEditGuards.ts";
+import {
+  touchCoverageByPlatform,
+  touchModePlatformLabel,
+  type TouchPlatformCoverage,
+} from "./touchPlatformCoverage.ts";
 // TIKE touch-builder port (slice-spec): the "Code" tab pane. Phase 0 lands
 // it as a stub; Phase 2 wires in the Monaco editor. Lazy-loaded so the
 // Monaco bundle never lands in the main chunk.
@@ -298,6 +313,8 @@ import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
 import { PublishStepNav } from "../../hooks/usePublishStepNav.ts";
+import type { StepNavSpec } from "../../stores/stepNavStore.ts";
+import { visuallyHidden } from "../../survey/surveyStyles.ts";
 import { usePositionalCharNav, nearestSurvivingChar, indexOfChar } from "./usePositionalCharNav.ts";
 import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
@@ -452,35 +469,6 @@ function isNoOutputLetterCell(cell: KeyGridCellViewModel): boolean {
   if (cell.keycap.startsWith("*")) return false;
   if (KEY_MODE_NON_LETTER_ALLOWLIST.has(cell.id)) return false;
   return cell.producedChars.length === 0;
-}
-
-/** Localized label for a `.keyman-touch-layout` platform id (T072's key-mode
- * platform tabs). Takes an optional i18n + resolves via msg()/resolveMessage()
- * — see touchMechanismLabel's doc comment just below for why a bare `t`
- * parameter would break Lingui's static extraction here. */
-function touchModePlatformLabel(id: string, i18n?: I18n): string {
-  if (id === "phone") {
-    return resolveMessage(
-      i18n,
-      msg({ id: "editor.assignLoop.touch.keyMode.platform.phone", message: "Phone" }),
-    );
-  }
-  if (id === "tablet") {
-    return resolveMessage(
-      i18n,
-      msg({ id: "editor.assignLoop.touch.keyMode.platform.tablet", message: "Tablet" }),
-    );
-  }
-  if (id === "desktop") {
-    return resolveMessage(
-      i18n,
-      msg({
-        id: "editor.assignLoop.touch.keyMode.platform.desktop",
-        message: "Desktop touch",
-      }),
-    );
-  }
-  return id;
 }
 
 /**
@@ -1771,6 +1759,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // re-implemented here.
   const undoStack = useWorkingCopyStore((s) => s.undoStack);
   const undoDelete = useWorkingCopyStore((s) => s.undoDelete);
+  const liveOpen = useWorkingCopyStore((s) => isLiveOpen(s));
 
   // Shared id linking the mode tablist's tabs (`aria-controls`) to whichever
   // pane content is currently mounted — only one of characterModeContent/
@@ -1977,25 +1966,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [keyModeRuleIndex, ir, coverageOptions],
   );
 
-  // Session-aware desktop produced set (shaped-bug fix, diacritic-
-  // implementability) — the SAME `producedSet` MechanismGallery's coverage
-  // gate derives from (base .kmn + this session's physical assignments
-  // injected via applyAssignments/buildSessionProducedSet; see
-  // useInventoryDiff.ts and
-  // packages/engine/src/pattern-apply/sessionProducedSet.ts). Used ONLY by
-  // `handleContinue`'s completion-GATE re-check below (touchCoverage's
-  // `additionalProduced` parameter), so a touch inventory char composable
-  // only because its combining-mark component was assigned a DESKTOP deadkey
-  // this session (e.g. "ж" + a session-assigned diaeresis deadkey composing
-  // "ӝ") doesn't block completion. Deliberately NOT threaded into
-  // `detectedChars`/`touchLettersToAdd` below — those drive the INTERACTIVE
-  // walk (`usePositionalCharNav`'s `list`), which must stay static across a
-  // session for the identical reason useInventoryDiff.ts's own module doc
-  // gives for MechanismGallery's `lettersToAdd`: reflowing it whenever a
-  // session assignment changes coverage would strand/reflow the walk mid-edit
-  // (caught by this fix's own regression pass).
-  const { producedSet: desktopProducedSet, rawProducedSet: desktopRawProducedSet } =
-    useInventoryDiff();
+  // This session's desktop produced set, un-augmented (useInventoryDiff.ts;
+  // packages/engine/src/pattern-apply/sessionProducedSet.ts). It never credits
+  // TOUCH coverage, not even as a composition seed: a mark the desktop types
+  // through a deadkey is not typeable on a phone unless a touch key reaches
+  // it, and a touch key bound to a .kmn rule is already credited through
+  // `keyModeCoverageOptions`' rule index. Read only for `desktopDirectProducedSet`.
+  const { rawProducedSet: desktopRawProducedSet } = useInventoryDiff();
 
   // Draft persistence — read on mount; write on every charTouch change.
   const touchDraft = useWorkingCopyStore((s) => s.touchDraft);
@@ -2033,6 +2010,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     () =>
       touchDraft !== null ? new Map(touchDraft.charTouchEntries) : new Map(),
   );
+
+  // Open: characters whose placement was written into the touch file this session.
+  // Once written a character is "detected" (the file holds it), which would drop it
+  // from the walk list mid-walk; keeping it there mirrors Copy, where a placed
+  // character stays a walk stop until the author moves on. Memory only.
+  const [sessionPlacedChars, setSessionPlacedChars] = useState<ReadonlySet<string>>(() => new Set());
 
   // Sibling-accent bulk groups (longpress accelerator): each batch the author
   // confirms via the "Add them" banner is recorded here so the gallery renders
@@ -2122,11 +2105,60 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // !== "touch_inherited" (an assignment may carry several mechanisms — issue
   // 3, multiple methods per character). This filter matches handleContinue
   // exactly (the single source of truth).
+  // Open (spec 111 FR-041/FR-044): the touch FILE is the layout the key grid, the
+  // builder and the Code tab show. Edits are written into it (touchOpenCommit), so
+  // nothing is replayed over it; the overlay is a record only. A keyboard opened
+  // without a touch file has no layout here: the step offers to create one
+  // (FR-017, one agreed and undoable change) and edits nothing until it exists.
+  const fileTouch = useMemo<{ layout: TouchLayoutIR | null; unreadable: boolean }>(() => {
+    if (!liveOpen || startVfs === null) return { layout: null, unreadable: false };
+    const path = findTouchLayoutPath(startVfs);
+    const text = path === undefined ? undefined : readVfsText(startVfs, path);
+    if (text === undefined) return { layout: null, unreadable: false };
+    try {
+      return { layout: parseTouchLayout(text), unreadable: false };
+    } catch (err) {
+      // A touch file that exists but cannot be read is never replaced by a derived
+      // layout: the grid and the builder are read-only until the Code tab fixes it.
+      devLog.error("[TouchGallery] the touch layout file cannot be read:", err);
+      return { layout: null, unreadable: true };
+    }
+  }, [liveOpen, startVfs]);
+  const fileTouchLayout = fileTouch.layout;
+  const openTouch = fileTouchLayout !== null;
+  const openTouchUnreadable = fileTouch.unreadable;
+  // Open with no touch file at all (FR-017): nothing to edit until the author agrees
+  // to create one. An unreadable file is not "missing": it is never replaced here.
+  const openNoTouch = liveOpen && startVfs !== null && !openTouch && !openTouchUnreadable;
+  const applyOnOpen = useApplyOnOpen();
+
   const touchLayoutResult = useMemo(() => {
     const appliedEdits = [...charTouch.values()].filter((a) =>
       a.mechanisms.some((m) => m.patternId !== "touch_inherited"),
     );
     if (startIr === null) return { json: null, warnings: [] };
+    // Open without a readable touch file: nothing is derived (the file is created
+    // only by the agreed reseed/create change, never emitted at output).
+    if (liveOpen && !openTouch) return { json: null, warnings: [] };
+    if (openTouch) {
+      // Open: the preview starts from the touch FILE (which already holds every
+      // key-grid edit) and lays only the in-progress character assignments over it.
+      // Nothing in progress: nothing to inject, the file is read as it is.
+      if (appliedEdits.length === 0 || startVfs === null) return { json: null, warnings: [] };
+      const path = findTouchLayoutPath(startVfs);
+      const text = path === undefined ? undefined : readVfsText(startVfs, path);
+      if (text === undefined) return { json: null, warnings: [] };
+      try {
+        const overlaid = applyTouchAssignmentsToRawJson(text.replace(/^\uFEFF/, ""), appliedEdits);
+        return {
+          json: applyTouchKeycapRemovalsToRawJson(overlaid.json, deletedTouchKeyIds).json,
+          warnings: overlaid.warnings,
+        };
+      } catch (err) {
+        devLog.error("[TouchGallery] the in-progress assignments could not be laid over the touch file:", err);
+        return { json: null, warnings: [] };
+      }
+    }
     if (
       !shouldEmitTouchLayout(resolvedSeedSource, mods, appliedEdits.length > 0)
     )
@@ -2166,7 +2198,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // not stable; the key is). baseIr is a stable snapshot post-lockDesktop.
     // baseVfs is stable after instantiation but included for correctness.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startIr, touchKey, startVfs, mods, resolvedSeedSource, deletedTouchKeyIds]);
+  }, [startIr, touchKey, startVfs, mods, resolvedSeedSource, deletedTouchKeyIds, openTouch, liveOpen]);
 
   const touchLayoutJson = touchLayoutResult.json;
   // Diagnostic messages for touch assignments the engine could not apply
@@ -2195,7 +2227,11 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // method no longer produces the character at all, so there'd be nothing
   // left to name/restore if this were the only seed layout kept around.
   const rawDetectionSeedLayout = useMemo<TouchLayoutIR | null>(() => {
-    if (startIr === null) return null;
+    // Open: the touch FILE is the layout, as the key grid shows it. No desktop mods are
+    // replayed onto it (a letter placed on the desktop reaches touch only as a
+    // suggestion, never as a key) and no seed source re-derives it.
+    if (fileTouchLayout !== null) return fileTouchLayout;
+    if (liveOpen || startIr === null) return null;
     try {
       const baseTouchJson =
         resolvedSeedSource === "reseed-from-desktop"
@@ -2213,7 +2249,29 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       );
       return null;
     }
-  }, [startIr, startVfs, mods, resolvedSeedSource]);
+  }, [startIr, startVfs, mods, resolvedSeedSource, fileTouchLayout, liveOpen]);
+
+  // Open: the methods the session log holds as deleted (restorable), and the file's
+  // layout with them put back (for naming them only; never written).
+  const openRecords = useOpenUndoStore((st) => st.records);
+  const pendingDeletions = useMemo(
+    () => (openTouch ? pendingTouchDeletions(openRecords) : new Map<string, TouchKeyRestoreEntry[]>()),
+    [openTouch, openRecords],
+  );
+  const layoutWithDeletionsBack = useMemo<TouchLayoutIR | null>(() => {
+    if (!openTouch || pendingDeletions.size === 0 || startVfs === null) return null;
+    const path = findTouchLayoutPath(startVfs);
+    const text = path === undefined ? undefined : readVfsText(startVfs, path);
+    if (text === undefined) return null;
+    try {
+      const raw: unknown = JSON.parse(text.replace(/^\uFEFF/, ""));
+      for (const entries of new Set(pendingDeletions.values())) putKeysBack(raw, entries, true);
+      return parseTouchLayout(JSON.stringify(raw));
+    } catch (err) {
+      devLog.error("[TouchGallery] the deleted methods could not be laid back over the touch file:", err);
+      return null;
+    }
+  }, [openTouch, pendingDeletions, startVfs]);
 
   // The seed layout for the chosen seed source, with desktop mods (spec 035
   // R3) AND the author's touch-method deletions both replayed — mirroring
@@ -2275,10 +2333,41 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // than an exception (FR-033a), and an orphaned op is an author edit that
   // will not be applied — so Continue has to be able to say so instead of
   // completing the step over the top of it ("neither silently discarded").
+  const openTouchLabel = t({
+    id: "editor.assignLoop.touch.open.undoLabel",
+    message: "touch layout edit",
+  });
+  // "Reseed touch from desktop" on Open (owner ruling 2026-11-14): the layout Copy
+  // builds, written as ONE agreed change that replaces the touch file (or creates
+  // it when there is none). The host asks first, with what will change; a decline
+  // leaves everything as it was. The label names the undo step.
+  const reseedUndoLabel = openNoTouch
+    ? t({ id: "editor.assignLoop.touch.open.createUndoLabel", message: "created the touch layout" })
+    : t({ id: "editor.assignLoop.touch.open.reseedUndoLabel", message: "reseeded the touch layout from the desktop keys" });
+  const [reseedFailed, setReseedFailed] = useState(false);
+  const handleReseedOnOpen = useCallback(() => {
+    setReseedFailed(false);
+    const built = buildTouchReseedChange(reseedUndoLabel);
+    if (!built.ok) {
+      devLog.error("[TouchGallery] the touch layout could not be built from the desktop keys:", built.reason);
+      setReseedFailed(true);
+      return;
+    }
+    void applyOnOpen(built.change);
+  }, [applyOnOpen, reseedUndoLabel]);
+  const groupOnOpen = useCallback(
+    (run: () => void): void => {
+      if (openTouch) groupTouchCommitsOnOpen(run, openTouchLabel);
+      else run();
+    },
+    [openTouch, openTouchLabel],
+  );
+
   const keyModeOverlayReplay = useMemo<{
     layout: TouchLayoutIR | null;
     orphaned: readonly KeyEditOperation[];
   }>(() => {
+    if (fileTouchLayout !== null) return { layout: fileTouchLayout, orphaned: [] };
     if (layoutForLintAndGate === null) return { layout: null, orphaned: [] };
     if (keyEditOverlay.ops.length === 0) {
       return { layout: layoutForLintAndGate, orphaned: [] };
@@ -2296,7 +2385,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       );
       return { layout: layoutForLintAndGate, orphaned: [] };
     }
-  }, [layoutForLintAndGate, keyEditOverlay]);
+  }, [layoutForLintAndGate, keyEditOverlay, fileTouchLayout]);
   const effectiveKeyModeLayout = keyModeOverlayReplay.layout;
 
   // ONE derived source (FR-036d): "characters still unplaced" and "keys with
@@ -2310,14 +2399,18 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // same index the completion gate and the edit-time guard use — see that
   // memo's own doc comment. A synthesized touch-key rule must move these
   // figures, the gate, and the inline warning together or not at all.
+  //
+  // Unplaced is per platform (touchPlatformCoverage.ts): a letter on the
+  // tablet layout but not the phone one is still unplaced, on the phone.
   const keyGridProgress = useMemo<{
     unplacedChars: readonly string[];
+    unplacedByPlatform: ReadonlyMap<string, readonly string[]>;
     keysWithNoOutput: readonly string[];
   }>(() => {
     if (effectiveKeyModeLayout === null || keyModeRuleIndex === undefined) {
-      return { unplacedChars: inventory, keysWithNoOutput: [] };
+      return { unplacedChars: inventory, unplacedByPlatform: new Map(), keysWithNoOutput: [] };
     }
-    const { uncovered } = touchCoverage(
+    const { uncovered, byPlatform } = touchCoverageByPlatform(
       effectiveKeyModeLayout,
       inventory,
       keyModeCoverageOptions,
@@ -2339,31 +2432,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         }
       }
     }
-    return { unplacedChars: uncovered, keysWithNoOutput };
+    return { unplacedChars: uncovered, unplacedByPlatform: byPlatform, keysWithNoOutput };
   }, [effectiveKeyModeLayout, keyModeRuleIndex, inventory, keyModeCoverageOptions]);
-
-  // Placement tray for the header bar: unplaced inventory chars + anything
-  // demoted back to it, deduped, in order. Lives in the locked header so it
-  // stays visible while the board scrolls beneath it.
-  const trayLetters = useMemo(() => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const c of [...keyGridProgress.unplacedChars, ...trayReturns]) {
-      if (!seen.has(c)) {
-        seen.add(c);
-        out.push(c);
-      }
-    }
-    return out;
-  }, [keyGridProgress.unplacedChars, trayReturns]);
-
-  // Already-placed letters (inventory minus unplaced), for the "show placed"
-  // checkbox — dotted in the tray so they can be placed in more than one
-  // location.
-  const placedLetters = useMemo(() => {
-    const unplaced = new Set(keyGridProgress.unplacedChars);
-    return inventory.filter((c) => !unplaced.has(c));
-  }, [inventory, keyGridProgress.unplacedChars]);
 
   // Platform catalog for the key-mode grid's platform tabs (T077 already
   // renders the tablist; this just supplies the catalog from the effective
@@ -2413,6 +2483,40 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         : (keyModePlatforms[0]?.id ?? null),
     );
   }, [keyModePlatforms]);
+
+  // What the tray offers is what the platform on screen lacks: a letter placed
+  // on the tablet still sits in the phone's tray. A platform with no figure of
+  // its own (not tracked, or not chosen yet) falls back to the overall list.
+  const activePlatformUnplaced = useMemo(
+    () =>
+      (activeKeyPlatformId !== null
+        ? keyGridProgress.unplacedByPlatform.get(activeKeyPlatformId)
+        : undefined) ?? keyGridProgress.unplacedChars,
+    [activeKeyPlatformId, keyGridProgress],
+  );
+
+  // Placement tray for the header bar: unplaced inventory chars + anything
+  // demoted back to it, deduped, in order. Lives in the locked header so it
+  // stays visible while the board scrolls beneath it.
+  const trayLetters = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const c of [...activePlatformUnplaced, ...trayReturns]) {
+      if (!seen.has(c)) {
+        seen.add(c);
+        out.push(c);
+      }
+    }
+    return out;
+  }, [activePlatformUnplaced, trayReturns]);
+
+  // Already-placed letters (inventory minus unplaced), for the "show placed"
+  // checkbox — dotted in the tray so they can be placed in more than one
+  // location.
+  const placedLetters = useMemo(() => {
+    const unplaced = new Set(activePlatformUnplaced);
+    return inventory.filter((c) => !unplaced.has(c));
+  }, [inventory, activePlatformUnplaced]);
 
   const activeKeyPlatformEntry = useMemo(
     () =>
@@ -2682,11 +2786,23 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // (checked synchronously in handleAssignPanelCommit below, before the
   // commit lands) — never deferred to the Continue gate. Cleared on a new
   // selection so a stale warning from a previous key never lingers.
+  //
+  // A commit can move the selection itself (Delete selects a neighbour; add,
+  // rename and move follow the key), and that move must not wipe the warning
+  // the same commit just raised. `warningsJustSetRef` marks warnings set since
+  // the last render; the selection effect skips one clear for them, and the
+  // effect after it retires the mark either way, so the author's next
+  // selection change clears as before.
   const [keyEditInvalidationWarnings, setKeyEditInvalidationWarnings] =
     useState<readonly KeyEditInvalidationWarning[]>([]);
+  const warningsJustSetRef = useRef(false);
   useEffect(() => {
+    if (warningsJustSetRef.current) return;
     setKeyEditInvalidationWarnings([]);
   }, [selectedKeyAddress]);
+  useEffect(() => {
+    warningsJustSetRef.current = false;
+  }, [keyEditInvalidationWarnings]);
 
   // T106 (FR-062): the characters a KEY EDIT has actually sent back to the
   // unplaced worklist — accumulated across commits, deliberately NOT re-derived
@@ -2789,12 +2905,29 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       op: PendingKeyEditOperation,
       promotedLayout: TouchLayoutIR,
       onGuardsPassed?: () => void,
-      options?: { readonly rejectionRuleIndex?: TouchKeyRuleIndex | undefined },
+      options?: {
+        readonly rejectionRuleIndex?: TouchKeyRuleIndex | undefined;
+        /**
+         * The IR the commit bundles (AssignPanel's synthesis, the severance
+         * merge). On Open it rides in the touch change as its rules half and
+         * `onGuardsPassed` is NOT run: the apply seam is the only writer of the
+         * working IR, so a declined, pending or failed change leaves it alone.
+         */
+        readonly bundledIr?: KeyboardIR | undefined;
+        /**
+         * Runs once the commit has landed: at once on Copy; on Open when the
+         * change is in the file (now, after the author agreed, or when its group
+         * is written). Never for a decline or a failure.
+         */
+        readonly afterApplied?: (() => void) | undefined;
+      },
     ): { committed: boolean; warnings: readonly KeyEditInvalidationWarning[] } => {
       // T118 (FR-045) FIRST: there is no point warning about a lost character
       // for an edit that is about to be refused. A hard rejection returns
       // without touching the store at all — that is what "the invalid state
       // never exists" means, and why no finding is emitted for it.
+      // Open with a touch file that cannot be read: read-only (the notice says so).
+      if (openTouchUnreadable) return { committed: false, warnings: [] };
       const rejections = checkKeyEditRejectionNotices(op, options?.rejectionRuleIndex);
       const unwaived = rejections.filter(
         (r) => r.blocking || !acknowledgedRejections.has(`${op.address}:${r.reason}`),
@@ -2818,10 +2951,54 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
       const warnings = checkKeyEditOperation(op);
       setKeyEditInvalidationWarnings(warnings);
+      if (warnings.length > 0) warningsJustSetRef.current = true;
 
-      onGuardsPassed?.();
+      if (!openTouch) onGuardsPassed?.();
 
       const store = useWorkingCopyStore.getState();
+
+      // A character this edit invalidated AND that has lost its LAST mechanism
+      // anywhere returns to the unplaced worklist (T106, FR-062). Shared by the
+      // overlay path and the Open path (which runs it once the edit is written).
+      const returnLostToWorklist = (): void => {
+        const lostForGood = warnings.filter((w) => w.returnsToWorklist).map((w) => w.char);
+        if (lostForGood.length === 0) return;
+        setCharTouch((prev) => {
+          let next: Map<string, TouchAssignment> | null = null;
+          for (const ch of lostForGood) {
+            if (prev.has(ch)) {
+              if (next === null) next = new Map(prev);
+              next.delete(ch);
+            }
+          }
+          return next ?? prev;
+        });
+        setReturnedToWorklistChars((prev) => {
+          const merged = new Set(prev);
+          const before = merged.size;
+          for (const ch of lostForGood) merged.add(ch);
+          return merged.size === before ? prev : [...merged];
+        });
+      };
+
+      if (openTouch) {
+        // Open: the edit goes into the touch file (one change, one undo record);
+        // the overlay gets the op only as a record once it is there.
+        const outcome = commitTouchOpOnOpen(
+          {
+            op,
+            // AssignPanel's synthesized rules ride in the same change.
+            rulesIr: options?.bundledIr,
+            onApplied: () => {
+              returnLostToWorklist();
+              options?.afterApplied?.();
+            },
+          },
+          openTouchLabel,
+        );
+        return { committed: outcome !== "failed", warnings };
+      }
+
       store.commitKeyEdit(op);
 
       if (keyModeProvenance === "derived-from-base") {
@@ -2889,49 +3066,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         if (!spliced) store.setTouchLayoutJson(emitTouchLayout(promotedLayout));
       }
 
-      // T106 (FR-062): a character this edit invalidated AND that has lost
-      // its LAST mechanism anywhere in the layout (`returnsToWorklist` —
-      // never merely "invalidated at this address"; see useKeyEditGuards.ts)
-      // must return to the unplaced worklist and be OFFERED for
-      // re-placement, not merely reported. Its recorded `charTouch` entry now
-      // names a mechanism this commit just erased, so pruning the entry is
-      // what makes the character-mode gallery re-offer the method chooser
-      // for it instead of continuing to show a stale "existing methods" list
-      // for a placement that no longer exists. A character still available
-      // elsewhere (`returnsToWorklist: false`, FR-061) keeps its `charTouch`
-      // entry untouched — it is not lost, so it must not be treated as such
-      // here either.
-      const lostForGood = warnings.filter((w) => w.returnsToWorklist).map((w) => w.char);
-      if (lostForGood.length > 0) {
-        setCharTouch((prev) => {
-          let next: Map<string, TouchAssignment> | null = null;
-          for (const ch of lostForGood) {
-            if (prev.has(ch)) {
-              if (next === null) next = new Map(prev);
-              next.delete(ch);
-            }
-          }
-          return next ?? prev;
-        });
-        // Pruning the assignment above only stops the gallery showing a stale
-        // "existing methods" list for the erased placement; it does not by
-        // itself put the character back in front of the author, because the
-        // walk's own membership test reads `detectedChars` — a SEED-time
-        // snapshot that still remembers the placement this commit just took
-        // away. Recording the character here is what actually re-offers it
-        // (see `returnedToWorklistChars`' declaration for why this is recorded
-        // rather than re-derived).
-        setReturnedToWorklistChars((prev) => {
-          const merged = new Set(prev);
-          const before = merged.size;
-          for (const ch of lostForGood) merged.add(ch);
-          return merged.size === before ? prev : [...merged];
-        });
-      }
+      returnLostToWorklist();
+      options?.afterApplied?.();
 
       return { committed: true, warnings };
     },
-    [checkKeyEditOperation, checkKeyEditRejectionNotices, acknowledgedRejections, keyModeProvenance],
+    [checkKeyEditOperation, checkKeyEditRejectionNotices, acknowledgedRejections, keyModeProvenance, openTouch, openTouchLabel, openTouchUnreadable, startVfs],
   );
 
   // T013 (FR-065) — offer the layer-family fan-out after an edit that can
@@ -3029,8 +3169,15 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // actually committed, so a caller can decide whether to close its own
   // transient UI state (a dialog, a picker) only on success.
   const commitKeyEditOp = useCallback(
-    (op: PendingKeyEditOperation, options?: { readonly offerFamilyApply?: boolean }): boolean => {
-      if (layoutForLintAndGate === null) return false;
+    (
+      op: PendingKeyEditOperation,
+      options?: {
+        readonly offerFamilyApply?: boolean;
+        /** Runs once the edit has landed (on Open: when the file holds it). */
+        readonly afterApplied?: () => void;
+      },
+    ): boolean => {
+      if (openTouchUnreadable || (layoutForLintAndGate === null && !openTouch)) return false;
 
       // Read BEFORE the commit: `keyEditAffectsFamilyParallelism` asks whether
       // an `sp` change crosses the frame boundary, which is a claim about the
@@ -3042,54 +3189,51 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       const asIfCommitted = { ...op, seq: currentOps.length } as KeyEditOperation;
       let promotedLayout: TouchLayoutIR;
       try {
-        promotedLayout = replayKeyEditOverlay(layoutForLintAndGate, {
-          ops: [...currentOps, asIfCommitted],
-        }).layout;
+        // Open: the file is written, not promoted from a replay.
+        promotedLayout = openTouch
+          ? (fileTouchLayout ?? EMPTY_TOUCH_LAYOUT)
+          : replayKeyEditOverlay(layoutForLintAndGate ?? EMPTY_TOUCH_LAYOUT, {
+              ops: [...currentOps, asIfCommitted],
+            }).layout;
       } catch (err) {
         devLog.error("[TouchGallery] commitKeyEditOp promotion derivation failed:", err);
         return false;
       }
 
-      const { committed } = commitKeyEditCore(op, promotedLayout);
+      // Selection-follow and the family offer run once the edit has landed
+      // (`afterApplied`): at once on Copy; on Open only when the file holds it,
+      // never for a decline, a failure, or an op still waiting in its group.
+      const afterApplied = (): void => {
+        // The SAME "a successful commit must not silently strand the selection"
+        // rule `handleAssignPanelCommit` applies for a renaming `set`, extended
+        // to `add` (the new key's own address) and to a moved/copied key (which
+        // keeps its id on the target layer).
+        const parts = parseTouchKeyAddress(op.address);
+        if (parts !== undefined) {
+          if (op.kind === "set" && op.fields.id !== undefined) {
+            selectKeyAddress(touchKeyAddress(parts.platform, parts.layerId, op.fields.id));
+          } else if (op.kind === "add") {
+            selectKeyAddress(touchKeyAddress(parts.platform, parts.layerId, op.key.id));
+          } else if (op.kind === "moveToLayer" || op.kind === "copyToLayer") {
+            selectKeyAddress(touchKeyAddress(parts.platform, op.toLayer, parts.keyId));
+          }
+        }
+        if ((options?.offerFamilyApply ?? true) && isFamilyApplicableOp(op)) {
+          maybeOfferFamilyApply(op, beforeSp);
+        }
+        options?.afterApplied?.();
+      };
+
+      const { committed } = commitKeyEditCore(op, promotedLayout, undefined, { afterApplied });
       if (!committed) return false;
-
-      // Selection-follow — the SAME "a successful commit must not silently
-      // strand the selection" rule `handleAssignPanelCommit` already applies
-      // for a renaming `set`, extended here to the `add` kind (the new key's
-      // own address, at the anchor's platform/layer).
-      if (op.kind === "set" && op.fields.id !== undefined) {
-        const parts = parseTouchKeyAddress(op.address);
-        if (parts !== undefined) {
-          selectKeyAddress(touchKeyAddress(parts.platform, parts.layerId, op.fields.id));
-        }
-      } else if (op.kind === "add") {
-        const parts = parseTouchKeyAddress(op.address);
-        if (parts !== undefined) {
-          selectKeyAddress(touchKeyAddress(parts.platform, parts.layerId, op.key.id));
-        }
-      } else if (op.kind === "moveToLayer") {
-        // The moved key keeps its id — follow it to the target layer.
-        const parts = parseTouchKeyAddress(op.address);
-        if (parts !== undefined) {
-          selectKeyAddress(touchKeyAddress(parts.platform, op.toLayer, parts.keyId));
-        }
-      } else if (op.kind === "copyToLayer") {
-        // The copied key keeps its id — follow it to the target layer, like
-        // a move (#2596 item 1). The pane switches the displayed layer.
-        const parts = parseTouchKeyAddress(op.address);
-        if (parts !== undefined) {
-          selectKeyAddress(touchKeyAddress(parts.platform, op.toLayer, parts.keyId));
-        }
-      }
-
-      if ((options?.offerFamilyApply ?? true) && isFamilyApplicableOp(op)) {
-        maybeOfferFamilyApply(op, beforeSp);
-      }
 
       return committed;
     },
     [
       layoutForLintAndGate,
+      openTouch,
+      openTouchUnreadable,
+      fileTouchLayout,
       commitKeyEditCore,
       maybeOfferFamilyApply,
       resolveKeyEditSubjectSp,
@@ -3100,7 +3244,26 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // -- Spec 104 T016 helpers (see the state block above) ----------------------
 
   /** The commit exactly as AssignPanel authored it (the pre-104 behaviour). */
-  const commitAssignmentAsAuthored = (result: AssignPanelCommitResult): boolean => {
+  const commitAssignmentAsAuthored = (
+    result: AssignPanelCommitResult,
+    /** Runs once the commit has landed (on Open: when the file holds it). */
+    onDone?: () => void,
+  ): boolean => {
+    const followRename = (): void => {
+      // touchKeyAddress.ts builds the address from the key's OWN id, so a
+      // "set" op that renames the key (the U_/T_ minting path — virtually
+      // always) changes the address that SAME key now resolves under. Follow
+      // it — a successful commit must not silently strand the selection (and
+      // with it, the inspector/panel, which both read `selectedKeyCell`
+      // derived from this address) on an address nothing answers to anymore.
+      if (result.op.kind === "set" && result.op.fields.id !== undefined) {
+        const parts = parseTouchKeyAddress(result.op.address);
+        if (parts !== undefined) {
+          selectKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.op.fields.id));
+        }
+      }
+      onDone?.();
+    };
     const { committed } = commitKeyEditCore(
       result.op,
       result.promotedLayout,
@@ -3115,23 +3278,11 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       {
         rejectionRuleIndex:
           result.nextIr !== undefined ? buildTouchKeyRuleIndex(result.nextIr) : undefined,
+        bundledIr: result.nextIr,
+        afterApplied: followRename,
       },
     );
-    if (!committed) return false;
-
-    // touchKeyAddress.ts builds the address from the key's OWN id, so a
-    // "set" op that renames the key (the U_/T_ minting path — virtually
-    // always) changes the address that SAME key now resolves under. Follow
-    // it — a successful commit must not silently strand the selection (and
-    // with it, the inspector/panel, which both read `selectedKeyCell`
-    // derived from this address) on an address nothing answers to anymore.
-    if (result.op.kind === "set" && result.op.fields.id !== undefined) {
-      const parts = parseTouchKeyAddress(result.op.address);
-      if (parts !== undefined) {
-        selectKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.op.fields.id));
-      }
-    }
-    return true;
+    return committed;
   };
 
   /** Append a plan's transplant record + decision to the decision spine. */
@@ -3153,6 +3304,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     result: AssignPanelCommitResult,
     plan: InlineSeverancePlan,
     anchorLayerId: string,
+    /** Runs once the commit has landed (on Open: when the file holds it). */
+    onDone?: () => void,
   ): boolean => {
     if (ir === null || effectiveKeyModeLayout === null) return false;
     const mergedIr = mergeSeveranceWithSynthesis({
@@ -3161,46 +3314,61 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       nextIr: result.nextIr,
       anchorLayerId,
     });
-    const { committed } = commitKeyEditCore(
-      result.op,
-      result.promotedLayout,
-      () => {
-        useWorkingCopyStore.getState().setWorkingIR(mergedIr);
-      },
-      // Same bundled-IR rule as the as-authored path: judge the rejection
-      // gate against the merged (transplant + synthesis) IR this commit
-      // installs, not the pre-commit IR.
-      { rejectionRuleIndex: buildTouchKeyRuleIndex(mergedIr) },
-    );
-    if (!committed) return false;
-    if (result.op.kind === "set" && result.op.fields.id !== undefined) {
-      const parts = parseTouchKeyAddress(result.op.address);
-      if (parts !== undefined) {
-        selectKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.op.fields.id));
-      }
-    }
-    const affected = new Set(plan.speculative.layersAffected);
-    for (const platform of effectiveKeyModeLayout.platforms) {
-      if (platform.id !== plan.platformId) continue;
-      for (const layer of platform.layers) {
-        if (!affected.has(layer.id)) continue;
-        const nextOccurrence = createKeyOccurrenceCounter();
-        for (const row of layer.rows) {
-          for (const key of row.keys) {
-            const occurrence = nextOccurrence(key.id);
-            if (key.id !== plan.sourceId) continue;
-            const address = touchKeyAddress(platform.id, layer.id, key.id, occurrence);
-            if (address === result.op.address) continue;
-            commitKeyEditOp(
-              { kind: "rename", address, toId: plan.targetId },
-              { offerFamilyApply: false },
-            );
+    let committed = false;
+    // True once the commit has landed (on Open: the file holds it). The result is
+    // this, not "not refused": a pending, declined or failed change is not committed.
+    let landed = false;
+    // On Open the anchor op (with its merged rules) and the sibling renames are one
+    // change; on Copy `groupOnOpen` just runs the body.
+    groupOnOpen(() => {
+      committed = commitKeyEditCore(
+        result.op,
+        result.promotedLayout,
+        () => {
+          useWorkingCopyStore.getState().setWorkingIR(mergedIr);
+        },
+        // Same bundled-IR rule as the as-authored path: judge the rejection
+        // gate against the merged (transplant + synthesis) IR this commit
+        // installs, not the pre-commit IR.
+        {
+          rejectionRuleIndex: buildTouchKeyRuleIndex(mergedIr),
+          bundledIr: mergedIr,
+          afterApplied: () => {
+            if (result.op.kind === "set" && result.op.fields.id !== undefined) {
+              const parts = parseTouchKeyAddress(result.op.address);
+              if (parts !== undefined) {
+                selectKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.op.fields.id));
+              }
+            }
+            landed = true;
+            appendSeveranceRecords(plan);
+            onDone?.();
+          },
+        },
+      ).committed;
+      if (!committed) return;
+      const affected = new Set(plan.speculative.layersAffected);
+      for (const platform of effectiveKeyModeLayout.platforms) {
+        if (platform.id !== plan.platformId) continue;
+        for (const layer of platform.layers) {
+          if (!affected.has(layer.id)) continue;
+          const nextOccurrence = createKeyOccurrenceCounter();
+          for (const row of layer.rows) {
+            for (const key of row.keys) {
+              const occurrence = nextOccurrence(key.id);
+              if (key.id !== plan.sourceId) continue;
+              const address = touchKeyAddress(platform.id, layer.id, key.id, occurrence);
+              if (address === result.op.address) continue;
+              commitKeyEditOp(
+                { kind: "rename", address, toId: plan.targetId },
+                { offerFamilyApply: false },
+              );
+            }
           }
         }
       }
-    }
-    appendSeveranceRecords(plan);
-    return true;
+    });
+    return landed;
   };
 
   /** The severance notice for a completed severance (contracts §6, FR-026). */
@@ -3301,16 +3469,14 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
       // Track 1 (Copy): the criteria apply directly (FR-016's other half).
       if (plan.speculative.record.outcome === "completed") {
-        if (commitAssignmentWithSeverance(result, plan, parts.layerId)) {
-          showSeveranceNotice(physicalKeyLabel);
-        }
+        commitAssignmentWithSeverance(result, plan, parts.layerId, () => showSeveranceNotice(physicalKeyLabel));
       } else {
         // Refusal: the author's edit stands as authored; the key is
         // flagged for manual definition with the refusal recorded.
-        if (commitAssignmentAsAuthored(result)) {
+        commitAssignmentAsAuthored(result, () => {
           appendSeveranceRecords(plan);
           setSeveranceRefusedNotice(true);
-        }
+        });
       }
   };
 
@@ -3347,21 +3513,20 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         authorAnswer: "sever-the-link",
       });
       if (plan.speculative.record.outcome === "completed") {
-        if (commitAssignmentWithSeverance(result, plan, parts.layerId)) {
-          showSeveranceNotice(pending.physicalKeyLabel);
-        }
+        commitAssignmentWithSeverance(result, plan, parts.layerId, () => showSeveranceNotice(pending.physicalKeyLabel));
         return;
       }
       // State changed under the held choice and severance now refuses:
       // fall through to the flag path with the fresh refusal.
-      if (commitAssignmentAsAuthored(result)) {
+      commitAssignmentAsAuthored(result, () => {
         appendSeveranceRecords(plan);
         setSeveranceRefusedNotice(true);
-      }
+      });
       return;
     }
 
-    if (!commitAssignmentAsAuthored(result)) return;
+    // The keep / flag record follows the edit once it has landed (on Open: once the file holds it).
+    const recordAnswer = (): void => {
     const store = useWorkingCopyStore.getState();
     if (answer === "keep") {
       const decisionRecordId = mintRecordId(store.touchKeyIdentity, "decision", result.op.address);
@@ -3419,6 +3584,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       }
       setSeveranceRefusedNotice(true);
     }
+    };
+    commitAssignmentAsAuthored(result, recordAnswer);
   };
 
   // Abandoning the held choice (selecting another key) discards the held
@@ -4001,12 +4168,14 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           return;
         }
         case "addRequiredKeys": {
-          for (const keyId of fix.keyIds) {
-            commitKeyEditOp(
-              { address: fix.address, kind: "add", position: "after", key: { id: keyId, text: "", sp: 0 } },
-              { offerFamilyApply: false },
-            );
-          }
+          groupOnOpen(() => {
+            for (const keyId of fix.keyIds) {
+              commitKeyEditOp(
+                { address: fix.address, kind: "add", position: "after", key: { id: keyId, text: "", sp: 0 } },
+                { offerFamilyApply: false },
+              );
+            }
+          });
           return;
         }
         case "clearSpecialLabel": {
@@ -4068,6 +4237,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [
       selectedKeyCell,
       commitKeyEditOp,
+      groupOnOpen,
       focusAssignPanelCharacterField,
       openRenameDialog,
       selectKeyAddress,
@@ -4117,6 +4287,21 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // closed the dialog having renamed nothing at all.
   const _handleRenameConfirm = useCallback(
     (result: RenameDialogConfirmResult) => {
+      if (openTouchUnreadable) {
+        setRenameDialogTarget(null);
+        return;
+      }
+      if (openTouch) {
+        // Open: the rename is written into the touch file (and the `.kmn` key
+        // bindings) as one change, through the same chain as every other edit.
+        const parts = parseTouchKeyAddress(result.op.address);
+        if (commitKeyEditOp(result.op, { offerFamilyApply: false }) && parts !== undefined) {
+          selectKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.newId));
+        }
+        setRenameDialogTarget(null);
+        dialogInvokerRef.current?.focus();
+        return;
+      }
       const rejections = checkKeyEditRejectionNotices(result.op);
       const unwaived = rejections.filter(
         (r) => r.blocking || !acknowledgedRejections.has(`${result.op.address}:${r.reason}`),
@@ -4138,6 +4323,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       setKeyEditRejections([]);
       const warnings = checkKeyEditOperation(result.op);
       setKeyEditInvalidationWarnings(warnings);
+      if (warnings.length > 0) warningsJustSetRef.current = true;
 
       const store = useWorkingCopyStore.getState();
       const outcome = store.commitTouchKeyRename(result.oldId, result.newId);
@@ -4209,6 +4395,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       effectiveKeyModeLayout,
       commitKeyEditOp,
       selectKeyAddress,
+      openTouch,
+      openTouchUnreadable,
     ],
   );
 
@@ -4227,7 +4415,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     (record: TransplantRecord) => {
       const store = useWorkingCopyStore.getState();
       const base = store.ir;
-      if (base === null || effectiveKeyModeLayout === null) return;
+      if (base === null || effectiveKeyModeLayout === null || openTouchUnreadable) return;
       // The decision is recorded against the re-linked key's own address —
       // the selected key's platform, the transplant's anchor layer, and the
       // key's current (severed) id, matching the severance record's keyRef
@@ -4242,6 +4430,48 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         recordedAt: Date.now(),
       });
       if (!result.ok) return;
+      const followRelink = (): void => {
+        store.recordKeyIdentityDecision(result.decision);
+        // Selection follows the key to its re-linked (source) id.
+        const parts = parseTouchKeyAddress(selectedKeyAddress ?? "");
+        if (parts !== undefined) {
+          selectKeyAddress(touchKeyAddress(parts.platform, parts.layerId, record.sourceId));
+        }
+      };
+      if (openTouch) {
+        // Open: the clone rules are taken out of the `.kmn` and the source id is put
+        // back in the touch file as ONE change (renames of every affected occurrence);
+        // the seam writes the working IR, and the decision is recorded once it landed.
+        const affectedLayers = new Set(record.layersAffected);
+        const subs: PendingKeyEditOperation[] = [];
+        for (const platform of effectiveKeyModeLayout.platforms) {
+          for (const layer of platform.layers) {
+            if (!affectedLayers.has(layer.id)) continue;
+            const nextOccurrence = createKeyOccurrenceCounter();
+            for (const row of layer.rows) {
+              for (const key of row.keys) {
+                const occurrence = nextOccurrence(key.id);
+                if (key.id.toUpperCase() !== record.targetId.toUpperCase()) continue;
+                subs.push({
+                  kind: "rename",
+                  address: touchKeyAddress(platform.id, layer.id, key.id, occurrence),
+                  toId: record.sourceId,
+                });
+              }
+            }
+          }
+        }
+        if (subs.length === 0) return;
+        groupTouchCommitsOnOpen(() => {
+          subs.forEach((op, i) =>
+            commitTouchOpOnOpen(
+              { op, ...(i === 0 ? { rulesIr: result.ir, onApplied: followRelink } : {}) },
+              openTouchLabel,
+            ),
+          );
+        }, openTouchLabel);
+        return;
+      }
       if (keyModeProvenance === "derived-from-base") {
         store.setWorkingIR({ ...result.ir, touchLayout: result.layout });
       } else {
@@ -4264,6 +4494,9 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       keyModeProvenance,
       selectedKeyAddress,
       selectKeyAddress,
+      openTouch,
+      openTouchLabel,
+      openTouchUnreadable,
     ],
   );
 
@@ -4283,10 +4516,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       // constructs every op by spreading the author's ORIGINAL, already
       // correctly-shaped op (`{ ...op, address }`), so this narrows a type
       // TS cannot itself distribute, not the actual runtime value.
-      for (const op of ops) commitKeyEditOp(op as PendingKeyEditOperation, { offerFamilyApply: false });
+      groupOnOpen(() => {
+        for (const op of ops) commitKeyEditOp(op as PendingKeyEditOperation, { offerFamilyApply: false });
+      });
       dialogInvokerRef.current?.focus();
     },
-    [commitKeyEditOp],
+    [commitKeyEditOp, groupOnOpen],
   );
 
   const _handleFamilyApplyCancel = useCallback(() => {
@@ -4439,6 +4674,43 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     }
   }, [undoTargetDescription, t]);
 
+  // On an opened keyboard the footer's one Undo (OpenUndoButton) undoes the last
+  // APPLIED change; this one stays only while touch edits (still an overlay, not
+  // applied to the file yet) hold undo entries, and says so by name and by a
+  // description mounted below.
+  const touchUndoHintId = useId();
+  // With the touch file open, placements, deletions and key edits are all applied
+  // changes the footer's Undo covers, so this button is not shown at all.
+  const touchUndoSlot: Pick<StepNavSpec, "secondary"> =
+    liveOpen && (openTouch || undoStack.length === 0)
+      ? {}
+      : {
+          secondary: {
+            label: liveOpen
+              ? t({ id: "editor.assignLoop.touch.undoTouchEdit.label", message: "Undo touch edit" })
+              : t({ id: "editor.assignLoop.touch.undo.label", message: "Undo" }),
+            onClick: undoDelete,
+            testId: "touch-undo-button",
+            ariaLabel: liveOpen
+              ? t({
+                  id: "editor.assignLoop.touch.undoTouchEdit.ariaLabel",
+                  message: `Undo touch edit: ${{ what: undoAffordanceLabel }}`,
+                })
+              : undoAffordanceLabel,
+            ...(liveOpen ? { ariaDescribedBy: touchUndoHintId } : {}),
+            disabled: undoStack.length === 0,
+          },
+        };
+  const touchUndoHint = liveOpen && !openTouch ? (
+    <span id={touchUndoHintId} style={visuallyHidden}>
+      {t({
+        id: "editor.assignLoop.touch.undoTouchEdit.hint",
+        message:
+          "Undoes touch edits that are not yet applied. The Undo button in the footer undoes the last applied change.",
+      })}
+    </span>
+  ) : null;
+
   // T013/T014 — `handleSwitchTouchEditorMode` (the ONE mode-switch call site,
   // T074) is declared further below, after `currentChar`/`setCurrentChar`
   // exist — `useModeContextCarry` (FR-036c) needs both halves of the
@@ -4462,12 +4734,20 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // key-edit overlay ops. previewedStartId is intentionally omitted: this is
   // a post-commit gallery with no candidate-base picker of its own (see the
   // hook's own previewedStartId doc comment).
-  const vfsTransform = useWorkingCopyTransform({
-    liveLayoutOverride: {
-      touchLayoutJson,
-      keyEditOps: keyEditOverlay.ops,
-    },
-  });
+  // On Open the key-edit overlay is a record (its ops are already in the file),
+  // so the preview never replays it. The key grid, builder and Code tab read the
+  // file alone (no override at all); the character view keeps its in-progress
+  // assignments (`touchLayoutJson`) until it is moved onto the file.
+  const vfsTransform = useWorkingCopyTransform(
+    openTouch && touchEditorMode !== "character"
+      ? {}
+      : {
+          liveLayoutOverride: {
+            touchLayoutJson,
+            keyEditOps: openTouch ? [] : keyEditOverlay.ops,
+          },
+        },
+  );
 
   const { stage, retry } = useKeyboardArtifact(
     startKeyboard,
@@ -4520,12 +4800,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // than currentChar/usePositionalCharNav below — because touchLettersToAdd
   // (the walk list) needs it before either of those can be declared.
   //
-  // Deliberately NOT session-aware (does not take desktopProducedSet): this
-  // memo drives touchLettersToAdd (the interactive walk denominator below),
-  // which must stay static across a session — see this file's
-  // desktopProducedSet declaration comment and useInventoryDiff.ts's module
-  // doc for why. The session-aware completion check lives in handleContinue
-  // below instead.
+  // Deliberately NOT session-aware: this memo drives touchLettersToAdd (the
+  // interactive walk denominator below), which must stay static across a
+  // session — see useInventoryDiff.ts's module doc for why. The live
+  // completion check lives in touchGateCoverage below instead.
   const detectedChars = useMemo<Set<string>>(() => {
     if (detectionSeedLayout === null) return new Set<string>();
     try {
@@ -4616,7 +4894,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           (c) =>
             !detectedChars.has(c) ||
             desktopSuggestionTargets.has(c) ||
-            (returnedSet.has(c) && unplacedSet.has(c)),
+            (returnedSet.has(c) && unplacedSet.has(c)) ||
+            sessionPlacedChars.has(c),
         ),
       ),
       loanwordSet,
@@ -4633,6 +4912,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     unplacedCharsKey,
     returnedToWorklistKey,
     loanwordSet,
+    sessionPlacedChars,
   ]);
   const touchLettersToAddKey = touchLettersToAdd.join("\0");
 
@@ -4697,7 +4977,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // behavior change: nothing between the two positions ever called this
   // function (confirmed by search before moving it).
   // ---------------------------------------------------------------------------
-  const handleSwitchTouchEditorMode = useCallback(
+  const switchTouchEditorModeNow = useCallback(
     (mode: TouchEditorMode) => {
       if (
         (mode === "key" || mode === "code") &&
@@ -4743,6 +5023,15 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       selectKeyAddress,
     ],
   );
+  // Leaving the Code tab with text that is not applied asks first on a keyboard opened for update
+  // (spec 111 FR-046); the switch runs at once when nothing is unapplied.
+  const handleSwitchTouchEditorMode = useCallback(
+    (mode: TouchEditorMode) => {
+      if (touchEditorMode === "code" && mode !== "code") guardLeave(() => switchTouchEditorModeNow(mode));
+      else switchTouchEditorModeNow(mode);
+    },
+    [touchEditorMode, switchTouchEditorModeNow],
+  );
 
   // FR-008 completion gate (mechanism-gallery-progression): names of chars
   // with no reachable touch mechanism on the final layout — computed LIVE
@@ -4752,47 +5041,51 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // T120/key-mode reconciliation note there): `effectiveKeyModeLayout` (which
   // IS `layoutForLintAndGate` whenever the key-edit overlay is empty) +
   // `keyModeCoverageOptions` (the mutable-`ir` rule index both the key-mode
-  // grid and the gate resolve coverage through) + `desktopProducedSet`. Kept
+  // grid and the gate resolve coverage through). Kept
   // as one shared memo — read by BOTH `handleContinue` and the proactive
   // button-disable below — so the two can never disagree about what counts
   // as uncovered.
   const sessionAlphabet = useWorkingCopyStore((s) => s.session.alphabet);
   const sessionMarksWorklist = useWorkingCopyStore((s) => s.session.marksWorklist);
-  const uncoveredTouchChars = useMemo<string[]>(() => {
-    if (effectiveKeyModeLayout === null) return [];
-    const uncovered = [
-      ...touchCoverage(
-        effectiveKeyModeLayout,
-        inventory,
-        keyModeCoverageOptions,
-        desktopProducedSet,
-      ).uncovered,
-    ];
+  //
+  // Judged per platform (touchPlatformCoverage.ts), like the progress figures:
+  // a character the phone layout cannot type keeps the gate closed even when
+  // the tablet types it.
+  const touchGateCoverage = useMemo<TouchPlatformCoverage>(() => {
+    if (effectiveKeyModeLayout === null) return { uncovered: [], byPlatform: new Map() };
     // Composed-treatment mark credit (lib/placementInventory.ts's
     // treatmentCreditedMarks — the same rule the shared coverage gate
     // applies): a lone mark whose treatment is `composed` is not a
     // placement unit, so this walk can never give it a touch mechanism;
     // once every attested combination of it is reachable on the layout
-    // (the inventory-minus-uncovered covered set — touchCoverage has
-    // already folded desktopProducedSet in as its composability seed),
+    // (the inventory-minus-uncovered covered set),
     // the mark's touch obligation is discharged through those
-    // combinations and it must not keep the FR-008 gate closed.
-    if (sessionAlphabet === undefined || sessionMarksWorklist === undefined) return uncovered;
-    const uncoveredSet = new Set(uncovered.map((c) => c.normalize("NFC")));
-    const covered = new Set<string>(
-      inventory.filter((c) => !uncoveredSet.has(c.normalize("NFC"))),
+    // combinations and it must not keep the FR-008 gate closed. Applied to
+    // each platform's own list, since the combinations must be reachable there.
+    const creditMarks = (uncovered: readonly string[]): readonly string[] => {
+      if (sessionAlphabet === undefined || sessionMarksWorklist === undefined) return uncovered;
+      const uncoveredSet = new Set(uncovered.map((c) => c.normalize("NFC")));
+      const covered = new Set<string>(
+        inventory.filter((c) => !uncoveredSet.has(c.normalize("NFC"))),
+      );
+      const credited = treatmentCreditedMarks(sessionAlphabet, sessionMarksWorklist, covered);
+      if (credited.size === 0) return uncovered;
+      return uncovered.filter((c) => !credited.has(c.normalize("NFC")));
+    };
+    return touchCoverageByPlatform(
+      effectiveKeyModeLayout,
+      inventory,
+      keyModeCoverageOptions,
+      creditMarks,
     );
-    const credited = treatmentCreditedMarks(sessionAlphabet, sessionMarksWorklist, covered);
-    if (credited.size === 0) return uncovered;
-    return uncovered.filter((c) => !credited.has(c.normalize("NFC")));
   }, [
     effectiveKeyModeLayout,
     inventory,
     keyModeCoverageOptions,
-    desktopProducedSet,
     sessionAlphabet,
     sessionMarksWorklist,
   ]);
+  const uncoveredTouchChars = useMemo(() => [...touchGateCoverage.uncovered], [touchGateCoverage]);
 
   // Bind this walk to the shared within-step position model — one footer dot per
   // character, and a jump into the middle of the walk lands. Declared AFTER the
@@ -4820,6 +5113,19 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [uncoveredTouchChars, markedTouchSet],
   );
 
+  // The platform tabs' warning badges count exactly what keeps Continue shut
+  // on each platform (the gate's per-platform lists, less letters marked for
+  // later), so a badge shows if and only if that platform blocks the step.
+  const unplacedCountByPlatform = useMemo(
+    () =>
+      new Map(
+        [...touchGateCoverage.byPlatform].map(
+          ([id, chars]) => [id, subtractMarked(chars, markedTouchSet).length] as const,
+        ),
+      ),
+    [touchGateCoverage, markedTouchSet],
+  );
+
   // T120 (FR-036e): the key-edit overlay's half of "committed or explicitly
   // resolved". `true` once the author has been shown the orphaned-edit notice
   // at Continue, so the second Continue completes. Component-local, and NOT a
@@ -4833,13 +5139,22 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
   // Named string local for the FR-008 inline hint rendered near the
   // completion control below — null hides the hint entirely.
-  const unaccountedTouchMessage = useMemo(
-    () =>
-      unaccountedTouchChars.length > 0
-        ? unaccountedTouchChars.map((c) => formatUncoveredTouchMessage(c)).join("; ")
-        : null,
-    [unaccountedTouchChars],
-  );
+  // A character missing on only some platforms names them, so "has no touch
+  // mechanism" is never claimed for a letter the tablet already types.
+  const unaccountedTouchMessage = useMemo(() => {
+    if (unaccountedTouchChars.length === 0) return null;
+    const tracked = [...touchGateCoverage.byPlatform.keys()];
+    return unaccountedTouchChars
+      .map((c) => {
+        const missingOn = tracked.filter((id) => touchGateCoverage.byPlatform.get(id)?.includes(c));
+        if (missingOn.length === 0 || missingOn.length === tracked.length) return formatUncoveredTouchMessage(c);
+        return t({
+          id: "editor.assignLoop.touch.uncoveredOnPlatforms",
+          message: `${{ notation: toUPlusNotation(c) }} ${{ char: c }} has no key on ${{ platforms: missingOn.map((id) => touchModePlatformLabel(id, i18n)).join(", ") }}`,
+        });
+      })
+      .join("; ");
+  }, [unaccountedTouchChars, touchGateCoverage, t, i18n]);
 
   // T120: a NEW orphan is never waived by an earlier acknowledgement. Keyed on
   // the overlay itself rather than on `touchKey` above, because the overlay is
@@ -4875,8 +5190,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // Continue button (`touch-key-mode-continue`) are BOTH disabled proactively
   // while `unaccountedTouchChars` (mark-aware; see that memo above — it
   // re-runs touchCoverage on the effective layout, `effectiveKeyModeLayout`,
-  // using `keyModeCoverageOptions` + the session-aware `desktopProducedSet`,
-  // so it can never disagree with either button's own disabled computation)
+  // using `keyModeCoverageOptions`, so it can never disagree with either button's own disabled computation)
   // is non-empty — so this callback should be unreachable via either control
   // in the ordinary walk. Kept as a guard rather than removed, in case a
   // future button branch omits the same check.
@@ -5049,11 +5363,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
   // Pre-augment, desktop-session-only produced set — mirrors
   // MechanismGallery's `baseProducedSet`: `buildSessionProducedSet` does NOT
-  // call `augmentWithComposable` (contrast with `desktopProducedSet` above,
-  // useInventoryDiff's AUGMENTED `producedSet`, used only by the completion
-  // GATE). `selectDesktopAssignments(phaseResults)` — the SAME unfiltered
-  // (by scope) selector `useInventoryDiff` itself uses internally to build
-  // `desktopProducedSet` — not the narrower `desktopAssignments` above (which
+  // call `augmentWithComposable` (unlike useInventoryDiff's AUGMENTED
+  // `producedSet`). `selectDesktopAssignments(phaseResults)` — the SAME
+  // unfiltered (by scope) selector `useInventoryDiff` itself uses internally
+  // to build its `producedSet` — not the narrower `desktopAssignments` above (which
   // filters to `scope: "individual"` only), so this can't disagree with the
   // gate's own desktop-side produced set over a sequence/character-class-
   // scope assignment. Feeds `directTouchProducedSet` below.
@@ -5243,13 +5556,21 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // name here. Scoped to `deletable` methods only — a non-deletable
   // (desktop-backed) row is never in deletedTouchKeyIds in the first place.
   const deletedExistingTouchMethods = useMemo<TouchMethodDescriptor[]>(() => {
+    if (openTouch) {
+      // Open: the restore list is the session log's deletions (a restore step or an
+      // undo takes one off it), named from the file with those keys put back.
+      if (layoutWithDeletionsBack === null || currentChar === null) return [];
+      return enumerateTouchMethodsForChar(layoutWithDeletionsBack, currentChar).filter(
+        (m) => m.deletable && pendingDeletions.has(m.id),
+      );
+    }
     if (rawDetectionSeedLayout === null || currentChar === null) return [];
     return enumerateTouchMethodsForChar(
       rawDetectionSeedLayout,
       currentChar,
     ).filter((m) => m.deletable && isTouchKeyDeleted(m.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rawDetectionSeedLayout, currentChar, isTouchKeyDeleted, deletedTouchKeyIds]);
+  }, [rawDetectionSeedLayout, currentChar, isTouchKeyDeleted, deletedTouchKeyIds, openTouch, layoutWithDeletionsBack, pendingDeletions]);
 
   // The FULL, unfiltered enumeration of touch methods for currentChar —
   // sourced from rawDetectionSeedLayout (the UNDELETED seed, same source as
@@ -5262,9 +5583,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // already-filtered arrays alone is a safe stand-in for "every method this
   // char has".
   const allTouchMethodsForChar = useMemo<TouchMethodDescriptor[]>(() => {
-    if (rawDetectionSeedLayout === null || currentChar === null) return [];
-    return enumerateTouchMethodsForChar(rawDetectionSeedLayout, currentChar);
-  }, [rawDetectionSeedLayout, currentChar]);
+    const layout = layoutWithDeletionsBack ?? rawDetectionSeedLayout;
+    if (layout === null || currentChar === null) return [];
+    return enumerateTouchMethodsForChar(layout, currentChar);
+  }, [rawDetectionSeedLayout, layoutWithDeletionsBack, currentChar]);
 
   // Unified "Existing methods" row list (SHOW-ALL, spec follow-up — mirrors
   // MechanismGallery's desktop `existingMethods`): every real touch method
@@ -5365,9 +5687,30 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // deletedExistingTouchMethods above.
   const handleRestoreExistingTouchMethod = useCallback(
     (method: TouchMethodDescriptor) => {
+      if (openTouch) {
+        // Open: the saved key goes back through the seam, and is refused (with a
+        // notice) when the key there has changed since the deletion.
+        const entries = pendingDeletions.get(method.id);
+        if (entries === undefined) return;
+        commitTouchEditOnOpen({ restoreKeys: entries, ids: [method.id] }, openTouchLabel);
+        return;
+      }
       restoreTouchKey(method.id);
     },
-    [restoreTouchKey],
+    [restoreTouchKey, openTouch, pendingDeletions, openTouchLabel],
+  );
+
+  // Delete an existing method: on Open a `removeIds` change to the file, else the overlay.
+  const handleDeleteExistingTouchMethod = useCallback(
+    (id: string) => {
+      if (openTouch) {
+        commitTouchEditOnOpen({ removeIds: [id] }, openTouchLabel);
+        return;
+      }
+      if (openTouchUnreadable) return;
+      deleteTouchKey(id);
+    },
+    [deleteTouchKey, openTouch, openTouchUnreadable, openTouchLabel],
   );
 
   // ---------------------------------------------------------------------------
@@ -5946,12 +6289,63 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     return next;
   }
 
+  /**
+   * Open: write character placements into the touch file now, as one `touch`
+   * change (one undo record, recorded only once applied). Nothing goes into the
+   * in-progress `charTouch` set: the file is the truth, so a placement is never
+   * shown twice (file and overlay) and a declined or refused one leaves the file,
+   * the grid and `charTouch` as they were. `afterApplied` runs once the file holds
+   * the placements (at once when placed precisely, after the author agreed when
+   * asked first), never otherwise.
+   */
+  function placeOnOpen(
+    placements: readonly { char: string; ref: MechanismRef }[],
+    afterApplied?: () => void,
+  ): void {
+    let map = new Map<string, TouchAssignment>();
+    for (const p of placements) map = appendMechanismToChar(map, p.char, p.ref);
+    const assignments = [...map.values()].filter((a) =>
+      a.mechanisms.some((m) => m.patternId !== "touch_inherited"),
+    );
+    if (assignments.length === 0) {
+      afterApplied?.();
+      return;
+    }
+    commitTouchEditOnOpen({ assignments }, openTouchLabel, () => {
+      setSessionPlacedChars((prev) => new Set([...prev, ...assignments.map((a) => a.target)]));
+      afterApplied?.();
+    });
+  }
+
   const handleCasePairConfirm = useCallback(() => {
     if (casePairProposal === null || casePairProposal.mechanism !== "touch") {
       return;
     }
     const { originalChar, counterpart, baseKey: hk, targetLayer, baseRef } =
       casePairProposal;
+
+    if (openTouch) {
+      // Open: the base placement is already in the file, so there is no in-progress
+      // entry to guard against; the capital is written as its own change.
+      placeOnOpen(
+        [
+          {
+            char: counterpart,
+            ref: {
+              patternId: baseRef.patternId,
+              slotValues: {
+                ...(baseRef.slotValues ?? {}),
+                char: counterpart,
+                hostKey: hk,
+                layer: targetLayer,
+              },
+            },
+          },
+        ],
+        clearCompanion,
+      );
+      return;
+    }
 
     setCharTouch((prev) => {
       // Stale-base guard (FR-008): the placement this was raised for must
@@ -5976,7 +6370,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     });
 
     clearCompanion();
-  }, [casePairProposal, clearCompanion]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [casePairProposal, clearCompanion, openTouch, openTouchLabel]);
 
   // Confirm the sibling-accent proposal: place every sibling in ONE update
   // (single Accept places all — spec: "one click to accept all"). Each
@@ -5996,7 +6391,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // siblings would share — must still be present. Without this, removing the
     // just-placed base chip while this banner is open and then clicking "Add
     // them" would place orphaned siblings with no base longpress underneath.
-    const acceptedStillPlaced = (
+    // Open: the accepted placement is in the file, not in `charTouch`.
+    const acceptedStillPlaced = openTouch || (
       charTouch.get(acceptedChar)?.mechanisms ?? []
     ).some((m) => normalizeTouchSlots(m.slotValues)["hostKey"] === acceptedBaseKey);
     if (!acceptedStillPlaced) {
@@ -6020,6 +6416,28 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       });
       return !alreadyProduced;
     });
+
+    if (openTouch) {
+      // Open: the siblings are written into the file as one change. They are
+      // not recorded as a bulk group: that box's "Remove all" acts on `charTouch`,
+      // and a written placement is removed from the file (delete on its own chip).
+      const refs: { char: string; ref: MechanismRef }[] = [];
+      for (const placement of toPlace) {
+        const ref = buildTouchMechanismRef(
+          "longpress_alternates",
+          placement.baseKey,
+          "",
+          placement.char,
+          placement.layer,
+        );
+        if (ref !== null) refs.push({ char: placement.char, ref });
+      }
+      placeOnOpen(refs, () => {
+        setDeferredCompanionInput(null);
+        setSiblingAccentProposal(null);
+      });
+      return;
+    }
 
     if (toPlace.length > 0) {
       setCharTouch((prev) => {
@@ -6066,7 +6484,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // is discarded rather than raised.
     setDeferredCompanionInput(null);
     setSiblingAccentProposal(null);
-  }, [siblingAccentProposal, charTouch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siblingAccentProposal, charTouch, openTouch, openTouchLabel]);
 
   const handleSiblingAccentDismiss = useCallback(() => {
     // CHANGE 4 precedence fallback: the bulk proposal is denied, so if a
@@ -6127,8 +6546,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // handleApply's own `if (ref === null) return;`, not a second real path.
     const ref = buildTouchMechanismRef(nextMethod, hk, "", currentChar);
     if (ref === null) return;
-    setCharTouch((prev) => appendMechanismToChar(prev, currentChar, ref));
-    markSuggestionResolved(currentChar);
+    const placed = (): void => {
 
     // Case-pair companion (CHANGE 3: the companion must fire whenever a
     // lowercase letter is implemented, not only via the manual chooser's
@@ -6196,10 +6614,25 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     } else if (companionInput !== null) {
       proposeCompanion(companionInput);
     }
+    };
+    if (openTouch) {
+      // Open: written into the touch file now; the resolution and the offers
+      // that follow run once the file holds the placement.
+      placeOnOpen([{ char: currentChar, ref }], () => {
+        markSuggestionResolved(currentChar);
+        placed();
+      });
+      return;
+    }
+    setCharTouch((prev) => appendMechanismToChar(prev, currentChar, ref));
+    markSuggestionResolved(currentChar);
+    placed();
     // inventoryKey is the stable primitive proxy for `inventory` (same
     // precedent as detectedChars/touchKey above).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    openTouch,
+    openTouchLabel,
     suggestion,
     currentChar,
     markSuggestionResolved,
@@ -6232,7 +6665,38 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // null) return;` style.
     const ref = buildMechanismRef(currentChar);
     if (ref === null) return;
+    if (openTouch) {
+      // Open: written into the touch file now. The offers and the reset of the
+      // chooser follow once the file holds it; a decline leaves the chooser as it is.
+      placeOnOpen([{ char: currentChar, ref }], () => afterPlacement(ref));
+      return;
+    }
     setCharTouch((prev) => appendMechanismToChar(prev, currentChar, ref));
+    afterPlacement(ref);
+    // `charTouch` is listed because the case-pair "already placed" predicate in
+    // `afterPlacement` closes over it — a stale map would re-propose a pairing the
+    // author has already made.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    currentChar,
+    canApply,
+    method,
+    baseKey,
+    resolvedBaseKey,
+    flickDirection,
+    layerTokens,
+    charTouch,
+    assembledLayerCombo,
+    isLayerComboInUse,
+    proposeCompanion,
+    i18n,
+    openTouch,
+    openTouchLabel,
+  ]);
+
+  // What follows an applied placement (on Copy at once; on Open once the file holds it).
+  function afterPlacement(ref: MechanismRef): void {
+    if (currentChar === null) return;
 
     // Case-pair proposal (FR-005): offer the capital on the casing-parallel
     // layer of the layer being edited. Suppressed when that layer has no
@@ -6276,7 +6740,9 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // the author's edit. Spec 089 T021 (OI-1 ruled global): the mutate flag
     // that used to gate this is deleted — promotion is unconditional.
     // Logic lives in touchBehavior.ts; this call site stays thin.
-    if (resolvedBaseKey !== null) {
+    // Not on Open: the promotion is IR-only provenance, and on Open the working IR is
+    // written by the apply seam alone (it would drift ahead of the files).
+    if (resolvedBaseKey !== null && !liveOpen) {
       const store = useWorkingCopyStore.getState();
       const ir = store.ir;
       // INCREMENTAL patch (promote host key to hand-set) — use the
@@ -6291,24 +6757,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     setBaseKeyCustomChar("");
     setFlickDirection("");
     setLayerTokens(seedLayerTokensForChar(currentChar));
-    // `charTouch` is listed because the case-pair "already placed" predicate
-    // above closes over it — a stale map would re-propose a pairing the author
-    // has already made.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    currentChar,
-    canApply,
-    method,
-    baseKey,
-    resolvedBaseKey,
-    flickDirection,
-    layerTokens,
-    charTouch,
-    assembledLayerCombo,
-    isLayerComboInUse,
-    proposeCompanion,
-    i18n,
-  ]);
+  }
 
   // Strip every bulk-added longpress mechanism for `members` on `baseKey` from
   // a charTouch map (dropping any member left with no mechanisms). Touches ONLY
@@ -6344,8 +6793,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // Bulk box "Remove all": delete every sibling the group added, in one click.
   const handleRemoveBulkGroup = useCallback(
     (group: BulkAccentGroup) => {
+      // On Open `charTouch` holds nothing written (placements go to the file, and no bulk
+      // group is recorded), so this leaves it untouched: only a restored draft can have entries.
       setCharTouch((prev) =>
-        stripBulkMembers(prev, group.members, group.baseKey),
+        prev.size === 0 ? prev : stripBulkMembers(prev, group.members, group.baseKey),
       );
       setBulkAccentGroups((prev) => prev.filter((g) => g.id !== group.id));
     },
@@ -6401,6 +6852,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // cleared, since its pending placements would target a removed base.
   const handleRemoveMechanism = useCallback(
     (char: string, idx: number) => {
+      // On Open this is a no-op unless a restored draft left an entry: a written
+      // placement is not in `charTouch` (it is removed with its own chip, from the file).
       setCharTouch((prev) => {
         const existing = prev.get(char);
         if (existing === undefined) return prev;
@@ -6530,7 +6983,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           label: touchContinueLabel,
           ariaLabel: touchContinueLabel,
           onClick: handleContinue,
-          disabled: false,
+          // allCovered pools platforms; a letter can count as covered there
+          // while one platform still lacks a key, and handleContinue would
+          // then do nothing. Gate exactly as handleContinue does.
+          disabled: unaccountedTouchChars.length > 0,
         }
       : currentChar !== null && touchLettersToAdd.includes(currentChar)
         ? {
@@ -6745,10 +7201,32 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     <TouchKeyIdentityList
       ir={ir}
       layout={effectiveKeyModeLayout}
-      onCommitOps={(ops) => {
-        for (const op of ops) commitKeyEditOp(op, { offerFamilyApply: false });
+      onCommitOps={(ops, record) => {
+        // The repair record is made once, when the change has landed.
+        let recorded = false;
+        const once = (): void => {
+          if (!recorded) {
+            recorded = true;
+            record();
+          }
+        };
+        groupOnOpen(() => {
+          for (const op of ops) commitKeyEditOp(op, { offerFamilyApply: false, afterApplied: once });
+        });
       }}
-      onInstallIr={(nextIr) => useWorkingCopyStore.getState().setWorkingIR(nextIr)}
+      onInstallIr={(nextIr, record) => {
+        // Open: the rule is written into the `.kmn` by the seam (it is the only
+        // writer of the working IR there); Copy: the overlay-preserving setter.
+        if (liveOpen) {
+          // A touch file that cannot be read makes the grid read-only (no install either).
+          if (openTouchUnreadable) return;
+          installRulesOnOpen(nextIr, openTouchLabel, record);
+        }
+        else {
+          record();
+          useWorkingCopyStore.getState().setWorkingIR(nextIr);
+        }
+      }}
     />
   );
 
@@ -6891,6 +7369,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                 label: t({ id: "editor.assignLoop.doneButton", message: "Continue" }),
                 onClick: handleContinue,
                 testId: "touch-continue",
+                // The walk can be empty while a letter still lacks a key on one
+                // platform (detection pools platforms; the gate does not), so
+                // this Continue gates exactly as handleContinue does.
+                disabled: unaccountedTouchChars.length > 0,
+                ...(unaccountedTouchMessage !== null
+                  ? { ariaDescribedBy: unaccountedTouchHintId }
+                  : {}),
               },
             }}
           />
@@ -6899,6 +7384,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               No new characters to add.
             </Trans>
           </p>
+          {completionGateNotice}
         </>
       )}
 
@@ -7425,7 +7911,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               row.deletable ? (
                 <HoverDangerChip
                   key={row.id}
-                  onClick={() => deleteTouchKey(row.id)}
+                  onClick={() => handleDeleteExistingTouchMethod(row.id)}
                   ariaLabel={t({
                     id: "editor.assignLoop.touch.removeExistingMethodAriaLabel",
                     message: `Remove existing touch method ${{ label: row.label }} for ${{ notation: toUPlusNotation(currentChar) }}`,
@@ -7557,14 +8043,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   );
 
   // ---------------------------------------------------------------------------
-  // Key mode (T072) — the editable schematic grid surface. FR-020h/FR-035:
-  // this MUST read as visually and verbally distinct from the live OSK
-  // preview beside it (labelled "for editing" here vs. "for testing" on the
-  // preview pane below) so the two keyboard-shaped surfaces never look like
-  // two ways to do the same thing. Wrapped in the SAME onKeyDown/style shell
-  // characterModeContent uses, so the pane-level ArrowLeft/Right char-cycle
-  // handler (useCharCycleKeys) still correctly skips past the grid — its
-  // SKIP_SELECTOR already excludes `[role="grid"]`.
+  // Key mode (T072) — the editable schematic grid surface. Wrapped in the
+  // SAME onKeyDown/style shell characterModeContent uses, so the pane-level
+  // ArrowLeft/Right char-cycle handler (useCharCycleKeys) still correctly
+  // skips past the grid — its SKIP_SELECTOR already excludes `[role="grid"]`.
   const keyModeContent = (
     /* eslint-disable-next-line jsx-a11y/no-static-element-interactions --
        same bubbled-keydown rationale as characterModeContent above; this
@@ -7583,6 +8065,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       }}
     >
       {/* Back and Continue live in the footer (spec 081). */}
+      {touchUndoHint}
       <PublishStepNav
         spec={{
           back: {
@@ -7594,13 +8077,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               message: "Back to mechanisms",
             }),
           },
-          secondary: {
-            label: t({ id: "editor.assignLoop.touch.undo.label", message: "Undo" }),
-            onClick: undoDelete,
-            testId: "touch-undo-button",
-            ariaLabel: undoAffordanceLabel,
-            disabled: undoStack.length === 0,
-          },
+          ...touchUndoSlot,
           forward: {
             label: t({
               id: "editor.assignLoop.touch.keyMode.continueButton",
@@ -7622,57 +8099,27 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           didn't. */}
       {completionGateNotice}
 
-      {/* The "for editing" verb (FR-020h) — an editable SCHEMATIC layout, not
-          a rendered keyboard you type on. */}
-      <p
-        style={{
-          margin: 0,
-          fontSize: 12,
-          fontWeight: 600,
-          color: TEXT_DIM,
-          fontFamily: FONT,
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-        }}
-      >
-        <Trans id="editor.assignLoop.touch.keyMode.editingLabel">
-          Editable layout — for editing
-        </Trans>
-      </p>
-
       {/* TIKE touch-builder port (slice-spec §3.2): the visual builder pane
           replaces the old "By key" editor surface (layer selector, grid,
           gesture panel, property panel, key dialogs). Step chrome — nav,
           gate notices, find, invalidation warnings, rejections, the
           dead-key repair list — stays: it belongs to the step, not the
           editor surface. */}
-      {/* The one key-mode control that genuinely has no key to hang off:
-          finding a key you cannot yet see. `handleFindJump` sets the
-          platform/layer/selection the builder pane reads, so it keeps
-          working against the new surface. */}
-      <div style={{ display: "flex", gap: 8 }}>
-        <button
-          type="button"
-          onClick={() => setFindPanelOpen((prev) => !prev)}
-          data-testid="touch-key-mode-find-toggle"
-          style={ghostBtn}
-        >
-          {t({ id: "editor.assignLoop.touch.keyMode.findButton", message: "Find a key" })}
-        </button>
-      </div>
-
-      {findPanelOpen && effectiveKeyModeLayout !== null && keyModeRuleIndex !== undefined && (
-        <FindPanel
-          layout={effectiveKeyModeLayout}
-          ruleIndex={keyModeRuleIndex}
-          onJumpToResult={handleFindJump}
-        />
+      {openTouchUnreadable && (
+        <p role="alert" data-testid="touch-open-unreadable">
+          {t({
+            id: "editor.assignLoop.touch.open.unreadable",
+            message:
+              "This keyboard's touch layout file cannot be read, so the key grid is read-only. Fix the file in the Code tab, then come back.",
+          })}
+        </p>
       )}
 
       <TouchBuilderPane
         layout={effectiveKeyModeLayout}
         activePlatformId={activeKeyPlatformId}
         onSelectPlatform={setActiveKeyPlatformId}
+        unplacedCountByPlatform={unplacedCountByPlatform}
         activeLayerId={activeKeyLayerId}
         onSelectLayer={setActiveKeyLayerId}
         selectedKeyAddress={selectedKeyAddress}
@@ -7680,6 +8127,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         selectedKeyAddresses={selectedKeyAddresses}
         onSelectKeys={selectKeyAddresses}
         commitOp={commitKeyEditOp}
+        groupCommits={groupOnOpen}
         fontFaceUrl={stage.kind === "ready" ? stage.fontFaceUrl : undefined}
         fontFaceFamily={stage.kind === "ready" ? stage.fontFaceFamily : undefined}
         trayLetter={trayLetter}
@@ -7690,6 +8138,28 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         }}
         panelDropHover={panelDropHover}
         dropHoverAddress={dropHoverAddress}
+        // The one key-mode control that genuinely has no key to hang off:
+        // finding a key you cannot yet see. It rides the builder's platform
+        // row; `handleFindJump` sets the platform/layer/selection the pane reads.
+        toolbarActions={
+          <button
+            type="button"
+            onClick={() => setFindPanelOpen((prev) => !prev)}
+            data-testid="touch-key-mode-find-toggle"
+            style={ghostBtn}
+          >
+            {t({ id: "editor.assignLoop.touch.keyMode.findButton", message: "Find a key" })}
+          </button>
+        }
+        toolbarPanel={
+          findPanelOpen && effectiveKeyModeLayout !== null && keyModeRuleIndex !== undefined ? (
+            <FindPanel
+              layout={effectiveKeyModeLayout}
+              ruleIndex={keyModeRuleIndex}
+              onJumpToResult={handleFindJump}
+            />
+          ) : null
+        }
       />
 
         {/* FR-036f: warn AT THE MOMENT of the edit when a key-level edit
@@ -7759,12 +8229,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                   message: "Undo this edit",
                 })}
               </button>
-              {keyEditInvalidationWarnings.some((w) => w.returnsToWorklist) && (
+              {keyEditInvalidationWarnings.some((w) => w.lostOnPlatform) && (
                 <span data-testid="key-edit-invalidation-restore-note" style={{ fontFamily: FONT }}>
                   {t({
-                    id: "editor.assignLoop.touch.keyMode.invalidationRestoreNote",
+                    id: "editor.assignLoop.touch.keyMode.invalidationRestoreNoteTray",
                     message:
-                      "Or keep the edit — the affected characters are back in the by-character list, ready to place somewhere else.",
+                      "Or keep the edit — the affected characters are back in Letters to place, ready to put on another key.",
                   })}
                 </span>
               )}
@@ -7846,6 +8316,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       <Suspense fallback={null}>
         {/* Back/Undo/Continue live in the footer (spec 081) — the code tab
             publishes the same nav as the key tab. */}
+        {touchUndoHint}
         <PublishStepNav
           spec={{
             back: {
@@ -7857,13 +8328,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                 message: "Back to mechanisms",
               }),
             },
-            secondary: {
-              label: t({ id: "editor.assignLoop.touch.undo.label", message: "Undo" }),
-              onClick: undoDelete,
-              testId: "touch-undo-button",
-              ariaLabel: undoAffordanceLabel,
-              disabled: undoStack.length === 0,
-            },
+            ...touchUndoSlot,
             forward: {
               label: t({
                 id: "editor.assignLoop.touch.keyMode.continueButton",
@@ -7878,7 +8343,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
             },
           }}
         />
-        <TouchCodePane layout={effectiveKeyModeLayout} />
+        <TouchCodePane layout={effectiveKeyModeLayout ?? (openTouchUnreadable ? EMPTY_TOUCH_LAYOUT : null)} />
       </Suspense>
     ) : (
       characterModeContent
@@ -7893,20 +8358,22 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // Automatic activation (Left/Right/Home/End move AND select, wrapping)
   // mirrors KeyGrid.tsx's own platform-tablist pattern (T077) — the one
   // existing tabs precedent in this codebase.
+  // Manage Layout leads and is the default view; Place Letters stays
+  // available as the secondary one.
   const touchModeTabs: ReadonlyArray<{ id: TouchEditorMode; label: string }> =
     [
-      {
-        id: "character",
-        label: t({
-          id: "editor.assignLoop.touch.mode.characterTab",
-          message: "Place Letters",
-        }),
-      },
       {
         id: "key",
         label: t({
           id: "editor.assignLoop.touch.mode.keyTab",
           message: "Manage Layout",
+        }),
+      },
+      {
+        id: "character",
+        label: t({
+          id: "editor.assignLoop.touch.mode.characterTab",
+          message: "Place Letters",
         }),
       },
       {
@@ -8044,6 +8511,45 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         </span>
       </div>
 
+      {/* Open (owner ruling 2026-11-14): reseeding the touch layout from the desktop
+          keys stays available but is not the step's lead. It sits behind a native
+          disclosure (keyboard-reachable, labelled by its summary), and using it asks
+          the author first and can be undone from the footer. */}
+      {openTouch && (
+        <details
+          data-testid="touch-open-more"
+          style={{ flex: "0 0 auto", fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}
+        >
+          <summary className="ks-focus-ring" style={{ cursor: "pointer" }}>
+            {t({ id: "editor.assignLoop.touch.open.moreOptions", message: "More touch options" })}
+          </summary>
+          <p style={{ margin: "6px 0" }}>
+            {t({
+              id: "editor.assignLoop.touch.open.reseedHint",
+              message:
+                "Make a new touch layout from your desktop keys, replacing this one. You are shown what will change and asked first, and you can undo it.",
+            })}
+          </p>
+          <button
+            type="button"
+            className="ks-focus-ring"
+            data-testid="touch-open-reseed"
+            onClick={handleReseedOnOpen}
+            style={ghostBtn}
+          >
+            {t({ id: "editor.assignLoop.touch.open.reseedButton", message: "Reseed touch from desktop" })}
+          </button>
+          {reseedFailed && (
+            <p role="alert" data-testid="touch-open-reseed-failed" style={{ margin: "6px 0" }}>
+              {t({
+                id: "editor.assignLoop.touch.open.reseedFailed",
+                message: "The touch layout could not be made from the desktop keys. Your files are unchanged.",
+              })}
+            </p>
+          )}
+        </details>
+      )}
+
       {touchEditorMode === "character" ? (
         <>
           {totalChars > 0 && (
@@ -8150,8 +8656,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   );
 
   // FR-020h/FR-035: the live OSK preview's "for testing" verb — this is the
-  // surface you TYPE ON, in contrast with the schematic key-mode grid's
-  // "for editing" label above (keyModeContent). The character-mode wording
+  // surface you TYPE ON, in contrast with the schematic key-mode grid
+  // (keyModeContent). The character-mode wording
   // stays exactly as it was (no id/message change) since that mode never
   // renders anything grid-shaped beside the preview to be confused with.
   // Only character mode renders a preview pane at all as of spec 065 T037
@@ -8165,6 +8671,79 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     id: "editor.assignLoop.touch.previewHeading",
     message: "Touch preview",
   });
+
+  // Open, no touch file (FR-017): generation is offered as the way forward, and it
+  // is the only thing this step does until the file exists. Continue without it
+  // ships the keyboard as it was opened (desktop only); nothing is held for later.
+  if (openNoTouch) {
+    return (
+      <AssignLoopShell
+        headingText={t({
+          id: "editor.assignLoop.touchGalleryHeading",
+          message: "Touch Gallery",
+        })}
+        modalityLabel={t({
+          id: "editor.assignLoop.modality.touch",
+          message: "Touch",
+        })}
+        modalityLabelPlacement="inline"
+        leftContent={
+          <div
+            data-testid="touch-open-no-file"
+            style={{ display: "flex", flexDirection: "column", gap: 12, padding: isNarrow ? "24px 0" : "24px 20px" }}
+          >
+            <PublishStepNav
+              spec={{
+                back: {
+                  label: t({ id: "editor.assignLoop.touch.keyMode.backButton", message: "Back" }),
+                  onClick: onBack,
+                  testId: "touch-key-mode-back",
+                  ariaLabel: t({
+                    id: "editor.assignLoop.touch.keyMode.backAriaLabel",
+                    message: "Back to mechanisms",
+                  }),
+                },
+                forward: {
+                  label: t({
+                    id: "editor.assignLoop.touch.keyMode.continueButton",
+                    message: "Continue",
+                  }),
+                  onClick: () => onComplete([]),
+                  testId: "touch-key-mode-continue",
+                },
+              }}
+            />
+            <p style={{ margin: 0, fontFamily: FONT, color: TEXT_MAIN }}>
+              {t({
+                id: "editor.assignLoop.touch.open.noFile",
+                message:
+                  "This keyboard has no touch layout. You can create one from your desktop keys, which adds a phone and tablet layout. You are shown what it will contain and asked first, and you can undo it. Or continue without one, and the keyboard stays desktop only.",
+              })}
+            </p>
+            <div>
+              <button
+                type="button"
+                className="ks-focus-ring"
+                data-testid="touch-open-create"
+                onClick={handleReseedOnOpen}
+                style={ghostBtn}
+              >
+                {t({ id: "editor.assignLoop.touch.open.createButton", message: "Create a touch layout" })}
+              </button>
+            </div>
+            {reseedFailed && (
+              <p role="alert" data-testid="touch-open-reseed-failed" style={{ margin: 0 }}>
+                {t({
+                  id: "editor.assignLoop.touch.open.reseedFailed",
+                  message: "The touch layout could not be made from the desktop keys. Your files are unchanged.",
+                })}
+              </p>
+            )}
+          </div>
+        }
+      />
+    );
+  }
 
   return (
     <>

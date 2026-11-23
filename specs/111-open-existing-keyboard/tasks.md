@@ -235,3 +235,71 @@ Polish (T048–T051) after the last story shipped in this spec
 ## Phase 13: Ctrl and removing letters (moved)
 
 T070-T077 (FR-035..FR-040) moved to [spec 114](../114-ctrl-and-letter-removal/spec.md) on 2026-11-06. Their ids are not reused here.
+
+## Phase 14: One read source (live-files amendment 2026-11-13, FR-043)
+
+**Goal**: on Open, the preview and the criteria read the working copy's current files, and the preview places changes the way the output does. No constitution change.
+
+**Independent test**: open a keyboard, apply a code edit to the source with no other change, and check the preview and the criteria follow it; edit the on-screen keyboard and check the preview shows it (SC-012).
+
+- [x] T078 On Open, the preview projection starts from the working copy's current files, not the files as fetched (`packages/studio/src/hooks/useWorkingCopyTransform.ts`, `packages/studio/src/hooks/useKeyboardArtifact.ts`). A change to any working-copy file re-runs the projection in the existing validation cycle; no new timer (FR-022). Copy is unchanged.
+- [x] T079 On Open, the preview passes Open mode to the projection, so a changed source is spliced as in the output (`useWorkingCopyTransform.ts`, `packages/studio/src/lib/projectionInput.ts`). Where the splice cannot place a change, the preview compiles the reformatted text the author would be asked to accept.
+- [x] T080 Tests for SC-012: a source code edit with no other change, an on-screen keyboard edit, and an accepted documentation fix each reach the projected preview files; an applied upgrade's criterion passes; the session baseline (FR-019) is still the keyboard as opened; preview and output files agree on Open (extend `projectionInput.parity.test.ts`).
+
+## Phase 15: The apply seam for the keyboard source (FR-041, FR-042, FR-009 amended)
+
+**Goal**: on Open, the remove tool, Mechanisms assignments and added rules write the source file when applied, and decisions are no longer replayed. The Article III amendment lands with this phase (owner approval needed).
+
+- [x] T081 One Open-only apply function: compute the change on the model, splice it into the current text, replace the file and re-read the model; ask for reformat consent here (FR-009 amended).
+- [x] T082 Route the remove tool, Mechanisms assignments and rule additions through it on Open; applied changes then read as existing content.
+- [x] T082a Route Layout-tab edits (spec 117) through the apply function on Open, keeping their decision as the record; Copy keeps the replay. Depends on the Layout tab having merged. Until then the Open output row of `PROJECTION_STEPS` keeps `layoutEdits` as a temporary replay of that one decision (spliced through `writeKmn`) so Layout-tab edits made on Open are not lost; this task removes it from that row. Code-tab edits on Open never use a `code-apply` entry (`codeEdits` is in no Open row). (Done: `lib/layoutOpenCommit.ts`; the store's `commitKmnEdit` and `commitLayoutDeadkeyOp` write a `model` change scoped to the groups (and stores/raw for deadkeys) on Open; `layoutEdits` left the Open `output` row; the Layout tab reads `startIr` on Open; its own undo is hidden there and the footer Open undo takes the step back.)
+- [x] T082b The preview drops a file the working copy no longer holds (phase 14's overlay only adds and replaces); needed before any tool can remove a file. (Phase 15 S6: `removedPaths` on the undo store, derived from the log; the preview drops them, undo restores; tests in `projectionInput.openWorkingCopy.test.ts` and `projectionInput.parity.open.test.ts`.)
+- [x] T082c Trace whether the caps step and the id rename can re-emit the whole source on Open, and route them through the splice if so. (S3a: the caps step splices on Open and runs only for an answered decision; the id rename never runs on Open. Applying caps at the moment it is answered waits for the Layout tab, T082a.)
+- [x] T083 Stop replaying decisions after a code edit on Open; decisions remain as the record (trail, review notes, PR body).
+- [x] T084 Measure across the corpus sample how often a tool change cannot be spliced; report before converting more tools.
+- [x] T085 Apply the Article III wording from the spec amendment to `.specify/memory/constitution.md`, with the version bump (owner-approved only).
+- [x] T086 Tests: SC-010 and SC-011 for the source file. (S3a: SC-011 done in `openApply.s3a.test.ts`; SC-010 remains.) (Phase 15: SC-010 for removal, restore, code-view edit, assignment, marks guards, deadkey, context-tolerance fix and normalization step in `projectionInput.parity.open.test.ts`, `openApply.assign.test.ts`, `openApply.s2.test.tsx`, `openApply.s3b.test.tsx`; SC-011 in `openApply.s3a.test.ts`.)
+- [x] T086a (slice S2) Retire on Open the disabled-families overlay (`disabledFamilyIds`): disabling a family writes the file when applied, then the overlay and its replay are dropped for Open.
+- [x] T086b (slice S2) Retire on Open the marks-guards overlay: guard rules are written into the file when applied; no guard state is replayed at output.
+- [x] T086f (do before slice 3b, so 3b adds its steps to the table rather than new flags) Replace the projection's per-kind skip flags (`applyOnly`, `skipMarkGuards`, `skipIntendedCheck`) with one per-kind table of steps (`APPLY_STEPS`) before T087.
+- [x] T086c (slice S3) Retire on Open the context-tolerance overlay store: the fix is spliced when applied, so `contextToleranceOverlay` is never held on Open (S1 carries a held one into the file on the next apply as a stopgap).
+- [x] T086d (slice S3) Retire on Open the deadkey-ops overlay and the key-edit-ops overlay: each op is written to the file when applied; `keepAll` no longer needs the Open exception that keeps them (FR-041). S3b: deadkey ops done (written when made, undo record, no projection step replays the log; the log stays only as the `deadkeys-defined` decision record). Key-edit ops are touch-only and stay for phase 16 (T087/T087a). (Phase 16 S4: key-edit ops are written into the touch file when applied; `keyEditOverlay` is a record only on Open and nothing replays it, in any apply row or the output row; the projection input ignores `keyEditOps` there.)
+- [x] T086e (slice S1 follow-up) Wire the generic `files` change (`OpenChange` kind `files`) and `undoLastOpenApply` to their first editors; S4 builds the undo UI over the session undo list.
+- [x] T086g (slice S3; S3b narrowed it) Remove the held-overlay flush in `openApply` (the flush that writes held overlays ahead of another change) once T086c and T086d retire the overlays. S3b: older Open drafts need no compatibility (owner ruling), so the flush no longer carries carves or a context-tolerance fix: the Mechanisms gallery and the carve suggestion write through the seam, and the tolerance fix is written when applied. The flush stayed only for touch key-identity rule additions until phase 16. (Phase 16 T087b, done: with the no-touch-file path gone nothing holds `rulesStepAdded` rules on Open. The flush, its `flush` undo kind and label, and the carry of held additions on removal and assignment runs are removed from `lib/openApply`; evidence `openApply.carried.test.ts` (a remove, a Restore and an assignment write only themselves, one record), `openApply.consent.test.tsx`, `openApply.assign.test.ts`.)
+- [x] T086h Retire on Open the output's rule-additions step (step 1.8's `ruleAdditions` splice from the working IR): the rules step's additions are written when applied (through the patch sink, `model` change), so the output derives none. Depends on T086c and T086g. (Phase 16 S4: `ruleAdditions` left `PROJECTION_STEPS.output` for a keyboard with a touch file. T087b, done: the `outputNoTouchFile` row is gone, so no Open output derives rule additions; evidence `projectionSteps.test.ts`, `projectionInput.parity.open.test.ts`.)
+
+## Phase 16: Touch (FR-044)
+
+- [x] T087 Settle which touch host is live on Open, then make key-grid, builder and character edits patch the touch file's text when applied; Continue no longer rebuilds the layout on Open. (Phase 16 S1-S4. Open with a touch file: grid, builder, placements, deletes, restores and the Code tab write the file; Continue builds nothing; the output runs no touch step. An opened keyboard with no touch file keeps build-at-output until T087b.)
+- [x] T087a Retire on Open the touch overlays that S1 leaves in place: `deletedTouchKeyIds` and `carveTouchKeepInert` (touch-key deletions and keep-inert characters) are written into the touch layout file when applied.
+- [x] T087b Reseed touch from desktop on Open: an understated secondary action (OWNER RULING 2026-11-14); replaces the touch file as one applied change, shown and agreed first (FR-009), undoable; creates the file when none exists (FR-017). Desktop letter placements reach touch only as suggestions in the touch step, as on Copy (OWNER RULING 2026-11-14). (Done 2026-11-14: `lib/openApply/touchReseed.ts`; consent dialog extended with a touch-replacement summary; TouchGallery shows the secondary disclosure with a touch file and the create panel without one; the no-touch-file overlay path, the `outputNoTouchFile` row and the held-overlay flush are retired. Evidence: `openApply.touchReseed.test.ts` (summary; consent naming the file; Copy-equal layout on `akan` and `bambara`; one undo record, byte-identical undo; working copy, preview and download equal; generation on `basic_kbdus` with its touch file removed, then a precise key edit), `TouchGallery.open.reseed.test.tsx` (understated, keyboard-reachable disclosure; decline changes nothing; no-touch panel; Continue ships it desktop-only), `projectionInput.parity.open.test.ts` (no generation: the download has no touch file, nothing held).)
+- [x] T088 Tests: SC-013. (SC-013 tests: `touchOpenPlacement.test.ts`, `touchOpenCommit.test.ts`, `TouchGallery.open.s3.test.tsx`; S4 adds `projectionInput.parity.open.test.ts` (mixed edits: output equals the working copy apart from version/HISTORY; no-touch-file interim) and `projectionSteps.test.ts`.)
+- [x] ~~T087c (S2a prerequisite) The `touch` change kind needs a layer-add path (an intended-layout edit or a layer applier) before the builder's add-layer is routed (S2a).~~ (Closed as not needed, OWNER RULING 2026-11-16: no step of the Open walk adds a touch layer; reopen as a new task if layer adding on Open is wanted.)
+
+## Phase 17: Remaining files (FR-041, FR-047)
+
+- [x] T089 The documentation and style editors write their files on Open; no separate edited copy replaces a file at output.
+- [x] T089a Retire on Open the CSS output override: the OSK stylesheet (`customCss`, projection steps 0b and 4b) is written into the stylesheet file when the author applies it, so the output writes none. Goes with T089.
+- [x] T090 The language list patches the package descriptor when applied.
+- [x] T091 On-screen keyboard key labels after a Mechanisms change, per the owner's answer to open question 1. (Design pass found nothing to build: `assign` writes the .kvks and touch labels in the same change (`lib/openApply/assign.ts`, row `assign` in `lib/projectionSteps.ts`), a removal relabels through `carveKeycaps`; evidence `openApply.assign.test.ts` (only the K_E label changes, undo exact). `keycapLabels` left the Open `output` row: assignments are [] on Open, so it did nothing; `projectionSteps.test.ts`.)
+- [x] T092 Tests: SC-014, and SC-010 for these files. (SC-014: `docRegenerationFix.open.test.tsx`; SC-010: the mixed-session case in `projectionInput.parity.open.test.ts`, plus per-file `descriptorOpenCommit.test.ts` and `cssOpenCommit.test.ts`.)
+
+## Phase 18: Undo, drafts, unapplied text (FR-045, FR-046, FR-049)
+
+- [x] T093 Undo and "Discard changes and go back" restore file text on Open, including code-view edits (depth per open question 3). (Phase 15 S4: `OpenUndoButton` in the footer cluster; Discard restores the log as at arrival, `RevisionSnapshot.openUndo`; no redo exists in the studio, so none added; no undo shortcut exists, so none added; touch key edits keep the touch Undo until T087. Tests: `OpenUndoButton.test.tsx`.)
+- [x] T094 Leaving a code view with unapplied text asks whether to apply or discard it.
+- [x] T095 Open drafts save the current files and the record. No migration of drafts saved earlier (OWNER RULING 2026-11-13, FR-049 amended).
+
+## Phase 18b: Owner rulings 2026-11-16 (FR-041, FR-029)
+
+OWNER RULINGS 2026-11-16: the copyright holder and the project link are written when answered; a missing documentation page is offered as a suggested fix that creates it; the on-screen keyboard editor writes through the apply seam; the keyboard icon (dropped on both tracks) is tracked outside this spec.
+
+- [x] T098 Copyright holder on Open is written when answered: the `.kmn` `&COPYRIGHT` store and the descriptor's `<Info><Copyright>`, in place, as one change with one undo record. `LICENSE.md` is left as it is.
+- [x] T099 Project link on Open is written when answered: the descriptor's `<Info><WebSite>` in place, one undo record, through the same descriptor patch as the language list. The `descriptor` step then leaves the Open output row.
+- [x] T100 A documentation page the keyboard lacks is offered on Open as a suggested fix that creates it from the generated text and lists it in the descriptor (`<Files>`, and `<WelcomeFile>` for the welcome page), as one change with one undo record. Once created it is edited like any other page.
+- [x] T101 The on-screen keyboard editor on Open (Visual and Code) writes the `.kvks` through the apply seam with an undo record, as the other editors do.
+
+## Phase 19: Cleanup
+
+- [x] T096 Remove the Open branches of the output projection that no longer do anything, leaving the version bump and HISTORY entry (FR-048). Includes: remove the output-time reformat consent on Open from the download, test-build and PR paths (consent is asked when the change is applied, so output never asks).
+- [x] T097 Extend the Open end-to-end walk to assert SC-010 on every step.

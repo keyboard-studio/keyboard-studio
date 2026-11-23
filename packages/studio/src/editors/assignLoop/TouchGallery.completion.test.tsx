@@ -72,6 +72,8 @@ function seedShippedPlusSwapped(opts: {
   ]);
   const ir = makeTestIR([]);
   useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
+  // The Place Letters walk is no longer the default view.
+  useWorkingCopyStore.getState().setTouchEditorMode("character");
   const swapAssignment: MechanismAssignment = {
     scope: "individual",
     target: opts.swappedChar,
@@ -154,6 +156,8 @@ describe("TouchGallery — touch base-direct signal (a) is LIVE, not frozen (P1 
     ]);
     const ir = makeTestIR([]);
     useWorkingCopyStore.getState().instantiateFromStart(basicKbdus, { vfs, ir });
+    // The Place Letters walk is no longer the default view.
+    useWorkingCopyStore.getState().setTouchEditorMode("character");
     useWorkingCopyStore.getState().recordPhase({
       phase: "B",
       answers: [],
@@ -242,7 +246,7 @@ describe("TouchGallery — touch base-direct signal (a) is LIVE, not frozen (P1 
 //       character). See TouchGallery.tsx's `touchForwardButton` top-priority
 //       branch doc comment for the full reconciliation between the two.
 describe("TouchGallery — Continue button forced visible when the whole inventory is covered", () => {
-  it("shows an ENABLED Continue button when every inventory character has count >= 1, even navigated to an already-detected character outside touchLettersToAdd (previously hidden)", async () => {
+  it("shows the Continue button when every inventory character has count >= 1, even navigated to an already-detected character outside touchLettersToAdd (previously hidden)", async () => {
     // "x" carries a desktop swap assignment (mirrored onto the touch seed —
     // badge count via signal (a), and it stays IN touchLettersToAdd as an
     // actionable suggestion target). "€" is detected purely via the SHIPPED
@@ -265,17 +269,17 @@ describe("TouchGallery — Continue button forced visible when the whole invento
       expectCurrentChar("€");
     });
 
-    // The Done button is FORCED visible and enabled — the whole inventory
-    // (both "x" and "€") is covered per the producer badge, even though
-    // currentChar ("€") is outside touchLettersToAdd's walk. (The completion
-    // round-trip itself — whether clicking Continue actually calls onComplete —
-    // is FR-008's own gate, re-deriving coverage from this file's mocked
-    // `buildTouchLayoutJson`, which does not reflect shipped/mirrored
-    // content; that gate is exercised by its own existing test suite, not
-    // this one — the property under test here is button visibility/state.)
+    // The Done button is FORCED visible — the whole inventory (both "x" and
+    // "€") is covered per the producer badge, even though currentChar ("€")
+    // is outside touchLettersToAdd's walk. Visible is the property under test.
+    // Its enabled state follows FR-008's own gate, exactly as handleContinue
+    // does, so it is never an enabled button that does nothing: here that
+    // gate, re-deriving coverage from this file's mocked
+    // `buildTouchLayoutJson` (which does not reflect mirrored content), still
+    // finds a letter without a touch key, so the button is shown disabled.
     const doneBtn = screen.getByTestId("touch-continue");
     expect(doneBtn.textContent).toMatch(/Continue/i);
-    expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
     expect(onComplete).not.toHaveBeenCalled();
   });
 

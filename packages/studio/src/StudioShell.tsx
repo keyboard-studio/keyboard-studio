@@ -141,6 +141,9 @@ import { buildPathOverlay } from "./dashboard/pathOverlay.ts";
 import { projectWorkingCopyForOutput } from "./lib/serializeWorkingCopy.ts";
 import { DocPreviewProjectionContext } from "./lib/docPreviewProjection.ts";
 import { StepHost } from "./components/StepHost.tsx";
+import { OpenApplyHost } from "./components/OpenApplyHost.tsx";
+import { noteAccepted } from "./lib/navigationGuard.ts";
+import { UnappliedTextDialog } from "./components/UnappliedTextDialog.tsx";
 import { ResumeDraftBanner } from "./components/ResumeDraftBanner.tsx";
 import {
   loadServerDraftMeta,
@@ -250,6 +253,7 @@ function useRoute(): RouteId {
         // soft-lock described below.
         if (parsed !== null) setPendingWelcomeLocation(parsed);
         window.history.replaceState(window.history.state, "", "#welcome");
+        noteAccepted("#welcome");
       }
       return "welcome";
     }
@@ -1779,6 +1783,8 @@ function StudioShellContent() {
   // here (where every other cross-cutting NavBar/StudioShell signal is read)
   // and is passed down as a plain prop.
   const surveyActiveStepId = useSurveySessionStore((s) => s.activeStepId);
+  // The stepper leaves out the phases this track's walk never visits.
+  const stepperDecisions = useDecisionStore((s) => s.decisions);
 
   // ---------------------------------------------------------------------------
   // Completeness report — T042/US3.
@@ -2094,6 +2100,8 @@ function StudioShellContent() {
     // The Documentation step's preview needs the output projection but cannot
     // import it (see lib/docPreviewProjection.ts); the shell supplies it.
     <DocPreviewProjectionContext.Provider value={projectWorkingCopyForOutput}>
+    <OpenApplyHost>
+    <UnappliedTextDialog />
     <div
       style={{
         display: "flex",
@@ -2136,7 +2144,7 @@ function StudioShellContent() {
         {...(isNarrow && route === "survey"
           ? {
               narrowCenter: (
-                <PhaseStepper activeStepId={surveyActiveStepId} inline />
+                <PhaseStepper activeStepId={surveyActiveStepId} decisions={stepperDecisions} inline />
               ),
             }
           : {})}
@@ -2150,7 +2158,7 @@ function StudioShellContent() {
       {/* Narrow viewports fold the compact stepper into the NavBar row
           (narrowCenter above) rather than spending a second row on it. */}
       {route === "survey" && !isNarrow && (
-        <PhaseStepper activeStepId={surveyActiveStepId} />
+        <PhaseStepper activeStepId={surveyActiveStepId} decisions={stepperDecisions} />
       )}
       {/* Spec 111 US5: consistency suggestions raised by an applied change.
           Always mounted (it watches the working copy); the list shows only
@@ -2171,6 +2179,7 @@ function StudioShellContent() {
           place to keep that rule, and the two would drift. */}
       <StudioFooter activeRoute={route} />
     </div>
+    </OpenApplyHost>
     </DocPreviewProjectionContext.Provider>
   );
 }

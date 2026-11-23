@@ -14,6 +14,7 @@ import {
 import { render } from "../test/renderWithI18n.tsx";
 import { PhaseStepper } from "./PhaseStepper.tsx";
 import { manifest } from "../steps/manifest.ts";
+import type { DecisionSet } from "../decisions/decisionTypes.ts";
 
 describe("PhaseStepper", () => {
   // No global auto-cleanup is registered (see test-setup.ts) — every
@@ -103,6 +104,48 @@ describe("PhaseStepper", () => {
   });
 });
 
+describe("PhaseStepper on each track", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  function trackDecisions(value: "copy" | "adapt"): DecisionSet {
+    return {
+      "authoring-track": { id: "authoring-track", value, provenance: "asked" },
+    };
+  }
+
+  function visibleLabels(): string[] {
+    return Array.from(
+      screen.getByTestId("phase-stepper").querySelectorAll("li"),
+    ).map((li) => li.textContent ?? "");
+  }
+
+  it("shows all eight phases on Copy", () => {
+    render(<PhaseStepper activeStepId="characters" decisions={trackDecisions("copy")} />);
+    expect(visibleLabels()).toHaveLength(8);
+  });
+
+  it("leaves out the phases the Open walk never visits and re-letters the rest", () => {
+    render(<PhaseStepper activeStepId="open_languages" decisions={trackDecisions("adapt")} />);
+    for (const letter of ["a", "c", "d"]) {
+      expect(screen.queryByTestId(`phase-pill-${letter}`)).toBeNull();
+    }
+    const labels = visibleLabels();
+    expect(labels).toHaveLength(5);
+    // Display letters run A-E; the test ids keep the fixed phase letters.
+    expect(labels[0]).toMatch(/^AReview/);
+    expect(labels[1]).toMatch(/^BEnable/);
+    expect(labels[4]).toMatch(/^EPublish/);
+    expect(screen.getByTestId("phase-pill-b").getAttribute("aria-current")).toBe("step");
+  });
+
+  it("keeps the phase of a step opened from the menu that the Open walk skips", () => {
+    render(<PhaseStepper activeStepId="carve" decisions={trackDecisions("adapt")} />);
+    expect(screen.getByTestId("phase-pill-d").getAttribute("aria-current")).toBe("step");
+  });
+});
+
 describe("PhaseStepper compact (narrow viewport)", () => {
   const NARROW_WIDTH = 390;
   const DESKTOP_WIDTH = 1024;
@@ -173,6 +216,25 @@ describe("PhaseStepper compact (narrow viewport)", () => {
     expect(trigger.textContent).toContain(
       `step ${stepNumber} of ${manifest.length}`,
     );
+  });
+
+  it("counts only the steps the Open walk visits in the compact summary", () => {
+    setViewportWidth(NARROW_WIDTH);
+    render(
+      <PhaseStepper
+        activeStepId="open_languages"
+        decisions={{
+          "authoring-track": { id: "authoring-track", value: "adapt", provenance: "asked" },
+        }}
+      />,
+    );
+    const text = screen.getByTestId("phase-stepper-compact").textContent ?? "";
+    expect(text).toContain("Phase A");
+    expect(text).toContain("Review");
+    const match = /step (\d+) of (\d+)/.exec(text);
+    expect(match).not.toBeNull();
+    expect(Number(match![1])).toBe(1);
+    expect(Number(match![2])).toBeLessThan(manifest.length - 10);
   });
 
   it("keeps the desktop pill row at desktop widths", () => {

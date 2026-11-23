@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { useLingui } from "@lingui/react/macro";
+import { useUnappliedText } from "../../hooks/useUnappliedText.ts";
 import { lintHtmlText, type HtmlCodeMarker } from "./htmlCodeLint.ts";
 
 const LINT_DEBOUNCE_MS = 300;
@@ -30,6 +31,13 @@ interface HtmlCodePaneProps {
   initialText: string;
   /** Called with the HTML text when the user clicks Apply. */
   onApply: (html: string) => void;
+  /**
+   * The leave guard's apply on a keyboard opened for update: stage the text and write it into the
+   * file now, true when the file took it. Absent: the leave guard uses `onApply`.
+   */
+  onApplyForLeave?: (html: string) => Promise<boolean>;
+  /** What the leave question calls this view (already translated). */
+  guardLabel?: string;
   /** Whether Apply is currently disabled (e.g., lint errors). */
   applyDisabled?: boolean;
   /**
@@ -39,7 +47,7 @@ interface HtmlCodePaneProps {
   language?: "html" | "markdown";
 }
 
-export function HtmlCodePane({ initialText, onApply, applyDisabled, language = "html" }: HtmlCodePaneProps) {
+export function HtmlCodePane({ initialText, onApply, onApplyForLeave, guardLabel, applyDisabled, language = "html" }: HtmlCodePaneProps) {
   const { t } = useLingui();
   const [text, setText] = useState(initialText);
   const [markers, setMarkers] = useState<readonly HtmlCodeMarker[]>([]);
@@ -49,6 +57,8 @@ export function HtmlCodePane({ initialText, onApply, applyDisabled, language = "
   const monacoRef = useRef<Parameters<OnMount>[1] | null>(null);
   const lintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAppliedRef = useRef<string>(initialText);
+  // The draft as a ref too: the leave guard reads it between a Discard or Apply and the next render.
+  const textRef = useRef<string>(initialText);
 
   const isDirty = text !== lastAppliedRef.current;
 
@@ -100,6 +110,7 @@ export function HtmlCodePane({ initialText, onApply, applyDisabled, language = "
     }
   };
 
+  const [, bump] = useState(0);
   const handleApply = () => {
     // Synchronous lint gate: don't apply with errors
     const next = language === "markdown" ? [] : lintHtmlText(text);
@@ -113,6 +124,37 @@ export function HtmlCodePane({ initialText, onApply, applyDisabled, language = "
     onApply(text);
   };
 
+  // Leave guard (spec 111 FR-046): see stores/unappliedTextStore.ts. The pane's own Apply stages the
+  // text and the editor writes it on a page switch or Continue; leaving with unapplied text writes
+  // it now, so a refused write stays.
+  useUnappliedText({
+    label: guardLabel ?? t({ id: "open.unapplied.view.page", message: "the page code" }),
+    hasUnapplied: () => textRef.current !== lastAppliedRef.current,
+    apply: async () => {
+      const next = language === "markdown" ? [] : lintHtmlText(text);
+      if (next.some((m) => m.severity === "error")) {
+        setMarkers(next);
+        setHasErrors(true);
+        applyMarkersToModel(next);
+        return false;
+      }
+      if (onApplyForLeave === undefined) {
+        handleApply();
+        return true;
+      }
+      const ok = await onApplyForLeave(text);
+      if (ok) {
+        lastAppliedRef.current = text;
+        bump((n) => n + 1);
+      }
+      return ok;
+    },
+    discard: () => {
+      textRef.current = lastAppliedRef.current;
+      setText(lastAppliedRef.current);
+    },
+  });
+
   const errorCount = markers.filter((m) => m.severity === "error").length;
   const warningCount = markers.filter((m) => m.severity === "warning").length;
 
@@ -123,7 +165,10 @@ export function HtmlCodePane({ initialText, onApply, applyDisabled, language = "
           height="100%"
           defaultLanguage={language}
           value={text}
-          onChange={(value) => setText(value ?? "")}
+          onChange={(value) => {
+            textRef.current = value ?? "";
+            setText(value ?? "");
+          }}
           onMount={handleMount}
           options={{
             minimap: { enabled: false },

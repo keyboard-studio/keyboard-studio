@@ -40,6 +40,7 @@ export function useConsistencyOnApply(): void {
   const previous = useRef<{ startId: string | null; snap: Snapshot } | null>(null);
 
   useEffect(() => {
+    // isOpenMode: suggestions are read-only advice, so an older descriptor-less Open draft keeps them.
     if (!isOpenMode(mode) || ir === null) {
       previous.current = null;
       useSuggestedFixesStore.getState().clear();

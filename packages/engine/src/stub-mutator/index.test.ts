@@ -289,3 +289,35 @@ describe("applyIdentityStubMutation: open mode", () => {
     expect(getText(vfs)).toBe(NO_KBV);
   });
 });
+
+describe("applyIdentityStubMutation: &COPYRIGHT on a keyboard opened for update", () => {
+  const rules = "begin Unicode > use(main)\r\ngroup(main) using keys\r\n+ [K_A] > 'a'\r\n";
+  const run = (text: string, copyright: string): string => {
+    const vfs = textVfs({ [`source/${KEYBOARD_ID}.kmn`]: text });
+    applyIdentityStubMutation(vfs, KEYBOARD_ID, { copyright }, { open: true });
+    return getText(vfs);
+  };
+
+  it("rewrites only the store line, keeping the BOM and CRLF", () => {
+    const text = `﻿store(&NAME) 'N'\r\nstore(&COPYRIGHT) 'Old'\r\nstore(&VERSION) '10.0'\r\n${rules}`;
+    expect(run(text, "New")).toBe(text.replace("'Old'", "'New'"));
+    const first = `﻿store(&COPYRIGHT) 'Old'\r\n${rules}`;
+    expect(run(first, "New")).toBe(first.replace("'Old'", "'New'"));
+  });
+
+  it("leaves a line that already holds the text byte-identical", () => {
+    const text = `store(&NAME) 'N'\r\nstore( &COPYRIGHT )   'Same'  c comment\r\n${rules}`;
+    expect(run(text, "Same")).toBe(text);
+  });
+
+  it("inserts the store after &NAME when absent, with the file's line ending", () => {
+    const text = `store(&NAME) 'N'\r\nstore(&VERSION) '10.0'\r\n${rules}`;
+    expect(run(text, "(c) Me")).toBe(`store(&NAME) 'N'\r\nstore(&COPYRIGHT) '(c) Me'\r\nstore(&VERSION) '10.0'\r\n${rules}`);
+  });
+
+  it("Copy mode does not insert it", () => {
+    const vfs = textVfs({ [`source/${KEYBOARD_ID}.kmn`]: `store(&NAME) 'N'\n${rules}` });
+    applyIdentityStubMutation(vfs, KEYBOARD_ID, { copyright: "x" });
+    expect(getText(vfs)).toBe(`store(&NAME) 'N'\n${rules}`);
+  });
+});

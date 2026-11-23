@@ -82,3 +82,34 @@ describe("KmnCodePane on Open", () => {
     expect(vfsText("source/kb.kmn")).toBe(TEXT);
   });
 });
+
+describe("KmnCodePane on Open, physical keys locked (a basic keyboard)", () => {
+  it("says only touch behaviour can change", () => {
+    render(<KmnCodePane physicalLocked />);
+    expect(screen.getByTestId("kmn-code-physical-locked").textContent).toContain("platform('touch')");
+  });
+
+  it("refuses an edit to a physical key and leaves the file alone", async () => {
+    render(<KmnCodePane physicalLocked />);
+    typeInto(TEXT.replace("+ [K_A] > 'a'", "+ [K_A] > 'b'"));
+    fireEvent.click(screen.getByTestId("kmn-code-apply"));
+    expect((await screen.findByTestId("kmn-code-apply-error")).textContent).toContain("Not applied");
+    expect(vfsText("source/kb.kmn")).toBe(TEXT);
+  });
+
+  it("applies touch-only rules: a T_ key, a U_ key and a platform('touch') rule", () => {
+    render(<KmnCodePane physicalLocked />);
+    const edited = `${TEXT}+ [T_X] > 'x'\n+ [U_0101] > U+0101\nplatform('touch') + [K_B] > 'b'\n`;
+    typeInto(edited);
+    fireEvent.click(screen.getByTestId("kmn-code-apply"));
+    expect(vfsText("source/kb.kmn")).toBe(edited);
+  });
+
+  it("still applies a comment edit", () => {
+    render(<KmnCodePane physicalLocked />);
+    const edited = TEXT.replace("author comment", "author comment, edited");
+    typeInto(edited);
+    fireEvent.click(screen.getByTestId("kmn-code-apply"));
+    expect(vfsText("source/kb.kmn")).toBe(edited);
+  });
+});

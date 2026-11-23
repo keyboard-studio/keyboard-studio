@@ -83,6 +83,8 @@ import type {
 } from "@keyboard-studio/contracts";
 import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useCommitAssignments } from "./useCommitAssignments.ts";
+import { useSessionAssignments } from "../../hooks/useSessionAssignments.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 import {
@@ -127,6 +129,7 @@ import {
 } from "../../hooks/usePlacementInventory.ts";
 import { useLoanwordSet } from "../../hooks/useLoanwordSet.ts";
 import { useRemovalWarning } from "../../hooks/useRemovalWarning.ts";
+import { useRemovalActions } from "../carve/useRemovalActions.ts";
 import { RemovalWarningNotice } from "../../components/RemovalWarningNotice.tsx";
 import type { PlacementSeedEntry } from "../../survey/placementSeeds.ts";
 import {
@@ -214,7 +217,6 @@ import {
 } from "./parts/RemovableChipRow.tsx";
 import {
   unimplementedDesktopChars,
-  selectDesktopAssignments,
   formatUncoveredCharsList,
 } from "../../lib/unimplementedInventory.ts";
 import { subtractMarked } from "../../lib/accountedForGate.ts";
@@ -1337,6 +1339,17 @@ function MethodChooser({
 // MechanismGallery — main component
 // ---------------------------------------------------------------------------
 
+/** The editing region's fieldset: no chrome of its own, laid out like the pane around it. */
+const EDIT_REGION_STYLE: CSSProperties = {
+  border: 0,
+  margin: 0,
+  padding: 0,
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: 16,
+};
+
 export interface MechanismGalleryProps {
   selectedStartKeyboard: StartKeyboard | null;
   onComplete?: () => void;
@@ -1348,6 +1361,13 @@ export interface MechanismGalleryProps {
    * No kbgen data => no row; gallery behaves exactly as today.
    */
   placementMap?: PlacementMap;
+  /**
+   * The physical keys may be looked at but not changed (a basic keyboard
+   * opened for update, lib/basicKeyboard.ts). The character strip and the
+   * preview stay usable; every editing control is disabled, and Continue is
+   * always offered and calls `onComplete` without the unplaced-letters gate.
+   */
+  readOnly?: boolean;
 }
 
 export function MechanismGallery({
@@ -1355,6 +1375,7 @@ export function MechanismGallery({
   onComplete,
   onBack,
   placementMap,
+  readOnly = false,
 }: MechanismGalleryProps) {
   const { t, i18n } = useLingui();
   // Narrow-viewport branch (mobile adaptation, Phase 4): the
@@ -1373,7 +1394,7 @@ export function MechanismGallery({
   const unlockDesktop = useWorkingCopyStore((s) => s.unlockDesktop);
   const markStale = useWorkingCopyStore((s) => s.markStale);
   const touchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
-  const recordAssignments = useWorkingCopyStore((s) => s.recordAssignments);
+  const recordAssignments = useCommitAssignments();
   // unflagCharForSequence is reused here purely for its assignment-stripping
   // side effect (it removes a char's whole recorded multi_char_sequence
   // assignment regardless of sequenceFlaggedChars membership — see the store
@@ -1388,7 +1409,6 @@ export function MechanismGallery({
   // Loanword-tier letters the author added: needed, but placed after the
   // alphabet's own letters (survey/collation.ts loanwordsLast).
   const loanwordSet = useLoanwordSet();
-  const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const axes = useWorkingCopyStore(
     useShallow((s) => s.session.axes as Partial<DiscoveryAxisVector>),
   );
@@ -1425,7 +1445,8 @@ export function MechanismGallery({
   // does not, on its own, subscribe this component to deletedItemIds.
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const isItemDeleted = useWorkingCopyStore((s) => s.isItemDeleted);
-  const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
+  // Open: a removal is written into the files when made (useRemovalActions); Copy keeps the overlay action.
+  const { cascadeDelete } = useRemovalActions();
 
   // One-time intro splash — read the seen flag on mount; mark it on "Get started".
   const mechIntroSeen = useWorkingCopyStore(
@@ -1489,10 +1510,7 @@ export function MechanismGallery({
   // This session's physical (desktop) assignments — feeds baseProducedSet
   // below (session-aware coverage) and mechanismAssignments further down.
   // Declared once, early, so both can share it.
-  const sessionAssignments = useMemo(
-    () => selectDesktopAssignments(phaseResults),
-    [phaseResults],
-  );
+  const sessionAssignments = useSessionAssignments();
 
   // BASE-DIRECT signal (a) of the 3-signal producer badge (charMechanisms.ts's
   // getProducerBadge) — the PRISTINE base-only produced set: no session
@@ -1533,8 +1551,8 @@ export function MechanismGallery({
   // Perf dedup (km-synthesis): this is the SAME round-trip useInventoryDiff()
   // already computes internally (identical startIr/sessionAssignments/
   // getPatternByIdSync inputs — sessionAssignments here is
-  // selectDesktopAssignments(phaseResults), same as useInventoryDiff.ts's own
-  // derivation) to produce its pre-augment set — reuse that hook's
+  // useSessionAssignments(), the selectSessionAssignments hook, same as
+  // useInventoryDiff.ts's own derivation) to produce its pre-augment set — reuse that hook's
   // `rawProducedSet` rather than re-running `buildSessionProducedSet` a
   // second time per render.
   const baseProducedSet = sharedRawProducedSet;
@@ -1572,8 +1590,9 @@ export function MechanismGallery({
     return placementWalkList(inventoryLettersToAdd, placementInventory, loanwordSet);
   }, [inventoryLettersToAdd, placementInventory, loanwordSet]);
 
-  // Read Phase C assignments directly (not the merged session.assignments view)
-  // so multiple methods per character are preserved.
+  // Read the session's assignments (selectSessionAssignments: Phase C on Copy,
+  // the applied list on Open), not the merged session.assignments view, so
+  // multiple methods per character are preserved.
   // (sessionAssignments itself is declared earlier, alongside baseProducedSet
   // above, so both can share the one derivation.)
 
@@ -3237,6 +3256,8 @@ export function MechanismGallery({
   // below); it is cleared on the next character change, not by a timer (D3 —
   // no new debounce/timer is introduced here).
   const handleUnlock = useCallback(() => {
+    // Nothing on a read-only layout may unlock it (or flag the touch layout).
+    if (readOnly) return;
     unlockDesktop();
     if (touchLayoutJson !== null) {
       markStale(TOUCH_STEP_ID);
@@ -3255,7 +3276,7 @@ export function MechanismGallery({
         }),
       );
     }
-  }, [unlockDesktop, markStale, touchLayoutJson, t]);
+  }, [readOnly, unlockDesktop, markStale, touchLayoutJson, t]);
 
   // ---------------------------------------------------------------------------
   // Shared styles
@@ -3300,7 +3321,8 @@ export function MechanismGallery({
   // Intro splash — first entry to the desktop mechanism gallery only
   // ---------------------------------------------------------------------------
 
-  if (showIntro) {
+  // A read-only layout skips the splash: it introduces building, which is not on offer.
+  if (showIntro && !readOnly) {
     return (
       <GalleryIntroSplash
         eyebrow={t({
@@ -3385,7 +3407,17 @@ export function MechanismGallery({
   // incomplete gallery where the author wants to move on without editing.
   const continueLabel = t({ id: "editor.assignLoop.doneButton", message: "Continue" });
   const forwardButton: ForwardButtonSpec | null =
-    // TOP PRIORITY (bug fix): once every inventory character has count >= 1
+    // A read-only layout cannot be completed by placing letters, so Continue
+    // is always offered and moves on as it is.
+    readOnly && onComplete !== undefined
+      ? {
+          label: continueLabel,
+          onClick: onComplete,
+          testId: "mechanisms-continue",
+          disabled: false,
+          style: forwardBtnStyle,
+        }
+      : // TOP PRIORITY (bug fix): once every inventory character has count >= 1
     // (allCovered, the SAME badge computation CharScrollStrip/currentCharBadge
     // use) OR every character is implemented-or-marked (unaccountedChars —
     // mark-aware, see below), the "Continue" button is ALWAYS rendered —
@@ -3552,7 +3584,7 @@ export function MechanismGallery({
             ...(forwardButton.ariaLabel !== undefined
               ? { ariaLabel: forwardButton.ariaLabel }
               : {}),
-            ...(unaccountedChars.length > 0
+            ...(unaccountedChars.length > 0 && !readOnly
               ? { ariaDescribedBy: unaccountedHintId }
               : {}),
           },
@@ -3595,7 +3627,24 @@ export function MechanismGallery({
           blocking role="alert" banner+button with a quiet, always-visible
           note while locked — role="status" (not "alert"), same convention as
           the coverage line below, so it never interrupts. */}
-      {locked && (
+      {readOnly && (
+        <p
+          role="status"
+          data-testid="mechanisms-read-only"
+          style={{
+            margin: 0,
+            fontSize: 13,
+            color: TEXT_DIM,
+            fontFamily: FONT,
+          }}
+        >
+          <Trans id="editor.assignLoop.basicReadOnlyNote">
+            This keyboard&rsquo;s physical keys match the Windows layout, so they
+            can&rsquo;t be changed here. You can look through them and continue.
+          </Trans>
+        </p>
+      )}
+      {locked && !readOnly && (
         <p
           role="status"
           aria-live="polite"
@@ -3664,7 +3713,7 @@ export function MechanismGallery({
               same re-render that recomputes unaccountedChars. Its id is
               referenced by the footer forward button's aria-describedby
               (spec 081) only while this hint is mounted. */}
-        {unaccountedChars.length > 0 && (
+        {unaccountedChars.length > 0 && !readOnly && (
           <p
             id={unaccountedHintId}
             role="status"
@@ -3734,6 +3783,13 @@ export function MechanismGallery({
           </div>
         )}
 
+        {/* Everything below edits the layout: disabled as a whole when read-only,
+              so the controls stay visible but cannot change anything. */}
+        <fieldset
+          disabled={readOnly}
+          data-testid="mechanisms-edit-region"
+          style={EDIT_REGION_STYLE}
+        >
         {/* Per-char UI */}
         {currentChar !== null && (
           <>
@@ -4603,6 +4659,7 @@ export function MechanismGallery({
             }))}
           />
         )}
+        </fieldset>
       </>
 
       {/* Load error for patterns (non-blocking; preview won't show transform) */}

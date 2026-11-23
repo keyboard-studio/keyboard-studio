@@ -35,6 +35,7 @@ import type {
   GuardSpecification,
   HelpDocsAnswers,
   KeyboardIR,
+  TouchLayoutIR,
   KeyIdentityDecision,
   LintFinding,
   RemovalCapability,
@@ -61,16 +62,12 @@ import {
   deriveRemapPosture,
   renameTouchKey,
   deriveFacets,
-  attributeLayer,
   applyLayoutOp,
   clearKeyLive,
   invertEffect,
   applyIRChanges,
   invertChanges,
-  parseKpsLanguages,
-  parseKmn,
-  isKeyboardSource,
-  NOT_A_KEYBOARD_SOURCE_MESSAGE,
+  parseTouchLayout,
 } from "@keyboard-studio/engine";
 import type { KmnEditEffect } from "@keyboard-studio/engine";
 import type { IRChange } from "@keyboard-studio/contracts";
@@ -82,11 +79,18 @@ import type {
   StartDocCssText,
 } from "@keyboard-studio/engine";
 import { readVfsText } from "../lib/vfsText.ts";
+import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
+import { modelsFromKmnText } from "../lib/modelsFromKmnText.ts";
+import { isLiveOpen, isOpenedWithDescriptor } from "../lib/openMode.ts";
+import { languagesFromKps } from "../lib/kpsLanguages.ts";
+import { clearOpenSession } from "./openUndoStore.ts";
 import type { PreviewProjection } from "../lib/previewProjection.ts";
 import type { BaseLayoutId as LdmlBaseLayoutChoice } from "../lib/referenceBaseLayouts.ts";
 import type { DeadkeyOperation, DeadkeyOverlay } from "../lib/deadkeyOps.ts";
 import { applyDeadkeyOp } from "../lib/deadkeyOps.ts";
 import { inverseDeadkeyOp } from "../lib/deadkeyInverse.ts";
+import type { CommitKmnEditResult, KmnEditInput, KmnEditRefusal } from "../lib/kmnEditTypes.ts";
+import { commitKmnEditOnOpen, commitLayoutDeadkeyOpOnOpen, slotIsReadOnly } from "../lib/layoutOpenCommit.ts";
 import type {
   ContextVariantsResult,
   ToleranceClassification,
@@ -271,18 +275,7 @@ export type UndoEntry =
   // is `applyIRChanges(ir, inverse)` and never a rebuild.
   | { k: "c"; seq: number; inverse: IRChange[] };
 
-/** A Layout-tab edit as the caller states it; the store assigns `seq` and `at` at commit. */
-export type KmnEditInput = DistributiveOmit<KmnEdit, "seq" | "at">;
-
-/** Why `commitKmnEdit` wrote nothing (FR-025). */
-export type KmnEditRefusal =
-  | "no-working-copy"
-  | "locked"
-  | "not-compiled"
-  | "read-only"
-  | "refused";
-
-export type CommitKmnEditResult = { ok: true; seqs: number[] } | { ok: false; reason: KmnEditRefusal };
+export type { KmnEditInput, KmnEditRefusal, CommitKmnEditResult };
 
 // ---------------------------------------------------------------------------
 // Key edit overlay (spec 063) — the ordered op log for the touch key grid,
@@ -873,6 +866,15 @@ export interface WorkingCopyState {
    */
   customCss: string | null;
   /**
+   * The icon step's edited icon as base64 `.ico` bytes (#2927). Null =
+   * untouched (the start keyboard's own icon file, if any, ships as-is).
+   * Projected into the VFS by projectWorkingCopyVfs step 4c, so the OSK
+   * preview and the zip carry the edited icon. Copy only: on Open the
+   * icon is written to its file when applied (lib/iconOpenCommit) and
+   * this field stays null.
+   */
+  iconIcoBase64: string | null;
+  /**
    * The Documentation step's authored overrides (specs/html-editor), one
    * nullable string per editable doc member, mirroring `customCss`:
    * null = untouched (the generated/carried text ships as-is);
@@ -952,7 +954,7 @@ export interface WorkingCopyState {
    * assignment walk) or `"key"` (the key-grid editor). A view toggle, not a
    * fork (FR-036b): switching modes never clears the other mode's
    * in-progress state (`touchDraft` or `keyEditOverlay`). Defaults to
-   * `"character"` per FR-036; reset on reset and on a new instantiation
+   * `"key"` (Manage Layout leads; the character walk is the secondary view); reset on reset and on a new instantiation
    * (each fresh working copy re-evaluates the propose-on-entry condition,
    * T073, from this same default).
    */
@@ -1200,6 +1202,8 @@ export interface WorkingCopyState {
   setTouchLayoutJson: (json: string | null) => void;
   /** Record the CSS step's result (null = untouched, "" = cleared). */
   setCustomCss: (css: string | null) => void;
+  /** Record the icon step's edited icon (base64 `.ico` bytes; null = untouched). */
+  setIconIco: (base64: string | null) => void;
   /** Record the Documentation step's authored welcome.htm (null = untouched, "" = cleared). */
   setAuthoredWelcomeHtm: (text: string | null) => void;
   /** Record the Documentation step's authored readme.htm (null = untouched, "" = cleared). */
@@ -1294,7 +1298,10 @@ export interface WorkingCopyState {
    * together (a changed combination is a remove plus an insert) are one confirm and one undo step,
    * and none is applied when any is refused.
    */
-  commitLayoutDeadkeyOp: (op: DeadkeyOperation | readonly DeadkeyOperation[]) => CommitKmnEditResult;
+  commitLayoutDeadkeyOp: (
+    op: DeadkeyOperation | readonly DeadkeyOperation[],
+    options?: { onAppliedLater?: () => void },
+  ) => CommitKmnEditResult;
   /**
    * Commit a Layout-tab edit (spec 117, research R12): applies `op` (and the accepted case
    * `partner`, same confirm) to the live IR through `applyMutatePatch` / `LAYOUT_WRITES`, then
@@ -1317,6 +1324,11 @@ export interface WorkingCopyState {
        * recorded entry is unchanged and the projection places it.
        */
       skipLiveMisses?: boolean;
+      /**
+       * Open only: runs once a change that came back `pending` (the author was asked to agree to a
+       * reformat) has been written. Never runs on a decline or a failure, nor for a change applied now.
+       */
+      onAppliedLater?: () => void;
     },
   ) => CommitKmnEditResult;
   /**
@@ -1452,14 +1464,27 @@ export interface WorkingCopyState {
 
   /**
    * Open mode (spec 111 FR-009): replace one starting-point file with
-   * author-edited text. The VFS text and, for a `.kmn`, the re-parsed `startIr`
-   * are written in ONE update so the VFS and `startIr` never disagree. A `.kmn`
-   * that does not parse changes nothing and returns `{ ok: false }` (FR-015).
-   * Replay over the new `startIr` is the caller's next step
-   * (`replaceStartingPointAndReplay`); this action never imports the decisions
-   * layer.
+   * author-edited text; the one-file case of `replaceStartingPointFiles` (a
+   * `.kmn` that does not parse changes nothing and returns `{ ok: false }`,
+   * FR-015). On Open the author's code views go through `applyOpenChange`
+   * (kind `files`) instead, so the edit is undoable; this action is the
+   * store-level write beneath it and for non-code editors.
    */
   replaceStartingPointFromText: (path: string, text: string) => ReplaceStartingPointResult;
+
+  /**
+   * Open mode (spec 111, "live files"): write several starting-point files in
+   * ONE update (`null` deletes a file). A changed `.kmn` is re-parsed (and
+   * pattern-recognized, like instantiation) into `startIr` AND `ir`, and
+   * `removalCapabilities` is recomputed from it; `touchLayoutJson` follows a
+   * changed touch layout. Node ids are positional, so every overlay or session
+   * set keyed by one is cleared (see the body for what is cleared and what is
+   * deliberately kept). A `.kmn` that is not a keyboard changes nothing and
+   * returns `{ ok: false }`. Only `lib/openApply.ts` calls this.
+   */
+  replaceStartingPointFiles: (
+    files: Readonly<Record<string, string | Uint8Array | null>>,
+  ) => ReplaceStartingPointResult;
 
   /**
    * Apply an identity patch (language name, BCP47 tag, display name) over
@@ -1720,7 +1745,7 @@ function openLanguagesFromVfs(
   if (seed?.languages !== undefined) return {};
   const kps = readVfsText(vfs, `source/${keyboardId}.kps`);
   if (kps === undefined) return {};
-  const languages = parseKpsLanguages(kps).map((l) => ({ tag: l.tag, name: l.name }));
+  const languages = languagesFromKps(kps);
   return languages.length > 0 ? { languages } : {};
 }
 
@@ -1817,6 +1842,7 @@ function freshInstantiationTail() {
     sequenceFlaggedChars: [],
     touchLayoutJson: null,
     customCss: null,
+    iconIcoBase64: null,
     authoredWelcomeHtm: null,
     authoredReadmeHtm: null,
     authoredReadmeMd: null,
@@ -1829,7 +1855,7 @@ function freshInstantiationTail() {
     deadkeyOverlay: { ops: [] },
     // Annotated, not inferred: without it the literal widens to string and
     // the spread no longer matches TouchEditorMode ("character" | "key" | "code").
-    touchEditorMode: "character" as TouchEditorMode,
+    touchEditorMode: "key" as TouchEditorMode,
     staleSteps: new Set<string>(),
     // A new working copy has no default-fill provenance yet (#890) — the
     // pattern-loading effect re-runs defaultFillAxes and republishes it.
@@ -1918,6 +1944,7 @@ export type WorkingCopyData = Omit<
   // actions are excluded from the data snapshot
   | "setIR"
   | "replaceStartingPointFromText"
+  | "replaceStartingPointFiles"
   | "setWorkingIR"
   | "clearIR"
   | "deleteNode"
@@ -1947,6 +1974,7 @@ export type WorkingCopyData = Omit<
   | "unlockDesktop"
   | "setTouchLayoutJson"
   | "setCustomCss"
+  | "setIconIco"
   | "setAuthoredWelcomeHtm"
   | "setAuthoredReadmeHtm"
   | "setAuthoredReadmeMd"
@@ -2059,17 +2087,18 @@ const INITIAL_STATE: WorkingCopyData = {
   sequenceFlaggedChars: [],
   touchLayoutJson: null,
   customCss: null,
+  iconIcoBase64: null,
   authoredWelcomeHtm: null,
   authoredReadmeHtm: null,
   authoredReadmeMd: null,
   authoredHelpPhp: null,
   touchDraft: null,
   galleryIntrosSeen: { mechanism: false, touch: false },
-  // key edit overlay + touch editor mode (spec 063) — empty log, character
-  // walk default (FR-036)
+  // key edit overlay + touch editor mode (spec 063) — empty log; Manage
+  // Layout (the key grid) is the default view, the character walk secondary
   keyEditOverlay: { ops: [] },
   deadkeyOverlay: { ops: [] },
-  touchEditorMode: "character",
+  touchEditorMode: "key",
   // staleness slice (US3) — default empty ("fresh", FR-019)
   staleSteps: new Set<string>(),
   // validator findings slice (US5, T034) — default empty (structural proxy)
@@ -2135,6 +2164,16 @@ export function registerKmnEditsFold(fold: KmnEditsFold | null): void {
 const logHasCodeEntry = (entries: readonly KmnEdit[]): boolean => entries.some((e) => e.op === "code-apply");
 
 /**
+ * Whether a commit re-derives the live IR through the decision fold. Never on a keyboard opened for
+ * update: there decisions are a record only (spec 111 FR-042) and the fold would replay them over
+ * the files, so the incremental path is the only one. The Code tab records no `code-apply` entry on
+ * Open (it writes the files through the apply seam), so this guard only matters for a log carried in
+ * from elsewhere.
+ */
+const shouldRederive = (s: WorkingCopyState, entries: readonly KmnEdit[]): boolean =>
+  logHasCodeEntry(entries) && !isLiveOpen(s);
+
+/**
  * One ordering rule for the live model (spec 117 R15, owner ruling 2026-11-13): whenever the log
  * holds a Code-tab entry, the live IR is the decision fold with `replayKmnEdits(base, entries)` as its `kmn-edits` step -- the build's order
  * (Layout-tab entries, then Code-tab entries) and supersede rule -- not an incremental patch, so a
@@ -2167,14 +2206,6 @@ function markUndoStale(stack: readonly UndoEntry[]): UndoEntry[] {
 
 const NO_EFFECT: KmnEditEffect = { groupNodeId: "", inserted: [], removed: [] };
 
-/** True when the static attribution says the target slot cannot be edited (FR-025). */
-function slotIsReadOnly(ir: KeyboardIR, entry: KmnEdit): boolean {
-  if (entry.op !== "set-key" && entry.op !== "clear-key") return false;
-  const cell = attributeLayer(ir, entry.layer, [entry.vkey])[0];
-  if (cell === undefined || cell.frame) return true;
-  return cell.plain !== null && !cell.plain.editable;
-}
-
 /**
  * A Code-tab entry (spec 117 US8). `code-apply` applies its changes to the live IR through
  * `applyMutatePatch(..., CODE_WRITES)` and pushes undo kind `c`; a change whose anchor is gone
@@ -2195,6 +2226,8 @@ function commitCodeEntry(
     return { ok: true, seqs: [seq] };
   }
   if (entry.op !== "code-apply" || s.ir === null) return { ok: false, reason: "refused" };
+  // On Open the Code tab applies through the apply seam, never as a `code-apply` entry.
+  if (isLiveOpen(s)) return { ok: false, reason: "refused" };
   let ir: KeyboardIR;
   let applied: typeof entry.changes = entry.changes;
   try {
@@ -2218,7 +2251,9 @@ function commitKmnEditImpl(
   get: StoreGet,
   set: StoreSet,
   op: KmnEditInput,
-  options: { partner?: KmnEditInput; extra?: readonly KmnEditInput[]; skipLiveMisses?: boolean } | undefined,
+  options:
+    | { partner?: KmnEditInput; extra?: readonly KmnEditInput[]; skipLiveMisses?: boolean; onAppliedLater?: () => void }
+    | undefined,
 ): CommitKmnEditResult {
   const s = get();
   if (s.ir === null || s.startIr === null) return { ok: false, reason: "no-working-copy" };
@@ -2230,16 +2265,33 @@ function commitKmnEditImpl(
     return { ok: false, reason: "not-compiled" };
   }
 
+  const inputs = [op, ...(options?.partner === undefined ? [] : [options.partner]), ...(options?.extra ?? [])];
+  // On a keyboard opened for update the edit goes into the file through the apply seam (spec 111
+  // FR-041); the entry is only the record, made once it is in the file.
+  if (isLiveOpen(s)) {
+    return commitKmnEditOnOpen({
+      startIr: () => get().startIr,
+      inputs,
+      ...(options?.onAppliedLater !== undefined ? { onAppliedLater: options.onAppliedLater } : {}),
+      record: (applied) => {
+        const log = recordedKmnEdits();
+        let next = log.reduce((max, e) => Math.max(max, e.seq), 0);
+        const at = Date.now();
+        const added = applied.map((input) => ({ ...input, seq: ++next, at }) as KmnEdit);
+        recordKmnEdits([...log, ...added]);
+        return added.map((e) => e.seq);
+      },
+    });
+  }
   const earlier = recordedKmnEdits();
   let seq = earlier.reduce((max, e) => Math.max(max, e.seq), 0);
   const at = Date.now();
-  const inputs = [op, ...(options?.partner === undefined ? [] : [options.partner]), ...(options?.extra ?? [])];
   const added: KmnEdit[] = [];
   const effects: KmnEditEffect[] = [];
   let ir = s.ir;
   // A log with a Code-tab entry re-derives the live IR (deriveLiveIr); the entries are then only
   // checked here (read-only slot), and replay refuses what an op refuses.
-  const rederive = logHasCodeEntry(earlier);
+  const rederive = shouldRederive(s, earlier);
   for (const input of inputs) {
     const entry = { ...input, seq: ++seq, at } as KmnEdit;
     if (slotIsReadOnly(ir, entry)) return { ok: false, reason: "read-only" };
@@ -2296,6 +2348,7 @@ function commitLayoutDeadkeyOpImpl(
   get: StoreGet,
   set: StoreSet,
   given: DeadkeyOperation | readonly DeadkeyOperation[],
+  options?: { onAppliedLater?: () => void },
 ): CommitKmnEditResult {
   const list: readonly DeadkeyOperation[] = Array.isArray(given) ? given : [given as DeadkeyOperation];
   const s = get();
@@ -2303,14 +2356,31 @@ function commitLayoutDeadkeyOpImpl(
   if (s.desktopLocked) return { ok: false, reason: "locked" };
   // A deadkey with an empty combination table does not compile (an empty any() store), so pair ops
   // that fill such a table are the way out of a not-compiled state and must not be refused by it.
+  // On Open the ops run on the file's parse, so that is the IR to look at.
+  const gateIr = isLiveOpen(s) && s.startIr !== null ? s.startIr : s.ir;
   const fillsEmptyTable = list.every((op) => {
     if (op.kind !== "add-pair" && op.kind !== "insert-pair") return false;
-    const info = listDeadkeys(s.ir!).find((d) => d.id === op.id);
-    const bases = info?.baseStore == null ? undefined : s.ir!.stores.find((st) => st.name === info.baseStore);
+    const info = listDeadkeys(gateIr).find((d) => d.id === op.id);
+    const bases = info?.baseStore == null ? undefined : gateIr.stores.find((st) => st.name === info.baseStore);
     return bases !== undefined && bases.items.length === 0;
   });
   if (!fillsEmptyTable && useRulesDemoArtifactStore.getState().artifact.status !== "ready") {
     return { ok: false, reason: "not-compiled" };
+  }
+  // On a keyboard opened for update the ops go into the file through the apply seam (spec 111
+  // FR-041); the op log and the `deadkeys-defined` decision are only the record, made once they
+  // are in the file. No undo entry here: the footer's Open undo takes the step back.
+  if (isLiveOpen(s)) {
+    return commitLayoutDeadkeyOpOnOpen({
+      startIr: () => get().startIr,
+      ops: list,
+      ...(options?.onAppliedLater !== undefined ? { onAppliedLater: options.onAppliedLater } : {}),
+      record: (applied) => {
+        const ops = [...get().deadkeyOverlay.ops, ...applied];
+        set({ deadkeyOverlay: { ops } });
+        recordDeadkeysDefined(ops);
+      },
+    });
   }
   let ir: KeyboardIR = s.ir;
   const inverses: DeadkeyOperation[] = [];
@@ -2330,7 +2400,7 @@ function commitLayoutDeadkeyOpImpl(
   // Code-tab entry in the log the live IR is re-derived through the same fold (the incremental ops
   // above only supplied the inverses and the refusal check). The decision is recorded first because
   // the fold reads it, and put back if the fold cannot be made.
-  const rederive = logHasCodeEntry(recordedKmnEdits());
+  const rederive = shouldRederive(s, recordedKmnEdits());
   if (rederive) {
     const prior = s.deadkeyOverlay.ops;
     recordDeadkeysDefined(ops);
@@ -2575,7 +2645,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   },
 
   commitKmnEdit: (op, options) => commitKmnEditImpl(get, set, op, options),
-  commitLayoutDeadkeyOp: (op) => commitLayoutDeadkeyOpImpl(get, set, op),
+  commitLayoutDeadkeyOp: (op, options) => commitLayoutDeadkeyOpImpl(get, set, op, options),
 
   undoKmnEdit: () => undoKmnEditImpl(get, set),
 
@@ -2651,21 +2721,38 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // must also reset keyEditOverlay to an empty log alongside wiping
   // undoStack — otherwise a committed key edit would be left applied with no
   // remaining way to undo it.
+  //
+  // Open (spec 111 live files) narrows that: a key edit or deadkey op there is
+  // an edit the author made, not a carve to discard, and "keep every rule"
+  // must not erase it. So on Open the two overlays and their 'k'/'kb' undo
+  // entries survive (the invariant above still holds: an op and its undo
+  // entry stay together).
   keepAll: () =>
-    set((s) => ({
-      carveSuggestion:
-        s.carveSuggestion === null
-          ? null
-          : { ...s.carveSuggestion, derived: [], touched: true },
-      deletedNodeIds: new Set(),
-      deletedItemIds: new Set(),
-      deletedTouchKeyIds: new Set(),
-      carveChars: new Set(),
-      undoStack: [],
-      keyEditOverlay: { ops: [] },
-      carveTouchKeepInert: [],
-      deadkeyOverlay: { ops: [] },
-    })),
+    set((s) => {
+      const open = isOpenedWithDescriptor(
+        s.instantiationMode,
+        s.startVfs,
+        s.startKeyboard?.id ?? "",
+      );
+      return {
+        carveSuggestion:
+          s.carveSuggestion === null
+            ? null
+            : { ...s.carveSuggestion, derived: [], touched: true },
+        deletedNodeIds: new Set(),
+        deletedItemIds: new Set(),
+        deletedTouchKeyIds: new Set(),
+        carveChars: new Set(),
+        carveTouchKeepInert: [],
+        ...(open
+          ? { undoStack: s.undoStack.filter((e) => e.k === "k" || e.k === "kb") }
+          : {
+              undoStack: [],
+              keyEditOverlay: { ops: [] },
+              deadkeyOverlay: { ops: [] },
+            }),
+      };
+    }),
 
   restoreAll: () => get().keepAll(),
 
@@ -2805,37 +2892,132 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     }
   },
 
-  replaceStartingPointFromText: (path, text) => {
-    const { startVfs, startKeyboard } = get();
+  // One file is the one-entry case of `replaceStartingPointFiles`.
+  replaceStartingPointFromText: (path, text) => get().replaceStartingPointFiles({ [path]: text }),
+
+  replaceStartingPointFiles: (files) => {
+    const { startVfs, startKeyboard, startIr: priorStartIr } = get();
     if (startVfs === null || startKeyboard === null) {
       return { ok: false, error: "No keyboard is open." };
     }
+    const kmnPath = `source/${startKeyboard.id}.kmn`;
+    const kmnText = files[kmnPath];
     let nextIr: KeyboardIR | null = null;
-    if (path.endsWith(".kmn")) {
-      let parsedIr: KeyboardIR;
-      try {
-        parsedIr = parseKmn(text, startKeyboard.id).ir;
-      } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : String(err) };
-      }
-      // parse() keeps unreadable text as opaque fragments, so text that is not
-      // a keyboard at all comes back as an empty IR instead of throwing.
-      if (!isKeyboardSource(parsedIr)) {
-        return { ok: false, error: NOT_A_KEYBOARD_SOURCE_MESSAGE };
-      }
-      nextIr = deriveFacets(parsedIr);
+    let nextCapabilities: Map<string, RemovalCapability> | null = null;
+    if (typeof kmnText === "string") {
+      const touchPath = findTouchLayoutPath(startVfs);
+      const models = modelsFromKmnText(
+        kmnText,
+        startKeyboard.id,
+        // A binary entry can never be the touch layout (text JSON); a
+        // binary value for that path reads as "no touch change".
+        touchPath === undefined
+          ? undefined
+          : files[touchPath] instanceof Uint8Array
+            ? undefined
+            : files[touchPath],
+        priorStartIr?.touchLayout,
+      );
+      if (!models.ok) return { ok: false, error: models.error };
+      nextCapabilities = models.capabilities;
+      nextIr = models.ir;
     }
-    // A fresh VFS object so subscribers see the change; the file text is the
-    // author's own, verbatim.
+    // A touch-only change leaves the `.kmn` alone but the layouts the IRs carry
+    // must follow the file. On Open this replaces `ir.touchLayout` with the file's
+    // own layout by design (the file is the truth). No facet derives from
+    // `touchLayout`, so facets and capabilities need no recompute.
+    let touchOnly: { layout: TouchLayoutIR | undefined } | null = null;
+    if (nextIr === null) {
+      const touchPath = findTouchLayoutPath(startVfs);
+      const touchChange =
+        touchPath === undefined
+          ? undefined
+          : files[touchPath] instanceof Uint8Array
+            ? undefined
+            : files[touchPath];
+      if (touchChange !== undefined) {
+        let layout: TouchLayoutIR | undefined;
+        if (touchChange !== null) {
+          try {
+            layout = parseTouchLayout(touchChange);
+          } catch {
+            layout = undefined;
+          }
+        }
+        touchOnly = { layout };
+      }
+    }
+    const withLayout = (ir: KeyboardIR, layout: TouchLayoutIR | undefined): KeyboardIR => {
+      const { touchLayout: _drop, ...rest } = ir;
+      void _drop;
+      return layout === undefined ? (rest as KeyboardIR) : { ...rest, touchLayout: layout };
+    };
+    // A fresh VFS object so subscribers see the change; file text is verbatim.
     const nextVfs = createVirtualFS(startVfs.entries());
-    nextVfs.set(path, text, false);
-    set({
+    let nextTouchJson: string | undefined;
+    for (const [path, content] of Object.entries(files)) {
+      if (content === null) nextVfs.delete(path);
+      // A binary entry (an applied `.ico`, #2927) is stored as bytes;
+      // text stays text. The `.kmn`/touch/`.kps` derivations above only
+      // read string entries, so a binary value passes through untouched.
+      else nextVfs.set(path, content, typeof content !== "string");
+      if (path.endsWith(".keyman-touch-layout") && typeof content === "string") nextTouchJson = content;
+    }
+    // Node ids are positional: a re-parse shifts them, so anything keyed by a
+    // node id is stale the moment `startIr` changes.
+    //   Cleared: deletedNodeIds, deletedItemIds (item/slot ids), carveChars
+    //   (replays a carve over the new text), undoStack's id-bearing entries
+    //   (n / i / t / batch), carveSuggestion.derived, the guard-intent
+    //   `keptGuardRuleIds` and `narrowUndoStack` (rule ids), and
+    //   `contextToleranceOverlay` (batches anchor on rule ids; its generated
+    //   rules were replayed over the old ids and would land beside the wrong
+    //   rules).
+    //   Kept: key-edit and deadkey overlays (addressed by touch key / deadkey
+    //   name, not node id), deletedTouchKeyIds and carveTouchKeepInert
+    //   (touch addresses and characters), disabledFamilyIds and the guard
+    //   intent family/question/group sets (keyed by name or question text),
+    //   carveSuggestion.kept (characters).
+    // Two stores cannot change in one update, so the order is what keeps them
+    // consistent: the guard ids are emptied FIRST. A subscriber that runs
+    // between the two writes sees the old `startIr` with no kept guards (safe:
+    // an empty set names no rule); the reverse order would show the new
+    // `startIr` against rule ids that now point at different rules.
+    if (nextIr !== null) {
+      useGuardIntentStore.setState({ keptGuardRuleIds: new Set(), narrowUndoStack: [] });
+    }
+    // On a keyboard opened for update the `.kps` is the single source of the
+    // language list: when its text changed, identity follows it (undo included).
+    const kpsPath = `source/${startKeyboard.id}.kps`;
+    const nextKps = files[kpsPath];
+    const kpsLanguages =
+      typeof nextKps === "string" && nextKps !== readVfsText(startVfs, kpsPath) && isLiveOpen(get())
+        ? languagesFromKps(nextKps)
+        : null;
+    set((s) => ({
       startVfs: nextVfs,
-      ...(nextIr !== null ? { startIr: nextIr, ir: nextIr } : {}),
-      // The touch layout the projection compares against the file: keep them
-      // identical so the author's text is not re-serialized.
-      ...(path.endsWith(".keyman-touch-layout") ? { touchLayoutJson: text } : {}),
-    });
+      ...(kpsLanguages !== null ? { identity: { ...(s.identity ?? {}), languages: kpsLanguages } } : {}),
+      ...(nextIr !== null && nextCapabilities !== null
+        ? {
+            startIr: nextIr,
+            ir: nextIr,
+            removalCapabilities: nextCapabilities,
+            deletedNodeIds: new Set<string>(),
+            deletedItemIds: new Set<string>(),
+            carveChars: new Set<string>(),
+            undoStack: s.undoStack.filter((e) => e.k === "k" || e.k === "kb"),
+            carveSuggestion:
+              s.carveSuggestion === null ? null : { ...s.carveSuggestion, derived: [] },
+            contextToleranceOverlay: null,
+          }
+        : {}),
+      ...(touchOnly !== null
+        ? {
+            startIr: s.startIr === null ? s.startIr : withLayout(s.startIr, touchOnly.layout),
+            ir: s.ir === null ? s.ir : withLayout(s.ir, touchOnly.layout),
+          }
+        : {}),
+      ...(nextTouchJson !== undefined ? { touchLayoutJson: nextTouchJson } : {}),
+    }));
     return { ok: true };
   },
 
@@ -2846,6 +3028,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setTouchLayoutJson: (json) => set({ touchLayoutJson: json }),
 
   setCustomCss: (css) => set({ customCss: css }),
+
+  setIconIco: (base64) => set({ iconIcoBase64: base64 }),
 
   setAuthoredWelcomeHtm: (text) => set({ authoredWelcomeHtm: text }),
 
@@ -2931,6 +3115,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   // Deadkey lifecycle overlay (spec 083) — append-only within a session.
   // The Deadkeys step calls this as a sibling of its setWorkingIR commit.
+  // On Open the log is the `deadkeys-defined` decision's record only: the edit is
+  // already in the files, and no projection step replays the log.
   commitDeadkeyOp: (op) =>
     set((s) => ({
       deadkeyOverlay: { ops: [...s.deadkeyOverlay.ops, op] },
@@ -3039,6 +3225,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   reset: () => {
     // Clear the module-level re-opened roots so clearStale after reset is correct.
     _reopenedRoots = new Set();
+    // Applied-change history belongs to the working copy being thrown away.
+    clearOpenSession();
     set({
       ...INITIAL_STATE,
       // Re-initialize mutable objects so mutations do not bleed across resets.
@@ -3053,7 +3241,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // Set/Map re-creations above.
       keyEditOverlay: { ops: [] },
       deadkeyOverlay: { ops: [] },
-      touchEditorMode: "character",
+      touchEditorMode: "key",
       staleSteps: new Set<string>(),
       // instantiationMode is null in INITIAL_STATE; explicit for clarity.
       instantiationMode: null,
@@ -3075,6 +3263,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     if (shouldNoop) {
       return;
     }
+    // A genuinely new working copy: the previous one's applied-change history
+    // (undo steps, removal list) must not carry over.
+    clearOpenSession();
 
     // Bake the base keyboard's facets (spec 048 FR-001) — casing, for now —
     // onto the working-copy IR before it is seeded onto both `startIr` and
@@ -3144,6 +3335,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     if (shouldNoop) {
       return;
     }
+    // A genuinely new working copy: the previous one's applied-change history
+    // (undo steps, removal list) must not carry over.
+    clearOpenSession();
 
     // Bake the loaded keyboard's facets (spec 048 FR-001) onto the working-copy
     // IR — the identical derivation instantiateFromStart applies, so both

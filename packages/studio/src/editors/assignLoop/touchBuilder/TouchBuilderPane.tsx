@@ -69,6 +69,8 @@ import {
   type SubkeyDragPayload,
 } from "./placementOps.ts";
 import { buildPlacementOps } from "./placementOps.ts";
+import { touchModePlatformLabel } from "../touchPlatformCoverage.ts";
+import { visuallyHidden } from "../../../survey/surveyStyles.ts";
 
 export interface TouchBuilderPaneProps {
   /** The shared `effectiveKeyModeLayout` selector — read, never copied. */
@@ -101,6 +103,12 @@ export interface TouchBuilderPaneProps {
     options?: { readonly offerFamilyApply?: boolean },
   ) => boolean;
   /**
+   * Wraps a loop of sequential `commitOp` calls that is ONE author action, so a
+   * keyboard opened for update writes it as one change (one undo record).
+   * Omitted: the loop just runs.
+   */
+  readonly groupCommits?: (run: () => void) => void;
+  /**
    * The keyboard's font as a blob URL + CSS family (from the artifact
    * stage). Injected as a FontFace so keycaps render in the real typeface
    * instead of the UI font.
@@ -131,6 +139,18 @@ export interface TouchBuilderPaneProps {
    * drop-target highlighting. Undefined when no drag is in flight.
    */
   readonly dropHoverAddress?: string | null;
+  /**
+   * Step-owned controls appended to the platform row (TouchGallery's "Find a
+   * key" toggle), and the panel they open, rendered directly beneath that row.
+   */
+  readonly toolbarActions?: React.ReactNode;
+  readonly toolbarPanel?: React.ReactNode;
+  /**
+   * How many inventory letters each platform still lacks a key for — the
+   * per-platform half of the step's completion gate (touchPlatformCoverage.ts).
+   * A platform with a count above zero gets a warning badge on its tab.
+   */
+  readonly unplacedCountByPlatform?: ReadonlyMap<string, number>;
 }
 
 /** Drag operations the builder pane exposes to TouchGallery. */
@@ -199,7 +219,7 @@ function spColor(sp: number | undefined): { bg: string; fg: string; border: stri
 }
 
 export function TouchBuilderPane(props: TouchBuilderPaneProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const {
     layout,
     activePlatformId,
@@ -211,6 +231,7 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     selectedKeyAddresses,
     onSelectKeys,
     commitOp,
+    groupCommits,
     fontFaceUrl,
     fontFaceFamily,
     trayLetter,
@@ -219,7 +240,11 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     onRegisterDragApi,
     panelDropHover,
     dropHoverAddress,
+    toolbarActions,
+    toolbarPanel,
+    unplacedCountByPlatform,
   } = props;
+  const groupAction = (run: () => void): void => (groupCommits !== undefined ? groupCommits(run) : run());
 
   // Load the keyboard's font into the document so keycaps render in the real
   // typeface. TIKE rendered keycaps in the platform's configured font; the
@@ -321,9 +346,11 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
             mintBuilderKeyId(layout),
           );
     if (plan.ops.length === 0) return;
-    for (const op of plan.ops) {
-      if (!commitOp(op)) break;
-    }
+    groupAction(() => {
+      for (const op of plan.ops) {
+        if (!commitOp(op)) break;
+      }
+    });
     if (source.type === "subkey") {
       // A cross-kind move leaves the moved entry under a different kind (and
       // possibly a fresh id) — the subkey selection would dangle, so clear
@@ -365,9 +392,11 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     const { letter, address, key } = placement;
     const plan = buildPlacementOps(address, key, letter, choice, mintBuilderKeyId(layout));
     // One undo batch via sequential commits (slice-spec §4).
-    for (const op of plan.ops) {
-      if (!commitOp(op)) break;
-    }
+    groupAction(() => {
+      for (const op of plan.ops) {
+        if (!commitOp(op)) break;
+      }
+    });
     if (plan.displacedBackToTray !== null) {
       const back = plan.displacedBackToTray;
       onTrayReturnsChange((prev) => (prev.includes(back) ? prev : [...prev, back]));
@@ -668,9 +697,11 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
     }
     const ops = buildTemplateApplyOps(layout, template);
     // One undo batch via sequential `commitKeyEdit` calls (slice-spec §4).
-    for (const op of ops) {
-      commitOp(op);
-    }
+    groupAction(() => {
+      for (const op of ops) {
+        commitOp(op);
+      }
+    });
     setTemplateOpen(false);
   };
 
@@ -700,9 +731,11 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
   // the author can retry.
   const handleBulkSet = (fields: BulkKeyEditFields): void => {
     const ops = buildBulkKeyEditOps(selectedEntriesOnLayer, fields);
-    for (const op of ops) {
-      if (!commitOp(op, { offerFamilyApply: false })) break;
-    }
+    groupAction(() => {
+      for (const op of ops) {
+        if (!commitOp(op, { offerFamilyApply: false })) break;
+      }
+    });
   };
 
   // Right-edge position of the selected key (#2596 item 4): the running
@@ -1049,19 +1082,66 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
           })}
           style={{ display: "flex", gap: 4 }}
         >
-          {layout.platforms.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              role="tab"
-              aria-selected={p.id === activePlatformId}
-              data-testid={`touch-builder-platform-${p.id}`}
-              onClick={() => onSelectPlatform(p.id)}
-              style={tabStyle(p.id === activePlatformId)}
-            >
-              {p.id}
-            </button>
-          ))}
+          {layout.platforms.map((p) => {
+            const unplaced = unplacedCountByPlatform?.get(p.id) ?? 0;
+            const unplacedLabel =
+              unplaced > 0
+                ? t({
+                    id: "editor.assignLoop.touch.builder.platformUnplaced",
+                    message: plural(unplaced, {
+                      one: `# letter still needs a key on ${{ platform: touchModePlatformLabel(p.id, i18n) }}`,
+                      other: `# letters still need a key on ${{ platform: touchModePlatformLabel(p.id, i18n) }}`,
+                    }),
+                  })
+                : undefined;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                role="tab"
+                aria-selected={p.id === activePlatformId}
+                data-testid={`touch-builder-platform-${p.id}`}
+                onClick={() => onSelectPlatform(p.id)}
+                title={unplacedLabel}
+                style={{
+                  ...tabStyle(p.id === activePlatformId),
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                {p.id}
+                {unplacedLabel !== undefined && (
+                  // A warning pill holding the count: a shape and a number, never
+                  // colour alone. The visually hidden text names it for a screen
+                  // reader as part of the tab's own name.
+                  <span
+                    data-testid={`touch-builder-platform-unplaced-${p.id}`}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 2,
+                      padding: "0 6px",
+                      minWidth: 18,
+                      height: 18,
+                      boxSizing: "border-box",
+                      borderRadius: 9,
+                      border: "1px solid var(--app-warning-border)",
+                      background: "var(--app-warning-bg)",
+                      color: "var(--app-warning-text)",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      lineHeight: 1,
+                    }}
+                  >
+                    <span aria-hidden="true">!</span>
+                    <span aria-hidden="true">{unplaced}</span>
+                    <span style={visuallyHidden}>{`, ${unplacedLabel}`}</span>
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: TEXT_DIM, fontFamily: FONT }}>
           {t({
@@ -1096,7 +1176,9 @@ export function TouchBuilderPane(props: TouchBuilderPaneProps) {
             message: "Apply template…",
           })}
         </button>
+        {toolbarActions}
       </div>
+      {toolbarPanel}
 
       {/* Layer switcher — folder tabs on wide screens (item 6), a horizontal
           tab row on narrow ones. Drag-dwell (item 4) lives on the tabs. */}

@@ -17,6 +17,7 @@ import { listDeadkeys } from "@keyboard-studio/contracts";
 import type { LayerCombo } from "@keyboard-studio/contracts";
 import { attributeLayer } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { selectLayoutIr } from "./layoutIr.ts";
 import type { KmnEditRefusal } from "../../stores/workingCopyStore.ts";
 import { completeDeadkeysStep } from "../../lib/mechanismStepCompletion.ts";
 import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../lib/galleryTheme.ts";
@@ -37,12 +38,14 @@ export interface DeadkeyListProps {
   /** Controlled disclosure state; when omitted the list manages its own collapsed state. */
   expanded?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
+  /** List the deadkeys without offering to place or delete them. */
+  readOnly?: boolean;
 }
 
-export function DeadkeyList({ layers, openId, selectedCell, onOpen, onDeleted, expanded: expandedProp, onExpandedChange }: DeadkeyListProps) {
+export function DeadkeyList({ layers, openId, selectedCell, onOpen, onDeleted, expanded: expandedProp, onExpandedChange, readOnly = false }: DeadkeyListProps) {
   const { t } = useLingui();
   const copy = useLayoutCopy();
-  const ir = useWorkingCopyStore((s) => s.ir);
+  const ir = useWorkingCopyStore(selectLayoutIr);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [problem, setProblem] = useState<KmnEditRefusal | null>(null);
   const [internalExpanded, setInternalExpanded] = useState(false);
@@ -76,21 +79,20 @@ export function DeadkeyList({ layers, openId, selectedCell, onOpen, onDeleted, e
 
   function place(ref: string): void {
     if (selectedCell === null || !selectedCell.editable) return;
-    const result = useWorkingCopyStore.getState().commitKmnEdit({
-      op: "set-key",
-      vkey: selectedCell.vkey,
-      layer: selectedCell.layer,
-      output: { kind: "deadkey", deadkeyId: ref },
-    });
-    if (result.ok) completeDeadkeysStep();
+    // The step completes once the key is in the file: now, or on agreement when asked first.
+    const result = useWorkingCopyStore.getState().commitKmnEdit(
+      { op: "set-key", vkey: selectedCell.vkey, layer: selectedCell.layer, output: { kind: "deadkey", deadkeyId: ref } },
+      { onAppliedLater: completeDeadkeysStep },
+    );
+    if (result.ok && result.pending !== true) completeDeadkeysStep();
     setProblem(result.ok ? null : result.reason);
   }
 
   function remove(id: number, ref: string): void {
-    const result = useWorkingCopyStore.getState().commitLayoutDeadkeyOp({ kind: "delete", id });
+    const result = useWorkingCopyStore.getState().commitLayoutDeadkeyOp({ kind: "delete", id }, { onAppliedLater: () => onDeleted(ref) });
     setConfirmDelete(null);
     setProblem(result.ok ? null : result.reason);
-    if (result.ok) onDeleted(ref);
+    if (result.ok && result.pending !== true) onDeleted(ref);
   }
 
   if (ir === null) return null;
@@ -163,7 +165,7 @@ export function DeadkeyList({ layers, openId, selectedCell, onOpen, onDeleted, e
                 >
                   {t({ id: "editor.layout.deadkey.list.open", message: "Open its table" })}
                 </button>
-                {placements.length === 0 && (
+                {placements.length === 0 && !readOnly && (
                   <button
                     type="button"
                     disabled={selectedCell === null || !selectedCell.editable}
@@ -176,6 +178,7 @@ export function DeadkeyList({ layers, openId, selectedCell, onOpen, onDeleted, e
                   </button>
                 )}
                 {info.id !== null &&
+                  !readOnly &&
                   (confirmDelete === ref ? (
                     <span role="group" aria-label={t({ id: "editor.layout.deadkey.list.deleteAria", message: "Confirm deleting this deadkey" })} style={rowStyle}>
                       <span>{t({ id: "editor.layout.deadkey.list.deleteWarn", message: "Delete it with all its combinations? This cannot be undone here." })}</span>
@@ -198,7 +201,9 @@ export function DeadkeyList({ layers, openId, selectedCell, onOpen, onDeleted, e
       )}
       {problem !== null && (
         <p role="alert" style={noteStyle} data-testid="deadkey-list-problem">
-          {t({ id: "editor.layout.deadkey.list.refused", message: "The keyboard could not take that change. It may be locked, not compiled yet, or read-only here." })}
+          {problem === "no-host"
+            ? t({ id: "editor.layout.deadkey.list.refusedNoHost", message: "The change needs your agreement, but nothing could ask you, so it was not made. Your files are unchanged." })
+            : t({ id: "editor.layout.deadkey.list.refused", message: "The keyboard could not take that change. It may be locked, not compiled yet, or read-only here." })}
         </p>
       )}
     </section>

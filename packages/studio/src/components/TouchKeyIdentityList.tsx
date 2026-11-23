@@ -58,10 +58,18 @@ export interface TouchKeyIdentityListProps {
   ir: KeyboardIR | null;
   /** The effective touch layout (with overlay edits applied). */
   layout: TouchLayoutIR | null;
-  /** Commit key-edit ops through the host's single-writer chain. */
-  onCommitOps: (ops: readonly PendingKeyEditOperation[]) => void;
-  /** Install an IR produced by a mint-and-rule repair. */
-  onInstallIr: (nextIr: KeyboardIR) => void;
+  /**
+   * Commit key-edit ops through the host's single-writer chain. `record` makes the
+   * repair proposal's record; the host calls it once the change has landed (at once
+   * on Copy, when the file holds it on Open), never for a decline or a failure.
+   */
+  onCommitOps: (ops: readonly PendingKeyEditOperation[], record: () => void) => void;
+  /**
+   * Install an IR produced by a mint-and-rule repair. `record` makes the repair
+   * proposal's record; the host calls it once the install has landed (at once on
+   * Copy, when the file holds it on Open) and never for a decline or a failure.
+   */
+  onInstallIr: (nextIr: KeyboardIR, record: () => void) => void;
 }
 
 export function TouchKeyIdentityList(
@@ -115,12 +123,14 @@ export function TouchKeyIdentityList(
         setMintBlocked((prev) => new Set(prev).add(row.keyRef));
         return;
       }
-      recordProposal(row, action === row.defaultAction ? "applied" : "changed");
-      props.onInstallIr(outcome.ir);
+      props.onInstallIr(outcome.ir, () => {
+        recordProposal(row, action === row.defaultAction ? "applied" : "changed");
+      });
       return;
     }
-    recordProposal(row, action === row.defaultAction ? "applied" : "changed");
-    props.onCommitOps(repairApplyOps(row, action));
+    props.onCommitOps(repairApplyOps(row, action), () => {
+      recordProposal(row, action === row.defaultAction ? "applied" : "changed");
+    });
   };
 
   const declineRepair = (row: DeadKeyRepairRow): void => {

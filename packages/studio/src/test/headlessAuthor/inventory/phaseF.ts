@@ -25,11 +25,9 @@ export const phaseFInventory: readonly InventoryEntry[] = [
   // The trial driver's "Make test build" press (spec 113): the same
   // DOM-free pieces the TestBuildPanel's handler calls through
   // usePreviewArtifact — build the numbered .kmp, fingerprint the working
-  // copy, record the build. ReformatConsentRequiredError is the guard's
-  // signal: the driver retries consented, as the dialog's Agree does.
+  // copy, record the build.
   { fn: "buildTestBuildKmp", module: "lib/buildOutputBundle.ts", callers: ["hooks/usePreviewArtifact.ts"] },
   { fn: "computeWorkingCopyFingerprint", module: "lib/workingCopyFingerprint.ts", callers: ["hooks/usePreviewArtifact.ts"] },
   { fn: "resolveTestBuildVersion", module: "@keyboard-studio/engine", callers: ["hooks/usePreviewArtifact.ts"] },
   { fn: "changedSectionsSince", module: "stores/testingStore.ts", callers: ["hooks/usePreviewArtifact.ts"] },
-  { fn: "ReformatConsentRequiredError", module: "lib/reformatConsentError.ts", callers: ["hooks/useReformatConsent.ts"] },
 ];

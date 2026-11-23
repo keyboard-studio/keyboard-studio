@@ -553,6 +553,9 @@ export function StepHost({ reducerDeps, onStartOver, ctx, manifest: manifestProp
   // No per-step conditional: only STEPS_WITH_APPLY_COMPLETION gates the reducer.
   // ---------------------------------------------------------------------------
 
+  // Spec 111 FR-046: this advances the walk before `navigateTo` is reached, so it must not run while
+  // a code view holds unapplied text. The code-view steps complete through the footer, whose
+  // buttons ask first (StepNavCluster); a new in-body completion path has to do the same.
   function handleComplete(result: unknown): void {
     // spec 079 T064: snapshot work-to-do as it stood the instant BEFORE this
     // Next's mutations run. `workToDo` here is THIS render's hook value —

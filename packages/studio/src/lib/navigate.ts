@@ -10,6 +10,7 @@
 // without introducing a second writer of `window.location.hash`.
 
 import { formatLocation, type Location, type RouteId } from "./location.ts";
+import { noteAccepted, runGuardedNavigation } from "./navigationGuard.ts";
 
 // `RouteId` now lives in lib/location.ts — the route token set is part of the
 // hash grammar, and defining it there is what keeps these two modules from
@@ -23,7 +24,11 @@ export function navigateTo(route: RouteId): void;
 export function navigateTo(location: Location): void;
 export function navigateTo(target: RouteId | Location): void {
   // A bare RouteId formats to the same hash it always did, so a route-only
-  // navigation is byte-identical to the pre-widening behaviour.
-  window.location.hash =
-    typeof target === "string" ? target : formatLocation(target).slice(1);
+  // navigation is byte-identical to the pre-widening behaviour when nothing is unapplied.
+  runGuardedNavigation(() => {
+    const hash = typeof target === "string" ? target : formatLocation(target).slice(1);
+    // Accepted before the write, so the hashchange it causes is not read as the browser's Back.
+    noteAccepted(hash.startsWith("#") ? hash : `#${hash}`);
+    window.location.hash = hash;
+  });
 }

@@ -17,6 +17,8 @@ import { attributeLayer, listContexts } from "@keyboard-studio/engine";
 import { listDeadkeys } from "@keyboard-studio/contracts";
 import type { LayerCombo } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { selectLayoutIr } from "./layoutIr.ts";
+import { isLiveOpen } from "../../lib/openMode.ts";
 import { usePickedWindowsLayouts } from "../../lib/layoutFamily.ts";
 import { plainDiagnosticMessage } from "../../lib/plainDiagnosticMessage.ts";
 import { groupDemoDiagnostics } from "../../components/rules/demoDiagnostics.ts";
@@ -48,15 +50,20 @@ const MAX_BANNER_DIAGNOSTICS = 3;
  */
 const NO_CONFIRMED_CLASSES: ReadonlySet<FallbackClass> = new Set();
 
-export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
+export function LayoutPane({ onViewInCode, readOnly = false }: LayoutPanelProps) {
   const { t, i18n } = useLingui();
   const copy = useLayoutCopy();
-  const ir = useWorkingCopyStore((s) => s.ir);
+  const ir = useWorkingCopyStore(selectLayoutIr);
   const startIr = useWorkingCopyStore((s) => s.startIr);
   const desktopLocked = useWorkingCopyStore((s) => s.desktopLocked);
+  // Keys stay read-only for a completed desktop step and for a read-only layout alike.
+  const keysLocked = desktopLocked || readOnly;
   const bases = usePickedWindowsLayouts();
   // The top undo entry is a Layout edit: undo is offered here (the shared stack also holds the
   // carve and touch entries, which their own tabs undo).
+  // On a keyboard opened for update the edit is in the file and the footer's Open undo takes it
+  // back (one record per confirm), so this pane's own undo is not offered there.
+  const live = useWorkingCopyStore((st) => isLiveOpen(st));
   const canUndoEdit = useWorkingCopyStore((st) => {
     const top = st.undoStack[st.undoStack.length - 1];
     return top !== undefined && (top.k === "l" || top.k === "lb" || top.k === "ld");
@@ -119,10 +126,10 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
       confirmedClasses: NO_CONFIRMED_CLASSES,
     }).cells;
     // A completed desktop step is read-only here as it is in the Assign tab.
-    return desktopLocked ? built.map((c) => (c.editable ? { ...c, editable: false } : c)) : built;
+    return keysLocked ? built.map((c) => (c.editable ? { ...c, editable: false } : c)) : built;
     // `layer` is covered by `layerId`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attribution, fallback, contexts, desktopLocked, layerId]);
+  }, [attribution, fallback, contexts, keysLocked, layerId]);
 
   // Provisional keys per layer (FR-030), shown as the layer's count. The open layer is counted from
   // its verified cells; the others from the working copy's own rules, as no other layer is compiled
@@ -311,7 +318,19 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
         </div>
       )}
 
-      {desktopLocked && (
+      {readOnly && (
+        <div role="status" data-testid="layout-banner-read-only" style={bannerStyle}>
+          <p style={bannerText}>
+            {t({
+              id: "editor.layout.pane.basicReadOnly",
+              message:
+                "This keyboard's physical keys match the Windows layout, so they can't be changed here. Every key, layer and deadkey is shown read-only.",
+            })}
+          </p>
+        </div>
+      )}
+
+      {desktopLocked && !readOnly && (
         <div role="status" data-testid="layout-banner-locked" style={bannerStyle}>
           <p style={bannerText}>
             {t({
@@ -401,16 +420,18 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
           hideGroupHeadings
           label={t({ id: "editor.layout.pane.layersLabel", message: "Layers" })}
         />
-        <button
-          type="button"
-          ref={addButtonRef}
-          onClick={() => setAddOpen(true)}
-          data-testid="layout-add-layer"
-          className="ks-focus-ring ks-hit-target ks-press"
-          style={addButtonStyle}
-        >
-          {t({ id: "editor.layout.pane.addLayer", message: "Add layer" })}
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            ref={addButtonRef}
+            onClick={() => setAddOpen(true)}
+            data-testid="layout-add-layer"
+            className="ks-focus-ring ks-hit-target ks-press"
+            style={addButtonStyle}
+          >
+            {t({ id: "editor.layout.pane.addLayer", message: "Add layer" })}
+          </button>
+        )}
         {(
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
             {t({ id: "editor.layout.pane.afterLabel", message: "Show keys after" })}
@@ -435,16 +456,18 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
             </select>
           </label>
         )}
-        <button
-          type="button"
-          onClick={() => useWorkingCopyStore.getState().undoKmnEdit()}
-          disabled={!canUndoEdit}
-          data-testid="layout-undo"
-          className="ks-focus-ring ks-hit-target ks-press"
-          style={addButtonStyle}
-        >
-          {t({ id: "editor.layout.pane.undo", message: "Undo last change" })}
-        </button>
+        {!live && !readOnly && (
+          <button
+            type="button"
+            onClick={() => useWorkingCopyStore.getState().undoKmnEdit()}
+            disabled={!canUndoEdit}
+            data-testid="layout-undo"
+            className="ks-focus-ring ks-hit-target ks-press"
+            style={addButtonStyle}
+          >
+            {t({ id: "editor.layout.pane.undo", message: "Undo last change" })}
+          </button>
+        )}
       </div>
 
       {unsaved && (
@@ -517,6 +540,7 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
             setAfterDeadkey(id);
           }}
           proposeSpaceRow={newDeadkey === openDeadkey}
+          readOnly={readOnly}
           onClose={handleCloseDeadkey}
           onSpaceDismissed={() => setNewDeadkey(null)}
         />
@@ -533,6 +557,7 @@ export function LayoutPane({ onViewInCode }: LayoutPanelProps) {
         }}
         expanded={deadkeyListExpanded}
         onExpandedChange={setDeadkeyListExpanded}
+        readOnly={readOnly}
       />
 
       <AddLayerDialog

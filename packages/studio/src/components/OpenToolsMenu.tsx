@@ -11,6 +11,8 @@ import { useDecisionStore } from "../stores/decisionStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { openMenuScreens } from "../survey/questions/registry.ts";
+import { useBasicKeyboardOpen } from "../hooks/useBasicKeyboardOpen.ts";
+import { BASIC_KEYBOARD_SKIPPED_TOOLS } from "../lib/basicKeyboard.ts";
 import { useDismissablePopover } from "../ui/useDismissablePopover.ts";
 import type { ActiveStepId } from "../stores/surveySessionStore.ts";
 
@@ -23,6 +25,8 @@ export function openToolScreen(screenId: string): void {
 export function OpenToolsMenu(): React.JSX.Element | null {
   const { t } = useLingui();
   const isOpen = useDecisionStore((s) => s.decisions["authoring-track"]?.value === "adapt");
+  // A basic keyboard opened for update keeps its physical keys: the tools that only change them are not offered.
+  const basicOpen = useBasicKeyboardOpen();
   const [expanded, setExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   useDismissablePopover(expanded, { containerRef, onClose: () => setExpanded(false) });
@@ -79,7 +83,7 @@ export function OpenToolsMenu(): React.JSX.Element | null {
             borderRadius: 6,
           }}
         >
-          {openMenuScreens.map((id) => (
+          {openMenuScreens.filter((id) => !basicOpen || !BASIC_KEYBOARD_SKIPPED_TOOLS.has(id)).map((id) => (
             <li key={id}>
               <button
                 type="button"

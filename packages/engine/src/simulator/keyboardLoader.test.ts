@@ -75,3 +75,17 @@ describe("browserKeyboardLoader matches nodeKeyboardLoader (spec 078 T004)", () 
     60_000,
   );
 });
+
+describe("nodeKeyboardLoader provides the browser globals compiled keyboards call (main-CI run 43933968353)", () => {
+  it("a script calling alert() evaluates without throwing", () => {
+    // kmc-kmn emits an alert() stub for every call() whose .call_js sibling
+    // was absent at compile time (e.g. korean_rr's jamo_combine). A bare vm
+    // context has no alert, so without the stub the first such call throws
+    // `ReferenceError: alert is not defined` and the keyboard cannot be
+    // measured at all.
+    const sandbox = nodeKeyboardLoader.createSandbox();
+    expect(() =>
+      nodeKeyboardLoader.evaluate(`alert("call(jamo_combine) not defined");`, sandbox),
+    ).not.toThrow();
+  });
+});

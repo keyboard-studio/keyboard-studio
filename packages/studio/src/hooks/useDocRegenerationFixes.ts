@@ -16,18 +16,20 @@ export function useDocRegenerationFixes(): SuggestedFix[] {
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
-  const docs = useDocsPreview();
+  // The raw renders: on Open the page fields are the file text, which would be
+  // compared with itself. The current text is read from startVfs.
+  const { generated } = useDocsPreview();
   return useMemo(() => {
     if (!isOpenMode(instantiationMode) || startVfs === null || startKeyboard === null) return NONE;
     return docRegenerationFixes({
       vfs: startVfs,
       keyboardId: startKeyboard.id,
       rendered: {
-        "readme-md": docs.readmeMd,
-        "readme-htm": docs.readmeHtm,
-        "welcome-htm": docs.welcomeHtm,
-        "help-php": docs.helpPhp,
+        "readme-md": generated.readmeMd,
+        "readme-htm": generated.readmeHtm,
+        "welcome-htm": generated.welcomeHtm,
+        "help-php": generated.helpPhp,
       },
     });
-  }, [instantiationMode, startVfs, startKeyboard, docs]);
+  }, [instantiationMode, startVfs, startKeyboard, generated]);
 }

@@ -8,6 +8,7 @@
 // hook rehydrates from sessionStorage so identity captured by the boot-time
 // /oauth/google/callback handler is picked up on the next render.
 
+import { noteAccepted } from "../lib/navigationGuard.ts";
 import { useCallback, useEffect, useState } from "react";
 import {
   beginGoogleAuthorize,
@@ -55,6 +56,7 @@ function consumeGoogleOAuthErrorParam(): string | null {
   const newUrl =
     window.location.pathname + (query === "" ? "" : `?${query}`) + window.location.hash;
   window.history.replaceState(window.history.state, "", newUrl);
+  noteAccepted(window.location.hash);
 
   if (oauthError === "") return null;
   return GOOGLE_OAUTH_ERROR_MESSAGES[oauthError as OAuthCallbackFailureReason] ?? GENERIC_GOOGLE_OAUTH_ERROR;

@@ -9,6 +9,14 @@ import type { KmnEditsValue } from "@keyboard-studio/contracts";
 import { diffIR, emitKmn, parseKmn, replayKmnEdits } from "@keyboard-studio/engine";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { ProjectWorkingCopyVfsInput } from "./projectWorkingCopyVfs.ts";
+import { PROJECTION_STEPS, type ProjectionStep } from "./projectionSteps.ts";
+
+// `openMode.steps` is required on Open. `layoutEdits`, `codeEdits` and `deadkeys` are in no Open row
+// (the Layout tab, the Code tab and the deadkey editor write the files directly through the apply
+// seam), so the tests that check their splice list the step explicitly: the step still splices when
+// a caller asks for it.
+const only = (...steps: ProjectionStep[]): ReadonlySet<ProjectionStep> => new Set(steps);
+const OUTPUT = only("layoutEdits");
 
 // Lets a test force the splice to refuse; otherwise the real implementation runs.
 const forced = vi.hoisted(() => ({ refuse: false }));
@@ -64,7 +72,7 @@ function run(openMode: ProjectWorkingCopyVfsInput["openMode"], kmnEdits: KmnEdit
 describe("projectWorkingCopyVfs step 2.2 on Open", () => {
   it("changes only the affected rule's lines; comments, blanks and store order are byte-identical", () => {
     forced.refuse = false;
-    const { text, result } = run({ kps: { nameEdited: false } });
+    const { text, result } = run({ steps: OUTPUT, kps: { nameEdited: false } });
     expect(result.reformatRequired).toBeUndefined();
     // The edited rule's line (index 12) is replaced by the new rule at the end of the group.
     const expected = KMN.split("\n");
@@ -75,7 +83,7 @@ describe("projectWorkingCopyVfs step 2.2 on Open", () => {
 
   it("leaves the file unchanged and reports it when the change cannot be placed", () => {
     forced.refuse = true;
-    const { result, text } = run({ kps: { nameEdited: false } });
+    const { result, text } = run({ steps: OUTPUT, kps: { nameEdited: false } });
     expect(text).toBe(KMN);
     expect(result.reformatRequired).toEqual([`source/${ID}.kmn`]);
     expect(result.warnings.some((w) => w.startsWith("[open]") && w.includes(`source/${ID}.kmn`))).toBe(true);
@@ -83,7 +91,7 @@ describe("projectWorkingCopyVfs step 2.2 on Open", () => {
 
   it("re-emits with the [open] warning once the author agrees", () => {
     forced.refuse = true;
-    const { result, text } = run({ kps: { nameEdited: false }, consentedReemit: true });
+    const { result, text } = run({ steps: OUTPUT, kps: { nameEdited: false }, consentedReemit: true });
     expect(result.reformatRequired).toBeUndefined();
     expect(text).toContain("U+014B");
     expect(text).not.toBe(KMN);
@@ -103,7 +111,7 @@ describe("projectWorkingCopyVfs step 2.2 on Open", () => {
       getPattern: () => undefined,
       identity: null,
       deadkeyOps: [{ kind: "define", triggerKey: "e", id: 0x3001, accentChar: "\u0301" }],
-      openMode: { kps: { nameEdited: false } },
+      openMode: { steps: only("deadkeys"), kps: { nameEdited: false } },
     });
     const text = vfs.get(`source/${ID}.kmn`)!.content as string;
     expect(text).toContain("dk(3001)");
@@ -117,7 +125,7 @@ describe("projectWorkingCopyVfs step 2.2 on Open", () => {
       parseKmn(KMN.replace("+ [K_C] > 'c'", "+ [K_C] > 'z'"), ID).ir,
     );
     const { text, result } = run(
-      { kps: { nameEdited: false } },
+      { steps: only("codeEdits"), kps: { nameEdited: false } },
       { entries: [{ op: "code-apply", seq: 1, at: 0, changes, overrides: [] }] },
     );
     expect(result.reformatRequired).toBeUndefined();
@@ -131,11 +139,26 @@ describe("projectWorkingCopyVfs step 2.2 on Open", () => {
       parseKmn(KMN.replace("+ [K_C] > 'c'", "+ [K_C] > 'z'"), ID).ir,
     );
     const { text, result } = run(
-      { kps: { nameEdited: false } },
+      { steps: only("codeEdits"), kps: { nameEdited: false } },
       { entries: [{ op: "code-apply", seq: 1, at: 0, changes, overrides: [] }] },
     );
     expect(text).toBe(KMN);
     expect(result.reformatRequired).toEqual([`source/${ID}.kmn`]);
+  });
+
+  it("the Open output row replays no kmn-edits entry: Layout-tab and Code-tab edits are written to the file when applied", () => {
+    forced.refuse = false;
+    const changes = diffIR(
+      parseKmn(KMN, ID).ir,
+      parseKmn(KMN.replace("+ [K_C] > 'c'", "+ [K_C] > 'z'"), ID).ir,
+    );
+    const { text } = run(
+      { steps: PROJECTION_STEPS.output, kps: { nameEdited: false } },
+      { entries: [...SET_B.entries, { op: "code-apply", seq: 2, at: 0, changes, overrides: [] }] },
+    );
+    expect(text).toBe(KMN);
+    expect(PROJECTION_STEPS.output.has("layoutEdits")).toBe(false);
+    expect(PROJECTION_STEPS.output.has("codeEdits")).toBe(false);
   });
 
   it("Copy mode keeps the full emit", () => {

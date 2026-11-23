@@ -77,13 +77,21 @@ export interface KpsLanguageEntry {
  *   - `<Description>` is kept unless `description` is given (the author edited it);
  *   - `<Languages>` is written from `languages` (the author's list) and left
  *     byte-identical when that list matches the descriptor's own;
- *   - `<WebSite>` is never removed, and the welcome-path migration and font
+ *   - `<WebSite>` is written only from `websiteUrl`, and the welcome-path migration and font
  *     re-declaration (Copy-track writes) do not run.
  */
 export interface OpenKpsOptions {
   nameEdited: boolean;
   description?: string;
   languages?: readonly KpsLanguageEntry[];
+  /**
+   * The project link for `<Info><WebSite>`. A blank value removes the element
+   * (a descriptor with no link carries none, as most shipped packages do); an
+   * absent field leaves the element as it is.
+   */
+  websiteUrl?: string;
+  /** The single-line copyright notice for `<Info><Copyright>`; absent leaves the element as it is. */
+  copyright?: string;
 }
 
 export interface ApplyIdentityToKpsResult {
@@ -471,7 +479,8 @@ function patchKpsIdentity(
         if (openOpts.description !== undefined) {
           patched = replaceElementText(patched, "Description", escapeHtml(openOpts.description));
         }
-        if ((identity.websiteUrl?.trim() ?? "") !== "") patched = patchWebSite(patched, identity.websiteUrl);
+        if (openOpts.websiteUrl !== undefined) patched = patchOpenWebSite(patched, openOpts.websiteUrl);
+        if (openOpts.copyright !== undefined) patched = patchOpenCopyright(patched, openOpts.copyright);
       }
       return `${openTag}${patched}${close}`;
     });
@@ -517,6 +526,175 @@ function patchKpsIdentity(
 }
 
 /**
+ * What a live write into an opened keyboard's own descriptor can change. Each
+ * field present is written; an absent field leaves its elements untouched.
+ * Further fields (the website link, the copyright line) join here without a
+ * signature change.
+ */
+export interface OpenKpsInfoPatch {
+  /** The author's language list, in order (see `OpenKpsOptions.languages`). */
+  languages?: readonly KpsLanguageEntry[];
+  /** The project link; blank removes `<WebSite>` (see `OpenKpsOptions.websiteUrl`). */
+  websiteUrl?: string;
+  /** The copyright notice line for `<Copyright>` (see `OpenKpsOptions.copyright`). */
+  copyright?: string;
+}
+
+/**
+ * Open mode (spec 111 FR-041/FR-012): patch an opened keyboard's `.kps` text in
+ * place with only the fields given. Everything else in the descriptor stays
+ * byte-for-byte as it was, and the text is returned unchanged when the given
+ * fields already match. `unwritable` names anchors the descriptor lacks.
+ */
+export function patchOpenKpsInfo(
+  text: string,
+  patch: OpenKpsInfoPatch,
+): { text: string; unwritable: string[] } {
+  const openOpts: OpenKpsOptions = {
+    nameEdited: false,
+    ...(patch.languages !== undefined ? { languages: patch.languages } : {}),
+    ...(patch.websiteUrl !== undefined ? { websiteUrl: patch.websiteUrl } : {}),
+    ...(patch.copyright !== undefined ? { copyright: patch.copyright } : {}),
+  };
+  // The dummy identity and the empty id are safe: with `openOpts` set, the Open
+  // branch of `patchKpsIdentity` reads neither. `<Name>` is rewritten only when
+  // `nameEdited` (false here), `<Description>` only when `description` is given
+  // (never here), `<WebSite>` only from `openOpts.websiteUrl` (never `identity`), and
+  // `keyboardId` feeds only the Copy-track display-name fallback.
+  return patchKpsIdentity(text, { displayName: "" }, "", openOpts);
+}
+
+/** The `<Options>` elements that name a package member the installer shows. */
+export type OpenKpsOptionTag = "WelcomeFile" | "ReadMeFile";
+
+/** A package member to list in an opened keyboard's `.kps` (spec 111 FR-041). */
+export interface OpenKpsFileEntry {
+  /** The member reference as the descriptor spells it, relative to the `.kps` (e.g. `welcome\\welcome.htm`, `readme.htm`). */
+  name: string;
+  /** Also declare it as this `<Options>` element (filled when absent or blank, never overriding another file). */
+  declareAs?: OpenKpsOptionTag;
+}
+
+/** Where each `<Options>` element sits among its neighbours (the corpus order). */
+const OPTION_PLACEMENT: Record<OpenKpsOptionTag, { after: readonly string[]; before: readonly string[] }> = {
+  WelcomeFile: { after: ["LicenseFile", "ReadMeFile"], before: ["MSIFileName"] },
+  ReadMeFile: { after: ["ExecuteProgram"], before: ["LicenseFile", "WelcomeFile", "MSIFileName"] },
+};
+
+/**
+ * Open mode (spec 111 FR-041): list a package member in an opened keyboard's
+ * `.kps` in place, and optionally declare it as `<WelcomeFile>` / `<ReadMeFile>`.
+ * Everything else stays byte-for-byte as it was: the new `<File>` takes the file's
+ * own line ending and indentation and goes after the last existing entry (its
+ * Description is `File <basename>`, as Keyman Developer writes it), and a BOM is
+ * left where it is. The text is returned unchanged when the member is already
+ * listed (case-insensitive, either slash) and the declaration already holds.
+ * `unwritable` names what the descriptor has no place for: no `<Files>` block
+ * (nothing is invented), no `<Options>` block for the declaration, or an element
+ * that already names another file (left as the author has it).
+ */
+export function addOpenKpsFile(
+  text: string,
+  entry: OpenKpsFileEntry,
+): { text: string; unwritable: string[] } {
+  const unwritable: string[] = [];
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  const wanted = memberKey(entry.name);
+  let out = text;
+
+  const filesRe = /<Files(?:\s[^>]*)?>[\s\S]*?<\/Files\s*>/i;
+  const filesBlock = filesRe.exec(out);
+  if (filesBlock === null && !/<Files\s*\/>/i.test(out)) {
+    unwritable.push("no <Files> block");
+  } else {
+    const listed = [...(filesBlock?.[0] ?? "").matchAll(/<File(?:\s[^>]*)?>[\s\S]*?<\/File\s*>/gi)].some((m) => {
+      const name = /<Name(?:\s[^>]*)?>([^<]*)<\/Name\s*>/i.exec(m[0])?.[1];
+      return name !== undefined && memberKey(name) === wanted;
+    });
+    if (!listed) {
+      const dot = entry.name.lastIndexOf(".");
+      const ext = dot >= 0 ? entry.name.slice(dot).toLowerCase() : "";
+      const base = entry.name.slice(Math.max(entry.name.lastIndexOf("\\"), entry.name.lastIndexOf("/")) + 1);
+      const firstFile = /^([ \t]*)<File(?:\s[^>]*)?>/im.exec(out);
+      const closeLine = /^([ \t]*)<\/Files\s*>/im.exec(out);
+      const fileIndent = firstFile?.[1] ?? `${closeLine?.[1] ?? "  "}  `;
+      const inner = /^([ \t]*)<Name\b/im.exec(firstFile === null ? "" : out.slice(firstFile.index))?.[1] ?? `${fileIndent}  `;
+      const block = [
+        `${fileIndent}<File>`,
+        `${inner}<Name>${escapeHtml(entry.name)}</Name>`,
+        `${inner}<Description>${escapeHtml(`File ${base}`)}</Description>`,
+        `${inner}<CopyLocation>0</CopyLocation>`,
+        `${inner}<FileType>${escapeHtml(ext)}</FileType>`,
+        `${fileIndent}</File>`,
+      ].join(eol);
+      if (filesBlock === null) {
+        out = out.replace(/<Files\s*\/>/i, () => `<Files>${eol}${block}${eol}${closeLine?.[1] ?? "  "}</Files>`);
+      } else if (closeLine !== null) {
+        // `</Files>` starts its line: the entry goes on the line before it.
+        out = `${out.slice(0, closeLine.index)}${block}${eol}${out.slice(closeLine.index)}`;
+      } else {
+        const at = out.search(/<\/Files\s*>/i);
+        out = `${out.slice(0, at)}${eol}${block}${eol}${out.slice(at)}`;
+      }
+    }
+  }
+
+  if (entry.declareAs !== undefined) {
+    const tag = entry.declareAs;
+    const optionRe = new RegExp(`<${tag}\\b[^>]*?(?:/>|>([^<]*)</${tag}\\s*>)`, "i");
+    const found = optionRe.exec(out);
+    const ref = escapeHtml(entry.name);
+    if (found !== null) {
+      const current = unescapeText(found[1] ?? "").trim();
+      if (current === "") {
+        out = out.replace(optionRe, () => `<${tag}>${ref}</${tag}>`);
+      } else if (memberKey(current) !== wanted) {
+        unwritable.push(`<${tag}> already names ${current}`);
+      }
+    } else {
+      const optionsMatch = /<Options(?:\s[^>]*)?>([\s\S]*?)<\/Options\s*>/i.exec(out);
+      if (optionsMatch === null) {
+        unwritable.push("no <Options> block");
+      } else {
+        const bodyStart = optionsMatch.index + optionsMatch[0].indexOf(">") + 1;
+        const bodyEnd = bodyStart + (optionsMatch[1] ?? "").length;
+        const body = optionsMatch[1] ?? "";
+        const indent = /\n([ \t]*)<[A-Za-z]/.exec(body)?.[1] ?? "    ";
+        const element = `<${tag}>${ref}</${tag}>`;
+        const placement = OPTION_PLACEMENT[tag];
+        let result: string | null = null;
+        for (const neighbour of placement.after) {
+          const hit = new RegExp(`</${neighbour}\\s*>|<${neighbour}\\s*/>`, "i").exec(body);
+          if (hit !== null) {
+            const at = bodyStart + hit.index + hit[0].length;
+            result = `${out.slice(0, at)}${eol}${indent}${element}${out.slice(at)}`;
+            break;
+          }
+        }
+        if (result === null) {
+          for (const neighbour of placement.before) {
+            const hit = new RegExp(`^([ \\t]*)<${neighbour}\\b`, "im").exec(body);
+            if (hit !== null) {
+              const at = bodyStart + hit.index;
+              result = `${out.slice(0, at)}${hit[1] ?? ""}${element}${eol}${out.slice(at)}`;
+              break;
+            }
+          }
+        }
+        if (result === null) {
+          const trailing = /[ \t\r\n]*$/.exec(body)?.[0] ?? "";
+          const at = bodyEnd - trailing.length;
+          result = `${out.slice(0, at)}${eol}${indent}${element}${out.slice(at)}`;
+        }
+        out = result;
+      }
+    }
+  }
+
+  return { text: out, unwritable };
+}
+
+/**
  * Open mode: write the author's language list into the first `<Languages>`
  * block, preserving each kept entry's own markup. When the tags already match,
  * in order, the block is returned untouched (byte-identical round trip, spec
@@ -526,23 +704,25 @@ function patchKpsIdentity(
  */
 function patchOpenLanguages(keyboardBody: string, languages: readonly KpsLanguageEntry[]): string {
   const block = /(<Languages(?:\s[^>]*)?>)([\s\S]*?)(<\/Languages\s*>)/.exec(keyboardBody);
+  // BCP 47 tags are case-insensitive: entries match on the lower-cased tag, and a
+  // matched entry keeps the file's own spelling (it is reused verbatim).
   const existing = new Map<string, string>();
   const existingOrder: string[] = [];
   if (block !== null) {
     for (const m of (block[2] ?? "").matchAll(/<Language\b[^>]*\bID="([^"]*)"[^>]*>[^<]*<\/Language\s*>/g)) {
-      const tag = m[1] ?? "";
+      const tag = (m[1] ?? "").toLowerCase();
       if (!existing.has(tag)) existingOrder.push(tag);
       existing.set(tag, m[0]);
     }
     if (
       existingOrder.length === languages.length &&
-      existingOrder.every((tag, i) => tag === languages[i]?.tag)
+      existingOrder.every((tag, i) => tag === languages[i]?.tag.toLowerCase())
     ) {
       return keyboardBody;
     }
   }
   const elements = languages.map((lang) => {
-    const kept = existing.get(lang.tag);
+    const kept = existing.get(lang.tag.toLowerCase());
     if (kept !== undefined) return kept;
     const name = lang.name?.trim() ?? "";
     return `<Language ID="${escapeHtml(lang.tag)}">${escapeHtml(name !== "" ? name : lang.tag)}</Language>`;
@@ -582,6 +762,68 @@ function patchWebSite(body: string, websiteUrl: string | undefined): string {
   }
   // No <Description> anchor either (unusual) — append rather than drop it.
   return `${body}\n    ${element}`;
+}
+
+// ---------------------------------------------------------------------------
+// Open-mode <Info> element writes (<WebSite>, <Copyright>). Unlike the Copy
+// helpers above these keep the file's own line ending and indentation, remove
+// an element together with its line, and return the text untouched when the
+// element already says what is asked.
+// ---------------------------------------------------------------------------
+
+function infoEol(body: string): string {
+  return body.includes("\r\n") ? "\r\n" : "\n";
+}
+
+function infoIndent(body: string): string {
+  return /(?:^|\n)([ \t]*)<[A-Za-z]/.exec(body)?.[1] ?? "    ";
+}
+
+/** Insert `element` on its own line after the match of `anchor`, or after the last child. */
+function insertInfoElement(body: string, element: string, anchor: RegExp): string {
+  const eol = infoEol(body);
+  const line = `${eol}${infoIndent(body)}${element}`;
+  const hit = anchor.exec(body);
+  if (hit !== null) return `${body.slice(0, hit.index + hit[0].length)}${line}${body.slice(hit.index + hit[0].length)}`;
+  const trailing = /[ \t\r\n]*$/.exec(body)?.[0] ?? "";
+  return `${body.slice(0, body.length - trailing.length)}${line}${trailing === "" ? eol : trailing}`;
+}
+
+/** The `<tag ...>text</tag>` or `<tag .../>` element, with its own line when it has one to itself. */
+function infoElementRe(tag: string): RegExp {
+  return new RegExp(`(?:^|(?<=\\n))[ \\t]*<${tag}\\b[^>]*?(?:/>|>[^<]*</${tag}\\s*>)[ \\t]*(?:\\r?\\n)?|<${tag}\\b[^>]*?(?:/>|>[^<]*</${tag}\\s*>)`, "i");
+}
+
+function unescapeText(s: string): string {
+  return s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
+}
+
+function patchOpenWebSite(body: string, websiteUrl: string): string {
+  const url = websiteUrl.trim();
+  const re = infoElementRe("WebSite");
+  const found = re.exec(body);
+  if (url === "") return found === null ? body : body.replace(re, "");
+  const element = `<WebSite URL="${escapeHtml(url)}">${escapeHtml(url)}</WebSite>`;
+  if (found !== null) {
+    const text = />([^<]*)</.exec(found[0])?.[1];
+    if (text !== undefined && unescapeText(text.trim()) === url) return body;
+    return body.replace(/<WebSite\b[^>]*?(?:\/>|>[^<]*<\/WebSite\s*>)/i, () => element);
+  }
+  return insertInfoElement(body, element, /<\/Description\s*>/i);
+}
+
+function patchOpenCopyright(body: string, copyright: string): string {
+  const line = copyright.trim();
+  if (line === "") return body;
+  const re = /<Copyright\b[^>]*?(?:\/>|>[^<]*<\/Copyright\s*>)/i;
+  const found = re.exec(body);
+  if (found !== null) {
+    const text = />([^<]*)</.exec(found[0])?.[1];
+    if (text !== undefined && unescapeText(text) === line) return body;
+    const open = /^<Copyright\b[^>]*?(?=\/?>)/i.exec(found[0])?.[0] ?? "<Copyright";
+    return body.replace(re, () => `${open}>${escapeHtml(line)}</Copyright>`);
+  }
+  return insertInfoElement(body, `<Copyright URL="">${escapeHtml(line)}</Copyright>`, /<\/Name\s*>/i);
 }
 
 /**

@@ -33,7 +33,9 @@ import {
   type TouchLayoutIR,
 } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../../stores/workingCopyStore.ts";
-import { isOpenMode } from "../../../lib/openMode.ts";
+import { isLiveOpen, isOpenMode } from "../../../lib/openMode.ts";
+import { useApplyOnOpen } from "../../../components/OpenApplyHost.tsx";
+import { useUnappliedText } from "../../../hooks/useUnappliedText.ts";
 import { readVfsText } from "../../../lib/vfsText.ts";
 import {
   lintTouchLayoutText,
@@ -72,9 +74,12 @@ export function TouchCodePane({ layout }: { layout: TouchLayoutIR | null }) {
   const mode = useWorkingCopyStore((s) => s.instantiationMode);
   const startVfs = useWorkingCopyStore((s) => s.startVfs);
   const startKeyboard = useWorkingCopyStore((s) => s.startKeyboard);
+  const liveOpen = useWorkingCopyStore((s) => isLiveOpen(s));
+  const applyOnOpen = useApplyOnOpen();
   // Open mode (spec 111 FR-009, research R7): the pane shows the file's own
   // text and Apply replaces the file, bypassing the structural-edit refusal --
   // the author is editing the real file, not composing key operations.
+  // isOpenMode, not isLiveOpen: a descriptor-less older Open draft still gets the Open view; its Apply goes through the store (the seam move is T087).
   const openPath =
     isOpenMode(mode) && startKeyboard !== null
       ? `source/${startKeyboard.id}.keyman-touch-layout`
@@ -84,6 +89,9 @@ export function TouchCodePane({ layout }: { layout: TouchLayoutIR | null }) {
 
   // The canonical text for the current layout (Q3 text source; Open: the file).
   const canonical = layout === null ? null : (openText ?? emitTouchLayout(layout));
+  // The canonical text as a ref: a live apply moves it ahead of the next render, and the leave guard reads it then.
+  const canonicalRef = useRef<string | null>(canonical);
+  canonicalRef.current = canonical;
 
   // Editor text. `null` until the first canonical text arrives.
   const [text, setText] = useState<string | null>(null);
@@ -159,6 +167,34 @@ export function TouchCodePane({ layout }: { layout: TouchLayoutIR | null }) {
     [],
   );
 
+  // Leave guard (spec 111 FR-046): text typed here and not applied is asked about when the author
+  // leaves the Code tab or the step, on a keyboard opened for update.
+  const applyForLeaveRef = useRef<() => Promise<boolean>>(() => Promise.resolve(false));
+  // The one definition of "unapplied": on Open the text differs from the file's text; otherwise
+  // from what the draft was last synced to. The Apply badge and the leave guard both read it.
+  const isDirtyNow = (): boolean => {
+    const cur = textRef.current;
+    if (cur === null) return false;
+    if (openText !== undefined) return canonicalRef.current !== null && cur !== canonicalRef.current;
+    return cur !== lastAppliedRef.current;
+  };
+  // Set by the live-files branch of Apply when the files took the text; read by the leave guard.
+  const liveApplyOkRef = useRef(false);
+  useUnappliedText({
+    label: t({ id: "open.unapplied.view.touch", message: "the touch layout (Code tab)" }),
+    hasUnapplied: isDirtyNow,
+    apply: () => applyForLeaveRef.current(),
+    discard: () => {
+      const c = canonicalRef.current;
+      if (c === null) return;
+      textRef.current = c;
+      lastAppliedRef.current = c;
+      setText(c);
+      setApplyError(null);
+      runLint(c);
+    },
+  });
+
   if (layout === null) {
     return (
       <div data-testid="touch-code-pane">
@@ -181,7 +217,7 @@ export function TouchCodePane({ layout }: { layout: TouchLayoutIR | null }) {
     );
   }
 
-  const dirty = text !== null && text !== lastAppliedRef.current;
+  const dirty = isDirtyNow();
   const errorCount = markers.filter((m) => m.severity === "error").length;
   const warningCount = markers.filter((m) => m.severity === "warning").length;
 
@@ -243,7 +279,8 @@ export function TouchCodePane({ layout }: { layout: TouchLayoutIR | null }) {
     }
   };
 
-  const handleApply = () => {
+  const handleApply = async () => {
+    liveApplyOkRef.current = false;
     const current = textRef.current;
     if (current === null || canonical === null) return;
     let raw: unknown;
@@ -265,7 +302,31 @@ export function TouchCodePane({ layout }: { layout: TouchLayoutIR | null }) {
     }
     if (openText !== undefined && openPath !== null) {
       // Open: a formatting-only change is still a change to the file.
-      if (current === canonical) return;
+      if (current === canonical) {
+        // Already the file's text: nothing to write, and nothing left unapplied.
+        liveApplyOkRef.current = true;
+        return;
+      }
+      if (liveOpen) {
+        // Live files: the text is written through the apply seam (the author is
+        // asked first when it needs a reformat; one undo record).
+        await applyOnOpen({
+          kind: "files",
+          files: { [openPath]: current },
+          label: "Touch code view edit",
+          labelKey: "code-view",
+        }).then((applied) => {
+          if (applied.status === "applied" || applied.status === "unchanged") {
+            liveApplyOkRef.current = true;
+            canonicalRef.current = current;
+            justAppliedRef.current = true;
+            setApplyError(null);
+          } else if (applied.status === "failed") {
+            setApplyError(applied.reason);
+          }
+        });
+        return;
+      }
       const result = useWorkingCopyStore.getState().replaceStartingPointFromText(openPath, current);
       if (!result.ok) {
         setApplyError(result.error);
@@ -296,6 +357,11 @@ export function TouchCodePane({ layout }: { layout: TouchLayoutIR | null }) {
     setApplyError(null);
   };
 
+  applyForLeaveRef.current = async () => {
+    await handleApply();
+    return liveApplyOkRef.current;
+  };
+
   return (
     <div
       data-testid="touch-code-pane"
@@ -313,7 +379,7 @@ export function TouchCodePane({ layout }: { layout: TouchLayoutIR | null }) {
           type="button"
           data-testid="touch-code-apply"
           disabled={!dirty || !parsed}
-          onClick={handleApply}
+          onClick={() => void handleApply()}
         >
           {t({
             id: "editor.assignLoop.touch.code.apply",

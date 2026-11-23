@@ -35,7 +35,7 @@ export interface DeadkeySnapshot {
 export interface SimulatorContextSeed {
   /** Initial buffer contents. Default `""` (today's behaviour, unchanged). */
   text?: string;
-  /** Default: end of `text`. */
+  /** Default: end of `text`. Positions are code-point offsets into `text`. */
   caretPos?: number;
   /**
    * Reuses {@link DeadkeySnapshot} rather than a new shape. Inserted after

@@ -156,7 +156,13 @@ export interface DeadkeyDetailEditorProps {
   deadkeyId: number | null;
   /** Opaque name, for looking up null-id (named) deadkeys. */
   deadkeyName?: string;
-  onCommitIr: (nextIr: KeyboardIR) => void;
+  /**
+   * Commit an IR edit and the ops that produced it. `false`: not written (a
+   * keyboard opened for update refused it), so the ops are not logged.
+   * `"pending"`: waiting for the author's agreement; the surface logs the ops
+   * itself once it is written. Anything else: written, and the editor logs them.
+   */
+  onCommitIr: (nextIr: KeyboardIR, ops: DeadkeyOperation[]) => boolean | "pending" | void;
   /** Rename succeeded — follow the deadkey to its new id. */
   onRenamed: (newId: number) => void;
   /** Adopt another deadkey's editor (merge/repoint resolutions). */
@@ -199,7 +205,8 @@ export function DeadkeyDetailEditor({
   // the info-undefined early return below — hooks cannot run after it.)
   const recordDeadkeyOp = useWorkingCopyStore((s) => s.commitDeadkeyOp);
   const commitAndRecord = (next: KeyboardIR, ops: DeadkeyOperation[]) => {
-    onCommitIr(next);
+    const written = onCommitIr(next, ops);
+    if (written === false || written === "pending") return;
     for (const op of ops) recordDeadkeyOp(op);
   };
 

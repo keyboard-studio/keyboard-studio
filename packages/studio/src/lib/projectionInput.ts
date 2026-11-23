@@ -41,11 +41,14 @@ import type {
 } from "./projectWorkingCopyVfs.ts";
 import type { MarksTreatmentValue } from "../survey/marks/marksValue.ts";
 import type { CapsHandlingValue, DecisionSet } from "../decisions/decisionTypes.ts";
-import { alphabetOf, isCasedAlphabet } from "../survey/caps/capsLogic.ts";
 import { disabledFamilyRuleIds } from "../components/rules/disabledFamilyRules.ts";
 import { deriveRuleAdditions } from "../survey/rules/ruleAdditions.ts";
 import { welcomePagePath } from "./welcomeFolder.ts";
-import { isOpenedWithDescriptor } from "./openMode.ts";
+import { isOpenMode, isOpenedWithDescriptor } from "./openMode.ts";
+import { PROJECTION_STEPS, type ProjectionKind } from "./projectionSteps.ts";
+import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
+import { readVfsText } from "./vfsText.ts";
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 
 /** The store fields the projection reads. `startIr` must already be set. */
 export type ProjectionState = Pick<
@@ -62,6 +65,7 @@ export type ProjectionState = Pick<
   | "contextToleranceOverlay"
   | "touchLayoutJson"
   | "customCss"
+  | "iconIcoBase64"
   | "authoredWelcomeHtm"
   | "authoredReadmeHtm"
   | "authoredReadmeMd"
@@ -129,16 +133,65 @@ export function marksGuardsFromValue(value: MarksTreatmentValue | undefined): Ma
   };
 }
 
+export { capsHandlingFromDecisions } from "./capsHandlingFromDecisions.ts";
+
 /**
- * Step 2.8's input from the decision set: the recorded caps-handling value,
- * or undefined when it was not asked. A caseless alphabet is never asked, so
- * a value left over from an earlier alphabet is ignored rather than writing a
- * store nothing needs.
+ * The Open-mode projection options, built once for the download and the
+ * preview so both place a `.kmn` change and patch the descriptor identically.
+ *
+ * `consentedReemit` is the author's agreement to a full re-emit of a file whose
+ * change cannot be placed precisely. Only an apply run passes it (the consent is
+ * asked when the change is applied); the output and the preview never do.
  */
-export function capsHandlingFromDecisions(decisions: DecisionSet): CapsHandlingValue | undefined {
-  const value = decisions["caps-handling"]?.value as CapsHandlingValue | undefined;
-  if (value === undefined) return undefined;
-  return isCasedAlphabet(alphabetOf(decisions["character-inventory"]?.value)) ? value : undefined;
+export function openModeProjection(args: {
+  identity: {
+    displayName?: string | undefined;
+    languages?: ReadonlyArray<{ tag: string; name?: string }> | undefined;
+  } | null;
+  /** The starting point's display name; null/undefined (not known) reads as "not edited". */
+  startDisplayName: string | null | undefined;
+  consentedReemit?: boolean;
+  /** What the run is for; picks its row of `PROJECTION_STEPS`. */
+  kind: ProjectionKind;
+}): NonNullable<ProjectWorkingCopyVfsInput["openMode"]> {
+  const { identity, startDisplayName, consentedReemit, kind } = args;
+  return {
+    steps: PROJECTION_STEPS[kind],
+    kps: {
+      nameEdited:
+        startDisplayName !== null &&
+        startDisplayName !== undefined &&
+        identity?.displayName !== undefined &&
+        identity.displayName !== startDisplayName,
+      ...(identity?.languages !== undefined ? { languages: identity.languages } : {}),
+    },
+    ...(consentedReemit === true ? { consentedReemit: true } : {}),
+  };
+}
+
+/**
+ * Open mode: overlays the working copy's current files (`startVfs`) onto `vfs`
+ * in place, so a projection starts from what the author's tools wrote rather
+ * than from the keyboard as fetched. A no-op outside Open or without a
+ * starting-point VFS (Copy is untouched).
+ *
+ * Add / replace, plus delete: a file only `vfs` holds (fetched, never in the
+ * working copy, e.g. a welcome image a draft left out) is kept, but a path in
+ * `removedPaths` (a file an applied change deleted) is dropped from `vfs`.
+ */
+export function applyOpenWorkingCopyFiles(
+  vfs: VirtualFS,
+  instantiationMode: WorkingCopyState["instantiationMode"],
+  startVfs: VirtualFS | null | undefined,
+  removedPaths: readonly string[] = [],
+): void {
+  if (!isOpenMode(instantiationMode) || startVfs === null || startVfs === undefined) return;
+  for (const entry of startVfs.entries()) {
+    vfs.set(entry.path, entry.content, entry.isBinary);
+  }
+  for (const path of removedPaths) {
+    if (startVfs.get(path) === undefined) vfs.delete(path);
+  }
 }
 
 export function projectionInputFromState(
@@ -146,13 +199,58 @@ export function projectionInputFromState(
   extras: ProjectionExtras,
 ): ProjectWorkingCopyVfsInput {
   const { liveLayoutOverride, liveCssOverride, marksTreatment, kmnEdits, capsHandling, ...callSite } = extras;
+  // Open output (spec 111 FR-041, SC-013): every touch edit is in the file (or there is no
+  // touch file and the keyboard ships without one), so no touch overlay is read. The store holds none of them here; say so in development.
+  const openOutputWithTouchFile = extras.openMode?.steps === PROJECTION_STEPS.output;
+  if (openOutputWithTouchFile) {
+    // The store mirrors the file's own text in `touchLayoutJson` after a touch write; that is not a held edit.
+    const touchPath = state.startVfs === null || state.startVfs === undefined ? undefined : findTouchLayoutPath(state.startVfs);
+    const fileText = touchPath === undefined ? null : (readVfsText(state.startVfs!, touchPath) ?? null);
+    const held =
+      (state.touchLayoutJson !== null && state.touchLayoutJson !== fileText) ||
+      state.deletedTouchKeyIds.size > 0 ||
+      state.carveTouchKeepInert.length > 0 ||
+      (liveLayoutOverride !== undefined &&
+        ((liveLayoutOverride.touchLayoutJson !== null && liveLayoutOverride.touchLayoutJson !== fileText) ||
+          liveLayoutOverride.keyEditOps.length > 0));
+    if (held) {
+      devLog.error("[projection] a touch overlay is held on a keyboard opened with a touch file; it is ignored (the file is the layout)");
+    }
+  }
+  // Open output: the stylesheet is in the files (written when applied), so the text the CSS step
+  // holds is never replayed; a held one is a bug, not an overlay.
+  if (
+    extras.openMode?.steps === PROJECTION_STEPS.output &&
+    ((state.customCss !== null && state.customCss !== undefined) || (liveCssOverride !== undefined && liveCssOverride !== null))
+  ) {
+    devLog.error("[projection] a stylesheet overlay is held on a keyboard opened for update; it is ignored (the file is the stylesheet)");
+  }
+  // Open output: a documentation page is in its file (written when edited), so no authored text is held.
+  if (
+    extras.openMode?.steps === PROJECTION_STEPS.output &&
+    (state.authoredWelcomeHtm !== null ||
+      state.authoredReadmeHtm !== null ||
+      state.authoredReadmeMd !== null ||
+      state.authoredHelpPhp !== null)
+  ) {
+    devLog.error("[projection] an authored documentation page is held on a keyboard opened for update; it is ignored (the file is the page)");
+  }
+  // Open output: a carve is in the files (written when applied), so no deleted node or item is held.
+  if (
+    extras.openMode?.steps === PROJECTION_STEPS.output &&
+    (state.deletedNodeIds.size > 0 || state.deletedItemIds.size > 0)
+  ) {
+    devLog.error("[projection] a carve is held on a keyboard opened for update; it is ignored (the file already has it)");
+  }
   // spec 082 FR-018: disabled families' member rules are removed outright.
   // They join the deletion set and are exempt from the fallback-policy
   // expansion, which would otherwise carve them instead.
   const disabledRuleIds = disabledFamilyRuleIds(state.ir, state.disabledFamilyIds);
-  const touchLayoutJson = liveLayoutOverride !== undefined
-    ? liveLayoutOverride.touchLayoutJson
-    : state.touchLayoutJson;
+  const touchLayoutJson = openOutputWithTouchFile
+    ? null
+    : liveLayoutOverride !== undefined
+      ? liveLayoutOverride.touchLayoutJson
+      : state.touchLayoutJson;
   return {
     ...callSite,
     startIr: state.startIr,
@@ -162,15 +260,19 @@ export function projectionInputFromState(
       : new Set([...state.deletedItemIds, ...disabledRuleIds]),
     ...(disabledRuleIds.size > 0 ? { suppressionExemptIds: disabledRuleIds } : {}),
     carveChars: state.carveChars,
-    deletedTouchKeyIds: state.deletedTouchKeyIds,
+    deletedTouchKeyIds: openOutputWithTouchFile ? new Set<string>() : state.deletedTouchKeyIds,
     fallbackPolicy: state.fallbackPolicy,
     // T020 (FR-023): the store array is NFC-normalized at write time.
-    ...(state.carveTouchKeepInert.length > 0
+    ...(!openOutputWithTouchFile && state.carveTouchKeepInert.length > 0
       ? { carveTouchKeepInert: new Set(state.carveTouchKeepInert) }
       : {}),
-    keyEditOps: liveLayoutOverride?.keyEditOps ?? [],
+    keyEditOps: openOutputWithTouchFile ? [] : (liveLayoutOverride?.keyEditOps ?? []),
     deadkeyOps: state.deadkeyOverlay.ops,
     touchLayoutJson,
+    // #2927: the icon step's edited icon. Open output reads the files (the
+    // icon was written when applied), so a held value there is a bug, not
+    // an overlay — null it the way touchLayoutJson is nulled above.
+    iconIcoBase64: openOutputWithTouchFile ? null : state.iconIcoBase64,
     customCss: liveCssOverride !== undefined ? liveCssOverride : state.customCss,
     authoredDocs: {
       authoredWelcomeHtm: state.authoredWelcomeHtm,
@@ -178,8 +280,8 @@ export function projectionInputFromState(
       authoredReadmeMd: state.authoredReadmeMd,
       authoredHelpPhp: state.authoredHelpPhp,
     },
-    // Open is read from the store, not from `openMode`: the preview passes no
-    // openMode, and the authored welcome page must land at the same path on both.
+    // Open is read from the store, not from `openMode`, so the authored welcome
+    // page lands at the same path on every caller whether or not it passes one.
     welcomePath: welcomePagePath(
       isOpenedWithDescriptor(state.instantiationMode, state.startVfs, callSite.keyboardId),
       state.startWelcomeConvention,

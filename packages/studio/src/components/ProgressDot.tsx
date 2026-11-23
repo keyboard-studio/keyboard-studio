@@ -30,7 +30,7 @@
 // Hover is the shortcut, not the mechanism (Q8 resolved): the native `title`
 // attribute mirrors the accessible name (FR-044).
 //
-// `layout="row"` (the narrow-viewport journey contents, JourneyContents.tsx)
+// `layout="row"` (the journey contents list, JourneyContents.tsx)
 // renders the SAME mark beside its visible label as one full-width row
 // button, because a phone has no hover to reveal what a bare dot is. The
 // shape vocabulary and accessible name are identical in both layouts.

@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
+import { PROJECTION_STEPS } from "./projectionSteps.ts";
 import type { ProjectWorkingCopyVfsInput } from "./projectWorkingCopyVfs.ts";
 
 const ID = "tiny";
@@ -36,13 +37,34 @@ function run(opts: { stripSourceLine?: boolean; consent?: boolean }) {
     assignments: [],
     getPattern: () => undefined,
     identity: null,
-    openMode: { kps: { nameEdited: false }, ...(opts.consent === true ? { consentedReemit: true } : {}) },
+    openMode: { kps: { nameEdited: false }, steps: PROJECTION_STEPS.remove, ...(opts.consent === true ? { consentedReemit: true } : {}) },
   };
   const result = projectWorkingCopyVfs(input);
   return { result, text: vfs.get(`source/${ID}.kmn`)!.content as string };
 }
 
 describe("projectWorkingCopyVfs: Open mode", () => {
+  it("an output run carves nothing: a held carve set is not replayed", () => {
+    const vfs = createVirtualFS();
+    vfs.set(`source/${ID}.kmn`, KMN, false);
+    const startIr = parseKmn(KMN, ID).ir;
+    const rule = startIr.groups.find((g) => !g.readonly)!.rules[0]!;
+    const result = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: ID,
+      startIr,
+      deletedNodeIds: new Set([rule.nodeId]),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+      targetKeyboardId: "renamed",
+      openMode: { kps: { nameEdited: false }, steps: PROJECTION_STEPS.output },
+    });
+    expect(vfs.get(`source/${ID}.kmn`)!.content).toBe(KMN);
+    expect(result.reformatRequired).toBeUndefined();
+    expect(result.effectiveKeyboardId).toBeUndefined();
+  });
+
   it("splices a deleted rule out of the text and keeps CRLF and the comment", () => {
     const { result, text } = run({});
     expect(result.reformatRequired).toBeUndefined();

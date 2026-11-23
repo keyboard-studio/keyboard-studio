@@ -50,6 +50,7 @@
 // a second enumeration of the WorkingCopyData field list.
 
 import type {
+  KeyboardIR,
   FallbackPolicy,
   RemovalCapability,
   VirtualFS,
@@ -57,13 +58,19 @@ import type {
   WelcomeFolderImage,
 } from "@keyboard-studio/contracts";
 import { createVirtualFS, mergePhaseResults } from "@keyboard-studio/contracts";
-import { classifyRemovalCapabilities, parseKpsLanguages, rewriteKpsBuildEntries } from "@keyboard-studio/engine";
+import { languagesFromKps } from "./kpsLanguages.ts";
+import { classifyRemovalCapabilities, rewriteKpsBuildEntries } from "@keyboard-studio/engine";
+import { modelsFromKmnText } from "./modelsFromKmnText.ts";
+import { devLog } from "@keyboard-studio/contracts/dev-log";
+import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
 import type { KeyEditOverlay, StartDocCssText } from "@keyboard-studio/engine";
 import type { DeadkeyOverlay } from "./deadkeyOps.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { WorkingCopyData, TouchEditorMode } from "../stores/workingCopyStore.ts";
 import { useGuardIntentStore } from "../stores/guardIntentStore.ts";
+import { clearOpenSession } from "../stores/openUndoStore.ts";
 import { pinnedProxyBase, pinnedSourceFor } from "./openSourceChoice.ts";
+import { isLiveOpen } from "./openMode.ts";
 import { migrateFallbackPolicy } from "../survey/carve/fallbackPolicyMigration.ts";
 
 // ---------------------------------------------------------------------------
@@ -361,6 +368,106 @@ function serializeStartVfsEntries(startVfs: VirtualFS | null): SerializedEntry[]
  * immutable base file tree on every write.
  */
 export function snapshotWorkingCopyData(): WorkingCopySnapshot {
+  const snapshot = buildWorkingCopySnapshot();
+  // A keyboard opened for update is saved as its current files (`startVfsEntries`)
+  // plus the record; state held for the Copy path is never written (spec 111 FR-049).
+  return isLiveOpen(useWorkingCopyStore.getState()) ? { ...snapshot, ...OPEN_UNUSED_HELD_STATE } : snapshot;
+}
+
+/**
+ * Held state a keyboard opened for update no longer uses: its edits live in the
+ * files, and no live-Open path writes or reads these (the values are the store
+ * defaults). `keyEditOverlay`, `deletedTouchKeyIds` and `deadkeyOverlay` are
+ * deliberately NOT here: the touch-layout and deadkey decisions are derived from
+ * them. `narrowedGuardQuestions` / `dismissedMissingGroups` / `keptGuardRuleIds`
+ * are also kept: they are keyed by question text, group name or rule id, and a
+ * restore that re-reads changed rules clears the rule-id set
+ * (`clearGuardRuleIdsIfModelsChanged`).
+ */
+const OPEN_UNUSED_HELD_STATE = {
+  customCss: null,
+  iconIcoBase64: null,
+  authoredWelcomeHtm: null,
+  authoredReadmeHtm: null,
+  authoredReadmeMd: null,
+  authoredHelpPhp: null,
+  carveTouchKeepInert: [] as string[],
+  contextToleranceOverlay: null,
+  deletedNodeIds: [] as string[],
+  deletedItemIds: [] as string[],
+  carveChars: [] as string[],
+} satisfies Partial<WorkingCopySnapshot>;
+
+/**
+ * The restore-side rules for a keyboard opened for update, applied to a patch
+ * (or state) BEFORE it is committed so a restore stays atomic. Held state
+ * unused on Open is reset, and the models (`startIr`, `ir`, capabilities) are
+ * read from the `.kmn` text in the files so they stay the one truth (FR-043,
+ * FR-049); id-keyed sets are reset as a file edit's wipe would. An unreadable
+ * `.kmn` keeps the saved models. Not live Open: returned unchanged.
+ */
+export function withOpenRestoreRules(patch: Partial<WorkingCopyData>): Partial<WorkingCopyData> {
+  if (!isLiveOpen(patch as Parameters<typeof isLiveOpen>[0])) return patch;
+  const out: Partial<WorkingCopyData> = {
+    ...patch,
+    customCss: null,
+    // The icon is in the files on Open (written when applied, #2927).
+    iconIcoBase64: null,
+    authoredWelcomeHtm: null,
+    authoredReadmeHtm: null,
+    authoredReadmeMd: null,
+    authoredHelpPhp: null,
+    carveTouchKeepInert: [],
+    contextToleranceOverlay: null,
+    deletedNodeIds: new Set<string>(),
+    deletedItemIds: new Set<string>(),
+    carveChars: new Set<string>(),
+    undoStack: (patch.undoStack ?? []).filter((e) => e.k === "k" || e.k === "kb"),
+    ...(patch.carveSuggestion ? { carveSuggestion: { ...patch.carveSuggestion, derived: [] } } : {}),
+  };
+  const vfs = patch.startVfs;
+  const id = patch.startKeyboard?.id;
+  if (vfs === null || vfs === undefined || id === undefined) return out;
+  try {
+    const text = vfs.get(`source/${id}.kmn`)?.content;
+    if (typeof text !== "string") return out;
+    const touchPath = findTouchLayoutPath(vfs);
+    const touchContent = touchPath === undefined ? undefined : vfs.get(touchPath)?.content;
+    const models = modelsFromKmnText(
+      text,
+      id,
+      // No touch file in the saved files means no layout: a stale saved layout is not kept.
+      typeof touchContent === "string" ? touchContent : null,
+      undefined,
+    );
+    if (!models.ok) {
+      devLog.error("open restore: the saved .kmn could not be read; keeping the saved models", models.error);
+      return out;
+    }
+    return { ...out, startIr: models.ir, ir: models.ir, removalCapabilities: models.capabilities };
+  } catch (err) {
+    devLog.error("open restore: the saved .kmn could not be read; keeping the saved models", err);
+    return out;
+  }
+}
+
+/**
+ * After a restore or repair re-read an opened keyboard's models: when the rules
+ * and stores differ from the saved ones (a stale draft), the rule ids the guard
+ * intent holds point at other rules, so clear them as a live file edit's wipe
+ * does. Only the id-keyed state; question and group dispositions stay.
+ */
+export function clearGuardRuleIdsIfModelsChanged(
+  saved: KeyboardIR | null | undefined,
+  patch: Partial<WorkingCopyData>,
+): void {
+  if (!isLiveOpen(patch as Parameters<typeof isLiveOpen>[0])) return;
+  const shape = (ir: KeyboardIR | null | undefined): string => JSON.stringify([ir?.stores, ir?.groups]);
+  if (shape(saved) === shape(patch.startIr)) return;
+  useGuardIntentStore.setState({ keptGuardRuleIds: new Set(), narrowUndoStack: [] });
+}
+
+function buildWorkingCopySnapshot(): WorkingCopySnapshot {
   const s = useWorkingCopyStore.getState();
   const startWelcomeImages = serializeWelcomeImages(s.startWelcomeImages);
   return {
@@ -437,6 +544,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     sequenceFlaggedChars: s.sequenceFlaggedChars,
     touchLayoutJson: s.touchLayoutJson,
     customCss: s.customCss,
+    iconIcoBase64: s.iconIcoBase64,
     authoredWelcomeHtm: s.authoredWelcomeHtm,
     authoredReadmeHtm: s.authoredReadmeHtm,
     authoredReadmeMd: s.authoredReadmeMd,
@@ -542,6 +650,10 @@ function normalizeStartDocCssTexts(
 }
 
 export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<WorkingCopyData> {
+  return withOpenRestoreRules(prepareSnapshotPatch(input));
+}
+
+function prepareSnapshotPatch(input: WorkingCopySnapshot): Partial<WorkingCopyData> {
   const snapshot = withLegacySnapshotKeys(input);
   const startVfs = createVirtualFS(snapshot.startVfsEntries.map(deserializeEntry));
 
@@ -622,7 +734,10 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     touchLayoutJson: snapshot.touchLayoutJson,
     // Drafts saved before the CSS step wrote a value carry no key.
     customCss: snapshot.customCss ?? null,
-    // Drafts saved before the Documentation step wrote a value carry no key.
+    // Drafts saved before the icon step wrote a value carry no key (#2927).
+    iconIcoBase64: snapshot.iconIcoBase64 ?? null,
+    // Drafts saved before the Documentation step wrote a value carry no key. A keyboard opened for
+    // update ignores these (the pages are in the files; no migration of older Open drafts, spec 111 FR-049).
     authoredWelcomeHtm: snapshot.authoredWelcomeHtm ?? null,
     authoredReadmeHtm: snapshot.authoredReadmeHtm ?? null,
     authoredReadmeMd: snapshot.authoredReadmeMd ?? null,
@@ -657,7 +772,7 @@ export function prepareWorkingCopySnapshot(input: WorkingCopySnapshot): Partial<
     // spec 083: tolerant read, same idiom as keyEditOverlay above — a
     // pre-083 snapshot has no key, which reads as "no deadkey edits".
     deadkeyOverlay: snapshot.deadkeyOverlay ?? { ops: [] },
-    touchEditorMode: snapshot.touchEditorMode ?? "character",
+    touchEditorMode: snapshot.touchEditorMode ?? "key",
     contextToleranceOverlay: snapshot.contextToleranceOverlay ?? null,
     contextNormalizationStep: snapshot.contextNormalizationStep ?? null,
     // spec 090 T063: a pre-090 snapshot may still carry the retired
@@ -745,7 +860,10 @@ export function rehydrateWorkingCopyFromSession(): boolean {
     // instantiationMode was already checked non-null above — patch directly
     // into the ONE working-copy store (Article III — restore never
     // constructs a second working copy).
-    useWorkingCopyStore.setState(prepareWorkingCopySnapshot(snapshot));
+    const patch = prepareWorkingCopySnapshot(snapshot);
+    useWorkingCopyStore.setState(patch);
+    // A restored project has none of the previous session's applied changes.
+    clearOpenSession();
     // spec 082 FR-020/FR-022: guard-intent dispositions live in their own
     // store; restore them alongside. Tolerate pre-082 snapshots (absent →
     // empty, never re-ask nothing).
@@ -754,6 +872,7 @@ export function rehydrateWorkingCopyFromSession(): boolean {
       dismissedMissingGroups: new Set(snapshot.dismissedMissingGroups ?? []),
       narrowedGuardQuestions: new Set(snapshot.narrowedGuardQuestions ?? []),
     });
+    clearGuardRuleIdsIfModelsChanged(snapshot.startIr, patch);
 
     return true;
   } catch {
@@ -821,14 +940,18 @@ export async function repairOpenDraftDescriptor(deps?: {
 
   const vfs = createVirtualFS(current.startVfs.entries());
   vfs.set(kpsPath, rewriteKpsBuildEntries(text, startKeyboard.id), false);
-  const languages = parseKpsLanguages(text).map((l) => ({ tag: l.tag, name: l.name }));
+  const languages = languagesFromKps(text);
   const identity = current.identity;
-  useWorkingCopyStore.setState({
-    startVfs: vfs,
-    ...(identity !== null && identity.languages === undefined && languages.length > 0
-      ? { identity: { ...identity, languages } }
-      : {}),
+  // The keyboard is now live Open: apply the same restore rules as a restore.
+  const repaired = withOpenRestoreRules({
+      ...current,
+      startVfs: vfs,
+      ...(identity !== null && identity.languages === undefined && languages.length > 0
+        ? { identity: { ...identity, languages } }
+        : {}),
   });
+  useWorkingCopyStore.setState(repaired);
+  clearGuardRuleIdsIfModelsChanged(current.startIr, repaired);
 
   const carriedFiles: string[] = [];
   if (current.startReadmeMdText !== null) carriedFiles.push("README.md");

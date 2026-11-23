@@ -97,6 +97,22 @@ describe("DeadkeyTablePanel", () => {
     expect((within(o!).getByTestId("deadkey-table-keystroke-result") as HTMLInputElement).value).toBe("ó");
   });
 
+  it("read-only: shows every row with its inputs and edit buttons disabled, and offers nothing to add", () => {
+    const before = text();
+    panel({ readOnly: true, proposeSpaceRow: true });
+    for (const row of [...screen.getAllByTestId("deadkey-table-fanout-row"), ...screen.getAllByTestId("deadkey-table-keystroke-row")]) {
+      for (const control of within(row).queryAllByRole("textbox")) expect((control as HTMLInputElement).disabled).toBe(true);
+      for (const id of ["deadkey-table-fanout-change", "deadkey-table-fanout-remove", "deadkey-table-keystroke-change", "deadkey-table-keystroke-remove"]) {
+        const button = within(row).queryByTestId(id) as HTMLButtonElement | null;
+        if (button !== null) expect(button.disabled).toBe(true);
+      }
+    }
+    expect(screen.queryByTestId("deadkey-table-add")).toBeNull();
+    expect(screen.queryByTestId("deadkey-table-add-key-row")).toBeNull();
+    expect(screen.queryByTestId("deadkey-table-space-confirm")).toBeNull();
+    expect(text()).toBe(before);
+  });
+
   it("adds a fan-out row: one confirm is one ld undo step, and undo restores the text", () => {
     panel();
     const before = text();

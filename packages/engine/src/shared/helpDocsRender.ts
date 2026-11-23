@@ -293,6 +293,37 @@ function renderDocBodyHtml(input: HelpDocsRenderInput, inherited: boolean): stri
   return renderDocForm(DOC_FORMS.forms.body, slots).replace(/\n+$/, "");
 }
 
+/** Options for rendering a FRESH page (no inherited text). The default render is unchanged by them. */
+export interface FreshPageOptions {
+  /**
+   * Wrap the generated sections in the `ks:generated` markers and leave the fresh-only
+   * introduction (heading, description, language line) outside them, so the page has the
+   * shape an inherited page is given: a later regeneration replaces the block in place
+   * instead of appending a second copy. Used where a page is created on Open.
+   */
+  markGenerated?: boolean;
+}
+
+/**
+ * A fresh page body with its generated sections marked: the fresh-only introduction first,
+ * then one marked block holding exactly what the inherited render splices (`extra` is the
+ * welcome layout section). With nothing generated no block is written, as an inherited page
+ * with nothing generated ships verbatim.
+ */
+function renderMarkedFreshBody(input: HelpDocsRenderInput, extra: string): string {
+  const description = descriptionOf(input);
+  const intro = renderDocForm(DOC_FORMS.forms.body, {
+    displayName: escapeDocHtml(input.displayName),
+    pageHeading: "1",
+    description: description !== undefined ? escapeDocHtml(description) : "",
+    noDescription: description === undefined ? "1" : "",
+    languages: languageLineOf(input),
+  }).replace(/\n+$/, "");
+  const generated = [renderDocBodyHtml(input, true), extra].filter((part) => part !== "").join("\n");
+  if (generated === "") return intro;
+  return `${intro}\n${DOC_GENERATED_START}\n${generated}\n${DOC_GENERATED_END}`;
+}
+
 /** The generated sections, marked, spliced into an inherited page before `</body>` (FR-033). */
 function spliceGenerated(inheritedPage: string, generated: string): string {
   return insertBeforeClosingBody(inheritedPage, `${DOC_GENERATED_START}\n${generated}\n${DOC_GENERATED_END}`);
@@ -779,6 +810,7 @@ export function renderWelcomeHtm(
   startWelcomeHtmText: string | null,
   welcomeImageFiles: readonly string[] = [],
   startHelpPhpText: string | null = null,
+  options: FreshPageOptions = {},
 ): string {
   const lang = descriptionOf(input) !== undefined ? proseLang(input.answers, input.primaryBcp47) : undefined;
 
@@ -811,12 +843,13 @@ export function renderWelcomeHtm(
   // inherited paths above keep their description-gated `lang`: retagging a
   // base page the author has not touched is not this render's business.
   const freshLang = proseLang(input.answers, input.primaryBcp47);
+  const marked = options.markGenerated === true;
   return renderDocForm(DOC_FORMS.forms.welcome, {
     docLang: freshLang !== undefined ? escapeDocHtml(freshLang) : "",
     displayName: escapeDocHtml(input.displayName),
     pageStyle: DOC_PAGE_STYLE,
-    body: renderDocBodyHtml(input, false),
-    layoutPictures: renderWelcomeLayoutSection(welcomeImageFiles),
+    body: marked ? renderMarkedFreshBody(input, renderWelcomeLayoutSection(welcomeImageFiles)) : renderDocBodyHtml(input, false),
+    layoutPictures: marked ? "" : renderWelcomeLayoutSection(welcomeImageFiles),
   });
 }
 
@@ -887,6 +920,7 @@ export function renderHelpPhp(
   input: HelpDocsRenderInput,
   startHelpPhpText: string | null,
   startWelcomeHtmText: string | null = null,
+  options: FreshPageOptions = {},
 ): string {
   const { answers, displayName, primaryBcp47 } = input;
   if (startHelpPhpText === null && startWelcomeHtmText !== null) {
@@ -930,6 +964,6 @@ export function renderHelpPhp(
   return renderDocForm(DOC_FORMS.forms.help, {
     helpHeader: helpSiteHeader(displayName, `<style>${DOC_PAGE_STYLE}</style>`),
     pageStyle: "",
-    body: renderDocBodyHtml(input, false),
+    body: options.markGenerated === true ? renderMarkedFreshBody(input, "") : renderDocBodyHtml(input, false),
   });
 }

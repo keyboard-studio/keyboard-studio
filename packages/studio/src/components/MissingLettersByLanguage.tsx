@@ -7,15 +7,18 @@
 // Removal records the same `language-list` decision the Languages step does,
 // so the .kps patch and the next criteria run both follow it.
 
+import { useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 
 import { Button } from "../ui/Button.tsx";
-import { BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
+import { BORDER, ERROR_TEXT, FONT, TEXT_DIM } from "../ui/theme.ts";
 import { sectionHeading } from "../survey/surveyStyles.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { decideGalleryValue } from "../steps/galleryHost.tsx";
 import { buildGalleryHostDeps } from "../lib/galleryHostDeps.ts";
 import languageListModule from "../survey/questions/gallery/languageList.ts";
+import { commitDescriptorOnOpen } from "../lib/descriptorOpenCommit.ts";
+import { useApplyOnOpen } from "./OpenApplyHost.tsx";
 
 export interface LanguageGroup {
   tag: string;
@@ -76,6 +79,8 @@ export function MissingLettersByLanguage({
   const { t } = useLingui();
   const identity = useWorkingCopyStore((s) => s.identity);
   const setIdentity = useWorkingCopyStore((s) => s.setIdentity);
+  const applyOnOpen = useApplyOnOpen();
+  const [blocked, setBlocked] = useState(false);
   const languages = identity?.languages ?? [];
   const groups = groupMissingByLanguage(
     missing,
@@ -86,8 +91,14 @@ export function MissingLettersByLanguage({
 
   const remove = (tag: string): void => {
     const next = languages.filter((l) => l.tag.toLowerCase() !== tag.toLowerCase());
-    decideGalleryValue(languageListModule, next, { provenance: "asked" }, "open_languages", buildGalleryHostDeps());
-    setIdentity({ ...identity, languages: next });
+    // On Open the removal is written into the `.kps` now and identity follows the file;
+    // a write that did not happen records nothing.
+    void commitDescriptorOnOpen({ languages: next }, applyOnOpen).then((outcome) => {
+      setBlocked(outcome === "no-descriptor");
+      if (outcome === "no-descriptor" || outcome === "not-applied") return;
+      decideGalleryValue(languageListModule, next, { provenance: "asked" }, "open_languages", buildGalleryHostDeps());
+      if (outcome === "off-open") setIdentity({ ...(useWorkingCopyStore.getState().identity ?? {}), languages: next });
+    });
   };
 
   return (
@@ -107,6 +118,13 @@ export function MissingLettersByLanguage({
           </Trans>
         )}
       </p>
+      {blocked && (
+        <p role="alert" style={{ margin: "0 0 4px", color: ERROR_TEXT }}>
+          <Trans id="missingLetters.writeBlocked">
+            The language could not be removed from the keyboard's package, so the list was not changed.
+          </Trans>
+        </p>
+      )}
       <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {groups.map(({ tag, chars }) => {
           const entry = languages.find((l) => l.tag.toLowerCase() === tag.toLowerCase());

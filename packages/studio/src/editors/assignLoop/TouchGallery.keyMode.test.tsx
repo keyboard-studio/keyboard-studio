@@ -112,7 +112,7 @@ function seedKeyModeFixture(opts: {
 }
 
 describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)", () => {
-  it("renders a tablist with three tabs, 'Place Letters' selected by default", async () => {
+  it("renders a tablist with three tabs; a seeded walk opens on 'Place Letters'", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
@@ -164,7 +164,7 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
     expect(screen.getByText("Touch preview")).toBeTruthy();
   });
 
-  it("clicking the 'Manage Layout' tab switches to the editable schematic grid, labelled 'for editing', with the live preview gone; clicking back returns to the character walk and brings it back", async () => {
+  it("clicking the 'Manage Layout' tab switches to the editable schematic grid, with the live preview gone; clicking back returns to the character walk and brings it back", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
@@ -178,9 +178,7 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
       fireEvent.click(screen.getByTestId("touch-mode-tab-key"));
     });
 
-    // The grid pane still names itself "for editing" (FR-020h/FR-035).
     expect(screen.getByTestId("touch-key-mode-back")).toBeTruthy();
-    expect(screen.getByText(/for editing/i)).toBeTruthy();
 
     // But the "for testing" OSK preview is GONE, not merely relabelled —
     // spec 065 FR-024/T037: key mode uses the full pane width and does not
@@ -208,9 +206,12 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
 
   it("ArrowRight on the tablist moves AND selects the next tab (APG automatic activation)", async () => {
     seedStore({ withInventory: ["ä"] });
+    // Start where an author lands: Manage Layout, the first tab.
+    useWorkingCopyStore.getState().setTouchEditorMode("key");
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
+    expect(screen.getByTestId("touch-key-mode-back")).toBeTruthy();
 
     await act(async () => {
       fireEvent.keyDown(screen.getByTestId("touch-mode-tabs"), {
@@ -219,11 +220,11 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
     });
 
     expect(
-      screen.getByTestId("touch-mode-tab-key").getAttribute("aria-selected"),
+      screen.getByTestId("touch-mode-tab-character").getAttribute("aria-selected"),
     ).toBe("true");
-    expect(screen.getByTestId("touch-key-mode-back")).toBeTruthy();
+    expect(screen.getByText("Touch mapping")).toBeTruthy();
 
-    // ArrowRight from the key tab advances to the code tab (three-tab strip).
+    // ArrowRight from Place Letters advances to the code tab (three-tab strip).
     await act(async () => {
       fireEvent.keyDown(screen.getByTestId("touch-mode-tabs"), {
         key: "ArrowRight",
@@ -237,7 +238,7 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
       expect(screen.getByTestId("touch-code-pane")).toBeTruthy();
     });
 
-    // End/Home wrap correctly too — Home from the code tab returns to character.
+    // End/Home wrap correctly too — Home from the code tab returns to Manage Layout.
     await act(async () => {
       fireEvent.keyDown(screen.getByTestId("touch-mode-tabs"), {
         key: "Home",
@@ -245,7 +246,7 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
     });
     expect(
       screen
-        .getByTestId("touch-mode-tab-character")
+        .getByTestId("touch-mode-tab-key")
         .getAttribute("aria-selected"),
     ).toBe("true");
   });

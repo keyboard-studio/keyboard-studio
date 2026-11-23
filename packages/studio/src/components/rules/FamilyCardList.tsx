@@ -26,6 +26,9 @@ import { groupRules, type RuleFamily } from "./ruleFamilies.ts";
 import { formatRuleSummary } from "../ruleBuilder/RuleBuilderPanel.tsx";
 import { BG_CARD, BORDER, FONT_MONO, TEXT_DIM, TEXT_MAIN } from "../../ui/theme.ts";
 import { Button } from "../../ui/Button.tsx";
+import { useApplyOnOpen } from "../OpenApplyHost.tsx";
+import { useIsLiveOpen, useOpenRemovals } from "../../editors/carve/useRemovalActions.ts";
+import type { OpenRemovalEntry } from "../../stores/openRemovalStore.ts";
 import { secondaryButton } from "../../survey/surveyStyles.ts";
 
 /** Scroll the demo pane into view and focus its input. */
@@ -46,10 +49,24 @@ function focusBuilder(): void {
     ?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function FamilyCard({ family, rules }: { family: RuleFamily; rules: IRRule[] }) {
+function FamilyCard({ family, rules, readOnly }: { family: RuleFamily; rules: IRRule[]; readOnly: boolean }) {
   const [expanded, setExpanded] = useState(false);
-  const toggleFamilyDisabled = useWorkingCopyStore((s) => s.toggleFamilyDisabled);
+  const storeToggleFamilyDisabled = useWorkingCopyStore((s) => s.toggleFamilyDisabled);
   const isDisabled = useWorkingCopyStore((s) => s.disabledFamilyIds.has(family.id));
+  const live = useIsLiveOpen();
+  const applyOnOpen = useApplyOnOpen();
+  // Open (spec 111 live files): turning a group off removes its rules from the
+  // file when applied; nothing is held in `disabledFamilyIds`.
+  const toggleFamilyDisabled = (familyId: string) => {
+    if (!live) return storeToggleFamilyDisabled(familyId);
+    void applyOnOpen({
+      kind: "remove",
+      itemIds: [],
+      chars: [],
+      disabledRuleIds: [...family.memberIds],
+      family: { id: family.id, name: family.name, count: family.count },
+    });
+  };
   const setBundleFamilyId = useRulesStepUiStore((s) => s.setBundleFamilyId);
 
   const toggleExpanded = () => {
@@ -152,25 +169,29 @@ function FamilyCard({ family, rules }: { family: RuleFamily; rules: IRRule[] }) 
         >
           <Trans id="rules.familyCard.test">Test this group</Trans>
         </Button>
-        <Button
-          style={secondaryButton}
-          data-testid={`family-card-bundle-${family.id}`}
-          onClick={bundleAsPack}
-        >
-          <Trans id="rules.familyCard.bundle">Bundle as pack</Trans>
-        </Button>
-        <Button
-          style={secondaryButton}
-          data-testid={`family-card-disable-${family.id}`}
-          onClick={() => toggleFamilyDisabled(family.id)}
-          aria-pressed={isDisabled}
-        >
-          {isDisabled ? (
-            <Trans id="rules.familyCard.enable">Enable group</Trans>
-          ) : (
-            <Trans id="rules.familyCard.disable">Disable group</Trans>
-          )}
-        </Button>
+        {!readOnly && (
+          <>
+            <Button
+              style={secondaryButton}
+              data-testid={`family-card-bundle-${family.id}`}
+              onClick={bundleAsPack}
+            >
+              <Trans id="rules.familyCard.bundle">Bundle as pack</Trans>
+            </Button>
+            <Button
+              style={secondaryButton}
+              data-testid={`family-card-disable-${family.id}`}
+              onClick={() => toggleFamilyDisabled(family.id)}
+              aria-pressed={isDisabled}
+            >
+              {isDisabled ? (
+                <Trans id="rules.familyCard.enable">Enable group</Trans>
+              ) : (
+                <Trans id="rules.familyCard.disable">Disable group</Trans>
+              )}
+            </Button>
+          </>
+        )}
       </div>
       {isDisabled && (
         <p style={{ margin: "6px 0 0", color: TEXT_DIM, fontSize: 13 }}>
@@ -184,8 +205,46 @@ function FamilyCard({ family, rules }: { family: RuleFamily; rules: IRRule[] }) 
   );
 }
 
-export function FamilyCardList() {
+/** A group turned off on Open: its rules are out of the file, so the card is built from the record. */
+function DisabledFamilyCard({ entry, readOnly }: { entry: OpenRemovalEntry; readOnly: boolean }) {
+  const applyOnOpen = useApplyOnOpen();
+  const family = entry.family;
+  if (family === undefined) return null;
+  return (
+    <section
+      data-testid={`family-card-${family.id}`}
+      aria-label={family.name}
+      style={{ border: `1px solid ${BORDER}`, background: BG_CARD, borderRadius: 8, padding: 12, marginBottom: 10 }}
+    >
+      <strong style={{ color: TEXT_MAIN }}>{family.name}</strong>
+      {!readOnly && (
+        <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+          <Button
+            style={secondaryButton}
+            data-testid={`family-card-disable-${family.id}`}
+            onClick={() => void applyOnOpen({ kind: "reinsert", entries: [entry] })}
+            aria-pressed
+          >
+            <Trans id="rules.familyCard.enable">Enable group</Trans>
+          </Button>
+        </div>
+      )}
+      <p style={{ margin: "6px 0 0", color: TEXT_DIM, fontSize: 13 }}>
+        <Trans id="rules.familyCard.disabledNote">
+          This group&apos;s rules are excluded from the demo and the compiled keyboard.
+          Re-enable to restore them.
+        </Trans>
+      </p>
+    </section>
+  );
+}
+
+/** `readOnly`: the cards show the rules and Test, without Bundle or Disable / Enable. */
+export function FamilyCardList({ readOnly = false }: { readOnly?: boolean } = {}) {
   const ir = useWorkingCopyStore((s) => s.ir);
+  const live = useIsLiveOpen();
+  const removals = useOpenRemovals();
+  const disabledOnOpen = live ? removals.filter((e) => e.family !== undefined) : [];
 
   const groups = useMemo(() => {
     if (ir === null) return [];
@@ -200,12 +259,15 @@ export function FamilyCardList() {
   }, [ir]);
 
   if (ir === null) return null;
-  if (groups.length === 0) return null;
+  if (groups.length === 0 && disabledOnOpen.length === 0) return null;
 
   return (
     <div data-testid="family-card-list">
       {groups.map(({ family, rules }) => (
-        <FamilyCard key={family.id} family={family} rules={rules} />
+        <FamilyCard key={family.id} family={family} rules={rules} readOnly={readOnly} />
+      ))}
+      {disabledOnOpen.map((entry) => (
+        <DisabledFamilyCard key={entry.id} entry={entry} readOnly={readOnly} />
       ))}
     </div>
   );

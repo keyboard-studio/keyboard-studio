@@ -21,6 +21,7 @@ import { useLingui } from "@lingui/react/macro";
 import { allocateDeadkeyId, listDeadkeys } from "@keyboard-studio/contracts";
 import type { KmnEdit, LayerCombo } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { selectLayoutIr } from "./layoutIr.ts";
 import type { CommitKmnEditResult, KmnEditInput, KmnEditRefusal } from "../../stores/workingCopyStore.ts";
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { completeDeadkeysStep } from "../../lib/mechanismStepCompletion.ts";
@@ -55,7 +56,7 @@ export function KeyEditPanel({ cell, onViewInCode, onCommitted, onDeadkeyDefined
   const copy = useLayoutCopy();
   const ids = { text: useId(), inventory: useId(), nothing: useId(), partner: useId(), keep: useId(), deadkey: useId(), target: useId(), display: useId() };
 
-  const ir = useWorkingCopyStore((s) => s.ir);
+  const ir = useWorkingCopyStore(selectLayoutIr);
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const declined = useWorkingCopyStore((s) => s.displacedDeclined);
   const entries = useDecisionStore(
@@ -142,40 +143,56 @@ export function KeyEditPanel({ cell, onViewInCode, onCommitted, onDeadkeyDefined
     const store = useWorkingCopyStore.getState();
     let ref = target;
     if (makesNew) {
-      const current = store.ir;
+      const current = selectLayoutIr(store);
       if (current === null) {
         setRefusal("no-working-copy");
         return;
       }
       const id = allocateDeadkeyId(current);
       ref = hexId(id);
-      const defined = store.commitLayoutDeadkeyOp({
-        kind: "define",
-        triggerKey: cell.vkey,
-        ...(layer.length > 0 ? { triggerModifiers: [...layer] } : {}),
-        id,
-        accentChar: displayChar,
-      });
+      // Everything after a successful define runs once it is in the file: now, or on the author's
+      // agreement when asked first; never on a decline.
+      const done = (): void => {
+        completeDeadkeysStep();
+        setRefusal(null);
+        setDeadkeyMode(false);
+        setDisplayText("");
+        onDeadkeyDefined?.(ref);
+      };
+      const defined = store.commitLayoutDeadkeyOp(
+        {
+          kind: "define",
+          triggerKey: cell.vkey,
+          ...(layer.length > 0 ? { triggerModifiers: [...layer] } : {}),
+          id,
+          accentChar: displayChar,
+        },
+        { onAppliedLater: done },
+      );
       if (!defined.ok) {
         setRefusal(defined.reason);
         return;
       }
+      if (!defined.pending) done();
+      return;
+    }
+    const finish = (result: Extract<CommitKmnEditResult, { ok: true }>): void => {
       completeDeadkeysStep();
       setRefusal(null);
       setDeadkeyMode(false);
-      setDisplayText("");
-      onDeadkeyDefined?.(ref);
-      return;
-    }
-    const result = store.commitKmnEdit({ op: "set-key", vkey: cell.vkey, layer, output: { kind: "deadkey", deadkeyId: ref } });
+      onCommitted?.(result);
+    };
+    let landed: Extract<CommitKmnEditResult, { ok: true }> | null = null;
+    const result = store.commitKmnEdit(
+      { op: "set-key", vkey: cell.vkey, layer, output: { kind: "deadkey", deadkeyId: ref } },
+      { onAppliedLater: () => finish(landed ?? { ok: true, seqs: [] }) },
+    );
     if (!result.ok) {
       setRefusal(result.reason);
       return;
     }
-    completeDeadkeysStep();
-    setRefusal(null);
-    setDeadkeyMode(false);
-    onCommitted?.(result);
+    landed = result;
+    if (!result.pending) finish(result);
   }
 
   function commit(): void {
@@ -205,21 +222,39 @@ export function KeyEditPanel({ cell, onViewInCode, onCommitted, onDeadkeyDefined
       });
     }
 
-    const result = useWorkingCopyStore
-      .getState()
-      .commitKmnEdit(op, { ...(partnerInput !== undefined ? { partner: partnerInput } : {}), extra });
+    // The displaced character is declined only once the key is in the file: now, or on the
+    // author's agreement when asked first; nothing is recorded on a decline.
+    const declineKey = lost && !keep ? displacement.declineKey : null;
+    const recordDecline = (): void => {
+      if (declineKey !== null) useWorkingCopyStore.getState().declineDisplacement(declineKey);
+    };
+    // The panel resets and reports the commit only once the change is in the file: now, or on the
+    // author's agreement when asked first. A pending change keeps the author's input in place, so a
+    // decline leaves the panel as it was.
+    const landed = (r: Extract<CommitKmnEditResult, { ok: true }>): void => {
+      recordDecline();
+      setRefusal(null);
+      setText("");
+      setNothing(false);
+      setConfirmOverride(false);
+      onCommitted?.(r);
+    };
+    const result = useWorkingCopyStore.getState().commitKmnEdit(op, {
+      ...(partnerInput !== undefined ? { partner: partnerInput } : {}),
+      extra,
+      onAppliedLater: () => {
+        if (result.ok) landed(result);
+      },
+    });
     if (!result.ok) {
       setRefusal(result.reason);
       return;
     }
-    if (lost && !keep && displacement.declineKey !== null) {
-      useWorkingCopyStore.getState().declineDisplacement(displacement.declineKey);
+    if (result.pending) {
+      setRefusal(null);
+      return;
     }
-    setRefusal(null);
-    setText("");
-    setNothing(false);
-    setConfirmOverride(false);
-    onCommitted?.(result);
+    landed(result);
   }
 
   function onConfirm(): void {
@@ -240,6 +275,8 @@ export function KeyEditPanel({ cell, onViewInCode, onCommitted, onDeadkeyDefined
         return t({ id: "editor.layout.edit.refusedReadOnly", message: "This key is read-only, so the change was not made. You can change it in the Code tab." });
       case "no-working-copy":
         return t({ id: "editor.layout.edit.refusedNoKeyboard", message: "There is no keyboard to change yet." });
+      case "no-host":
+        return t({ id: "editor.layout.edit.refusedNoHost", message: "The change needs your agreement, but nothing could ask you, so it was not made. Your files are unchanged." });
       case "refused":
         return t({ id: "editor.layout.edit.refusedOther", message: "The keyboard code cannot take this change here. You can change it in the Code tab." });
     }

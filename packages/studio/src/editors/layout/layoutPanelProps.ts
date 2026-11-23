@@ -5,4 +5,6 @@
 export interface LayoutPanelProps {
   /** Switch to the Code tab and reveal the source line of this IR node. */
   readonly onViewInCode: (nodeId: string) => void;
+  /** Show the layout without letting it change (a basic keyboard opened for update). */
+  readonly readOnly?: boolean;
 }

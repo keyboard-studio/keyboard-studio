@@ -11,6 +11,10 @@
 import { useLingui } from "@lingui/react/macro";
 import { useStepNavStore, hasSlots, type NavAction } from "../stores/stepNavStore.ts";
 import { Button, type ButtonVariant } from "../ui/Button.tsx";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { isLiveOpen } from "../lib/openMode.ts";
+import { OpenUndoButton } from "./OpenUndoButton.tsx";
+import { guardLeave } from "../stores/unappliedTextStore.ts";
 
 const SLOT_VARIANTS = [
   ["back", "back"],
@@ -27,7 +31,10 @@ export function StepNavCluster({ stepId }: { stepId: string }) {
   const { t } = useLingui();
   const spec = useStepNavStore((s) => s.entries[stepId]?.spec);
   const revision = useStepNavStore((s) => (s.revision?.stepId === stepId ? s.revision : null));
-  if (revision === null && (spec === undefined || !hasSlots(spec))) return null;
+  // Opened keyboard (spec 111 FR-045): the one Undo over the session log sits in
+  // the cluster on every step, so the cluster is never empty there.
+  const liveOpen = useWorkingCopyStore((s) => isLiveOpen(s));
+  if (!liveOpen && revision === null && (spec === undefined || !hasSlots(spec))) return null;
 
   // #2050: applied AFTER the spread below, so a step's own forward ariaLabel
   // can never override the "Back to testing" accessible name.
@@ -89,12 +96,18 @@ export function StepNavCluster({ stepId }: { stepId: string }) {
             disabled={action.disabled ?? false}
             aria-label={action.ariaLabel}
             aria-describedby={action.ariaDescribedBy}
-            onClick={action.onClick}
+            // Spec 111 FR-046: on an opened keyboard, unapplied code-view text is asked about before
+            // the step navigates (Back, Continue, Skip, the touch Undo). Runs at once when there is none.
+            // After an answer the step's latest handler runs: an Apply may have changed what it reads.
+            onClick={() =>
+              guardLeave(() => (useStepNavStore.getState().entries[stepId]?.spec[slot]?.onClick ?? action.onClick)())
+            }
           >
             {action.label}
           </Button>
         );
       })}
+      {liveOpen && <OpenUndoButton />}
       {/* Revision Discard is an extra button too: it renders AFTER Back and
           Continue (ruling 2026-11-06), so opening a revision never shifts
           them. It used to render first, which moved both. */}
@@ -103,7 +116,7 @@ export function StepNavCluster({ stepId }: { stepId: string }) {
           variant="secondary"
           size="compact"
           data-testid="step-revision-discard"
-          onClick={revision.onDiscard}
+          onClick={() => guardLeave(revision.onDiscard, { allowApply: false })}
         >
           {t({ id: "step.revision.discard", message: "Discard changes and go back" })}
         </Button>

@@ -10,6 +10,9 @@ import type { DecisionSet } from "../decisions/decisionTypes.ts";
 
 vi.mock("../lib/navigate.ts", () => ({ navigateTo: vi.fn() }));
 
+const basic = vi.hoisted(() => ({ open: false }));
+vi.mock("../hooks/useBasicKeyboardOpen.ts", () => ({ useBasicKeyboardOpen: () => basic.open }));
+
 function setTrack(value: "copy" | "adapt"): void {
   useDecisionStore.setState({
     decisions: {
@@ -22,6 +25,7 @@ describe("OpenToolsMenu", () => {
   afterEach(() => {
     cleanup();
     useDecisionStore.setState({ decisions: {} as DecisionSet });
+    basic.open = false;
   });
 
   it("renders nothing on Copy", () => {
@@ -38,5 +42,18 @@ describe("OpenToolsMenu", () => {
     expect(screen.getAllByRole("button").length).toBe(openMenuScreens.length + 1);
     fireEvent.click(screen.getByRole("button", { name: "Remove characters" }));
     expect(advance).toHaveBeenCalledWith("carve");
+  });
+
+  it("on a basic keyboard offers only the tools that leave the physical keys alone", () => {
+    setTrack("adapt");
+    basic.open = true;
+    render(<OpenToolsMenu />);
+    fireEvent.click(screen.getByRole("button", { name: "Tools" }));
+    for (const name of ["Remove characters", "Convenience letters", "Marks", "Dead keys"]) {
+      expect(screen.queryByRole("button", { name }), name).toBeNull();
+    }
+    for (const name of ["Punctuation", "Invisible characters", "Rules"]) {
+      expect(screen.getByRole("button", { name }), name).toBeTruthy();
+    }
   });
 });

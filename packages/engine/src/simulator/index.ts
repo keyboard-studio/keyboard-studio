@@ -384,8 +384,15 @@ export function simulate(
   // byte-for-byte (spec 062 FR-004 / SC-002). The caret is set at
   // construction (not restored later) so no rule ever observes a transient,
   // wrong caret position.
+  //
+  // The caret is a CODE-POINT offset — SyntheticTextStore positions are
+  // KMWString counts — so the default is the code-point length, not
+  // `String.length`: for an astral seed (one code point, two UTF-16 units)
+  // the UTF-16 length lands the caret past the end, and a rule's context
+  // deletion then silently removes nothing (its match still succeeds, so
+  // the output is appended to the seed instead of replacing it).
   const seedText = initialContext?.text ?? '';
-  const caretPos = initialContext?.caretPos ?? seedText.length;
+  const caretPos = initialContext?.caretPos ?? KMWString.length(seedText);
   const textStore = new SyntheticTextStore(seedText, caretPos);
 
   // Initial context reset (no CAPS state set yet — each keystroke sets its own).
@@ -447,7 +454,10 @@ export function simulateEach(
   const { processor } = session;
 
   const seedText = seed?.text ?? '';
-  const caretPos = seed?.caretPos ?? seedText.length;
+  // Code-point length, not `String.length` — see simulate() above: an
+  // astral seed's UTF-16 length would land the caret past the end and
+  // silently defeat context deletion.
+  const caretPos = seed?.caretPos ?? KMWString.length(seedText);
 
   return inputs.map((input) => {
     const textStore = new SyntheticTextStore(seedText, caretPos);

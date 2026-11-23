@@ -134,6 +134,7 @@ export {
   emitRule,
   emitStore,
   parseKvks,
+  unescapeXml,
   emitKvks,
   parseTouchLayout,
   emitTouchLayout,
@@ -256,8 +257,11 @@ export {
   buildLanguageElement,
   buildLanguagesBlock,
   applyIdentityToKps,
+  patchOpenKpsInfo,
+  addOpenKpsFile,
   DESCRIPTOR_CONSUMED_FIELDS,
   parseTargetTokens,
+  KMW_JS_TARGETS,
   kpsMemberRef,
   normaliseKpsFontEntries,
   // spec 080 FR-002 — the welcome page's folder-convention member reference.
@@ -269,6 +273,9 @@ export type {
   ApplyIdentityToKpsResult,
   KpsFontDescriptorEntry,
   OpenKpsOptions,
+  OpenKpsInfoPatch,
+  OpenKpsFileEntry,
+  OpenKpsOptionTag,
   KpsLanguageEntry,
 } from "./package-descriptor/index.js";
 
@@ -279,6 +286,7 @@ export {
   renderReadmeMd,
   renderReadmeHtm,
   renderWelcomeHtm,
+  type FreshPageOptions,
   renderHelpPhp,
   // spec 080 FR-003 — the standard help-site header a fresh help page opens with.
   helpSiteHeader,

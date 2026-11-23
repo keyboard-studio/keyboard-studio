@@ -7,7 +7,7 @@
 import type { DriverContext, StepDrivers } from "./types.ts";
 import { chooseByPolicy } from "../walkPolicy.ts";
 import { useWorkingCopyStore } from "../../../stores/workingCopyStore.ts";
-import { selectDesktopAssignments } from "../../../lib/unimplementedInventory.ts";
+import { selectSessionAssignments } from "../../../lib/sessionAssignments.ts";
 import { displacementActions } from "../../../survey/slotOccupancy.ts";
 import { displacementOutcomeFor } from "../../../editors/assignLoop/mechanismPlacement.ts";
 import {
@@ -34,7 +34,7 @@ export function resolveDisplacement(ctx: DriverContext, proposal: DisplacementPr
   });
 
   const store = useWorkingCopyStore.getState();
-  const assignments = selectDesktopAssignments(store.phaseResults);
+  const assignments = selectSessionAssignments(store);
   const workingIr = store.ir ?? store.startIr;
   const outcome = displacementOutcomeFor(action, proposal, assignments, workingIr);
   if (outcome.kind === "dismiss") declineDisplacementProposal(proposal);

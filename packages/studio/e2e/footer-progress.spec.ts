@@ -1,7 +1,8 @@
 /**
- * E2E (spec 057 US4/US6, T054): the footer's whole-journey dot row.
+ * E2E (spec 057 US4/US6, T054): the footer's whole-journey marks, listed in
+ * its Contents sheet (JourneyContents) on every viewport.
  *
- * Asserts the row's composition against a scripted walk: the project name is
+ * Asserts the list's composition against a scripted walk: the project name is
  * shown, completed-question dots grow as the walk answers questions, an
  * optional question's dot appends once reached, question and stage dots are
  * visually distinguishable by shape (not colour alone — FR-046), the current
@@ -13,7 +14,7 @@
  * Not `.skip`-ped, ever (FR-083).
  */
 
-import { test, expect, type Page } from "playwright/test";
+import { test, expect, type Locator, type Page } from "playwright/test";
 import {
   driveIdentityLite,
   pickStartKeyboard,
@@ -25,6 +26,7 @@ import {
   seedReturningVisitor,
 } from "./helpers/surveyFlow";
 import { expectNoSeriousAxeViolations } from "./helpers/axe";
+import { closeContents, openContents, withContents } from "./helpers/journeyContents";
 
 const FIXTURE = {
   startKeyboardId: "basic_kbdfr",
@@ -34,9 +36,10 @@ const FIXTURE = {
 };
 
 const footer = (page: Page) => page.locator("footer");
-const completedDots = (page: Page) => footer(page).locator('[data-progress-dot-kind="completed"]');
-const upcomingDots = (page: Page) => footer(page).locator('[data-progress-dot-kind="upcoming"]');
-const currentDot = (page: Page) => footer(page).locator('[data-progress-dot-kind="current"]');
+const completedDots = (sheet: Locator) => sheet.locator('[data-progress-dot-kind="completed"]');
+const upcomingDots = (sheet: Locator) => sheet.locator('[data-progress-dot-kind="upcoming"]');
+const currentDot = (sheet: Locator) => sheet.locator('[data-progress-dot-kind="current"]');
+const countCompleted = (page: Page) => withContents(page, (sheet) => completedDots(sheet).count());
 
 /**
  * #1477's ground-truth sweep (live axe run with this list emptied) found
@@ -74,7 +77,7 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
     // ---- Completed dots grow as the walk answers questions -----------------
     // identity-lite alone answers several questions (English name, autonym,
     // code, script) before reaching the track step.
-    const completedAfterIdentity = await completedDots(page).count();
+    const completedAfterIdentity = await countCompleted(page);
     expect(completedAfterIdentity).toBeGreaterThan(0);
 
     // Answering the track question ("Authoring approach") appends its dot —
@@ -89,37 +92,39 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
 
     const prefillConfirm = page.getByTestId("prefill-continue");
     await expect(prefillConfirm).toBeVisible({ timeout: 30_000 });
-    const completedAfterTrack = await completedDots(page).count();
+    const completedAfterTrack = await countCompleted(page);
     expect(completedAfterTrack).toBeGreaterThan(completedAfterIdentity);
+
+    const sheet = await openContents(page);
 
     // ---- Question and stage dots differ by SHAPE, not colour alone --------
     // (FR-046). Completed/current dots are circles (borderRadius: 50%);
-    // upcoming stage dots are hollow squares (borderRadius: 3px).
-    const completedRadius = await completedDots(page)
-      .first()
-      .evaluate((el) => getComputedStyle(el).borderRadius);
-    const upcomingRadius = await upcomingDots(page)
-      .first()
-      .evaluate((el) => getComputedStyle(el).borderRadius);
+    // upcoming stage dots are hollow squares (borderRadius: 3px). In the
+    // list the mark is the row button's first (aria-hidden) child.
+    const markRadius = (row: Locator) =>
+      row.first().evaluate((el) => getComputedStyle(el.firstElementChild as Element).borderRadius);
+    const completedRadius = await markRadius(completedDots(sheet));
+    const upcomingRadius = await markRadius(upcomingDots(sheet));
     expect(completedRadius).not.toBe(upcomingRadius);
 
     // ---- The current marker is present, distinguishable, non-jumpable -----
-    await expect(currentDot(page)).toHaveCount(1);
-    await expect(currentDot(page)).toHaveAttribute("aria-current", "step");
+    await expect(currentDot(sheet)).toHaveCount(1);
+    await expect(currentDot(sheet)).toHaveAttribute("aria-current", "step");
 
     // ---- An upcoming dot behind a gate is refused with a reason ------------
     // (FR-045, US4 scenario 9) — clicking a far-future stage must not skip
     // the walk's own gates. "help" (Phase F) is many stages ahead here.
-    const helpDot = footer(page).getByTestId("progress-dot-row").locator('button[aria-label*="Help"]').first();
+    const helpDot = sheet.locator('button[aria-label*="Help"]').first();
     if (await helpDot.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await helpDot.click();
       await expect(footer(page).getByRole("status")).toHaveText(/not yet reached/i, {
         timeout: 5_000,
       });
-      // The walk did not move — still on the SAME prefill screen, never
-      // having actually reached Phase F.
-      await expect(prefillConfirm).toBeVisible();
     }
+    await closeContents(page);
+    // The walk did not move — still on the SAME prefill screen, never
+    // having actually reached Phase F.
+    await expect(prefillConfirm).toBeVisible();
 
     await confirmPrefill(page);
     await expect(page.getByTestId("charlist-continue")).toBeVisible({ timeout: 20_000 });
@@ -138,7 +143,7 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
     // its dot" is therefore asserted on the track question above (a recorded
     // survey-answer); walking the characters phase here only carries the test
     // forward to the dot-jump assertions below and must NOT shrink the row.
-    const completedBeforeMarks = await completedDots(page).count();
+    const completedBeforeMarks = await countCompleted(page);
     await buildOneCharacterList(page, "é");
     // MechanismGallery / carve now follow; wait for a stable landmark rather
     // than a fixed sleep.
@@ -146,11 +151,11 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
       .getByRole("button", { name: "Start the mechanism gallery" })
       .waitFor({ timeout: 20_000 })
       .catch(() => undefined);
-    const completedAfterMarks = await completedDots(page).count();
+    const completedAfterMarks = await countCompleted(page);
     expect(completedAfterMarks).toBeGreaterThanOrEqual(completedBeforeMarks);
 
-    // ---- Keyboard-only: Tab to a completed dot, read its name, arrive ------
-    const firstCompleted = completedDots(page).first();
+    // ---- Keyboard-only: focus a completed mark, read its name, arrive ------
+    const firstCompleted = completedDots(await openContents(page)).first();
     const label = await firstCompleted.getAttribute("aria-label");
     expect(label).toBeTruthy();
     await firstCompleted.focus();
@@ -200,8 +205,9 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
     // questions are still resolving into the record) — SOME of its marks
     // are QUESTION tier, and none of the OTHER manifest steps (e.g. the
     // upcoming "characters" stage) render as a question-tier mark.
-    const questionMarks = footer(page).locator('[data-progress-dot-tier="question"]');
-    const sectionMarks = footer(page).locator('[data-progress-dot-tier="section"]');
+    const sheet = await openContents(page);
+    const questionMarks = sheet.locator('[data-progress-dot-tier="question"]');
+    const sectionMarks = sheet.locator('[data-progress-dot-tier="section"]');
     await expect(questionMarks.first()).toBeVisible({ timeout: 10_000 });
     expect(await sectionMarks.count()).toBeGreaterThan(0);
 

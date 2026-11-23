@@ -732,7 +732,7 @@ describe("persistWorkingCopy", () => {
       expect(snapshot.keyEditOverlay).toEqual({
         ops: [{ address: "phone:default:K_A", kind: "suppress", spClass: 9, sentinelId: "T_none", seq: 0 }],
       });
-      expect(snapshot.touchEditorMode).toBe("character");
+      expect(snapshot.touchEditorMode).toBe("key");
     });
 
     it("prepareWorkingCopySnapshot tolerates a pre-058 snapshot missing both fields, without clobbering store defaults", () => {
@@ -764,7 +764,7 @@ describe("persistWorkingCopy", () => {
 
       const patch = prepareWorkingCopySnapshot(legacySnapshot);
       expect(patch.keyEditOverlay).toEqual({ ops: [] });
-      expect(patch.touchEditorMode).toBe("character");
+      expect(patch.touchEditorMode).toBe("key");
     });
 
     it("a rehydrated pre-058 snapshot loads without clobbering the store defaults", () => {
@@ -803,7 +803,7 @@ describe("persistWorkingCopy", () => {
       const s = useWorkingCopyStore.getState();
       // Store defaults, not undefined/clobbered.
       expect(s.keyEditOverlay).toEqual({ ops: [] });
-      expect(s.touchEditorMode).toBe("character");
+      expect(s.touchEditorMode).toBe("key");
     });
   });
 

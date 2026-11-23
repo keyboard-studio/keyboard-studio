@@ -10,16 +10,9 @@
 // to the browser uses up a number (FR-011), and the headless walk has no
 // browser — so the number is consumed by the recording, matching what the
 // UI does after `triggerDownload`.
-//
-// Reformat consent (spec 111 FR-009): the panel's guard runs the build
-// unconsented first and only asks the author when the projection throws
-// ReformatConsentRequiredError. The driver is the author agreeing — it
-// retries consented, the same outcome the dialog's Agree button produces.
-// On the copy track the error never fires (freshly derived working copy).
 
 import { resolveTestBuildVersion } from "@keyboard-studio/engine";
 import { buildTestBuildKmp } from "../../../lib/buildOutputBundle.ts";
-import { ReformatConsentRequiredError } from "../../../lib/reformatConsentError.ts";
 import { computeWorkingCopyFingerprint } from "../../../lib/workingCopyFingerprint.ts";
 import { useDecisionLogStore } from "../../../decisions/decisionLogStore.ts";
 import { changedSectionsSince, useTestingStore } from "../../../stores/testingStore.ts";
@@ -39,17 +32,7 @@ export const trialDrivers: StepDrivers = {
     if (!versionResult.ok) {
       throw new Error(`trial driver: cannot resolve a test build version: ${versionResult.reason}`);
     }
-    let result;
-    try {
-      result = await buildTestBuildKmp({ number, version: versionResult.version });
-    } catch (err) {
-      // Reformat consent (see header): retry as the author agreeing.
-      if (!(err instanceof ReformatConsentRequiredError)) throw err;
-      result = await buildTestBuildKmp(
-        { number, version: versionResult.version },
-        { consentedReemit: true },
-      );
-    }
+    const result = await buildTestBuildKmp({ number, version: versionResult.version });
     if (result === null) {
       throw new Error("trial driver: nothing instantiated — no test build to make");
     }

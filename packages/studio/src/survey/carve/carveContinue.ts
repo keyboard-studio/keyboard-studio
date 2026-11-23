@@ -15,6 +15,10 @@
 
 import { useDecisionStore } from "../../stores/decisionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { devLog } from "@keyboard-studio/contracts/dev-log";
+import { isLiveOpen } from "../../lib/openMode.ts";
+import type { OpenChange } from "../../lib/openApply/types.ts";
+import { applyThroughOpenSeam, handOverToOpenApplyHost } from "../../lib/openApplyNotifier.ts";
 import type { RecommendedRemovalChar } from "../../lib/irToCarveNodes.ts";
 import {
   currentCarvedLayoutValue,
@@ -103,7 +107,24 @@ export function applyCarveSuggestion(
     chars.push(...(row.caseGroup ?? [row.ch]));
   }
   if (ruleNodeIds.length > 0 || storeSlotIds.length > 0) {
-    store.cascadeDelete(ruleNodeIds, storeSlotIds, chars);
+    if (isLiveOpen(store)) {
+      // Open (spec 111 FR-041): the removal is written into the files now, with
+      // an undo record, like the carve gallery's own removals. A change that
+      // needs the author's agreement is handed to the apply host.
+      const change: OpenChange = {
+        kind: "remove",
+        itemIds: [...new Set([...ruleNodeIds, ...storeSlotIds])],
+        chars,
+      };
+      const result = applyThroughOpenSeam(change);
+      if (result.status === "needs-consent" || result.status === "failed") {
+        if (!handOverToOpenApplyHost({ build: () => change, onNotApplied: () => {} })) {
+          devLog.warn("[carve] the suggested removals were not written to the files");
+        }
+      }
+    } else {
+      store.cascadeDelete(ruleNodeIds, storeSlotIds, chars);
+    }
   }
   const added = currentCarvedLayoutValue().removals.map(removalKey).filter((k) => !before.has(k));
   if (cs === null && added.length === 0) return;

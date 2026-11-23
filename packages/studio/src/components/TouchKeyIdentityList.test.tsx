@@ -68,8 +68,8 @@ describe("TouchKeyIdentityList — repair rows (T015)", () => {
       <TouchKeyIdentityList
         ir={irOf()}
         layout={layoutOf()}
-        onCommitOps={() => {}}
-        onInstallIr={() => {}}
+        onCommitOps={(_ops, record) => record()}
+        onInstallIr={(_ir, record) => record()}
       />,
     );
     const rows = screen.getAllByTestId("touch-key-repair-row");
@@ -83,20 +83,21 @@ describe("TouchKeyIdentityList — repair rows (T015)", () => {
   });
 
   it("applying the default records 'applied' and commits rename ops for every occurrence", () => {
-    const onCommitOps = vi.fn();
+    const onCommitOps = vi.fn((_ops: unknown, record: () => void) => record());
     render(
       <TouchKeyIdentityList
         ir={irOf()}
         layout={layoutOf()}
         onCommitOps={onCommitOps}
-        onInstallIr={() => {}}
+        onInstallIr={(_ir, record) => record()}
       />,
     );
     const row = screen.getAllByTestId("touch-key-repair-row")[0]!;
     fireEvent.click(within(row).getByText("Apply fix"));
-    expect(onCommitOps).toHaveBeenCalledWith([
-      { kind: "rename", address: "tablet:default:T_0031", toId: "U_0031" },
-    ]);
+    expect(onCommitOps).toHaveBeenCalledWith(
+      [{ kind: "rename", address: "tablet:default:T_0031", toId: "U_0031" }],
+      expect.any(Function),
+    );
     const records = useWorkingCopyStore.getState().touchKeyIdentity;
     expect(records?.repairProposals).toHaveLength(1);
     expect(records?.repairProposals[0]).toMatchObject({
@@ -108,6 +109,26 @@ describe("TouchKeyIdentityList — repair rows (T015)", () => {
     expect(row.textContent).toContain("Fixed with the recommended repair.");
   });
 
+  it("records the proposal only when the host says the change landed (a declined or failed change records nothing)", () => {
+    let held: (() => void) | undefined;
+    render(
+      <TouchKeyIdentityList
+        ir={irOf()}
+        layout={layoutOf()}
+        onCommitOps={(_ops, record) => {
+          held = record;
+        }}
+        onInstallIr={() => {}}
+      />,
+    );
+    const row = screen.getAllByTestId("touch-key-repair-row")[0]!;
+    fireEvent.click(within(row).getByText("Apply fix"));
+    // Declined / pending / failed: the host never calls `record`.
+    expect(useWorkingCopyStore.getState().touchKeyIdentity?.repairProposals ?? []).toHaveLength(0);
+    held!();
+    expect(useWorkingCopyStore.getState().touchKeyIdentity?.repairProposals).toHaveLength(1);
+  });
+
   it("the answered row survives a re-render with the post-repair layout (the finding has resolved)", () => {
     // Regression: deriveRepairRows used to build rows ONLY from live
     // findings, so the moment the rename landed and the parent re-rendered
@@ -117,8 +138,8 @@ describe("TouchKeyIdentityList — repair rows (T015)", () => {
       <TouchKeyIdentityList
         ir={irOf()}
         layout={layoutOf()}
-        onCommitOps={() => {}}
-        onInstallIr={() => {}}
+        onCommitOps={(_ops, record) => record()}
+        onInstallIr={(_ir, record) => record()}
       />,
     );
     const row = screen.getAllByTestId("touch-key-repair-row")[0]!;
@@ -138,8 +159,8 @@ describe("TouchKeyIdentityList — repair rows (T015)", () => {
       <TouchKeyIdentityList
         ir={irOf()}
         layout={repaired}
-        onCommitOps={() => {}}
-        onInstallIr={() => {}}
+        onCommitOps={(_ops, record) => record()}
+        onInstallIr={(_ir, record) => record()}
       />,
     );
     const rowsAfter = screen.getAllByTestId("touch-key-repair-row");
@@ -194,8 +215,8 @@ describe("TouchKeyIdentityList — repair rows (T015)", () => {
       <TouchKeyIdentityList
         ir={irOf()}
         layout={layoutOf()}
-        onCommitOps={() => {}}
-        onInstallIr={() => {}}
+        onCommitOps={(_ops, record) => record()}
+        onInstallIr={(_ir, record) => record()}
       />,
     );
     const markRow = screen
@@ -211,8 +232,8 @@ describe("TouchKeyIdentityList — repair rows (T015)", () => {
       <TouchKeyIdentityList
         ir={parseKmn(kmn, "w3_list_test").ir}
         layout={layoutOf()}
-        onCommitOps={() => {}}
-        onInstallIr={() => {}}
+        onCommitOps={(_ops, record) => record()}
+        onInstallIr={(_ir, record) => record()}
       />,
     );
     expect(container.querySelector('[data-testid="touch-key-identity-list"]')).toBeNull();
